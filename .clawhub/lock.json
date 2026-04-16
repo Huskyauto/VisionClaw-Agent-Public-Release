@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "skills": {
+    "sonoscli": {
+      "version": "1.0.0",
+      "installedAt": 1773508801455
+    },
+    "pdf-toolkit-pro": {
+      "version": "1.0.0",
+      "installedAt": 1773508981843
+    }
+  }
+}

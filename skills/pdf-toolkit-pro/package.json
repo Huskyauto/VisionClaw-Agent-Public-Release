@@ -1,0 +1,23 @@
+{
+  "name": "pdf-toolkit-pro",
+  "version": "1.0.0",
+  "description": "PDF批量处理技能包 - 合并、分割、压缩、转换",
+  "main": "scripts/batch.js",
+  "scripts": {
+    "merge": "node scripts/merge.js",
+    "split": "node scripts/split.js",
+    "compress": "node scripts/compress.js",
+    "to-image": "node scripts/to-image.js",
+    "batch": "node scripts/batch.js"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.33.0",
+    "pdf2pic": "^3.1.0",
+    "commander": "^11.0.0",
+    "glob": "^10.3.0"
+  },
+  "keywords": ["pdf", "merge", "split", "compress", "convert", "automation"],
+  "author": "AI-Company",
+  "license": "MIT"
+}
