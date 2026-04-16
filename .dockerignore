@@ -1,0 +1,16 @@
+node_modules
+dist
+.git
+.local
+.agents
+.env
+*.md
+!README.md
+!FORK-SETUP.md
+!CONTRIBUTING.md
+!CODE_OF_CONDUCT.md
+attached_assets
+deliverables
+data
+uploads
+project-transcripts
