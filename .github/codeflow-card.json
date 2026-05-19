@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "runs": [
+    {
+      "at": "2026-05-19T12:47:12.363Z",
+      "sha": "1d87fba5fcd7f9be2e76066d9c8f96a21a5c3e16",
+      "pr": null,
+      "actor": "Huskyauto",
+      "files": 794,
+      "functions": 3953,
+      "loc": 277492,
+      "languages": 16,
+      "topLanguages": [
+        {
+          "ext": "ts",
+          "pct": 72,
+          "lines": 200165
+        },
+        {
+          "ext": "tsx",
+          "pct": 17,
+          "lines": 46543
+        },
+        {
+          "ext": "json",
+          "pct": 8,
+          "lines": 21050
+        },
+        {
+          "ext": "md",
+          "pct": 2,
+          "lines": 6283
+        },
+        {
+          "ext": "txt",
+          "pct": 0,
+          "lines": 1269
+        }
+      ],
+      "dead": 141,
+      "deadPct": 3.6,
+      "circular": 1,
+      "godObjects": 1,
+      "avgCoupling": 10,
+      "securityIssues": 115,
+      "patterns": 7,
+      "duplicates": 14,
+      "layerViolations": 830,
+      "connections": 7936,
+      "avgFnLines": 15.7,
+      "longestFn": 16,
+      "testFiles": 59,
+      "testRatio": 7.4,
+      "topFolders": [
+        {
+          "name": "server",
+          "count": 413
+        },
+        {
+          "name": "client",
+          "count": 156
+        },
+        {
+          "name": "scripts",
+          "count": 88
+        },
+        {
+          "name": "tests",
+          "count": 65
+        },
+        {
+          "name": "docs",
+          "count": 25
+        }
+      ],
+      "folders": 5,
+      "grade": "F",
+      "score": 54,
+      "topBlast": {
+        "path": "client/index.html",
+        "direct": 589,
+        "transitive": 755,
+        "total": 1344
+      },
+      "fragility": [
+        {
+          "path": "client/index.html",
+          "direct": 589,
+          "transitive": 755,
+          "total": 1344
+        },
+        {
+          "path": "server/recursive-llm.ts",
+          "direct": 381,
+          "transitive": 725,
+          "total": 1106
+        },
+        {
+          "path": "server/google-drive.ts",
+          "direct": 305,
+          "transitive": 717,
+          "total": 1022
+        }
+      ]
+    }
+  ]
+}
