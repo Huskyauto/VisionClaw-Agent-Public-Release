@@ -1,0 +1,41 @@
+.git
+.github
+node_modules
+dist
+.local
+# .cache — DO NOT exclude. Contains tool-embeddings.json (~10MB, content-hashed)
+# which the tool-curator persists across boots. Excluding this forces every
+# Autoscale deploy to regenerate all 338 OpenAI embeddings from scratch
+# (~3-4 min cold-start, surfaces as "App isn't live yet" page mid-promotion).
+# Bob May 10 2026: "it used to just boot up so smoothly and quickly".
+.replit
+replit.nix
+attached_assets
+.agents
+.config
+.upm
+uploads/*
+!uploads/.gitkeep
+*.log
+tmp
+.tmp
+.env
+.env.*
+project-assets
+docs
+# data/ is selectively allowlist-COPY'd in Dockerfile (specific files only, not the tree).
+# Listing the heavy/sensitive subdirs here keeps the build CONTEXT lean
+# (cuts ~17MB from `docker build` upload) but the COPY allowlist is the real safety boundary.
+data/youtube
+data/browser-screenshots
+data/lobster-state
+data/run-sandbox
+data/task-workspaces
+data/owner-email-digest*.json
+data/browser-config.json
+*.pdf
+*.mp4
+*.mov
+.DS_Store
+coverage
+tests/.cache

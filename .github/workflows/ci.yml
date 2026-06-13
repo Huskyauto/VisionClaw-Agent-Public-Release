@@ -1,0 +1,253 @@
+name: CI
+
+# R98.20: concurrency group — when Auto Git Push fires multiple commits in
+# rapid succession (common during a heavy editing session, where a single
+# user-facing edit batches across home/landing/updates/about/sidebar in <60s),
+# GitHub used to spawn one full CI run per commit AND email Bob for every
+# cancelled run as the next push superseded the previous. Now: same-branch
+# pushes share group "ci-main" with cancel-in-progress=true, so only the
+# latest commit on main runs CI to completion. Older in-flight runs are
+# cancelled at the workflow level (one cancellation, not one-per-job),
+# which collapses the email noise from ~6/push to at most 1 transient.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# R74.13c.fix3: skip CI for documentation-only / agent-internal changes.
+# These paths are also excluded by the public mirror sanitizer, so building &
+# testing for them is pure waste of GitHub Actions minutes (was burning ~40%
+# of monthly quota on replit.md updates alone).
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'replit.md'
+      - '.local/**'
+      - 'attached_assets/**'
+      - 'project-assets/**'
+      - 'stress-test-output/**'
+      - 'docs/**/*.md'
+      - '**/*.md'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - 'replit.md'
+      - '.local/**'
+      - 'attached_assets/**'
+      - 'project-assets/**'
+      - 'stress-test-output/**'
+      - 'docs/**/*.md'
+      - '**/*.md'
+      - '.gitignore'
+      - 'LICENSE'
+
+jobs:
+  build:
+    name: Build (hard gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Production bundle
+        run: npm run build
+
+  security-tests:
+    # R79.2: re-promoted to hard gate after the schema-drift burn-down landed.
+    #   * messages.citations + capability_gaps  →  declared in shared/schema.ts
+    #     (clean Drizzle-native, created by `db:push --force` below).
+    #   * stripe.{accounts,products,prices,payment_intents}  →  bootstrapped
+    #     by tests/fixtures/stripe-schema-bootstrap.sql AFTER db:push, BEFORE
+    #     the test step. These tables use Postgres-native GENERATED ALWAYS
+    #     AS STORED columns + FKs + triggers that Drizzle can't faithfully
+    #     express, so they live in the SQL fixture instead of schema.ts.
+    name: Security & Tenant-Isolation Tests (hard gate)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # pgvector image bundles the 'vector' extension that our schema needs;
+        # vanilla postgres:16 makes db:push fail with 'type "vector" does not exist'.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: visionclaw_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/visionclaw_test
+      SESSION_SECRET: ci-test-session-secret
+      OPENAI_API_KEY: sk-ci-smoke-placeholder
+      ANTHROPIC_API_KEY: sk-ant-ci-smoke-placeholder
+      XAI_API_KEY: xai-ci-smoke-placeholder
+      GOOGLE_OAUTH_CLIENT_ID: ci-smoke-google-client-id
+      GOOGLE_OAUTH_CLIENT_SECRET: ci-smoke-google-client-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Enable pgvector extension
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d visionclaw_test \
+            -c "CREATE EXTENSION IF NOT EXISTS vector;"
+      - name: Push schema to test DB
+        run: npm run db:push -- --force
+      - name: Bootstrap stripe.* mirror tables (generated columns + FKs + triggers)
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d visionclaw_test \
+            -v ON_ERROR_STOP=1 \
+            -f tests/fixtures/stripe-schema-bootstrap.sql
+      # R98.27.3 — seed minimal persona rows so FK constraints on
+      # agent_knowledge.persona_id and security_intent_checks.persona_id pass
+      # for tests that exercise persona ids 2/5/9/16 (caught in CI 25525911070).
+      # R125+13.13: now also populates safety_profile so the AHB coverage test
+      # (tests/security/persona-safety-profile-coverage.test.ts) passes.
+      - name: Seed minimal personas (FK satisfaction + AHB safety_profile coverage)
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d visionclaw_test \
+            -v ON_ERROR_STOP=1 \
+            -f tests/fixtures/seed-test-personas.sql
+      # R125+13.13 — apply RLS Phase 1 policies so the RLS isolation test
+      # (tests/security/rls-isolation.test.ts) can verify ENABLE + policy
+      # presence on the 14 sensitive tables. Migration is idempotent.
+      - name: Apply R120 RLS Phase 1 policies
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d visionclaw_test \
+            -v ON_ERROR_STOP=1 \
+            -f scripts/migrations/R120-rls-policies.sql
+      # R79.3e — Stub the gitignored project-assets/ catalog files so the
+      # storefront /api/store/checkout endpoint's existsSync gate passes.
+      # Real payloads ship via Drive, not git; CI just needs file presence.
+      - name: Seed catalog stub files
+        run: npx tsx tests/fixtures/seed-catalog-files.ts
+      - name: Run security, storage, queue, safety, cost & tools test suites
+        run: node --import tsx --test tests/security/*.test.ts tests/storage/*.test.ts tests/queue/*.test.ts tests/safety/*.test.ts tests/cost/*.test.ts tests/tools/*.test.ts
+
+  docker:
+    name: Docker image smoke (hard gate)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: visionclaw_smoke
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build container image
+        run: docker build -t visionclaw:ci .
+      - name: Boot container and probe /healthz
+        run: |
+          # Smoke test boots the container against a real Postgres service,
+          # with placeholder API keys (no external calls made during the probe).
+          # --network=host lets the container reach the postgres service on localhost.
+          docker run -d --name vc --network=host \
+            -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/visionclaw_smoke \
+            -e SESSION_SECRET=ci-smoke \
+            -e OPENAI_API_KEY=sk-ci-smoke-placeholder \
+            -e ANTHROPIC_API_KEY=sk-ant-ci-smoke-placeholder \
+            -e XAI_API_KEY=xai-ci-smoke-placeholder \
+            -e GOOGLE_OAUTH_CLIENT_ID=ci-smoke-google-client-id \
+            -e GOOGLE_OAUTH_CLIENT_SECRET=ci-smoke-google-client-secret \
+            -e REPL_ID=ci-smoke-repl-id \
+            -e ISSUER_URL=https://replit.com/oidc \
+            -e REPLIT_DOMAINS=ci-smoke.localhost \
+            -e NODE_ENV=production \
+            -e PORT=5000 \
+            visionclaw:ci
+          # Wait for the liveness probe (max 30s).
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5000/healthz; then
+              echo "  ← /healthz responded on attempt $i"
+              docker logs vc | tail -20
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::container never responded to /healthz"
+          docker logs vc
+          exit 1
+
+  typecheck:
+    # R79.2: re-promoted to hard gate after verifying `npm run check` returns
+    # 0 errors and exit code 0 against the entire codebase. Earlier rounds
+    # documented "pre-existing global tsc noise from @types/diff Intl.Segmenter
+    # and Drizzle's MySQL types" but that turned out to be inaccurate — the
+    # codebase is tsc-clean. Any future regression now fails CI red instead
+    # of hiding behind continue-on-error.
+    name: TypeScript (hard gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: tsc --noEmit
+        run: npm run check
+
+  silent-failure-hunter:
+    # Budget gate (not a full burn-down): the scan can hold steady or go DOWN,
+    # but a PR that pushes HIGH/MEDIUM above data/silent-failure-baseline.json
+    # fails CI red — so the scanner can't regress silently, which is the exact
+    # failure mode it hunts. Lower the baseline when you legitimately burn down.
+    name: Silent-failure scan (budget gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Scan server/ + shared/ then enforce the no-regression budget
+        id: hunt
+        run: |
+          set +e
+          npx tsx scripts/silent-failure-hunter.ts > silent-failure-report.txt 2>&1
+          set -e
+          # Headline counts (also surfaced in the run log).
+          grep -E "Findings:" silent-failure-report.txt || true
+          LINE=$(grep -E "Findings:" silent-failure-report.txt | tail -1)
+          HIGH=$(echo "$LINE" | sed -n 's/.*HIGH=\([0-9]\+\).*/\1/p')
+          MEDIUM=$(echo "$LINE" | sed -n 's/.*MEDIUM=\([0-9]\+\).*/\1/p')
+          if [ -z "$HIGH" ] || [ -z "$MEDIUM" ]; then
+            echo "::error::Could not parse finding counts from silent-failure-hunter output. Failing closed."
+            exit 1
+          fi
+          BASE_HIGH=$(node -p "require('./data/silent-failure-baseline.json').high")
+          BASE_MEDIUM=$(node -p "require('./data/silent-failure-baseline.json').medium")
+          echo "Counts: HIGH=$HIGH/$BASE_HIGH  MEDIUM=$MEDIUM/$BASE_MEDIUM (current/baseline)"
+          if [ "$HIGH" -gt "$BASE_HIGH" ] || [ "$MEDIUM" -gt "$BASE_MEDIUM" ]; then
+            echo "::error::Silent-failure findings regressed above baseline (HIGH $HIGH>$BASE_HIGH or MEDIUM $MEDIUM>$BASE_MEDIUM). Fix the new finding(s) or, if intentional, raise data/silent-failure-baseline.json."
+            exit 1
+          fi
+          if [ "$HIGH" -lt "$BASE_HIGH" ] || [ "$MEDIUM" -lt "$BASE_MEDIUM" ]; then
+            echo "::warning::Findings are BELOW baseline (HIGH $HIGH<=$BASE_HIGH, MEDIUM $MEDIUM<=$BASE_MEDIUM) — lower data/silent-failure-baseline.json to lock in the burn-down."
+          fi
+      - name: Upload silent-failure report
+        uses: actions/upload-artifact@v4
+        with:
+          name: silent-failure-report
+          path: silent-failure-report.txt
+          retention-days: 30
