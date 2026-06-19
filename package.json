@@ -17,7 +17,7 @@
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.169",
     "@anthropic-ai/sdk": "^0.78.0",
-    "@google/genai": "^1.44.0",
+    "@google/genai": "^2.8.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@microsoft/microsoft-graph-client": "^3.0.7",
