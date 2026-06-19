@@ -1,0 +1,51 @@
+.git
+.github
+node_modules
+dist
+.local
+# .cache — DO NOT exclude. Contains tool-embeddings.json (~10MB, content-hashed)
+# which the tool-curator persists across boots. Excluding this forces every
+# Autoscale deploy to regenerate all 338 OpenAI embeddings from scratch
+# (~3-4 min cold-start, surfaces as "App isn't live yet" page mid-promotion).
+# Bob May 10 2026: "it used to just boot up so smoothly and quickly".
+.replit
+replit.nix
+attached_assets
+.agents
+.config
+.upm
+uploads/*
+!uploads/.gitkeep
+*.log
+tmp
+.tmp
+.env
+.env.*
+project-assets
+docs
+# data/ is selectively allowlist-COPY'd in Dockerfile (specific files only, not the tree).
+# Listing the heavy/sensitive subdirs here keeps the build CONTEXT lean
+# (cuts ~17MB from `docker build` upload) but the COPY allowlist is the real safety boundary.
+data/youtube
+data/browser-screenshots
+data/lobster-state
+data/run-sandbox
+data/task-workspaces
+data/owner-email-digest*.json
+data/browser-config.json
+# NOTE: .dockerignore uses Docker glob semantics — a bare `*.mp4` matches ONLY
+# top-level files, NOT nested ones (unlike .gitignore). Use `**/` to exclude
+# recursively, or name the dir. public/videos is 2900+ generated mp4s (~750MB) of
+# runtime OUTPUT (deliverable-verifier allowed-output root; no frontend seed refs)
+# and is NOT copied by the Dockerfile runtime stage. It shipped in Replit's "Repl
+# layer" via the un-anchored `*.mp4` miss and pushed the image past the 8 GiB cap
+# (publish failed 2026-06-16 after the dir grew overnight). Exclude it explicitly.
+*.pdf
+*.mp4
+*.mov
+**/*.mp4
+**/*.mov
+public/videos
+.DS_Store
+coverage
+tests/.cache
