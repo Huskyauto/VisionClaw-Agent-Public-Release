@@ -138,7 +138,7 @@ jobs:
           mkdir -p bundle
           tar -xzf bundle.tar.gz -C bundle
       - name: Download all chapter artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: chapters
           pattern: chapter-*
