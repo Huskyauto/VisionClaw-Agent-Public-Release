@@ -48,7 +48,7 @@ jobs:
     name: Build (hard gate)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -92,7 +92,7 @@ jobs:
       GOOGLE_OAUTH_CLIENT_ID: ci-smoke-google-client-id
       GOOGLE_OAUTH_CLIENT_SECRET: ci-smoke-google-client-secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -155,7 +155,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build container image
         run: docker build -t visionclaw:ci .
       - name: Boot container and probe /healthz
@@ -200,7 +200,7 @@ jobs:
     name: TypeScript (hard gate)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -217,7 +217,7 @@ jobs:
     name: Silent-failure scan (budget gate)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -266,7 +266,7 @@ jobs:
     name: Dependency audit (critical gate)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
