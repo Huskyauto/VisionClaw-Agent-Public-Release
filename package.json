@@ -128,7 +128,7 @@
     "rollup": "^4.59.0",
     "stripe": "^20.4.1",
     "stripe-replit-sync": "^1.0.0",
-    "tailwind-merge": "^2.6.0",
+    "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
     "twitter-api-v2": "^1.29.0",
     "vaul": "^1.1.2",
