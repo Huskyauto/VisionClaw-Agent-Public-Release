@@ -107,7 +107,7 @@
     "openai": "^6.27.0",
     "openid-client": "^6.8.2",
     "p-limit": "^7.3.0",
-    "p-retry": "^7.1.1",
+    "p-retry": "^8.0.0",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "pdf-lib": "^1.17.1",
