@@ -1,0 +1,47 @@
+{
+  "name": "visionclaw-agent",
+  "version": "74.13.0",
+  "description": "VisionClaw Agent — multi-tenant agentic AI platform exposing 243 tools, 16 specialist personas, hybrid-search Skill-RAG, and a self-improving skill registry over MCP for OpenAI Codex CLI.",
+  "author": {
+    "name": "Robert Washburn",
+    "url": "https://agenticcorporation.net"
+  },
+  "homepage": "https://agenticcorporation.net",
+  "repository": "https://github.com/Huskyauto/VisionClaw-Agent-Public-Release",
+  "license": "Proprietary",
+  "keywords": [
+    "agent",
+    "agentic",
+    "multi-tenant",
+    "delegation",
+    "personas",
+    "skill-rag",
+    "mcp",
+    "automation"
+  ],
+  "mcpServers": {
+    "visionclaw": {
+      "transport": "sse",
+      "url": "https://agenticcorporation.net/api/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer ${VISIONCLAW_MCP_KEY}"
+      }
+    }
+  },
+  "interface": {
+    "displayName": "VisionClaw Agent",
+    "shortDescription": "Agentic AI corporation in a box — delegate to 16 personas, call 243 tools, evolve a skill library.",
+    "longDescription": "VisionClaw Agent is a multi-tenant agentic platform. This plugin connects OpenAI Codex CLI to a running VisionClaw instance over MCP so Codex can: delegate tasks to specialist personas (Felix CEO, Forge engineer, Scribe writer, Apollo sales, Atlas data, Cassandra finance, Luna legal, and 9 more), call any of 243 production tools (Drive, email, calendar, web, code execution, scheduler, Stripe, marketing automation, code-health scan), search the hybrid BM25+vector knowledge base, and synthesize/promote new reusable skills. All requests are scoped to your tenant via a per-tenant MCP key.",
+    "developerName": "Robert Washburn",
+    "category": "Automation",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://agenticcorporation.net",
+    "privacyPolicyURL": "https://agenticcorporation.net/privacy",
+    "termsOfServiceURL": "https://agenticcorporation.net/terms",
+    "defaultPrompt": [
+      "Use VisionClaw to delegate this task to the right specialist persona.",
+      "Use VisionClaw to search my organisation's knowledge base for relevant prior decisions.",
+      "Use VisionClaw to schedule a recurring weekday-morning briefing."
+    ]
+  }
+}
