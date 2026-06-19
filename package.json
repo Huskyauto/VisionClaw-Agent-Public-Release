@@ -126,7 +126,7 @@
     "recharts": "^2.15.2",
     "remark-gfm": "^4.0.1",
     "rollup": "^4.59.0",
-    "stripe": "^20.4.1",
+    "stripe": "^22.2.2",
     "stripe-replit-sync": "^1.0.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
