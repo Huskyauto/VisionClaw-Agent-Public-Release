@@ -18,7 +18,7 @@
     "@anthropic-ai/claude-code": "^2.1.169",
     "@anthropic-ai/sdk": "^0.78.0",
     "@google/genai": "^1.44.0",
-    "@hookform/resolvers": "^3.10.0",
+    "@hookform/resolvers": "^5.4.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@modelcontextprotocol/sdk": "^1.29.0",
