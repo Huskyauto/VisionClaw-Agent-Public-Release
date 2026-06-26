@@ -60,7 +60,7 @@
     "graphology-pagerank": "^1.1.0",
     "header-generator": "^2.1.82",
     "helmet": "^8.1.0",
-    "js-yaml": "^4.1.1",
+    "js-yaml": "^5.1.0",
     "jsdom": "^29.0.2",
     "magika": "^1.0.0",
     "mammoth": "^1.12.0",
