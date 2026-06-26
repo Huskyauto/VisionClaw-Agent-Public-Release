@@ -159,7 +159,7 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "5.6.3",
     "vaul": "^1.1.2",
-    "vite": "^7.3.3",
+    "vite": "^8.1.0",
     "wouter": "^3.3.5"
   },
   "overrides": {
