@@ -1,0 +1,11 @@
+import { chromium } from "playwright";
+const url = process.env.URL || "http://localhost:5000/inside-visionclaw-infographic.html";
+const out = process.env.OUT || "attached_assets/inside-visionclaw-infographic.jpg";
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: 2 });
+const page = await ctx.newPage();
+await page.goto(url, { waitUntil: "networkidle" });
+await page.waitForTimeout(300);
+await page.screenshot({ path: out, type: "jpeg", quality: 92, fullPage: true });
+await browser.close();
+console.log("wrote", out);
