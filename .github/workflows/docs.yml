@@ -1,0 +1,29 @@
+name: Docs
+
+# The main `ci.yml` workflow intentionally skips markdown/docs-only commits
+# (paths-ignore) to save Actions minutes. This lightweight workflow runs ONLY
+# on those docs commits so (a) every commit still gets a status check and
+# (b) platform counts can never silently drift from the single source of truth
+# (docs/CURRENT_PLATFORM_TOTALS.md).
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.md'
+
+jobs:
+  verify-counts:
+    name: Verify platform counts (docs vs SoT)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Counts agree with docs/CURRENT_PLATFORM_TOTALS.md
+        # Pinned tsx version for reproducible CI (no floating @latest resolve).
+        run: npx --yes tsx@4.20.5 scripts/verify-counts.ts
