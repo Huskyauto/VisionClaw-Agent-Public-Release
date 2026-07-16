@@ -1,0 +1,5 @@
+{
+  "_comment": "Budget gate for scripts/silent-failure-hunter.ts. AUTO-COMPUTED from the public mirror's final sanitized tree at build time so current == baseline (the gate can only hold steady or burn down). Regenerated every build by scripts/build-public-mirror.sh stage 3.5 — do not hand-edit.",
+  "high": 52,
+  "medium": 290
+}
