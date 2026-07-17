@@ -80,7 +80,7 @@
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.18.0",
     "pg": "^8.16.3",
-    "puppeteer-core": "^24.39.0",
+    "puppeteer-core": "^25.3.0",
     "qrcode": "^1.5.4",
     "rollup": "^4.59.0",
     "sharp": "^0.35.3",
