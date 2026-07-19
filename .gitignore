@@ -1,0 +1,84 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+.env
+.env.*
+!.env.example
+.env.local
+.replit
+replit.nix
+compaction-archives
+XXaecgaM
+sedFtEuid
+uploads/
+attached_assets/
+project-assets/
+project-transcripts/
+.whatsapp-auth/
+data/browser-config.json
+data/lobster-workflows/
+data/task-workspaces/
+*.docx
+*.pem
+.git-rewrite/
+.local/
+/tmp/
+
+# Mirror build artifact — created by scripts/build-public-mirror.sh dry-run
+public-mirror/
+
+# Root scratch artifacts (per HyperAgent review 2026-05-06 P0-3) — these
+# accumulate during dev and clutter the repo root + leak into the public
+# mirror. Patterns deny new occurrences without requiring per-file edits.
+battery-*.ts
+battery-*.json
+battery-*.log
+test-r*.ts
+felix-*-result.json
+cascadia-*-landing.html
+sitesnap-screenshot-*.jpg
+sitesnap-screenshot-*.png
+full_diff.patch
+*.baseline
+*\(copy\)*
+native-mind-repo/
+
+# R60.B — filesystem spool for jobs enqueued while the DB was down.
+.job-spool/
+
+# API response cache (gate-before-compress, R63.7)
+.api-cache/
+test-results/
+data/codebase-graph.json
+data/owner-email-digest.json
+data/owner-email-digest-state.json
+
+# R111.3 (architect finding) — stop the bleed: golden-path-replay video fixture
+# writes a fresh MP4 here every run. 116 historical artifacts are already
+# tracked (pre-R111.3) and intentionally left in-place to avoid rewriting git
+# history; this rule only ignores NEW outputs going forward. .gitkeep is
+# preserved so the dir survives a clean checkout.
+public/videos/*.mp4
+public/videos/*.mp3
+public/videos/*.webm
+public/videos/*.wav
+!public/videos/.gitkeep
+
+# Golden Path Replay live run-state — fingerprints.json is rewritten with fresh
+# timestamps/artifact sizes on EVERY replay run, so it conflicts on every rebase.
+# It is transient runtime state, not developer-authored code — untrack it.
+data/golden-path-replay/fingerprints.json
+data/.gmail-direct-token.json
+
+# Memory benchmark — dataset is re-downloadable; results are per-run artifacts
+data/benchmarks/locomo10.json
+data/benchmarks/results/
+
+# Render outputs — regenerable + already delivered to YouTube/Drive. Stop them
+# re-bloating git history + the deploy image (cleanup 2026-06-09). Weekly renders
+# and pre-baked scene images are re-created on the next render run.
+data/youtube/weekly-*.mp4
+data/youtube/scenes/

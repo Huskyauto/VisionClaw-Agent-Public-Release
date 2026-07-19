@@ -1,0 +1,3 @@
+The comprehensive features document is owner-internal and not shipped in the
+public mirror. For the public feature list see the repository README and docs/
+(tools.md, personas.md).
