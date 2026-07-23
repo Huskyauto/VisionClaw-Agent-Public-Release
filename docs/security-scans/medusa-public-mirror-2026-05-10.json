@@ -1,0 +1,1015 @@
+{
+  "timestamp": "2026-05-10T11:11:16.516425",
+  "medusa_version": "2026.5.4",
+  "scanner": {
+    "name": "MEDUSA",
+    "version": "2026.5.4",
+    "analyzers": 78,
+    "rules": "9,600+",
+    "url": "https://medusa-security.dev"
+  },
+  "scan_summary": {
+    "total_issues": 15,
+    "files_scanned": 3,
+    "lines_scanned": 443,
+    "security_score": 41,
+    "risk_level": "CRITICAL",
+    "false_positives_filtered": 3,
+    "missing_linters": [
+      "gitleaks"
+    ]
+  },
+  "severity_breakdown": {
+    "CRITICAL": 1,
+    "HIGH": 7,
+    "MEDIUM": 7,
+    "LOW": 0,
+    "UNDEFINED": 0
+  },
+  "findings": [
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 60,
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 138,
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 191,
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 133,
+      "severity": "CRITICAL",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: Reverse Shell Injection",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 50,
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 59,
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 87,
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 137,
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 190,
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 207,
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 290,
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 67,
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 262,
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 273,
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    },
+    {
+      "scanner": "AIContextScanner",
+      "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+      "line": 316,
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+      "cwe": null,
+      "code": null,
+      "fp_analysis": {
+        "is_likely_fp": false,
+        "confidence": 0.0,
+        "reason": null,
+        "explanation": ""
+      }
+    }
+  ],
+  "aggregations": {
+    "by_severity": {
+      "HIGH": [
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 60,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 138,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 191,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 67,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 262,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 273,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 316,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        }
+      ],
+      "CRITICAL": [
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 133,
+          "severity": "CRITICAL",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: Reverse Shell Injection",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        }
+      ],
+      "MEDIUM": [
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 50,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 59,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 87,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 137,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 190,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 207,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 290,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        }
+      ]
+    },
+    "by_file": {
+      "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md": [
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 60,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 138,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 191,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 133,
+          "severity": "CRITICAL",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: Reverse Shell Injection",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 50,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 59,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 87,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 137,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 190,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 207,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 290,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 67,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 262,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 273,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 316,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        }
+      ]
+    },
+    "by_scanner": {
+      "AIContextScanner": [
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 60,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 138,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 191,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "HTTP header-based exfiltration detected: environment variables or credentials are being sent via custom HTTP headers, avoiding URL-based detection mechanisms.",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 133,
+          "severity": "CRITICAL",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: Reverse Shell Injection",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 50,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 59,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 87,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 137,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 190,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 207,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 290,
+          "severity": "MEDIUM",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-code-generation-trigger-keywords",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 67,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 262,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 273,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        },
+        {
+          "scanner": "AIContextScanner",
+          "file": "/tmp/medusa-target/001_public-mirror_claude-skill_visionclaw_SKILL.md",
+          "line": 316,
+          "severity": "HIGH",
+          "confidence": "HIGH",
+          "issue": "Security issue detected: prompt-injection-m-gcg-adversarial-suffix-pattern",
+          "cwe": null,
+          "code": null,
+          "fp_analysis": {
+            "is_likely_fp": false,
+            "confidence": 0.0,
+            "reason": null,
+            "explanation": ""
+          }
+        }
+      ]
+    }
+  },
+  "fp_stats": {
+    "total_findings": 18,
+    "likely_fps": 3,
+    "retained": 15,
+    "fp_rate": 16.666666666666664
+  }
+}
