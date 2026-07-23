@@ -1,0 +1,430 @@
+/**
+ * Verified Revenue Missions — query-free guard tests (S1).
+ * Feature contract: data/feature-contracts/revenue-missions.
+ * Query-free by design: every write helper calls assertTenant BEFORE any
+ * db.execute, so invalid tenants throw with zero pg pool activity
+ * (see node-test-db-pool-hang memory).
+ */
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { ACTIVE_EXPERIMENT_STATUSES, canTransition, createMission, addEvidence, approveExperiment, listMissions, clampCap, HARD_CAPS, missionIdFromStripeMetadata, refundEvidenceItems, STRIPE_EVIDENCE_STAGES } from "../../server/lib/revenue-missions";
+
+// ── Tenant fail-closed guards ───────────────────────────────────────────────
+const badTenants = [0, -1, 1.5, NaN, undefined as any, null as any, "1" as any];
+
+for (const bad of badTenants) {
+  test(`createMission rejects invalid tenantId ${String(bad)}`, async () => {
+    await assert.rejects(
+      () => createMission({ tenantId: bad, name: "x", hypothesis: "y", idealCustomer: "z", offer: "o" }),
+      /invalid tenantId/,
+    );
+  });
+}
+
+test("addEvidence rejects invalid tenantId before any query", async () => {
+  await assert.rejects(
+    () => addEvidence({ tenantId: 0, missionId: 1, type: "payment", summary: "s", source: "stripe" }),
+    /invalid tenantId/,
+  );
+});
+
+test("approveExperiment rejects invalid tenantId before any query", async () => {
+  await assert.rejects(() => approveExperiment(-5, 1, "owner"), /invalid tenantId/);
+});
+
+test("listMissions rejects invalid tenantId before any query", async () => {
+  await assert.rejects(() => listMissions(NaN), /invalid tenantId/);
+});
+
+// ── Stage machine ───────────────────────────────────────────────────────────
+test("legal ladder transitions allowed", () => {
+  assert.equal(canTransition("hypothesis", "evidence_gathering"), true);
+  assert.equal(canTransition("hypothesis", "offer_defined"), true);
+  assert.equal(canTransition("offer_defined", "experiment_draft"), true);
+  assert.equal(canTransition("experiment_draft", "experiment_awaiting_approval"), true);
+  assert.equal(canTransition("experiment_awaiting_approval", "experiment_live"), true);
+  assert.equal(canTransition("experiment_live", "evaluating"), true);
+  assert.equal(canTransition("evaluating", "presell"), true);
+  assert.equal(canTransition("presell", "scale_ready"), true);
+});
+
+test("stage skipping is illegal", () => {
+  assert.equal(canTransition("hypothesis", "experiment_live"), false);
+  assert.equal(canTransition("offer_defined", "experiment_live"), false);
+  assert.equal(canTransition("experiment_draft", "experiment_live"), false, "cannot go live without awaiting_approval");
+  assert.equal(canTransition("hypothesis", "scale_ready"), false);
+});
+
+test("kill allowed from any live stage, never from killed", () => {
+  for (const from of ["hypothesis", "experiment_live", "presell", "scale_ready"]) {
+    assert.equal(canTransition(from, "killed"), true, `kill from ${from}`);
+  }
+  assert.equal(canTransition("killed", "killed"), false);
+  assert.equal(canTransition("killed", "hypothesis"), false, "killed is terminal");
+});
+
+test("awaiting_approval can fall back to draft (owner edits)", () => {
+  assert.equal(canTransition("experiment_awaiting_approval", "experiment_draft"), true);
+});
+
+// ── Contract hard caps (25 prospects / 3 contacts / $25) ────────────────────
+test("HARD_CAPS match the feature contract", () => {
+  assert.equal(HARD_CAPS.maxProspects, 25);
+  assert.equal(HARD_CAPS.maxContactsPerProspect, 3);
+  assert.equal(HARD_CAPS.maxSpendUsdCents, 2500);
+  assert.equal(HARD_CAPS.maxConcurrentExperiments, 3);
+});
+
+test("clampCap: mission values may tighten but never exceed the ceiling", () => {
+  assert.equal(clampCap(10, 25), 10, "tighter value honored");
+  assert.equal(clampCap(25, 25), 25);
+  assert.equal(clampCap(100, 25), 25, "elevated DB value clamped to ceiling");
+  assert.equal(clampCap(9999, 2500), 2500);
+});
+
+test("clampCap: junk/zero/negative values fall to the hard ceiling (never unbounded)", () => {
+  for (const junk of [0, -1, NaN, Infinity, undefined, null, "lots" as any]) {
+    assert.equal(clampCap(junk, 25), 25, `junk ${String(junk)}`);
+  }
+  assert.equal(clampCap(3.9, 25), 3, "fractional floors down");
+});
+
+// ── Evidence provenance (externalRef) fail-closed ───────────────────────────
+test("addEvidence rejects non-manual evidence without externalRef (before any query)", async () => {
+  for (const source of ["gmail", "stripe", "web", "crm"]) {
+    await assert.rejects(
+      () => addEvidence({ tenantId: 1, missionId: 1, type: "positive_reply", summary: "sss", source }),
+      /requires externalRef/,
+      `source ${source}`,
+    );
+  }
+});
+
+test("addEvidence rejects empty-string externalRef for non-manual sources", async () => {
+  await assert.rejects(
+    () => addEvidence({ tenantId: 1, missionId: 1, type: "payment", summary: "sss", source: "stripe", externalRef: "" }),
+    /requires externalRef/,
+  );
+});
+
+// ── S3: HITL send gate + sequence step builder (query-free, pure) ───────────
+import {
+  assertSendAllowed,
+  buildSequenceSteps,
+  classifyReplyText,
+  runApprovedExperiment,
+  pauseMissionEnrollments,
+  OPT_OUT_LINE,
+} from "../../server/lib/mission-experiment-run";
+
+test("assertSendAllowed: unapproved experiment is unreachable (fail closed)", () => {
+  assert.throws(() => assertSendAllowed(null), /fail closed/);
+  assert.throws(
+    () => assertSendAllowed({ status: "awaiting_approval", approved_by_owner_at: null }),
+    /not owner-approved/,
+  );
+  assert.throws(
+    () => assertSendAllowed({ status: "approved", approved_by_owner_at: undefined }),
+    /not owner-approved/,
+    "status alone is NOT enough — the timestamp is the gate",
+  );
+});
+
+test("assertSendAllowed: only status 'approved' with timestamp passes", () => {
+  assert.doesNotThrow(() => assertSendAllowed({ status: "approved", approved_by_owner_at: "2026-07-22" }));
+  for (const status of ["draft", "awaiting_approval", "live", "completed", "cancelled"]) {
+    assert.throws(
+      () => assertSendAllowed({ status, approved_by_owner_at: "2026-07-22" }),
+      /only 'approved'/,
+      `status ${status}`,
+    );
+  }
+});
+
+test("buildSequenceSteps caps steps at maxContactsPerProspect (hard ceiling 3)", () => {
+  const variants = [1, 2, 3, 4, 5].map((i) => ({ label: `v${i}`, subject: `s${i}`, body: `b${i}` }));
+  assert.equal(buildSequenceSteps(variants, 2, "tok").length, 2, "mission tightening honored");
+  assert.equal(buildSequenceSteps(variants, 99, "tok").length, 3, "clamped to contract ceiling");
+  assert.equal(buildSequenceSteps(variants, NaN as any, "tok").length, 3, "junk cap falls to ceiling");
+});
+
+test("buildSequenceSteps: every step carries the opt-out line + reply token; empty variants refuse", () => {
+  const steps = buildSequenceSteps([{ label: "a", subject: "Sub", body: "Body" }], 3, "vcm-1-abc");
+  assert.ok(steps[0].bodyTemplate.includes(OPT_OUT_LINE), "mandatory opt-out line");
+  assert.ok(steps[0].bodyTemplate.includes("vcm-1-abc"), "reply token in body");
+  assert.ok(steps[0].subject.includes("vcm-1-abc"), "reply token in subject");
+  assert.throws(() => buildSequenceSteps([], 3, "tok"), /no message variants/);
+});
+
+test("classifyReplyText: opt-out phrasings are negative, everything else positive", () => {
+  for (const t of ["No thanks!", "please UNSUBSCRIBE me", "not interested, sorry", "remove me from your list", "stop emailing me"]) {
+    assert.equal(classifyReplyText(t), "negative_reply", t);
+  }
+  for (const t of ["Sounds interesting, tell me more", "How much does it cost?", ""]) {
+    assert.equal(classifyReplyText(t), "positive_reply", t);
+  }
+});
+
+test("runApprovedExperiment / pauseMissionEnrollments reject invalid tenantId before any query", async () => {
+  await assert.rejects(() => runApprovedExperiment({ tenantId: 0, experimentId: 1 }), /invalid tenantId/);
+  await assert.rejects(() => pauseMissionEnrollments(-3, 1), /invalid tenantId/);
+});
+
+// ── S4: Stripe metadata mission-id parsing (fail closed on any junk) ────────
+test("missionIdFromStripeMetadata accepts clean positive integers only", () => {
+  assert.equal(missionIdFromStripeMetadata({ mission_id: "7" }), 7);
+  assert.equal(missionIdFromStripeMetadata({ mission_id: 12 }), 12);
+  assert.equal(missionIdFromStripeMetadata({ missionId: " 3 " }), 3, "camelCase + trim accepted");
+});
+
+test("missionIdFromStripeMetadata fails closed on junk", () => {
+  for (const bad of [
+    null, undefined, "x", 42, [],
+    {}, { mission_id: "" }, { mission_id: "0" }, { mission_id: "-4" },
+    { mission_id: "1.5" }, { mission_id: "7; DROP TABLE" }, { mission_id: "1e3" },
+    { mission_id: NaN }, { mission_id: {} }, { mission_id: "999999999999999999999" },
+  ]) {
+    assert.equal(missionIdFromStripeMetadata(bad as any), null, JSON.stringify(bad));
+  }
+});
+
+// ── S4: per-refund identity (architect finding — never dedupe on charge id) ─
+test("refundEvidenceItems extracts one item per succeeded refund (re_... identity)", () => {
+  const charge = {
+    id: "ch_1",
+    refunds: { data: [
+      { id: "re_a", amount: 500, status: "succeeded" },
+      { id: "re_b", amount: 300, status: "succeeded" },
+      { id: "re_pending", amount: 200, status: "pending" },
+      { id: "", amount: 100, status: "succeeded" },
+      { amount: 100, status: "succeeded" },
+      { id: "re_junk", amount: "nope", status: "succeeded" },
+      { id: "re_neg", amount: -50, status: "succeeded" },
+    ]},
+  };
+  const items = refundEvidenceItems(charge);
+  assert.deepEqual(items, [
+    { externalRef: "re_a", amountUsdCents: 500 },
+    { externalRef: "re_b", amountUsdCents: 300 },
+    { externalRef: "re_junk", amountUsdCents: 0 },
+    { externalRef: "re_neg", amountUsdCents: 0 },
+  ]);
+});
+
+test("refundEvidenceItems fails closed (empty) when refunds list is absent/junk", () => {
+  for (const bad of [null, undefined, {}, { refunds: null }, { refunds: {} }, { refunds: { data: "x" } }, "ch_1", 42]) {
+    assert.deepEqual(refundEvidenceItems(bad as any), [], JSON.stringify(bad));
+  }
+});
+
+test("STRIPE_EVIDENCE_STAGES only contains post-approval stages", () => {
+  assert.deepEqual([...STRIPE_EVIDENCE_STAGES], ["experiment_live", "evaluating", "presell", "scale_ready"]);
+  for (const pre of ["hypothesis", "experiment_draft", "experiment_awaiting_approval", "killed"]) {
+    assert.ok(!(STRIPE_EVIDENCE_STAGES as readonly string[]).includes(pre), pre);
+  }
+});
+
+// ── S5a persona-tool wiring guards (query-free: the owner gate rejects before
+// any dynamic lib import, so no pg pool activity) ───────────────────────────
+import { revenueMissionsDomainTools } from "../../server/tools/domains/revenue-missions";
+
+const toolByName = new Map(revenueMissionsDomainTools.map(t => [t.definition.function.name, t]));
+const MISSION_TOOLS = [
+  "revenue_mission_create",
+  "revenue_mission_list",
+  "revenue_mission_status",
+  "revenue_mission_draft_experiment",
+  "mission_portfolio_review",
+];
+
+test("all 5 mission tools registered in the domain", () => {
+  for (const name of MISSION_TOOLS) assert.ok(toolByName.has(name), name);
+});
+
+test("approve/kill are NOT tools (HITL-only invariant)", () => {
+  for (const name of toolByName.keys()) {
+    assert.ok(!/approve|kill|launch/.test(name), `forbidden tool surface: ${name}`);
+  }
+});
+
+for (const name of MISSION_TOOLS) {
+  test(`${name} rejects missing tenant context`, async () => {
+    const res = await toolByName.get(name)!.handler({ missionId: 1, name: "x", hypothesis: "h", idealCustomer: "i", offer: "o" }, {} as any);
+    assert.match(String((res as any).error), /Tenant context required/);
+  });
+  test(`${name} rejects non-owner tenant`, async () => {
+    const res = await toolByName.get(name)!.handler({ missionId: 1, name: "x", hypothesis: "h", idealCustomer: "i", offer: "o" }, { tenantId: 2 } as any);
+    assert.match(String((res as any).error), /owner-only/);
+  });
+}
+
+test("revenue_mission_status rejects bad missionId before any query", async () => {
+  const res = await toolByName.get("revenue_mission_status")!.handler({ missionId: 0 }, { tenantId: 1 } as any);
+  assert.match(String((res as any).error), /positive integer missionId/);
+});
+
+test("revenue_mission_draft_experiment rejects bad missionId before any query", async () => {
+  const res = await toolByName.get("revenue_mission_draft_experiment")!.handler({ missionId: -3 }, { tenantId: 1 } as any);
+  assert.match(String((res as any).error), /positive integer missionId/);
+});
+
+test("revenue_mission_create rejects empty required fields before any query", async () => {
+  const res = await toolByName.get("revenue_mission_create")!.handler({ name: " ", hypothesis: "", idealCustomer: "x", offer: "y" }, { tenantId: 1 } as any);
+  assert.match(String((res as any).error), /non-empty/);
+});
+
+// Architect nit (S5a review): pin fail-closed behavior on MALFORMED ctx tenant
+// values — strict !== 1 means a string "1" or object never passes the gate.
+for (const bad of ["1", { id: 1 }, true, 1.5] as any[]) {
+  test(`owner gate fails closed on malformed ctx.tenantId ${JSON.stringify(bad)}`, async () => {
+    const res = await toolByName.get("revenue_mission_list")!.handler({}, { tenantId: bad } as any);
+    assert.ok(/owner-only|Tenant context required/.test(String((res as any).error)), `expected fail-closed, got ${JSON.stringify(res)}`);
+  });
+}
+
+// ── S5c autonomy ladder (pure fns, no DB) ────────────────────────────────────
+import { parseAutonomyLevel, autonomyAllows, computeReinvestment, ACTION_MIN_LEVEL, REINVEST_RULES, AUTONOMY_MAX } from "../../server/lib/mission-autonomy";
+
+test("parseAutonomyLevel accepts only integers 0-6; junk fails closed", () => {
+  assert.equal(parseAutonomyLevel(0), 0);
+  assert.equal(parseAutonomyLevel(6), 6);
+  assert.equal(parseAutonomyLevel("3"), 3);
+  for (const bad of [-1, 7, 1.5, "1.5", "x", "", null, undefined, {}, [], true, NaN]) {
+    assert.equal(parseAutonomyLevel(bad as any), null, `expected null for ${JSON.stringify(bad)}`);
+  }
+});
+
+test("autonomyAllows fails closed: killed stage, malformed level, missing mission", () => {
+  assert.equal(autonomyAllows(null, "propose"), false);
+  assert.equal(autonomyAllows({ autonomy_level: 6, stage: "killed" }, "propose"), false);
+  for (const badLvl of ["3", 1.5, -1, 7, null, undefined]) {
+    assert.equal(autonomyAllows({ autonomy_level: badLvl, stage: "live" } as any, "propose"), false, `lvl ${JSON.stringify(badLvl)}`);
+  }
+});
+
+test("autonomyAllows enforces the ladder minimums; level 6 has no scale action", () => {
+  for (const [action, min] of Object.entries(ACTION_MIN_LEVEL)) {
+    assert.equal(autonomyAllows({ autonomy_level: min, stage: "validation" }, action as any), true, `${action} at ${min}`);
+    if (min > 0) assert.equal(autonomyAllows({ autonomy_level: min - 1, stage: "validation" }, action as any), false, `${action} below ${min}`);
+  }
+  assert.ok(!("scale_spend" in ACTION_MIN_LEVEL) && !("launch_new_product" in ACTION_MIN_LEVEL), "level-6 scale actions must never be autonomous");
+  assert.equal(AUTONOMY_MAX, 6);
+});
+
+test("computeReinvestment: only verified realized profit, 10% fraction, $250 ceiling", () => {
+  // margin = 20000 - 2000 - 3000 = 15000c ⇒ 10% = $15 reinvest
+  const r = computeReinvestment({ revenue_usd_cents: 20000, refunds_usd_cents: 2000, spend_usd_cents: 3000, max_cash_at_risk_usd: 25 });
+  assert.deepEqual(r, { newBudgetUsd: 40, reinvestedUsd: 15 });
+  // ceiling clamp
+  const c = computeReinvestment({ revenue_usd_cents: 10000000, refunds_usd_cents: 0, spend_usd_cents: 0, max_cash_at_risk_usd: 240 });
+  assert.deepEqual(c, { newBudgetUsd: REINVEST_RULES.maxBudgetUsd, reinvestedUsd: 10 });
+  // at ceiling already ⇒ null
+  assert.equal(computeReinvestment({ revenue_usd_cents: 10000000, refunds_usd_cents: 0, spend_usd_cents: 0, max_cash_at_risk_usd: 250 }), null);
+});
+
+test("computeReinvestment fails closed on no-profit and malformed inputs", () => {
+  assert.equal(computeReinvestment({ revenue_usd_cents: 100, refunds_usd_cents: 0, spend_usd_cents: 100, max_cash_at_risk_usd: 25 }), null);
+  assert.equal(computeReinvestment({ revenue_usd_cents: 0, refunds_usd_cents: 0, spend_usd_cents: 0, max_cash_at_risk_usd: 25 }), null);
+  for (const bad of [{ revenue_usd_cents: "x" }, { revenue_usd_cents: -5, refunds_usd_cents: 0, spend_usd_cents: 0, max_cash_at_risk_usd: 25 }, {}]) {
+    assert.equal(computeReinvestment(bad as any), null, JSON.stringify(bad));
+  }
+  // tiny margin where 10% floors to $0 ⇒ null
+  assert.equal(computeReinvestment({ revenue_usd_cents: 500, refunds_usd_cents: 0, spend_usd_cents: 0, max_cash_at_risk_usd: 25 }), null);
+});
+
+// ── S5d capital allocator (pure fns, no DB) ──────────────────────────────────
+import { assessMission, summarizePortfolio, PORTFOLIO_RULES } from "../../server/lib/mission-capital-allocator";
+
+test("assessMission verdicts are deterministic and evidence-derived", () => {
+  assert.equal(assessMission({ id: 1, stage: "killed" }).verdict, "killed");
+  assert.equal(assessMission({ id: 2, stage: "validation", leads_contacted: 10, positive_replies: 0 }).verdict, "kill_recommended");
+  assert.equal(assessMission({ id: 3, stage: "validation", leads_contacted: 25, positive_replies: 5, revenue_usd_cents: 0 }).verdict, "kill_recommended");
+  assert.equal(assessMission({ id: 4, stage: "live", revenue_usd_cents: 5000, refunds_usd_cents: 0, spend_usd_cents: 1000 }).verdict, "scale_candidate");
+  assert.equal(assessMission({ id: 5, stage: "live", revenue_usd_cents: 1000, refunds_usd_cents: 0, spend_usd_cents: 2000 }).verdict, "healthy");
+  assert.equal(assessMission({ id: 6, stage: "hypothesis" }).verdict, "unproven");
+});
+
+test("summarizePortfolio flags over-capacity above maxActiveUnproven and excludes killed", () => {
+  const un = (id: number) => assessMission({ id, stage: "hypothesis" });
+  const ok2 = summarizePortfolio([un(1), un(2)]);
+  assert.equal(ok2.overCapacity, false);
+  const over = summarizePortfolio([un(1), un(2), un(3)]);
+  assert.equal(over.overCapacity, true);
+  assert.equal(over.activeUnproven, 3);
+  const withKilled = summarizePortfolio([un(1), un(2), assessMission({ id: 9, stage: "killed" })]);
+  assert.equal(withKilled.overCapacity, false, "killed missions never count toward capacity");
+  assert.equal(PORTFOLIO_RULES.maxActiveUnproven, 2);
+});
+
+test("summarizePortfolio recommendations name kill/scale candidates as OWNER decisions", () => {
+  const kill = assessMission({ id: 7, name: "dead", stage: "validation", leads_contacted: 12, positive_replies: 0 });
+  const scale = assessMission({ id: 8, name: "winner", stage: "live", revenue_usd_cents: 9000, refunds_usd_cents: 0, spend_usd_cents: 100 });
+  const p = summarizePortfolio([kill, scale]);
+  assert.ok(p.recommendations.some(r => /KILL/.test(r) && /owner decision/.test(r)));
+  assert.ok(p.recommendations.some(r => /first-dollar proven/.test(r) && /owner decision/.test(r)));
+});
+
+// ── S5e evidence-gated rubric (pure fn, no DB) ───────────────────────────────
+import { evidenceGateScore, computeComposite, tierFor, EVIDENCE_GATE, type Score } from "../../server/lib/ideabrowser-score";
+
+function mkScore(market: number, monet: number): Score {
+  const base = { id: 1, vc_fit: 5, market_signal: market, monetization: monet, build_complexity: 1, strategic_bonus: 3, rationale: "r", buyer_hypothesis: "b", build_cost_estimate: "S" };
+  const composite = computeComposite(base as any);
+  return { ...base, composite, tier: tierFor(composite) } as Score;
+}
+
+test("evidenceGateScore clamps market/monetization to 3 without evidence and recomputes composite/tier", () => {
+  const gated = evidenceGateScore(mkScore(5, 5), 0);
+  assert.equal(gated.market_signal, EVIDENCE_GATE.maxUngated);
+  assert.equal(gated.monetization, EVIDENCE_GATE.maxUngated);
+  assert.equal(gated.composite, computeComposite(gated as any));
+  assert.equal(gated.tier, tierFor(gated.composite));
+  assert.match(gated.rationale, /evidence-gated/);
+});
+
+test("evidenceGateScore leaves scores untouched with evidence, or when already ≤3; junk counts gate (fail closed)", () => {
+  const s = mkScore(5, 5);
+  assert.equal(evidenceGateScore(s, 2), s);
+  const low = mkScore(2, 3);
+  assert.equal(evidenceGateScore(low, 0), low);
+  for (const junk of [null, undefined, "x", -1, NaN]) {
+    assert.equal(evidenceGateScore(mkScore(5, 5), junk).market_signal, EVIDENCE_GATE.maxUngated, `junk ${String(junk)}`);
+  }
+});
+
+test("concurrency ceiling: active statuses set is exact and the draft guard sits above the INSERT", () => {
+  assert.deepEqual([...ACTIVE_EXPERIMENT_STATUSES], ["awaiting_approval", "approved", "launching", "live"]);
+  const src = fs.readFileSync("server/lib/revenue-missions.ts", "utf8");
+  const fn = src.slice(src.indexOf("export async function createExperimentDraft"));
+  const guardIdx = fn.indexOf("countActiveExperiments");
+  const insertIdx = fn.indexOf("INSERT INTO mission_experiments");
+  assert.ok(guardIdx > -1 && insertIdx > -1 && guardIdx < insertIdx, "concurrency guard must precede the INSERT");
+  assert.match(fn.slice(guardIdx, insertIdx), /activeCount >= HARD_CAPS.maxConcurrentExperiments/);
+});
+
+// Architect finding (72h review): ownerGate must honor OWNER_TENANT_ID (single
+// source of truth shared with the route layer), not a hardcoded tenant 1.
+test("owner gate honors OWNER_TENANT_ID: tenant 1 is DENIED when owner is 7", async () => {
+  const prev = process.env.OWNER_TENANT_ID;
+  process.env.OWNER_TENANT_ID = "7";
+  try {
+    const res = await toolByName.get("revenue_mission_list")!.handler({}, { tenantId: 1 } as any);
+    assert.match(String((res as any).error), /owner-only/);
+  } finally {
+    if (prev === undefined) delete process.env.OWNER_TENANT_ID; else process.env.OWNER_TENANT_ID = prev;
+  }
+});
+
+test("owner gate honors OWNER_TENANT_ID: tenant 7 PASSES the gate when owner is 7 (fails later on params, not authz)", async () => {
+  const prev = process.env.OWNER_TENANT_ID;
+  process.env.OWNER_TENANT_ID = "7";
+  try {
+    // missionId 0 fails param validation AFTER the gate — proves the gate passed
+    // without ever reaching a DB query (keeps the test pool-free).
+    const res = await toolByName.get("revenue_mission_status")!.handler({ missionId: 0 }, { tenantId: 7 } as any);
+    assert.match(String((res as any).error), /positive integer missionId/);
+  } finally {
+    if (prev === undefined) delete process.env.OWNER_TENANT_ID; else process.env.OWNER_TENANT_ID = prev;
+  }
+});
