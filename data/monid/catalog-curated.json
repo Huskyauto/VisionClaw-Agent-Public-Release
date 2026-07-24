@@ -1,0 +1,413 @@
+{
+  "generatedAt": "2026-05-25T20:10:29.280Z",
+  "source": "monid api.monid.ai/v1/discover",
+  "rawEndpointsHarvested": 166,
+  "curatedEndpoints": 50,
+  "refreshCmd": "npx tsx scripts/monid-catalog-survey.ts && npx tsx scripts/monid-catalog-curate.ts",
+  "categories": {
+    "social_media": {
+      "description": "Scrape posts, profiles, engagement metrics from social platforms",
+      "vcaUseCase": "Competitive intel, brand monitoring, content research for Felix videos, Robert/CEO market sweep, lead-gen profile enrichment",
+      "endpoints": [
+        {
+          "slug": "apify/apify/instagram-profile-scraper",
+          "provider": "Apify",
+          "description": "Extracts public Instagram profile metadata and recent media for one or more accounts by username, ID, or URL. Returns bio, profile pictures, contact links, business category, verification status, audience metrics (follow",
+          "price": "$0.003/result",
+          "score": 1.92
+        },
+        {
+          "slug": "apify/apify/instagram-api-scraper",
+          "provider": "Apify",
+          "description": "Extracts structured Instagram data from profiles, posts (including reels and IGTV), hashtags, and locations by direct URL or text search query. Returns page-level details, media URLs, image/video dimensions, captions, ha",
+          "price": "$0.003/result + $0.001 flat",
+          "score": 1.78
+        },
+        {
+          "slug": "apify/apify/instagram-hashtag-scraper",
+          "provider": "Apify",
+          "description": "Scrapes Instagram posts and reels by hashtag or keyword. Returns engagement metrics (likes, comments, reshares, video views/plays), captions, timestamps, location data, creator identity, tagged users, mentions, carousel ",
+          "price": "$0.00345/call",
+          "score": 1.77
+        },
+        {
+          "slug": "apify/apify/instagram-post-scraper",
+          "provider": "Apify",
+          "description": "Extracts comprehensive post-level metadata from Instagram profiles and post URLs. Returns captions, hashtags, mentions, tagged users, media URLs (images, carousels, reels/videos), image dimensions, alt text, timestamps, ",
+          "price": "$0.00225/call",
+          "score": 1.74
+        },
+        {
+          "slug": "apify/harvestapi/linkedin-company-employees",
+          "provider": "Apify",
+          "description": "Extracts employee profiles from LinkedIn companies at scale with configurable filters for location, job title, seniority level, functional area, industry, and years at company. Returns profile summaries, headlines, curre",
+          "price": "$0.018/result + $0.02 flat",
+          "score": 1.74
+        },
+        {
+          "slug": "apify/apify/instagram-search-scraper",
+          "provider": "Apify",
+          "description": "Searches Instagram for places, profiles, and hashtags by keyword using discovery sources (Google, Facebook Ads, Threads). Returns place metadata (business name, category, contact info, address, geocoordinates, opening ho",
+          "price": "$0.00345/result",
+          "score": 1.73
+        },
+        {
+          "slug": "tikhub/api/v1/tiktok/ads/get_popular_trends",
+          "provider": "TikHub",
+          "description": "Get popular trend videos",
+          "price": "$0.0015/call",
+          "score": 1.69
+        },
+        {
+          "slug": "tikhub/api/v1/youtube/web/get_trending_videos",
+          "provider": "TikHub",
+          "description": "Get trending videos",
+          "price": "$0.0015/call",
+          "score": 1.58
+        }
+      ]
+    },
+    "commerce_reviews": {
+      "description": "Product listings, reviews, ratings, seller data from e-commerce + review platforms",
+      "vcaUseCase": "Felix product PDFs (review summaries), competitor pricing intel, employer-brand research",
+      "endpoints": [
+        {
+          "slug": "apify/compass/google-maps-reviews-scraper",
+          "provider": "Apify",
+          "description": "Extracts reviews and place metadata from Google Maps for specified location URLs. Returns review text, star ratings, publish timestamps, reviewer profile metadata, owner responses, review images, per-service ratings, and",
+          "price": "$0.000675/result",
+          "score": 1.73
+        },
+        {
+          "slug": "apify/damilo/google-maps-scraper",
+          "provider": "Apify",
+          "description": "Scrapes local business listings from Google Maps by keyword and location. Returns business names, addresses, phone numbers, websites, geographic coordinates, ratings, review counts, opening hours, categories, and images.",
+          "price": "$0.0045/result",
+          "score": 1.56
+        },
+        {
+          "slug": "api.strale.io/x402/employer-review-summary",
+          "provider": "Strale",
+          "description": "Get employer review summary from Glassdoor. Returns overall rating, culture/compensation scores, pros/cons themes. SQS: 98/100.",
+          "price": "$0.011/call",
+          "score": 1.51
+        },
+        {
+          "slug": "apify/axesso_data/amazon-search-scraper",
+          "provider": "Apify",
+          "description": "Extracts real-time Amazon search results by keyword with multi-page pagination. Returns product titles, pricing and discount info, product identifiers, star ratings, review counts, images, availability, Prime flags, desc",
+          "price": "$0.00015/result",
+          "score": 1.44
+        },
+        {
+          "slug": "apify/xmiso_scrapers/eu-amazon-sellers-email-leads",
+          "provider": "Apify",
+          "description": "Extracts Amazon seller business data across EU and US marketplaces by category and country. Returns seller identity and profile, legal and registration details, VAT and company identifiers, contact emails and phone numbe",
+          "price": "$0.01335/result",
+          "score": 1.44
+        },
+        {
+          "slug": "apify/burbn/google-shopping-scraper",
+          "provider": "Apify",
+          "description": "Scrapes Google Shopping product listings by keyword with detailed offer-level data. Returns product titles, descriptions, current and original prices, discounts, ratings, review counts, seller metadata (name, rating, shi",
+          "price": "$0.0075/result + $0.008 flat",
+          "score": 1.43
+        },
+        {
+          "slug": "apify/damilo/google-shopping-apify",
+          "provider": "Apify",
+          "description": "Scrapes live product listings from Google Shopping by keyword search. Returns product titles, prices, sellers, ratings, review counts, shipping details, images, offer counts, product identifiers (GTIN/MPN), listing posit",
+          "price": "$0.00525/result",
+          "score": 1.43
+        },
+        {
+          "slug": "apify/delicious_zebu/amazon-product-details-scraper",
+          "provider": "Apify",
+          "description": "Scrapes Amazon product detail pages by ASIN or product URL. Returns pricing, list prices, discounts, availability, delivery estimates, star ratings, rating distributions, review summaries, best-seller ranks, category bre",
+          "price": "$0.00225/result",
+          "score": 1.41
+        }
+      ]
+    },
+    "web_research": {
+      "description": "Web search, page metadata, screenshots, domain intel, structured web data, content extraction",
+      "vcaUseCase": "Autoresearch loop, competitor domain audits, knowledge-library ingestion, fact-check on public claims",
+      "endpoints": [
+        {
+          "slug": "api.strale.io/x402/meta-extract",
+          "provider": "Strale",
+          "description": "Extract all metadata from a URL: Open Graph, Twitter cards, JSON-LD, favicon, canonical URL, RSS feeds, robots directives. SQS: 96/100.",
+          "price": "$0.011/call",
+          "score": 1.68
+        },
+        {
+          "slug": "api.strale.io/x402/whois-lookup",
+          "provider": "Strale",
+          "description": "Perform a WHOIS lookup for a domain. Returns registrar, creation date, expiry date, name servers, registrant info, and raw WHOIS data.",
+          "price": "$0.059401/call",
+          "score": 1.67
+        },
+        {
+          "slug": "api.strale.io/x402/screenshot-url",
+          "provider": "Strale",
+          "description": "Take a full-page or viewport screenshot of any URL. Handles cookie banners, lazy loading, SPAs. Returns base64 PNG. SQS: 67/100.",
+          "price": "$0.0055/call",
+          "score": 1.62
+        },
+        {
+          "slug": "api.strale.io/x402/sitemap-parse",
+          "provider": "Strale",
+          "description": "Fetch and parse a website's XML sitemap. Returns URL count, top path segments, lastmod dates, and sample URLs. SQS: 96/100.",
+          "price": "$0.011/call",
+          "score": 1.59
+        },
+        {
+          "slug": "api.strale.io/x402/google-search",
+          "provider": "Strale",
+          "description": "Perform a Google search and return structured results. Returns title, URL, snippet, position for each result.",
+          "price": "$0.118801/call",
+          "score": 1.56
+        },
+        {
+          "slug": "api.strale.io/x402/dns-lookup",
+          "provider": "Strale",
+          "description": "Perform a comprehensive DNS lookup for a domain. Returns A, AAAA, MX, NS, TXT, CNAME records plus SPF and DMARC detection. SQS: 96/100.",
+          "price": "$0.011/call",
+          "score": 1.5
+        },
+        {
+          "slug": "blockrun.ai/api/v1/exa/contents",
+          "provider": "BlockRun",
+          "description": "Extract full text content from specific URLs. Priced at $0.002/URL â total = urls.length Ã $0.002.",
+          "price": "$0.0022/call",
+          "score": 1.48
+        },
+        {
+          "slug": "exa/contents",
+          "provider": "Exa",
+          "description": "Fetch clean, LLM-ready content for a list of URLs. Returns full page text, key highlights, LLM-generated summaries, and metadata for each URL — handles JavaScript-rendered pages, PDFs, and complex layouts. Supports subpa",
+          "price": "$0.002/call",
+          "score": 1.48
+        }
+      ]
+    },
+    "finance_market": {
+      "description": "Stock/crypto prices, SEC filings, market data, prediction markets, on-chain wallet activity",
+      "vcaUseCase": "CEO Robert market briefings, finance-personas portfolio analysis, ticker forecasting cross-check",
+      "endpoints": [
+        {
+          "slug": "blockrun.ai/api/v1/pm/binance/ticks/ETHUSDT",
+          "provider": "BlockRun",
+          "description": "Get raw book ticker data at microsecond granularity",
+          "price": "$0.0055/call",
+          "score": 1.59
+        },
+        {
+          "slug": "api.strale.io/x402/crypto-price",
+          "provider": "Strale",
+          "description": "Get current cryptocurrency price, market cap, and trends via CoinGecko API. Supports 10,000+ coins. Multiple fiat currencies. SQS: 88/100.",
+          "price": "$0.0055/call",
+          "score": 1.57
+        },
+        {
+          "slug": "blockrun.ai/api/v1/phone/numbers/list",
+          "provider": "BlockRun",
+          "description": "List all active phone numbers provisioned to your wallet.",
+          "price": "$0.0011/call",
+          "score": 1.56
+        },
+        {
+          "slug": "blockrun.ai/api/v1/pm/polymarket/crypto-updown",
+          "provider": "BlockRun",
+          "description": "List crypto up/down prediction markets",
+          "price": "$0.0011/call",
+          "score": 1.51
+        },
+        {
+          "slug": "api.strale.io/x402/exchange-rate",
+          "provider": "Strale",
+          "description": "Get current exchange rate between two currencies using ECB data. Supports all major currencies. Returns rate, inverse rate, and date. SQS: 98/100.",
+          "price": "$0.0055/call",
+          "score": 1.49
+        },
+        {
+          "slug": "api.strale.io/x402/forex-history",
+          "provider": "Strale",
+          "description": "Get historical exchange rates between two currencies. Returns daily rates, average, min, max, change percentage. SQS: 96/100.",
+          "price": "$0.011/call",
+          "score": 1.45
+        },
+        {
+          "slug": "blockrun.ai/api/v1/phone/numbers/buy",
+          "provider": "BlockRun",
+          "description": "Purchase a dedicated phone number valid for 30 days. The number is bound to your wallet address. Default country is US (no regulatory friction). Other countries can be requested via the `country` parameter, but Twilio ma",
+          "price": "$5.5/call",
+          "score": 1.45
+        },
+        {
+          "slug": "blockrun.ai/api/v1/surf/search/polymarket",
+          "provider": "BlockRun",
+          "description": "Polymarket event search.",
+          "price": "$0.0055/call",
+          "score": 1.43
+        }
+      ]
+    },
+    "lead_enrichment": {
+      "description": "Person + company enrichment, email/phone validation, B2B contact discovery, screening",
+      "vcaUseCase": "CRM lead-gen pipeline, sales-outreach prep, account-based marketing, deal qualification, KYC pre-screen",
+      "endpoints": [
+        {
+          "slug": "api.strale.io/x402/email-validate",
+          "provider": "Strale",
+          "description": "Validate an email address: RFC 5322 syntax, MX records, 5,361 disposable domain detection, role-based address detection (35 patterns), free provider detection, and typo suggestion for common providers (gmial.com ? gmail.",
+          "price": "$0.011/call",
+          "score": 1.72
+        },
+        {
+          "slug": "apify/dev_fusion/linkedin-profile-scraper",
+          "provider": "Apify",
+          "description": "Extracts and enriches LinkedIn profile data at scale from profile URLs. Returns personal metadata (name, headline, summary, profile images, location), full work history with company intelligence (industry, website, size,",
+          "price": "$0.015/result",
+          "score": 1.58
+        },
+        {
+          "slug": "pdl/v5/company/enrich",
+          "provider": "People Data Labs",
+          "description": "Enrich data on a company by matching against the People Data Labs company dataset. Input a company name, website, LinkedIn profile, or stock ticker. Returns a comprehensive company record with firmographics, funding, emp",
+          "price": "$0.1/call",
+          "score": 1.56
+        },
+        {
+          "slug": "pdl/v5/person/enrich",
+          "provider": "People Data Labs",
+          "description": "Enrich data on a person by matching against ~3 billion profiles in the People Data Labs dataset. Input identifiers like email, phone, name+company, LinkedIn URL, or PDL ID. Returns a comprehensive person record with empl",
+          "price": "$0.3/call",
+          "score": 1.56
+        },
+        {
+          "slug": "pdl/v5/company/search",
+          "provider": "People Data Labs",
+          "description": "Search and filter the full People Data Labs company dataset using Elasticsearch or SQL queries (provide one, not both; Elasticsearch recommended). The query runs directly against the Company Dataset without cleaning or p",
+          "price": "$0.1/result",
+          "score": 1.48
+        },
+        {
+          "slug": "api.strale.io/x402/postal-code-lookup",
+          "provider": "Strale",
+          "description": "Look up location information from a postal/ZIP code. Returns city, region/state, and approximate coordinates. Covers 60+ countries via Zippopotam.us. SQS: 96/100.",
+          "price": "$0.011/call",
+          "score": 1.36
+        },
+        {
+          "slug": "pdl/v5/person/search",
+          "provider": "People Data Labs",
+          "description": "Search and filter the full People Data Labs person dataset using Elasticsearch or SQL queries (provide one, not both; Elasticsearch recommended). The query runs directly against the Person Dataset without cleaning or pre",
+          "price": "$0.3/result",
+          "score": 1.34
+        }
+      ]
+    },
+    "media_ai": {
+      "description": "OCR, transcription, image cleanup/resize, video download — AI media utilities",
+      "vcaUseCase": "Felix media pipeline (OCR receipts/screenshots, transcribe podcasts, image prep), accessibility passes",
+      "endpoints": [
+        {
+          "slug": "api.strale.io/x402/image-to-text",
+          "provider": "Strale",
+          "description": "OCR on any image via Claude vision. Works on screenshots, photos of documents, handwritten notes. Returns text with confidence.",
+          "price": "$0.059401/call",
+          "score": 1.7
+        },
+        {
+          "slug": "api.strale.io/x402/image-resize",
+          "provider": "Strale",
+          "description": "Resize, crop, and convert images. Supports PNG, JPEG, WebP. Configurable dimensions, quality, fit mode. Uses Sharp. SQS: 96/100.",
+          "price": "$0.011/call",
+          "score": 1.34
+        }
+      ]
+    },
+    "document_pdf": {
+      "description": "PDF text extraction, doc conversion, HTML/markdown↔PDF",
+      "vcaUseCase": "Customer-uploaded contract analysis, legal review, deliverable conversion",
+      "endpoints": [
+        {
+          "slug": "api.strale.io/x402/pdf-extract",
+          "provider": "Strale",
+          "description": "Extract structured data from any PDF document. Accepts a URL or base64-encoded PDF. Works on contracts, reports, forms — any document type. Returns JSON based on your extraction instructions. SQS: 98/100.",
+          "price": "$0.033/call",
+          "score": 1.61
+        },
+        {
+          "slug": "api.strale.io/x402/invoice-extract",
+          "provider": "Strale",
+          "description": "Extract structured data from an invoice or receipt image/PDF. Returns line items, totals, dates, vendor info, VAT amounts. SQS: 77/100.",
+          "price": "$0.011/call",
+          "score": 1.35
+        },
+        {
+          "slug": "api.strale.io/x402/markdown-to-html",
+          "provider": "Strale",
+          "description": "Convert markdown to styled HTML with inline CSS. Supports light, dark, and plain themes. Algorithmic — instant. SQS: 98/100.",
+          "price": "$0.011/call",
+          "score": 1.32
+        }
+      ]
+    },
+    "comms_outreach": {
+      "description": "Email drafting, SMS/transactional email send, outbound outreach helpers",
+      "vcaUseCase": "Outbound sales cadence pre-flight, drip campaign hygiene, customer comms",
+      "endpoints": [
+        {
+          "slug": "api.strale.io/x402/email-draft",
+          "provider": "Strale",
+          "description": "Draft a professional email. Specify context, intent (cold outreach/follow-up/apology/etc), and tone. Returns subject line options, body, and key phrases. SQS: 97/100.",
+          "price": "$0.011/call",
+          "score": 1.3
+        }
+      ]
+    },
+    "utilities": {
+      "description": "Translation, currency, weather, QR, language detection, small utility calls",
+      "vcaUseCase": "i18n customer comms, multi-currency invoicing, travel-assistant briefings",
+      "endpoints": [
+        {
+          "slug": "api.strale.io/x402/currency-convert",
+          "provider": "Strale",
+          "description": "Convert an amount between currencies using ECB exchange rates. Supports all major currencies. Returns converted amount and rate. SQS: 96/100.",
+          "price": "$0.0055/call",
+          "score": 1.65
+        },
+        {
+          "slug": "api.strale.io/x402/translate",
+          "provider": "Strale",
+          "description": "Translate text between languages. Auto-detects source language. Supports all major languages. Returns translated text with confidence. SQS: 98/100.",
+          "price": "$0.0055/call",
+          "score": 1.62
+        },
+        {
+          "slug": "openweather-coral.vercel.app/weather/forecast",
+          "provider": "OpenWeather (x402)",
+          "description": "5-day weather forecast with 3-hour intervals including precipitation probability",
+          "price": "$0.0033/call",
+          "score": 1.39
+        },
+        {
+          "slug": "openweather-coral.vercel.app/weather/current",
+          "provider": "OpenWeather (x402)",
+          "description": "Current weather conditions for any city: temperature, feels-like, humidity, wind, pressure, visibility, sunrise/sunset",
+          "price": "$0.0022/call",
+          "score": 1.36
+        },
+        {
+          "slug": "api.strale.io/x402/payment-reference-generate",
+          "provider": "Strale",
+          "description": "Generate valid payment reference numbers with check digits: Swedish OCR, Norwegian KID, Finnish reference, ISO 11649 RF. SQS: 98/100.",
+          "price": "$0.011/call",
+          "score": 1.3
+        }
+      ]
+    }
+  }
+}
