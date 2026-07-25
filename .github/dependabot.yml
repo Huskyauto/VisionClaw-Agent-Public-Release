@@ -1,0 +1,26 @@
+# Dependabot — automated dependency-update PRs.
+# Part of the supply-chain story documented in docs/TRUST-RECEIPTS.md.
+# Bounded open-PR limits keep the noise low; security updates always come first.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # Batch low-risk patch/minor bumps into a single PR to cut review noise.
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    labels:
+      - "ci"
