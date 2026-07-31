@@ -62,7 +62,7 @@
     "graphology-types": "^0.24.8",
     "header-generator": "^2.1.82",
     "helmet": "^8.1.0",
-    "js-yaml": "^4.3.0",
+    "js-yaml": "^5.2.2",
     "jsdom": "^29.0.2",
     "magika": "^1.0.0",
     "mammoth": "^1.12.0",
