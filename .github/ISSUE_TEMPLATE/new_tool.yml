@@ -1,0 +1,58 @@
+name: New tool proposal
+description: Propose a new tool to add to the 220-tool registry.
+labels: ["new-tool"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tools are the verbs the agent team uses to accomplish work.
+        See `server/tools.ts` for the current registry and the existing patterns.
+  - type: input
+    id: name
+    attributes:
+      label: Tool name (snake_case)
+      placeholder: forecast_ticker
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description (the LLM-facing prompt)
+      description: What the agent should know to decide when to call this tool. Plain English. 1–3 sentences.
+      placeholder: Pulls live OHLC daily bars for a stock ticker and produces a directional analysis with confidence level.
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - research
+        - data
+        - file
+        - delivery
+        - communication
+        - finance
+        - voice
+        - admin
+        - automation
+        - other
+  - type: dropdown
+    id: voice_safe
+    attributes:
+      label: Voice-safe? (Glasses Gateway allowlist)
+      description: Read-only, low-cost, low-side-effect tools can be voice-safe. Anything destructive or expensive must NOT be.
+      options:
+        - "No (default)"
+        - "Yes — read-only, idempotent, sub-second"
+  - type: textarea
+    id: schema
+    attributes:
+      label: Parameter schema sketch
+      description: Either JSON Schema or a TypeScript-style sketch.
+      render: json
+  - type: textarea
+    id: side_effects
+    attributes:
+      label: Side effects, costs, and external services
+      placeholder: "Calls Stooq CSV (free, ~50KB), no auth. Caches for 5 min. Estimated cost per call: $0."
