@@ -1,0 +1,36 @@
+{
+  "name": "visionclaw-agent",
+  "version": "74.13.0",
+  "description": "VisionClaw Agent — multi-tenant agentic AI platform exposing 243 production tools, 16 specialist personas, hybrid-search Skill-RAG, and a self-improving skill registry over MCP. One-click access to project management, Drive/email/calendar, web research, code execution, multi-channel messaging, schema-aware databases, marketing automation, code health scanning, and a self-evolving skill library.",
+  "author": {
+    "name": "Robert Washburn",
+    "url": "https://agenticcorporation.net"
+  },
+  "homepage": "https://agenticcorporation.net",
+  "repository": "https://github.com/Huskyauto/VisionClaw-Agent-Public-Release",
+  "license": "Proprietary",
+  "keywords": [
+    "agent",
+    "agentic",
+    "multi-tenant",
+    "delegation",
+    "personas",
+    "skill-rag",
+    "mcp",
+    "automation",
+    "drive",
+    "email",
+    "calendar",
+    "stripe",
+    "scheduler"
+  ],
+  "mcpServers": {
+    "visionclaw": {
+      "transport": "sse",
+      "url": "https://agenticcorporation.net/api/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer ${VISIONCLAW_MCP_KEY}"
+      }
+    }
+  }
+}
