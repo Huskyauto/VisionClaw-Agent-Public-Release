@@ -84,7 +84,7 @@
     "qrcode": "^1.5.4",
     "rollup": "^4.59.0",
     "sharp": "^0.35.3",
-    "stripe": "^20.4.1",
+    "stripe": "^22.5.0",
     "stripe-replit-sync": "^1.0.0",
     "tsx": "^4.20.5",
     "twitter-api-v2": "^1.29.0",
