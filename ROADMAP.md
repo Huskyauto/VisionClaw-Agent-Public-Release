@@ -79,7 +79,7 @@ collapsed into the "Earlier highlights" section below.
 
 ## Current platform totals
 
-**408 tools · 67 skills · 18 personas · 228 tables · 663 production indexes · 131 active capabilities · 41 governance rules · 45 curated AI models in the core registry plus daily catalog discovery against 1000+ models on OpenRouter · ~320k LOC across 1,100+ TypeScript files.** ([authoritative counts](docs/CURRENT_PLATFORM_TOTALS.md))
+**413 tools · 67 skills · 18 personas · 229 tables · 663 production indexes · 131 active capabilities · 41 governance rules · 45 curated AI models in the core registry plus daily catalog discovery against 1000+ models on OpenRouter · ~320k LOC across 1,100+ TypeScript files.** ([authoritative counts](docs/CURRENT_PLATFORM_TOTALS.md))
 
 Single source of truth: [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md).
 

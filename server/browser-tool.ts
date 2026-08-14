@@ -629,18 +629,11 @@ async function applyStealthToPage(page: Page, tenantId?: number): Promise<void> 
       'sec-ch-ua-platform': '"Windows"',
     });
   } catch (_silentErr) { logSilentCatch("server/browser-tool.ts", _silentErr); }
-  // Every page prepared for use gets the request-level SSRF guard —
-  // attached OUTSIDE the stealth try/catch so a stealth hiccup can't skip it.
-  await attachSsrfRequestGuard(page);
   // Passive network capture for derived-api feature (fail-open, no-op if disabled).
-  if (tenantId) {
-    try {
-      const { attachNetworkCapture } = await import("./lib/derived-api");
-      attachNetworkCapture(page, tenantId);
-    } catch (e) {
-      logSilentCatch("server/browser-tool.ts (derived-api capture attach)", e, "expected");
-    }
-  }
+  if (tenantId) attachCaptureSafe(page, tenantId);
+  // Every page prepared for use gets the request-level SSRF guard —
+  // attached OUTSIDE the stealth try/catch (and LAST) so nothing can skip it.
+  await attachSsrfRequestGuard(page);
 }
 
 /** Fail-open derived-api capture attach (idempotent inside attachNetworkCapture). */

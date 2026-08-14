@@ -7,7 +7,7 @@
 
 | Area | Modules | Lines |
 | :--- | ---: | ---: |
-| `server/` | 887 | 247,054 |
+| `server/` | 887 | 247,047 |
 | `client/src/` | 176 | 56,993 |
 | `scripts/` | 211 | 44,929 |
 | `shared/` | 10 | 5,144 |
@@ -288,7 +288,7 @@ Changes to these ripple widest — check importers before editing.
 | [`replay-diag.ts`](../scripts/lib/replay-diag.ts) | 24 | — |
 | [`triage-dump.ts`](../scripts/lib/triage-dump.ts) | 24 | — |
 
-### `server/` — 316 module(s), 152,208 lines
+### `server/` — 316 module(s), 152,201 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
@@ -297,7 +297,7 @@ Changes to these ripple widest — check importers before editing.
 | [`chat-engine.ts`](../server/chat-engine.ts) | 4,676 | — |
 | [`seed.ts`](../server/seed.ts) | 4,275 | — |
 | [`heartbeat.ts`](../server/heartbeat.ts) | 3,236 | — |
-| [`browser-tool.ts`](../server/browser-tool.ts) | 2,705 | — |
+| [`browser-tool.ts`](../server/browser-tool.ts) | 2,698 | — |
 | [`google-workspace.ts`](../server/google-workspace.ts) | 2,457 | — |
 | [`scaffolding.ts`](../server/scaffolding.ts) | 2,358 | — |
 | [`ceo-orchestrator.ts`](../server/ceo-orchestrator.ts) | 1,581 | Task 104 girth split — persona routing/classification + plan synthesis live in |

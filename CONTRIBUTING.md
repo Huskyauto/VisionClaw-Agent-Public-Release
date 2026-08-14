@@ -43,7 +43,7 @@ maintainer can confirm the replay strategy before you invest the time.
 ## What We're Looking For
 
 - **Bug fixes** — Found something broken? Fix it and send a PR.
-- **New tools** — VisionClaw has 408 tools. If you build a useful one, we want it. See "How to add a new tool" below for the recipe. (Authoritative counts live in [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md) — please update there first.)
+- **New tools** — VisionClaw has 413 tools. If you build a useful one, we want it. See "How to add a new tool" below for the recipe. (Authoritative counts live in [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md) — please update there first.)
 - **Documentation** — Clearer explanations, better examples, typo fixes — all welcome.
 - **Performance improvements** — Faster queries, better caching, reduced token usage.
 - **New integrations** — Connect a new service or API provider.
