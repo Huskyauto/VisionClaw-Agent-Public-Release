@@ -1,0 +1,2 @@
+Felix presentation instructions are owner-internal and not shipped in the
+public mirror. See docs/ for the public feature and architecture overview.
