@@ -54,7 +54,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **The app runs with just one LLM key and a Postgres database.** Everything else — email, payments, voice, Drive — is optional and appears automatically when you add the key.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **413 tools · 134 active capabilities · 18 personas · 229 tables · 41 governance rules · 679 production indexes · 6 AI providers · 6 deployment targets.** Live, always-current counts: [`docs/CURRENT_PLATFORM_TOTALS.md`](docs/CURRENT_PLATFORM_TOTALS.md). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **413 tools · 134 active capabilities · 18 personas · 229 tables · 41 governance rules · 679 platform indexes · 6 AI providers · 6 deployment targets.** Live, always-current counts: [`docs/CURRENT_PLATFORM_TOTALS.md`](docs/CURRENT_PLATFORM_TOTALS.md). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 ---
 
@@ -246,7 +246,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
       <p align="center"><sub><b>Landing hero</b> — value prop in one line, with three real CTAs.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/images/tour-command-center.jpg"><img src="docs/images/tour-command-center.jpg" alt="Command Center — 18 agents, 413 tools, 45 curated models + 1000+ daily catalog, live workflows" /></a>
+      <a href="docs/images/tour-command-center.jpg"><img src="docs/images/tour-command-center.jpg" alt="Command Center — 18 agents, 413 tools, 67 curated models + 1000+ daily catalog, live workflows" /></a>
       <p align="center"><sub><b>Command Center</b> — live counts, recent ops with status pills, capability chips.</sub></p>
     </td>
   </tr>
@@ -288,7 +288,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | Governance Rules | 41 |
 | Corporate Operation Scaffolds | 75 |
 | Corporate Departments | 12 |
-| Agent Skills | 62 |
+| Reference Surfaces | 155 (53 platform agent skills + 63 user-facing skills + 39 output skills) |
 | Frontend Pages | 40+ |
 | API Endpoints | 300+ |
 | Database Tables | 229 live (declared delta in schema.ts) |
@@ -369,7 +369,7 @@ Every agent has a defined role, personality, skill set, and operating rules. The
 
 ### AI & Intelligence
 
-- **41 Curated AI Models in the Core Registry** with cost-aware auto-routing across OpenAI, Anthropic, Google Gemini, xAI Grok, OpenRouter, and Perplexity. Bring your own provider credentials — API billing is governed by each provider's own terms.
+- **67 Curated AI Models in the Core Registry** with cost-aware auto-routing across OpenAI, Anthropic, Google Gemini, xAI Grok, OpenRouter, and Perplexity. Bring your own provider credentials — API billing is governed by each provider's own terms.
 - **Adaptive Model Discovery (R73)** — a daily background task scans OpenRouter's full catalog of 1000+ models, tier-classifies each by completion price (reasoning / powerful / balanced / fast), probes the Replit gateway for new releases, and emails the owner a ranked digest of new models worth adding to the registry. Hard caps prevent inbox spam (10 alerts/run max), lifetime dedupe prevents re-alerts, and silent days mean nothing changed.
 - **Streaming Responses** via Server-Sent Events (SSE) — real-time token-by-token output
 - **Thinking Mode** — explainable reasoning with decision traces for complex problems

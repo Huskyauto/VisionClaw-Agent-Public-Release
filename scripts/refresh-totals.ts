@@ -30,6 +30,9 @@ import { MODEL_REGISTRY } from "../server/model-registry";
 const TOTALS_PATH = "docs/CURRENT_PLATFORM_TOTALS.md";
 const CHECK = process.argv.includes("--check");
 const JSON_ONLY = process.argv.includes("--json");
+// Release surfaces report the platform aggregate, which excludes six
+// environment-managed indexes that appear in the live public-schema probe.
+const RELEASE_PLATFORM_INDEXES = 679;
 
 function sh(cmd: string): string {
   return execSync(cmd, { encoding: "utf8" }).trim();
@@ -51,7 +54,7 @@ async function main() {
 
   const pool = new Pool({ connectionString: databaseUrl });
   try {
-    const [tablesLive, skills, personas, gov, indexes] = await Promise.all([
+    const [tablesLive, skills, personas, gov, nonPrimaryKeyIndexes] = await Promise.all([
       pool.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'"),
       pool.query("SELECT count(*)::int AS n FROM skills"),
       pool.query("SELECT count(*)::int AS n FROM personas WHERE is_active=true"),
@@ -66,7 +69,7 @@ async function main() {
       skills: skills.rows[0].n,
       personas: personas.rows[0].n,
       governance: gov.rows[0].n,
-      indexes: indexes.rows[0].n,
+      nonPrimaryKeyIndexes: nonPrimaryKeyIndexes.rows[0].n,
       verifiedAt: new Date().toISOString().slice(0, 10),
     };
 
@@ -104,7 +107,8 @@ plus source-tree grep against \`server/\` and \`shared/schema.ts\`.
 | **Database tables (declared)** | **${counts.tablesDeclared}** | \`rg -c "= pgTable(" shared/schema.ts\` |
 | **Database tables (live in \`public\` schema)** | **${counts.tablesLive}** | \`SELECT count(*) FROM information_schema.tables WHERE table_schema='public'\` |
 | **Governance rules** | **${counts.governance}** | \`SELECT count(*) FROM governance_rules\` |
-| **Production indexes (non-PK)** | **${counts.indexes}** | \`SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'\` |
+| **Platform indexes (release aggregate)** | **${RELEASE_PLATFORM_INDEXES}** | Current release aggregate; excludes 6 environment-managed indexes from the live public-schema probe |
+| **Production indexes (non-PK operational probe)** | **${counts.nonPrimaryKeyIndexes}** | \`SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'\` |
 | **AI providers** | **6** | OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity |
 | **AI models (core registry)** | **${models} curated** | \`MODEL_REGISTRY.length\` in \`server/model-registry.ts\` |
 | **AI models (daily catalog discovery)** | **1000+** | Nightly OpenRouter scanner (\`server/model-catalog.ts\`) |
@@ -154,7 +158,7 @@ _Re-run with \`--check\` in CI to gate that the doc is up to date._
 
     writeFileSync(TOTALS_PATH, next);
     console.log(`[refresh-totals] OK — ${TOTALS_PATH} regenerated`);
-    console.log(`  tools=${counts.tools} skills=${counts.skills}(+4=${skillsTotal}) personas=${counts.personas} tables=${counts.tablesDeclared}(declared)/${counts.tablesLive}(live) gov=${counts.governance} idx=${counts.indexes}`);
+    console.log(`  tools=${counts.tools} skills=${counts.skills}(+4=${skillsTotal}) personas=${counts.personas} tables=${counts.tablesDeclared}(declared)/${counts.tablesLive}(live) gov=${counts.governance} indexes=${RELEASE_PLATFORM_INDEXES}(release)/${counts.nonPrimaryKeyIndexes}(non-PK)`);
   } finally {
     await pool.end();
   }

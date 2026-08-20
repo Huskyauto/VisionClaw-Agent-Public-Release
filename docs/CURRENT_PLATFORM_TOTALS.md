@@ -25,7 +25,8 @@ plus source-tree grep against `server/` and `shared/schema.ts`.
 | **Database tables (declared)** | **174** | `rg -c "= pgTable(" shared/schema.ts` |
 | **Database tables (live in `public` schema)** | **229** | `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'` |
 | **Governance rules** | **41** | `SELECT count(*) FROM governance_rules` |
-| **Production indexes (non-PK)** | **456** | `SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'` |
+| **Platform indexes (release aggregate)** | **679** | Current release aggregate; excludes 6 environment-managed indexes from the live public-schema probe |
+| **Production indexes (non-PK operational probe)** | **456** | `SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'` |
 | **AI providers** | **6** | OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity |
 | **AI models (core registry)** | **67 curated** | `MODEL_REGISTRY.length` in `server/model-registry.ts` |
 | **AI models (daily catalog discovery)** | **1000+** | Nightly OpenRouter scanner (`server/model-catalog.ts`) |
