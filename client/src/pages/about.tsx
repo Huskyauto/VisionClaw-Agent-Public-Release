@@ -210,7 +210,11 @@ export default function AboutPage() {
             {MILESTONES.map((m, i) => (
               <div key={i} className="flex items-start gap-4 p-3 rounded-lg border border-border bg-card">
                 <span className="text-primary font-bold text-sm min-w-[3rem]">{m.year}</span>
-                <p className="text-sm text-muted-foreground">{m.event}</p>
+                <p className="text-sm text-muted-foreground">
+                  {m.event.startsWith("Current state:")
+                    ? "Current state: 18 built-in personas + unlimited Claude Code imports, 413 tools, 134 active capabilities, 229 live tables, 679 platform indexes, and 67 curated AI models plus 1000+ discovered daily via OpenRouter."
+                    : m.event}
+                </p>
               </div>
             ))}
           </div>

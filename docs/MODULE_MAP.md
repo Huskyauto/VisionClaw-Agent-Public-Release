@@ -8,7 +8,7 @@
 | Area | Modules | Lines |
 | :--- | ---: | ---: |
 | `server/` | 896 | 250,726 |
-| `client/src/` | 177 | 57,749 |
+| `client/src/` | 177 | 57,753 |
 | `scripts/` | 213 | 45,432 |
 | `shared/` | 10 | 5,173 |
 
@@ -147,7 +147,7 @@ Changes to these ripple widest — check importers before editing.
 | [`auth-utils.ts`](../client/src/lib/auth-utils.ts) | 18 | Redirect to login with a toast notification |
 | [`utils.ts`](../client/src/lib/utils.ts) | 7 | — |
 
-### `client/src/pages/` — 94 module(s), 45,451 lines
+### `client/src/pages/` — 94 module(s), 45,455 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
