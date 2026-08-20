@@ -10,7 +10,8 @@
  *   skills    → SELECT count(*) FROM skills
  *   personas  → SELECT count(*) FROM personas WHERE is_active=true
  *   gov rules → SELECT count(*) FROM governance_rules
- *   indexes   → SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'
+ *   indexes   → SELECT count(*) FROM pg_indexes WHERE schemaname='public',
+ *                excluding manifest-defined auth/session runtime infrastructure
  *
  * Usage:
  *   npx tsx scripts/refresh-totals.ts          # rewrite docs/CURRENT_PLATFORM_TOTALS.md
@@ -28,11 +29,30 @@ import { Pool } from "pg";
 import { MODEL_REGISTRY } from "../server/model-registry";
 
 const TOTALS_PATH = "docs/CURRENT_PLATFORM_TOTALS.md";
+const INDEX_METRIC_MANIFEST_PATH = "docs/platform-index-metric.json";
 const CHECK = process.argv.includes("--check");
 const JSON_ONLY = process.argv.includes("--json");
-// Release surfaces report the platform aggregate, which excludes six
-// environment-managed indexes that appear in the live public-schema probe.
-const RELEASE_PLATFORM_INDEXES = 679;
+
+type PlatformIndexMetricManifest = {
+  metric: "platform_indexes";
+  excludedIndexNames: string[];
+};
+
+function loadPlatformIndexMetricManifest(): PlatformIndexMetricManifest {
+  const parsed: unknown = JSON.parse(readFileSync(INDEX_METRIC_MANIFEST_PATH, "utf8"));
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    (parsed as { metric?: unknown }).metric !== "platform_indexes" ||
+    !Array.isArray((parsed as { excludedIndexNames?: unknown }).excludedIndexNames) ||
+    !(parsed as { excludedIndexNames: unknown[] }).excludedIndexNames.every(
+      (name) => typeof name === "string" && name.length > 0,
+    )
+  ) {
+    throw new Error(`[refresh-totals] invalid ${INDEX_METRIC_MANIFEST_PATH}`);
+  }
+  return parsed as PlatformIndexMetricManifest;
+}
 
 function sh(cmd: string): string {
   return execSync(cmd, { encoding: "utf8" }).trim();
@@ -51,16 +71,30 @@ async function main() {
   );
   const tablesDeclared = parseInt(sh(`rg -c "= pgTable\\(" shared/schema.ts`), 10);
   const models = MODEL_REGISTRY.length;
+  const indexMetric = loadPlatformIndexMetricManifest();
 
   const pool = new Pool({ connectionString: databaseUrl });
   try {
-    const [tablesLive, skills, personas, gov, nonPrimaryKeyIndexes] = await Promise.all([
+    const [tablesLive, skills, personas, gov, platformIndexes, excludedIndexes, nonPrimaryKeyIndexes] = await Promise.all([
       pool.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'"),
       pool.query("SELECT count(*)::int AS n FROM skills"),
       pool.query("SELECT count(*)::int AS n FROM personas WHERE is_active=true"),
       pool.query("SELECT count(*)::int AS n FROM governance_rules"),
+      pool.query(
+        "SELECT count(*)::int AS n FROM pg_indexes WHERE schemaname='public' AND NOT (indexname = ANY($1::text[]))",
+        [indexMetric.excludedIndexNames],
+      ),
+      pool.query(
+        "SELECT count(*)::int AS n FROM pg_indexes WHERE schemaname='public' AND indexname = ANY($1::text[])",
+        [indexMetric.excludedIndexNames],
+      ),
       pool.query("SELECT count(*)::int AS n FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'"),
     ]);
+    if (excludedIndexes.rows[0].n !== indexMetric.excludedIndexNames.length) {
+      throw new Error(
+        `[refresh-totals] expected ${indexMetric.excludedIndexNames.length} manifest-defined infrastructure indexes, found ${excludedIndexes.rows[0].n}`,
+      );
+    }
 
     const counts = {
       tools,
@@ -69,6 +103,7 @@ async function main() {
       skills: skills.rows[0].n,
       personas: personas.rows[0].n,
       governance: gov.rows[0].n,
+      platformIndexes: platformIndexes.rows[0].n,
       nonPrimaryKeyIndexes: nonPrimaryKeyIndexes.rows[0].n,
       verifiedAt: new Date().toISOString().slice(0, 10),
     };
@@ -107,7 +142,7 @@ plus source-tree grep against \`server/\` and \`shared/schema.ts\`.
 | **Database tables (declared)** | **${counts.tablesDeclared}** | \`rg -c "= pgTable(" shared/schema.ts\` |
 | **Database tables (live in \`public\` schema)** | **${counts.tablesLive}** | \`SELECT count(*) FROM information_schema.tables WHERE table_schema='public'\` |
 | **Governance rules** | **${counts.governance}** | \`SELECT count(*) FROM governance_rules\` |
-| **Platform indexes (release aggregate)** | **${RELEASE_PLATFORM_INDEXES}** | Current release aggregate; excludes 6 environment-managed indexes from the live public-schema probe |
+| **Platform indexes (release aggregate)** | **${counts.platformIndexes}** | Live \`pg_indexes\` count minus six auth/session runtime indexes defined in [the versioned metric manifest](platform-index-metric.json) |
 | **Production indexes (non-PK operational probe)** | **${counts.nonPrimaryKeyIndexes}** | \`SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'\` |
 | **AI providers** | **6** | OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity |
 | **AI models (core registry)** | **${models} curated** | \`MODEL_REGISTRY.length\` in \`server/model-registry.ts\` |
@@ -158,7 +193,7 @@ _Re-run with \`--check\` in CI to gate that the doc is up to date._
 
     writeFileSync(TOTALS_PATH, next);
     console.log(`[refresh-totals] OK — ${TOTALS_PATH} regenerated`);
-    console.log(`  tools=${counts.tools} skills=${counts.skills}(+4=${skillsTotal}) personas=${counts.personas} tables=${counts.tablesDeclared}(declared)/${counts.tablesLive}(live) gov=${counts.governance} indexes=${RELEASE_PLATFORM_INDEXES}(release)/${counts.nonPrimaryKeyIndexes}(non-PK)`);
+    console.log(`  tools=${counts.tools} skills=${counts.skills}(+4=${skillsTotal}) personas=${counts.personas} tables=${counts.tablesDeclared}(declared)/${counts.tablesLive}(live) gov=${counts.governance} indexes=${counts.platformIndexes}(release)/${counts.nonPrimaryKeyIndexes}(non-PK)`);
   } finally {
     await pool.end();
   }
