@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { getAllToolDefinitions } from "./tools";
+import { canonicalizePersonaToolsDocInputs } from "./lib/persona-tools-doc-order";
 // R98.27.6 — pull the operating_loop source of truth so we can re-sync it
 // alongside tools_doc/agents_doc. Previously operating_loop was set only at
 // initial seed and never refreshed, so source-file edits silently failed to
@@ -247,7 +248,14 @@ export function composeSyncToolsDoc(
   customTools: CustomToolRow[],
   enabledSkills: SkillRow[],
 ): string {
-  let toolsDoc = buildToolsDoc(personaId, personaName, allTools, customTools, enabledSkills);
+  const canonicalInputs = canonicalizePersonaToolsDocInputs(customTools, enabledSkills);
+  let toolsDoc = buildToolsDoc(
+    personaId,
+    personaName,
+    allTools,
+    canonicalInputs.customTools,
+    canonicalInputs.enabledSkills,
+  );
   // R125+13.16+sec2 — preserve persona-specific seed addendums (runbook
   // pointers, playbooks) that the universal buildToolsDoc cannot synthesize.
   const addendum = PERSONA_DOCS[personaId]?.tools_doc_addendum;
