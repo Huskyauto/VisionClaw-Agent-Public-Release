@@ -70,7 +70,7 @@
     "memorystore": "^1.6.7",
     "minimatch": "^10.2.6",
     "multer": "^2.2.0",
-    "openai": "^6.27.0",
+    "openai": "^7.5.0",
     "openid-client": "^6.8.2",
     "p-limit": "^7.3.0",
     "p-retry": "^7.1.1",
