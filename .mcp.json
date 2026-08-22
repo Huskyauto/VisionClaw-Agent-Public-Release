@@ -1,0 +1,12 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schema/mcp-config-2025-03.json",
+  "mcpServers": {
+    "visionclaw": {
+      "transport": "sse",
+      "url": "https://agenticcorporation.net/api/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer ${VISIONCLAW_MCP_KEY}"
+      }
+    }
+  }
+}

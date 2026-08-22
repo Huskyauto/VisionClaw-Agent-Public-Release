@@ -1,0 +1,24 @@
+{
+  "name": "VisionClaw Agent — Autonomous AI Corporation",
+  "short_name": "VisionClaw Agent",
+  "description": "R125+155+sec2: an 18-agent AI team with 413 tools, 134 capabilities, and 155 reference surfaces—plus managed skills validated before prompt injection",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0b",
+  "theme_color": "#ef4444",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
