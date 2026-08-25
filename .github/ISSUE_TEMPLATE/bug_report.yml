@@ -1,0 +1,56 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. The more detail you give, the faster it can be reproduced and fixed.
+        **Security-sensitive issues should be emailed to huskyauto@gmail.com — see SECURITY.md.**
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: When I clicked X, the app did Y instead of Z.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to /agent-board
+        2. Click "Spawn subagent"
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: deployment
+    attributes:
+      label: Deployment type
+      description: Replit, Docker, bare metal, hosted (agenticcorporation.net), etc.
+      placeholder: Docker on Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit / version
+      description: Output of `git rev-parse --short HEAD` or the release tag you're on.
+      placeholder: e.g. 5d1c37a or v0.1.1
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Server console output, browser console, or `/code-health` excerpts.
+      render: shell
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have searched existing issues for duplicates.
+          required: true
+        - label: I am not reporting a security vulnerability (those go to huskyauto@gmail.com).
+          required: true
