@@ -54,7 +54,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **The app runs with just one LLM key and a Postgres database.** Everything else — email, payments, voice, Drive — is optional and appears automatically when you add the key.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **414 tools · 67 total skills · 135 active capabilities · 18 personas · 179 declared / 234 live tables · 41 governance rules · 703 platform indexes · 77 curated AI models · 6 AI providers · 6 deployment targets.** Live, always-current counts: [`docs/CURRENT_PLATFORM_TOTALS.md`](docs/CURRENT_PLATFORM_TOTALS.md). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **414 tools · 67 total skills · 135 active capabilities · 18 personas · 180 declared / 235 live tables · 41 governance rules · 709 platform indexes · 77 curated AI models · 6 AI providers · 6 deployment targets.** Live, always-current counts: [`docs/CURRENT_PLATFORM_TOTALS.md`](docs/CURRENT_PLATFORM_TOTALS.md). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 **Latest — R125+155.2+sec (August 25, 2026):** trusted operational runbooks use reserved server-owned provenance, explicit persona-scoped retrieval, and content-matched embeddings, so tenant-controlled knowledge cannot impersonate authoritative guidance. R125+155.2 adds the official CMMC Level 1 package with 15 requirements, 59 objectives, immutable assessment snapshots, scope-based N/A rationales, and race-safe controlled report delivery.
 
@@ -327,7 +327,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
         ┌──────────┐   ┌────────────┐   ┌────────────┐
         │ PostgreSQL│   │ Google     │   │ 6 AI       │
         │ + pgvector│   │ Drive      │   │ Providers  │
-        │ 179 declared / 234 live tables │   │ Storage    │   │ 77 curated │
+        │ 180 declared / 235 live tables │   │ Storage    │   │ 77 curated │
         └──────────┘   └────────────┘   └────────────┘
 ```
 
@@ -515,7 +515,7 @@ server/                       # Express backend
     middleware/               # Extracted dispatch middleware (policy, telemetry, tenant seam)
   routes.ts                   # 300+ API endpoints
   site-config.ts              # Centralized env-driven configuration
-  seed.ts                     # Database seeding (179 declared / 234 live tables, 41 rules, 18 personas)
+  seed.ts                     # Database seeding (180 declared / 235 live tables, 41 rules, 18 personas)
   heartbeat.ts                # Background task scheduler with model-catalog sync (R73)
   model-catalog.ts            # Daily OpenRouter catalog scan + gateway probe (R73)
   orchestrator-ledger.ts      # Per-tenant cost ledger with pg_advisory locks (R73.B)

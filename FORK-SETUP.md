@@ -138,7 +138,7 @@ The seed script will populate default personas, skills, and platform configurati
 - **AI**: Multi-provider routing (OpenAI, Anthropic, Google, xAI, OpenRouter)
 - **18 AI Personas**: VisionClaw, Felix, Forge, Teagan, Blueprint, Chief of Staff, Scribe, Proof, Radar, Neptune, Apollo, Atlas, Cassandra, Luna, Minerva, Robert, Hermes, Echo
 - **Hundreds of built-in tools**: Research, documents, email, CRM, code execution, and more
-- **175 declared / 230 live database tables**, **703 platform indexes**, **135 active capabilities**, 67 total skills + governance rules, and a **76-model** curated AI registry + 1000+ daily catalog discovery
+- **175 declared / 230 live database tables**, **709 platform indexes**, **135 active capabilities**, 67 total skills + governance rules, and a **76-model** curated AI registry + 1000+ daily catalog discovery
 - See [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md) for the authoritative count.
 
 ## Graceful Degradation
