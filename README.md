@@ -54,7 +54,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **The app runs with just one LLM key and a Postgres database.** Everything else — email, payments, voice, Drive — is optional and appears automatically when you add the key.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **416 tools · 67 total skills · 135 active capabilities · 18 personas · 165 declared / 240 live tables · 41 governance rules · 736 platform indexes · 78 curated AI models · 6 AI providers · 6 deployment targets.** Live, always-current counts: [`docs/CURRENT_PLATFORM_TOTALS.md`](docs/CURRENT_PLATFORM_TOTALS.md). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **417 tools · 67 total skills · 135 active capabilities · 18 personas · 165 declared / 242 live tables · 41 governance rules · 742 platform indexes · 78 curated AI models · 6 AI providers · 6 deployment targets.** Live, always-current counts: [`docs/CURRENT_PLATFORM_TOTALS.md`](docs/CURRENT_PLATFORM_TOTALS.md). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 **Latest — R125+155.3 (September 3, 2026):** Economical multi-agent execution now uses NVIDIA Nemotron 3 Super as the first worker in the built-in `cheap` proposer pool and as the first economical seat in the `mixed` pool. Runtime model overrides and the existing free-only remap retain precedence, so the preference cannot silently force paid usage. Explicit model choices, protected frontier and premium lanes, aggregators, final synthesis, tenant attribution, owner spend ceilings, and provider quarantine remain unchanged. The preceding R125+155.2+sec13 release added exact Nemotron pricing ($0.085/M input, $0.40/M output) and enforced provider quarantine at both model selection and client resolution. Verification: 38/38 focused assertions, TypeScript, production build, stale-string gate, runtime restart, and final independent architect review passed.
 
@@ -120,7 +120,7 @@ flowchart TB
     P1 --> TOOLS
     P2 --> TOOLS
 
-    subgraph TOOLS["Tool layer — 416 governed tools"]
+    subgraph TOOLS["Tool layer — 417 governed tools"]
         direction TB
         T1["File I/O · web · email · LLM · payments · drive"]
         T2["TNR snapshots — irreversible calls are undoable"]
@@ -154,7 +154,7 @@ flowchart TB
     Engineer)        Writer)          Research)              runtime adapter)
         │                │                │                       │
         └──────┬─────────┴────────────────┴───────────────────────┘
-               │  tool dispatch (416 tools)
+               │  tool dispatch (417 tools)
                ▼
    ┌──────────────────────────────────────────────────────────────┐
    │  Tool layer: file I/O · web · email · LLM · payments · drive │
@@ -248,7 +248,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
       <p align="center"><sub><b>Landing hero</b> — value prop in one line, with three real CTAs.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/images/tour-command-center.jpg"><img src="docs/images/tour-command-center.jpg" alt="Command Center — 18 agents, 416 tools, 78 curated models + 1000+ daily catalog, live workflows" /></a>
+      <a href="docs/images/tour-command-center.jpg"><img src="docs/images/tour-command-center.jpg" alt="Command Center — 18 agents, 417 tools, 78 curated models + 1000+ daily catalog, live workflows" /></a>
       <p align="center"><sub><b>Command Center</b> — live counts, recent ops with status pills, capability chips.</sub></p>
     </td>
   </tr>
@@ -283,7 +283,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | Metric | Count |
 |--------|-------|
 | AI Agents (Personas) | 18 |
-| Built-in Tools | 416 |
+| Built-in Tools | 417 |
 | AI Models in Core Registry | 78 curated |
 | Daily Catalog Discovery | 1000+ models scanned on OpenRouter |
 | AI Providers | 6 (OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity) |
@@ -293,7 +293,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | Skills | 67 total (63 DB-seeded skills + 4 platform agent skills) |
 | Frontend Pages | 40+ |
 | API Endpoints | 300+ |
-| Database Tables | 165 declared / 240 live |
+| Database Tables | 165 declared / 242 live |
 
 ---
 
@@ -317,7 +317,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
                    │             │              │
                    ▼             ▼              ▼
             ┌─────────────────────────────────────────┐
-            │          416 Tools                      │
+            │          417 Tools                      │
             │  Search · Write · Build · Analyze ·     │
             │  Email · Pay · Generate · Research       │
             └──────────────────┬──────────────────────┘
@@ -327,7 +327,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
         ┌──────────┐   ┌────────────┐   ┌────────────┐
         │ PostgreSQL│   │ Google     │   │ 6 AI       │
         │ + pgvector│   │ Drive      │   │ Providers  │
-        │ 165 declared / 240 live tables │   │ Storage    │   │ 78 curated │
+        │ 165 declared / 242 live tables │   │ Storage    │   │ 78 curated │
         └──────────┘   └────────────┘   └────────────┘
 ```
 
@@ -510,12 +510,12 @@ client/                       # React frontend
 server/                       # Express backend
   chat-engine.ts              # Core AI conversation engine with streaming
   tools.ts                    # Legacy tool facade + dispatcher (strangler-fig split in progress)
-  tools/                      # 416 tools — per-domain modules (70+ domains) + shared middleware
+  tools/                      # 417 tools — per-domain modules (70+ domains) + shared middleware
     domains/                  # crm, finance, media, legal, knowledge, delivery, governance, ...
     middleware/               # Extracted dispatch middleware (policy, telemetry, tenant seam)
   routes.ts                   # 300+ API endpoints
   site-config.ts              # Centralized env-driven configuration
-  seed.ts                     # Database seeding (165 declared / 240 live tables, 41 rules, 18 personas)
+  seed.ts                     # Database seeding (165 declared / 242 live tables, 41 rules, 18 personas)
   heartbeat.ts                # Background task scheduler with model-catalog sync (R73)
   model-catalog.ts            # Daily OpenRouter catalog scan + gateway probe (R73)
   orchestrator-ledger.ts      # Per-tenant cost ledger with pg_advisory locks (R73.B)
@@ -529,7 +529,7 @@ server/                       # Express backend
   email.ts                    # Email server and tenant inboxes
   scaffolding.ts              # 75 corporate operation scaffolds
 shared/
-  schema.ts                   # Drizzle ORM schema (165 declared / 240 live — see docs/CURRENT_PLATFORM_TOTALS.md)
+  schema.ts                   # Drizzle ORM schema (165 declared / 242 live — see docs/CURRENT_PLATFORM_TOTALS.md)
 scripts/
   clean-for-release.sh        # Sanitize codebase for public release
 FORK-SETUP.md                 # Detailed setup instructions
@@ -572,7 +572,7 @@ npm run dev
 
 In under 10 minutes, you go from `git clone` to a live dashboard with 18 agents, seeded governance, and a `/setup` checklist that tells you exactly what's configured and what's missing.
 
-1. The database auto-creates all 240 live tables and full index set
+1. The database auto-creates all 242 live tables and full index set
 2. 41 governance rules and 18 AI personas are seeded automatically
 3. You're redirected to the **Setup Checklist** at `/setup` showing what's configured
 4. Click **Create Account** — the first account becomes the admin

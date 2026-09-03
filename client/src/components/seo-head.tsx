@@ -22,10 +22,10 @@ export function SeoHead({
 }: SeoHeadProps) {
   const { config } = useSiteConfig();
   const pName = config.platformName || "VisionClaw Agent";
-  const currentDescription = description.replace(/\b(?:413|414|415) tools\b/g, "416 tools");
-  const currentOgDescription = ogDescription?.replace(/\b(?:413|414|415) tools\b/g, "416 tools");
+  const currentDescription = description.replace(/\b(?:413|414|415|416) tools\b/g, "417 tools");
+  const currentOgDescription = ogDescription?.replace(/\b(?:413|414|415|416) tools\b/g, "417 tools");
   const effectiveDescription = useCurrentPlatformDescription
-    ? `R125+155.3: Deploy an 18-agent AI team with 416 tools, 135 capabilities, and 240 live tables. Economical multi-agent pools now use Nemotron 3 Super as their first parallel worker while free-only remapping, frontier seats, premium ensembles, and final synthesis remain unchanged. R125+155.2+sec13 adds exact pricing and fail-closed provider quarantine.`
+    ? `R125+155.3: Deploy an 18-agent AI team with 417 tools, 135 capabilities, and 242 live tables. Economical multi-agent pools now use Nemotron 3 Super as their first parallel worker while free-only remapping, frontier seats, premium ensembles, and final synthesis remain unchanged. R125+155.2+sec13 adds exact pricing and fail-closed provider quarantine.`
     : currentDescription;
   const effectiveOgDescription = useCurrentPlatformDescription
     ? "R125+155.3: economical multi-agent pools use Nemotron 3 Super first for parallel worker fan-out without forcing paid use or changing final synthesis. R125+155.2+sec13 exact accounting and provider quarantine remain in force."
