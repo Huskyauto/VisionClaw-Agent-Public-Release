@@ -4,7 +4,8 @@
  * "no tags, no GitHub Releases — people can't git bisect or diff snapshots").
  *
  * For each mirror push this script:
- *   1. Derives the current R-round from replit.md (first Recent-rounds bullet),
+ *   1. Derives the current R-round from replit.md (first top-level release heading,
+ *      with the compact Recent-rounds archive retained as a fallback),
  *      e.g. "R125+137.28" → tag "r125.137.28" / version "125.137.28".
  *   2. Points refs/tags/<tag> at the public repo's current main HEAD via the
  *      GitHub git-refs API (create, or force-update if the tag exists — a
@@ -48,13 +49,19 @@ function deriveRound(): { tag: string; heading: string; body: string } {
     return { tag: process.env.MIRROR_TAG, heading: process.env.MIRROR_TAG, body: "Manual tag (MIRROR_TAG override)." };
   }
   const full = readFileSync(resolve(process.cwd(), "replit.md"), "utf8");
-  // Anchor to the "Recent rounds" section so an earlier R-bullet elsewhere in the
-  // file can never win (architect robustness caveat, R125+137.29).
+  const section = full.match(/^## (R[\d.+]+(?:\+sec[\d-]*)?) — (.+?) \(([^)]+)\)\s*$/m);
+  if (section) {
+    const round = section[1];
+    const tag = "r" + round.slice(1).replace(/\+sec[\d-]*$/, "").replace(/\+/g, ".");
+    const body = `**${round}** (${section[3]})\n\n${section[2]}\n\n_Sanitized public snapshot — see docs/schema-snapshot.sql for the diffable schema DDL of this release._`;
+    return { tag, heading: `${round} — public mirror snapshot`, body };
+  }
+  // Backward-compatible fallback for older replit.md layouts.
   const anchor = full.indexOf("**Recent rounds");
   const md = anchor >= 0 ? full.slice(anchor) : full;
   // First bullet under "Recent rounds": - **R125+137.28** (date) — prose...
   const m = md.match(/^- \*\*(R[\d.+]+(?:\+sec[\d-]*)?)\*\* \(([^)]+)\) — ([\s\S]*?)(?=\n- \*\*R|\n\n)/m);
-  if (!m) fail(1, "could not derive current round from replit.md Recent rounds — set MIRROR_TAG to override");
+  if (!m) fail(1, "could not derive current round from replit.md — set MIRROR_TAG to override");
   const round = m[1]; // e.g. R125+137.28 or R125+140+sec
   // Tag is semver-ish: drop any +sec suffix, then + → . (R125+140+sec → r125.140)
   const tag = "r" + round.slice(1).replace(/\+sec[\d-]*$/, "").replace(/\+/g, ".");
