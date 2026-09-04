@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Inside VisionClaw</title>
+<style>
+  :root {
+    --bg: #eef0f3;
+    --ink: #0b0d10;
+    --muted: #5b6470;
+    --line: #d7dce3;
+    --term-bg: #0c0f13;
+    --term-fg: #d6dde6;
+    --green: #5ad17d;
+    --blue: #6aa9ff;
+    --orange: #ffb86b;
+    --pink: #ff7ab6;
+    --purple: #b78bff;
+    --yellow: #f3e26a;
+    --red: #ff6a6a;
+    --cyan: #6ad7d7;
+    --card: #ffffff;
+    --card-border: #e3e7ec;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  .canvas {
+    width: 1280px;
+    height: 720px;
+    padding: 14px 18px 14px;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+  }
+  .head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 0 4px 10px;
+  }
+  h1 {
+    font-size: 26px; line-height: 1.05; font-weight: 800;
+    margin: 0; letter-spacing: -0.5px; white-space: nowrap;
+  }
+  .sub {
+    font-size: 12.5px; color: var(--muted); font-weight: 500;
+    margin: 0 0 0 14px; white-space: nowrap;
+  }
+  .cta-top {
+    font-size: 12px; color: var(--muted); font-weight: 600;
+  }
+  .cta-top b { color: #d23b3b; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 520px 290px 1fr;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* terminal */
+  .term {
+    background: var(--term-bg);
+    color: var(--term-fg);
+    padding: 10px 14px 12px;
+    border-radius: 14px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.16);
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    font-size: 11.5px;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+  .term .titlebar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: -2px -4px 8px; padding-bottom: 6px;
+    border-bottom: 1px solid #1d2229;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .term .tab { color: #9aa3af; font-size: 11px; }
+  .term .row { white-space: pre; }
+  .c-green { color: var(--green); }
+  .c-blue  { color: var(--blue); }
+  .c-orange{ color: var(--orange); }
+  .c-pink  { color: var(--pink); }
+  .c-purple{ color: var(--purple); }
+  .c-yellow{ color: var(--yellow); }
+  .c-cyan  { color: var(--cyan); }
+  .c-red   { color: var(--red); }
+  .c-mute  { color: #7a8392; }
+
+  /* middle col */
+  .col { display: flex; flex-direction: column; min-height: 0; }
+  .section-title {
+    font-size: 14px; font-weight: 800; margin: 2px 2px 7px;
+  }
+  .card-stack { display: flex; flex-direction: column; gap: 5px; }
+  .ncard {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 9px;
+    padding: 5px 9px;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,.02);
+  }
+  .ncard.hl { background: #e8f6ec; border-color: #bfe3c8; }
+  .num {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #f1f3f6; color: var(--ink);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .ncard.hl .num { background: #cdebd5; }
+  .ncard .body { display: flex; flex-direction: column; line-height: 1.18; }
+  .ncard .ttl { font-size: 11.5px; font-weight: 700; }
+  .ncard .desc { font-size: 9.5px; color: var(--muted); margin-top: 1px; }
+
+  /* right col stacked */
+  .right-col { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .flow .frow {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 9px; padding: 6px 10px;
+    font-size: 11px; font-weight: 700; text-align: center;
+  }
+  .flow .frow .s { display: block; font-size: 9px; color: var(--muted); font-weight: 500; margin-top: 1px; }
+  .flow .card-stack { gap: 4px; }
+  .flow .fanout {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;
+  }
+  .flow .fanout .frow { padding: 5px 4px; font-size: 9.5px; }
+
+  .infra {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 8px 10px 10px;
+    flex: 0 0 auto;
+  }
+  .infra h3 {
+    margin: 0 0 7px; font-size: 13px; font-weight: 800;
+  }
+  .infra .row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  }
+  .icard {
+    border: 1.5px solid var(--card-border); border-radius: 8px;
+    padding: 5px 6px; text-align: center; background: #fff;
+  }
+  .icard .name { font-size: 10px; font-weight: 800; line-height: 1.15; }
+  .icard .name .b { color: var(--muted); font-weight: 600; }
+  .icard .li { font-size: 8.5px; color: var(--muted); line-height: 1.25; margin-top: 2px; }
+  .icard.pg   { border-color: #bfe3c8; }
+  .icard.moa  { border-color: #c8d6ff; }
+  .icard.tier { border-color: #d6c5ff; }
+  .icard.ahb  { border-color: #ffd2c5; }
+  .icard.del  { border-color: #ffe39a; }
+  .icard.hitl { border-color: #b5e6e0; }
+
+  .footer-cta {
+    margin: 6px 4px 0;
+    font-size: 13px; font-weight: 700; text-align: center;
+  }
+  .footer-cta .pill { color: #d23b3b; font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <div class="head">
+    <div style="display:flex; align-items:baseline;">
+      <h1>Inside VisionClaw — Agentic OS, not a wrapper</h1>
+      <span class="sub">16 personas · 371 tools · 179 tables · AHB safety · MoA jury · BYO-keys</span>
+    </div>
+    <div class="cta-top">Built solo on Replit · Comment <b>"SKILLS"</b> for the 122-skill manifest</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- LEFT: repo tree -->
+    <div class="term">
+      <div class="titlebar">
+        <div class="dots"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+        <div class="tab">bob — visionclaw — zsh</div>
+        <div style="width:30px"></div>
+      </div>
+<div class="row"><span class="c-blue">visionclaw/</span>          <span class="c-mute">← Express + Vite + Drizzle + pgvector</span></div>
+<div class="row">├── <span class="c-green">server/</span>               <span class="c-mute">← agent runtime · 371 tools</span></div>
+<div class="row">│   ├── <span class="c-green">tools.ts</span>          <span class="c-mute">tool registry · per-persona ACLs</span></div>
+<div class="row">│   ├── <span class="c-green">moa.ts</span>            <span class="c-mute">MoA jury · κ concordance</span></div>
+<div class="row">│   ├── <span class="c-green">providers.ts</span>      <span class="c-mute">3-tier model fallback</span></div>
+<div class="row">│   ├── <span class="c-green">delivery-pipeline.ts</span> <span class="c-mute">5-stage customer delivery</span></div>
+<div class="row">│   ├── <span class="c-green">safety/</span>           <span class="c-mute">destructive-tool policy · AHB</span></div>
+<div class="row">│   ├── <span class="c-green">seed-persona-prompts.ts</span> <span class="c-mute">16 personas</span></div>
+<div class="row">│   └── <span class="c-green">routes/</span>           <span class="c-mute">Express · Helmet · CSRF · Zod</span></div>
+<div class="row">├── <span class="c-blue">client/</span>               <span class="c-mute">← React 18 + shadcn + TanStack</span></div>
+<div class="row">│   ├── <span class="c-blue">pages/</span>            <span class="c-mute">landing · dashboard · admin</span></div>
+<div class="row">│   └── <span class="c-blue">components/</span>       <span class="c-mute">Wouter · Framer · Tailwind</span></div>
+<div class="row">├── <span class="c-orange">shared/</span>               <span class="c-mute">← Drizzle schema · 179 tables</span></div>
+<div class="row">│   └── <span class="c-orange">schema.ts</span>         <span class="c-mute">tenant_id NOT NULL · no defaults</span></div>
+<div class="row">├── <span class="c-purple">.agents/skills/</span>       <span class="c-mute">← 29 operational runbooks</span></div>
+<div class="row">│   ├── <span class="c-purple">post-edit-pipeline</span> <span class="c-mute">architect → push → email</span></div>
+<div class="row">│   ├── <span class="c-purple">marketing-week-autopilot</span> <span class="c-mute">Mon 7am conductor</span></div>
+<div class="row">│   └── <span class="c-purple">security-hardening</span> <span class="c-mute">AHB · intent · TOOL_POLICIES</span></div>
+<div class="row">├── <span class="c-yellow">data/</span>                 <span class="c-mute">← 31 output-skills · 62 db skills</span></div>
+<div class="row">├── <span class="c-pink">scripts/</span>              <span class="c-mute">← one-line agent-runnable</span></div>
+<div class="row">│   ├── <span class="c-pink">agentic-ci-self-heal.ts</span> <span class="c-mute">CI self-healer</span></div>
+<div class="row">│   └── <span class="c-pink">golden-path-replay.ts</span> <span class="c-mute">prod regression replay</span></div>
+<div class="row">├── <span class="c-cyan">tests/</span>                <span class="c-mute">← 63 *.test.ts · AHB regression</span></div>
+<div class="row">└── <span class="c-red">replit.md</span>             <span class="c-mute">← source-of-truth manifest</span></div>
+    </div>
+
+    <!-- MIDDLE: agent loop -->
+    <div class="col">
+      <div class="section-title">Agent Loop (per turn)</div>
+      <div class="card-stack">
+        <div class="ncard"><span class="num">1</span><div class="body"><span class="ttl">Intent Gate</span><span class="desc">AHB safety_profile · fail-OPEN logged</span></div></div>
+        <div class="ncard"><span class="num">2</span><div class="body"><span class="ttl">Persona Route</span><span class="desc">16 personas · CEO orchestrator</span></div></div>
+        <div class="ncard"><span class="num">3</span><div class="body"><span class="ttl">Tool Select</span><span class="desc">per-persona ACL · embedding match</span></div></div>
+        <div class="ncard hl"><span class="num">4</span><div class="body"><span class="ttl">ensemble_query</span><span class="desc">MoA jury · 3 / 5 / 6 proposers · κ score</span></div></div>
+        <div class="ncard"><span class="num">5</span><div class="body"><span class="ttl">Verify (CoVe)</span><span class="desc">chain-of-verification · self-check</span></div></div>
+        <div class="ncard"><span class="num">6</span><div class="body"><span class="ttl">Destructive Policy</span><span class="desc">fail-CLOSED · HITL on money/comms</span></div></div>
+        <div class="ncard"><span class="num">7</span><div class="body"><span class="ttl">deliver_product</span><span class="desc">streaming /uploads · Drive viewUrl</span></div></div>
+        <div class="ncard"><span class="num">8</span><div class="body"><span class="ttl">Telemetry + MNEMA</span><span class="desc">decline-events · memory · debounced</span></div></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: live flow + infra -->
+    <div class="right-col">
+      <div class="flow">
+        <div class="section-title">Live Request Flow</div>
+        <div class="card-stack">
+          <div class="frow">User asks Bob<span class="s">chat · webhook · scheduled task</span></div>
+          <div class="frow">Helmet + CSRF + Zod<span class="s">/api · validated · tenant scoped</span></div>
+          <div class="frow">Persona resolver + intent gate<span class="s">safety_profile · restrictedCategories</span></div>
+          <div class="frow">ensemble_query + CoVe<span class="s">frontier / cheap / mixed pool · κ</span></div>
+          <div class="fanout">
+            <div class="frow">Tool dispatch<span class="s">371 tools</span></div>
+            <div class="frow">deliverDigitalProduct<span class="s">stream + Drive</span></div>
+            <div class="frow">MNEMA write<span class="s">k=5 kin</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="infra">
+        <h3>Real Agentic Infra — built-in, not bolted on</h3>
+        <div class="row">
+          <div class="icard pg">
+            <div class="name"><span class="b">[Postgres]</span><br/>+ pgvector</div>
+            <div class="li">179 tables · 511 idx<br/>tenant_id NOT NULL</div>
+          </div>
+          <div class="icard moa">
+            <div class="name"><span class="b">[MoA]</span><br/>jury · κ score</div>
+            <div class="li">3·5·6 proposers<br/>κ &lt; 0.5 ⇒ HITL</div>
+          </div>
+          <div class="icard tier">
+            <div class="name"><span class="b">[Fallback]</span><br/>3-tier model</div>
+            <div class="li">frontier·cheap·free<br/>4 wire formats</div>
+          </div>
+          <div class="icard ahb">
+            <div class="name"><span class="b">[AHB]</span><br/>safety layer</div>
+            <div class="li">intent fail-open<br/>destructive fail-closed</div>
+          </div>
+          <div class="icard del">
+            <div class="name"><span class="b">[Delivery]</span><br/>stream + Drive</div>
+            <div class="li">/uploads faststart<br/>secret-scan gate</div>
+          </div>
+          <div class="icard hitl">
+            <div class="name"><span class="b">[HITL]</span><br/>human-in-loop</div>
+            <div class="li">money · creds · comms<br/>token-signed approval</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-cta">
+    No Vercel · no Supabase · no PostHog · no Sentry — <span class="pill">Postgres does the work of all four.</span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or general discussion
+    url: https://github.com/Huskyauto/VisionClaw-Agent-Public-Release/discussions
+    about: For usage questions, deployment help, and ideas. Bug reports and feature requests should use the templates instead.
+  - name: Security vulnerability
+    url: https://github.com/Huskyauto/VisionClaw-Agent-Public-Release/blob/main/SECURITY.md
+    about: Please email huskyauto@gmail.com directly. Do not open a public issue.

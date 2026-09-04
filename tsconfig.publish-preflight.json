@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["scripts/publish-preflight.ts"],
+  "exclude": ["node_modules", "build", "dist"],
+  "compilerOptions": {
+    "incremental": false,
+    "noImplicitAny": false,
+    "tsBuildInfoFile": null
+  }
+}
