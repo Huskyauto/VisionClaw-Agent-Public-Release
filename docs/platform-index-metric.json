@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "metric": "platform_indexes",
+  "description": "Public-schema application indexes, excluding environment-managed session and authentication runtime infrastructure.",
+  "excludedIndexNames": [
+    "IDX_session_expire",
+    "sessions_pkey",
+    "auth_sessions_pkey",
+    "idx_auth_sessions_expires",
+    "idx_auth_sessions_tenant",
+    "idx_auth_sessions_tenant_id"
+  ]
+}
