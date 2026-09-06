@@ -1,0 +1,37 @@
+name: Docs
+
+permissions:
+  contents: read
+
+# The main `ci.yml` workflow intentionally skips markdown/docs-only commits
+# (paths-ignore) to save Actions minutes. This lightweight workflow runs ONLY
+# on those docs commits so (a) every commit still gets a status check and
+# (b) platform counts can never silently drift from the single source of truth
+# (docs/CURRENT_PLATFORM_TOTALS.md).
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.md'
+
+jobs:
+  verify-counts:
+    name: Verify platform counts (docs vs SoT)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.12.0"
+          cache: "npm"
+      - run: npm ci
+      - name: Counts agree with docs/CURRENT_PLATFORM_TOTALS.md
+        # Use the lockfile's tsx rather than resolving a floating package at CI
+        # time. In the public mirror this script is rewritten to read README.md.
+        run: npx --no-install tsx scripts/verify-counts.ts
