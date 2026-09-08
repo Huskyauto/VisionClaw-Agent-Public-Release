@@ -193,6 +193,16 @@ test("client job projection strips private render plans and server paths", () =>
     status: "rendering",
     tenantId: 42,
     finalFilePath: "/workspace/private/output.mp4",
+    instanceId: "private-runner-instance",
+    concatAttempts: 4,
+    chapters: [{
+      idx: 0,
+      title: "Chapter 1",
+      scene_count: 3,
+      status: "rendering",
+      file_path: "/workspace/private/chapter-1.mp4",
+      duration_sec: 12.5,
+    }],
     spec: {
       voice: "onyx",
       renderManifest: { version: 1, chapters: [{ chapterTitle: "private narration", scenes: [] }] },
@@ -209,4 +219,45 @@ test("client job projection strips private render plans and server paths", () =>
   assert.equal((projected.spec as any).customerEmail, undefined);
   assert.equal((projected.spec as any)._projectDriveFolderId, undefined);
   assert.equal(projected.spec.voice, "onyx");
+  assert.equal(projected.tenantId, undefined);
+  assert.equal(projected.instanceId, undefined);
+  assert.equal(projected.concatAttempts, undefined);
+  assert.equal(projected.chapters[0].file_path, undefined);
+  assert.equal(projected.chapters[0].duration_sec, 12.5);
+});
+
+test("completed job projection preserves the customer-safe Drive delivery link", () => {
+  const projected = toClientRow({
+    jobId: "vj_recoverytest_drive",
+    status: "done",
+    tenantId: 42,
+    finalFilePath: null,
+    finalDriveUrl: "https://drive.google.com/file/d/safe-delivery/view?usp=sharing",
+    spec: {},
+  }, 42);
+
+  assert.equal(
+    projected.finalDriveUrl,
+    "https://drive.google.com/file/d/safe-delivery/view?usp=sharing",
+  );
+});
+
+test("job projection rejects Drive links that are unfinished or not trusted HTTPS Google hosts", () => {
+  const base = {
+    jobId: "vj_recoverytest_drive_guard",
+    tenantId: 42,
+    finalFilePath: null,
+    spec: {},
+  };
+  const cases = [
+    { status: "rendering", finalDriveUrl: "https://drive.google.com/file/d/not-ready/view" },
+    { status: "done", finalDriveUrl: "javascript:alert(1)" },
+    { status: "done", finalDriveUrl: "http://drive.google.com/file/d/insecure/view" },
+    { status: "done", finalDriveUrl: "https://drive.google.com.evil.example/file/d/lookalike/view" },
+    { status: "done", finalDriveUrl: "https://127.0.0.1/private-video" },
+  ];
+
+  for (const row of cases) {
+    assert.equal(toClientRow({ ...base, ...row }, 42).finalDriveUrl, null);
+  }
 });

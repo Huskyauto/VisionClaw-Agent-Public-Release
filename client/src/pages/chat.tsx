@@ -23,6 +23,7 @@ import type { Conversation, Message, Persona } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { normalizeAssistantMarkdown } from "@/lib/normalize-chat-markdown";
+import { extractDeliverablesFromTools, type Deliverable } from "@/lib/chat-deliverables";
 import { format } from "date-fns";
 import { ChartRenderer, type ChartData } from "@/components/chat-chart";
 import { ActionBalloons, ThinkingIndicator, type ActionBalloon } from "@/components/chat-activity-indicators";
@@ -49,76 +50,6 @@ function extractChartsFromTools(tools: ToolCallInfo[]): ChartData[] {
     }
   }
   return charts;
-}
-
-// R98.4 — Universal Deliverable Card extractor. Scans tool outputs for media
-// URLs (watch_url + download_url + drive_url) and produces structured cards
-// the chat surface renders as big tap-to-watch / tap-to-download buttons —
-// so Felix's deliverables look the same as the agent's present_asset cards
-// instead of plain blue markdown links.
-type Deliverable = {
-  toolName: string;
-  kind: "video" | "audio" | "pdf" | "image" | "file";
-  title: string;
-  watchUrl?: string;
-  downloadUrl?: string;
-  driveUrl?: string;
-  emailedTo?: string;
-};
-// R98.4+sec — URL protocol guard. Blocks javascript:/data:/vbscript: hrefs
-// from hostile tool output. Allows http(s):, mailto:, tel:, blob:, and
-// site-relative paths (/v/, /uploads/, /api/, etc).
-function isSafeDeliverableUrl(url?: string): url is string {
-  if (!url || typeof url !== "string") return false;
-  if (url.startsWith("/") && !url.startsWith("//")) return true;
-  const m = url.match(/^([a-z][a-z0-9+.-]*):/i);
-  if (!m) return false;
-  const proto = m[1].toLowerCase();
-  return proto === "http" || proto === "https" || proto === "mailto" || proto === "tel" || proto === "blob";
-}
-function safeDecode(s: string): string {
-  try { return decodeURIComponent(s); } catch { return s; }
-}
-function extractDeliverablesFromTools(tools: ToolCallInfo[]): Deliverable[] {
-  const out: Deliverable[] = [];
-  for (const tool of tools) {
-    if (!tool.output) continue;
-    const o = typeof tool.output === "string" ? (() => { try { return JSON.parse(tool.output); } catch { return null; } })() : tool.output;
-    if (!o || typeof o !== "object") continue;
-    const rawWatch = typeof o.watch_url === "string" ? o.watch_url
-      // R124/R125 — build_video_from_brief AND the routed produce_video both
-      // return watch_progress_url (e.g. /jobs/vj_xxx) for the persistent
-      // live-progress page. Treat it as the watch link so the inline
-      // DeliverableCard renders the moment the agent fires either tool —
-      // Bob gets an immediate clickable affordance to watch chapters render
-      // live, no waiting for the email at the end.
-      : ((tool.name === "build_video_from_brief" || tool.name === "produce_video") && typeof o.watch_progress_url === "string") ? o.watch_progress_url
-      : undefined;
-    const rawDownload = typeof o.download_url === "string" ? o.download_url
-      : (typeof o.url === "string" && (o.url.startsWith("/v/") || o.url.startsWith("/uploads/") || /\.(mp4|mp3|wav|m4a|pdf|zip|docx|pptx)$/i.test(o.url))) ? (o.url.includes("?") ? o.url : `${o.url}${o.url.startsWith("/v/") ? "?dl=1" : ""}`)
-      : undefined;
-    const rawDrive = typeof o.drive_url === "string" ? o.drive_url : (typeof o.driveUrl === "string" ? o.driveUrl : undefined);
-    const watchUrl = isSafeDeliverableUrl(rawWatch) ? rawWatch : undefined;
-    const downloadUrl = isSafeDeliverableUrl(rawDownload) ? rawDownload : undefined;
-    const driveUrl = isSafeDeliverableUrl(rawDrive) ? rawDrive : undefined;
-    if (!watchUrl && !downloadUrl && !driveUrl) continue;
-    const probe = (watchUrl || downloadUrl || driveUrl || "").toLowerCase();
-    let kind: Deliverable["kind"] = "file";
-    if (/\.(mp4|mov|webm|m4v)(\?|$)/.test(probe) || /\/v\/.*\.mp4/.test(probe) || tool.name === "produce_video" || tool.name === "create_slideshow_video" || tool.name === "build_video_from_brief") kind = "video";
-    else if (/\.(mp3|wav|m4a|ogg)(\?|$)/.test(probe) || tool.name === "generate_audio") kind = "audio";
-    else if (/\.pdf(\?|$)/.test(probe) || tool.name === "create_pdf") kind = "pdf";
-    else if (/\.(png|jpg|jpeg|webp|gif)(\?|$)/.test(probe) || tool.name === "generate_image" || tool.name === "generate_social_image") kind = "image";
-    const title = (typeof o.title === "string" && o.title) || (typeof o.filename === "string" && o.filename)
-      || (downloadUrl ? safeDecode(downloadUrl.split("?")[0].split("/").pop() || "") : "")
-      || (watchUrl ? safeDecode(watchUrl.split("?")[0].split("/").pop() || "") : "")
-      || `${kind.charAt(0).toUpperCase() + kind.slice(1)} ready`;
-    const emailedTo = typeof o.emailed_to === "string" ? o.emailed_to : (typeof o.email_to === "string" ? o.email_to : undefined);
-    out.push({ toolName: tool.name, kind, title, watchUrl, downloadUrl, driveUrl, emailedTo });
-  }
-  // De-dupe: only collapse when there's an actual URL key; never let "" merge
-  // distinct deliverables. Keep first occurrence (most-recent at end of array).
-  const seen = new Set<string>();
-  return out.filter((d) => { const k = d.downloadUrl || d.watchUrl || d.driveUrl; if (!k) return true; if (seen.has(k)) return false; seen.add(k); return true; }).reverse();
 }
 
 const getAuthUrl = (url: string) => {

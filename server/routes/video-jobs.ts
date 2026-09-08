@@ -24,12 +24,25 @@ function jobIdParamOk(s: string): boolean {
   return typeof s === "string" && /^vj_[a-z0-9_]{8,80}$/.test(s);
 }
 
+function safeCompletedDriveUrl(status: unknown, value: unknown): string | null {
+  if (status !== "done" || typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return null;
+    if (url.username || url.password) return null;
+    if (url.hostname !== "drive.google.com" && url.hostname !== "docs.google.com") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 // Shape a DB row for the client: drop the on-disk `finalFilePath` (server path
 // leak) and, for finished jobs whose final MP4 is on disk, attach freshly
 // signed self-hosted Watch (inline) + Download (attachment) URLs. These power
 // the /jobs dashboard buttons and the chat heartbeat banner's "Watch" tile.
 export function toClientRow(row: any, tenantId: number) {
-  const { finalFilePath, finalDriveUrl, spec, ...safe } = row;
+  const { finalFilePath, finalDriveUrl, spec } = row;
   const safeSpec = (spec && typeof spec === "object" && !Array.isArray(spec))
     ? {
       voice: typeof spec.voice === "string" ? spec.voice : undefined,
@@ -41,6 +54,18 @@ export function toClientRow(row: any, tenantId: number) {
       autoDeliver: spec.autoDeliver === true ? true : undefined,
     }
     : {};
+  const chapters = Array.isArray(row.chapters)
+    ? row.chapters.map((chapter: any) => ({
+      idx: typeof chapter?.idx === "number" ? chapter.idx : 0,
+      title: typeof chapter?.title === "string" ? chapter.title : "Chapter",
+      scene_count: typeof chapter?.scene_count === "number" ? chapter.scene_count : 0,
+      status: typeof chapter?.status === "string" ? chapter.status : "queued",
+      duration_sec: typeof chapter?.duration_sec === "number" ? chapter.duration_sec : undefined,
+      error: typeof chapter?.error === "string" ? chapter.error : undefined,
+      started_at: typeof chapter?.started_at === "number" ? chapter.started_at : undefined,
+      completed_at: typeof chapter?.completed_at === "number" ? chapter.completed_at : undefined,
+    }))
+    : [];
   let finalWatchUrl: string | null = null;
   let finalDownloadUrl: string | null = null;
   if (row.status === "done" && finalFilePath) {
@@ -49,7 +74,25 @@ export function toClientRow(row: any, tenantId: number) {
       finalDownloadUrl = signVideoDownloadUrl(row.jobId, tenantId, false);
     } catch (_silentErr) { logSilentCatch("server/routes/video-jobs.ts", _silentErr); }
   }
-  return { ...safe, spec: safeSpec, finalWatchUrl, finalDownloadUrl };
+  return {
+    jobId: row.jobId,
+    title: row.title,
+    status: row.status,
+    phase: row.phase ?? null,
+    totalChapters: row.totalChapters,
+    chapters,
+    spec: safeSpec,
+    finalDriveUrl: safeCompletedDriveUrl(row.status, finalDriveUrl),
+    finalWatchUrl,
+    finalDownloadUrl,
+    finalDurationSec: row.finalDurationSec ?? null,
+    finalSizeBytes: row.finalSizeBytes ?? null,
+    errorMessage: row.errorMessage ?? null,
+    cancelRequested: row.cancelRequested === true,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    completedAt: row.completedAt ?? null,
+  };
 }
 
 export function registerVideoJobRoutes(app: Express, helpers: Helpers) {

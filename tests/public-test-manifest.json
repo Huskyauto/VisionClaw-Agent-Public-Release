@@ -82,6 +82,7 @@
         "tests/unit/bwb-weekly-first-person-guard.test.ts",
         "tests/unit/bwb-weekly-weight-guard.test.ts",
         "tests/unit/capability-evidence-shadow.test.ts",
+        "tests/unit/chat-deliverables.test.ts",
         "tests/unit/chronicle-precision.test.ts",
         "tests/unit/claude-bridge-parsing.test.ts",
         "tests/unit/claude-model-mapping.test.ts",
