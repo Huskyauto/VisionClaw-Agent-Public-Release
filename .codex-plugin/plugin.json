@@ -1,0 +1,47 @@
+{
+  "name": "visionclaw-agent",
+  "version": "74.13.0",
+  "description": "VisionClaw Agent — a multi-tenant agentic AI platform plugin that connects OpenAI Codex CLI to a configured VisionClaw instance over MCP.",
+  "author": {
+    "name": "Robert Washburn",
+    "url": "https://agenticcorporation.net"
+  },
+  "homepage": "https://agenticcorporation.net",
+  "repository": "https://github.com/Huskyauto/VisionClaw-Agent-Public-Release",
+  "license": "Proprietary",
+  "keywords": [
+    "agent",
+    "agentic",
+    "multi-tenant",
+    "delegation",
+    "personas",
+    "skill-rag",
+    "mcp",
+    "automation"
+  ],
+  "mcpServers": {
+    "visionclaw": {
+      "transport": "sse",
+      "url": "https://agenticcorporation.net/api/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer ${VISIONCLAW_MCP_KEY}"
+      }
+    }
+  },
+  "interface": {
+    "displayName": "VisionClaw Agent",
+    "shortDescription": "Connect Codex CLI to a configured VisionClaw MCP server.",
+    "longDescription": "VisionClaw Agent is a multi-tenant agentic platform. This proprietary connection plugin connects OpenAI Codex CLI to a running VisionClaw instance over MCP. Available personas, tools, and capabilities depend on the connected instance and its tenant-scoped MCP key.",
+    "developerName": "Robert Washburn",
+    "category": "Automation",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://agenticcorporation.net",
+    "privacyPolicyURL": "https://agenticcorporation.net/privacy",
+    "termsOfServiceURL": "https://agenticcorporation.net/terms",
+    "defaultPrompt": [
+      "Use VisionClaw to delegate this task to the right specialist persona.",
+      "Use VisionClaw to search my organisation's knowledge base for relevant prior decisions.",
+      "Use VisionClaw to schedule a recurring weekday-morning briefing."
+    ]
+  }
+}
