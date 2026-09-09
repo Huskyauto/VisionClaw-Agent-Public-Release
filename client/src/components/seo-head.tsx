@@ -25,7 +25,7 @@ export function SeoHead({
   const currentDescription = description.replace(/\b(?:413|414|415|416) tools\b/g, "417 total registered tools");
   const currentOgDescription = ogDescription?.replace(/\b(?:413|414|415|416) tools\b/g, "417 total registered tools");
   const effectiveDescription = useCurrentPlatformDescription
-    ? `R125+155.18+sec: Deploy an 18-agent AI team with 417 total registered tools, 80 curated AI models, 135 capabilities, and 242 live tables. IdeaBrowser now reviews the complete scored archive through a bounded deep-analysis shortlist, saves every final report durably, and feeds a 20-idea owner opportunity bank.`
+    ? `R125+155.18+sec: Deploy an 18-agent AI team with 417 total registered tools, 80 curated AI models, 136 capabilities, and 242 live tables. IdeaBrowser now reviews the complete scored archive through a bounded deep-analysis shortlist, saves every final report durably, and feeds a 20-idea owner opportunity bank.`
     : currentDescription;
   const effectiveOgDescription = useCurrentPlatformDescription
     ? "R125+155.18+sec: durable full-archive IdeaBrowser review and a 20-idea owner opportunity bank; 417 tools and 80 curated AI models."

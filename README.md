@@ -49,7 +49,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **Latest — Round 125+155.9+sec (September 6, 2026):** Claude Fable 5.1 joins as an explicit owner-only final-decision option. It is excluded from customer tiers, juries, and autonomous loops, and paid output remains withheld until valid usage is durably recorded. This release also adds proof-backed capability evidence that remains human-review-only, content-free lifecycle oversight, adaptive final-report budgeting, and deterministic source-backed research citations.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **417 total registered tools · 386 public documented tools · 67 total skills · 135 active capabilities · 18 personas · 165 declared / 242 live tables · 41 governance rules · 743 platform indexes · 80 curated AI models · 6 AI providers · 6 deployment targets.** The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **417 total registered tools · 386 public documented tools · 67 total skills · 136 active capabilities · 18 personas · 165 declared / 242 live tables · 41 governance rules · 743 platform indexes · 80 curated AI models · 6 AI providers · 6 deployment targets.** The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 ---
 

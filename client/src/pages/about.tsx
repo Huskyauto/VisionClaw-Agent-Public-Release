@@ -212,7 +212,7 @@ export default function AboutPage() {
                 <span className="text-primary font-bold text-sm min-w-[3rem]">{m.year}</span>
                 <p className="text-sm text-muted-foreground">
                   {m.event.startsWith("Current state:")
-                    ? "Current state: 18 built-in personas + unlimited Claude Code imports, 415 tools, 135 active capabilities, 182 declared / 237 live tables, 720 platform indexes, and 77 curated AI models plus 1000+ discovered daily via OpenRouter."
+                    ? "Current state: 18 built-in personas + unlimited Claude Code imports, 417 tools, 136 active capabilities, 165 declared / 242 live tables, 743 platform indexes, and 80 curated AI models plus 1000+ discovered daily via OpenRouter."
                     : m.event}
                 </p>
               </div>

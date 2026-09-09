@@ -35,7 +35,7 @@ const HEADLINE_STATS = {
   tools: "417 governed tools",
   skills: "67 total skills (63 DB-seeded + 4 platform agent skills)",
   personas: "18",
-  capabilities: "135",
+  capabilities: "136",
   tables: "165 declared / 242 live",
   indexes: "743",
   governance: "41",
