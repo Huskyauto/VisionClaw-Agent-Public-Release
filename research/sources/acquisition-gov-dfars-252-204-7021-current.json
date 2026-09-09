@@ -1,0 +1,11 @@
+{
+  "source_url": "https://www.acquisition.gov/dfars/252.204-7021-contractor-compliance-cybersecurity-maturity-model-certification-level-requirements.",
+  "fetch_query": "DFARS 252.204-7021 Level 1 self-assessment SPRS current CMMC status affirmation",
+  "webFetch_response": {
+    "answer": "Regarding CMMC Level 1 (Self) assessments and the requirement for an affirmation of continuous compliance:\n\n*   **Definition of Current:** A \"Final Level 1 (Self)\" CMMC status is considered \"Current\" if it is not older than 1 year, provided there are no changes in compliance with 32 CFR part 170 since the status date and there is a corresponding affirmation of continuous compliance by an affirming official that is also not older than 1 year [L56-L60].\n*   **Affirmation Requirement:** The contractor must complete and maintain as current an annual affirmation of continuous compliance by an affirming official in the Supplier Performance Risk System (SPRS) for each applicable CMMC UID [L110, L126].",
+    "favicon": "https://www.acquisition.gov/themes/custom/acquisition_gov/assets/img/favicon.ico",
+    "title": "252.204-7021 Contractor Compliance With the Cybersecurity Maturity Model Certification Level Requirements. | Acquisition.GOV",
+    "truncated": false,
+    "url": "https://www.acquisition.gov/dfars/252.204-7021-contractor-compliance-cybersecurity-maturity-model-certification-level-requirements."
+  }
+}
