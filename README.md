@@ -49,7 +49,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **Latest — Round 125+155.19 (September 9, 2026):** **Bounded Human-AI Synergy Trial and 21-idea Opportunity Bank.** An owner-only, tenant-scoped, report-only UI/API compares human-alone, AI-alone, and human-plus-AI with deterministic 35/25/20/20 weighted dimensions; positive synergy requires beating both baselines plus a safety/setup pass. Server/client kill switches mean zero model calls/spend, with no IQ, hiring, employee-ranking, causal, or autonomous-action claims. Human-AI Synergy Audit is an unvalidated `Idea`.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **417 total registered tools · 386 public documented tools · 67 total skills · 137 active capabilities · 18 personas · 166 declared / 243 live tables · 41 governance rules · 747 platform indexes · 80 curated AI models · 6 AI providers · 6 deployment targets.** The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **417 total registered tools · 386 public documented tools · 67 total skills · 137 active capabilities · 18 personas · 167 declared / 244 live tables · 41 governance rules · 756 platform indexes · 80 curated AI models · 6 AI providers · 6 deployment targets.** The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 ---
 
@@ -287,7 +287,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | Skills | 67 total (63 DB-seeded skills + 4 platform agent skills) |
 | Frontend Pages | 40+ |
 | API Endpoints | 300+ |
-| Database Tables | 166 declared / 243 live |
+| Database Tables | 167 declared / 244 live |
 
 ---
 
@@ -321,7 +321,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
         ┌──────────┐   ┌────────────┐   ┌────────────┐
         │ PostgreSQL│   │ Google     │   │ 6 AI       │
         │ + pgvector│   │ Drive      │   │ Providers  │
-        │ 166 declared / 243 live tables │   │ Storage    │   │ 80 curated │
+        │ 167 declared / 244 live tables │   │ Storage    │   │ 80 curated │
         └──────────┘   └────────────┘   └────────────┘
 ```
 
@@ -509,7 +509,7 @@ server/                       # Express backend
     middleware/               # Extracted dispatch middleware (policy, telemetry, tenant seam)
   routes.ts                   # 300+ API endpoints
   site-config.ts              # Centralized env-driven configuration
-  seed.ts                     # Database seeding (166 declared / 243 live tables, 41 rules, 18 personas)
+  seed.ts                     # Database seeding (167 declared / 244 live tables, 41 rules, 18 personas)
   heartbeat.ts                # Background task scheduler with model-catalog sync (R73)
   model-catalog.ts            # Daily OpenRouter catalog scan + gateway probe (R73)
   orchestrator-ledger.ts      # Per-tenant cost ledger with pg_advisory locks (R73.B)
@@ -523,7 +523,7 @@ server/                       # Express backend
   email.ts                    # Email server and tenant inboxes
   scaffolding.ts              # 75 corporate operation scaffolds
 shared/
-  schema.ts                   # Drizzle ORM schema (166 declared / 243 live — see docs/CURRENT_PLATFORM_TOTALS.md)
+  schema.ts                   # Drizzle ORM schema (167 declared / 244 live — see docs/CURRENT_PLATFORM_TOTALS.md)
 scripts/
   clean-for-release.sh        # Sanitize codebase for public release
 FORK-SETUP.md                 # Detailed setup instructions
@@ -566,7 +566,7 @@ npm run dev
 
 In under 10 minutes, you go from `git clone` to a live dashboard with 18 agents, seeded governance, and a `/setup` checklist that tells you exactly what's configured and what's missing.
 
-1. The database auto-creates all 243 live tables and full index set
+1. The database auto-creates all 244 live tables and full index set
 2. 41 governance rules and 18 AI personas are seeded automatically
 3. You're redirected to the **Setup Checklist** at `/setup` showing what's configured
 4. Click **Create Account** — the first account becomes the admin
