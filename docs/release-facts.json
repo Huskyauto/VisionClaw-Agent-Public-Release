@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "releaseDate": "2026-09-09",
+  "metrics": {
+    "registeredTools": 417,
+    "publicDocumentedTools": 386,
+    "activePersonas": 18,
+    "dbSeededSkills": 63,
+    "totalSkills": 67,
+    "activeCapabilities": 137,
+    "declaredTables": 166,
+    "liveTables": 243,
+    "governanceRules": 41,
+    "platformIndexes": 747,
+    "nonPrimaryKeyIndexes": 510,
+    "aiProviders": 6,
+    "coreRegistryModels": 80
+  }
+}

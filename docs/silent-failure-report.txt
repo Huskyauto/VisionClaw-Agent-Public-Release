@@ -1,0 +1,1268 @@
+
+==============================================================================
+  SILENT-FAILURE HUNTER  —  scan report
+==============================================================================
+  Scanned: 254 TS files in server, shared
+  Findings: HIGH=76  MEDIUM=239  LOW=0
+==============================================================================
+
+[HIGH]    server/adaptive-execution.ts:162  (tenant-default-via-||)
+          const entries = await storage.getMemoryEntries(undefined, 50, 0, tenantId || 0);
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/agent-eval.ts:117  (tenant-default-param)
+          tenantId: number = 1,
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/agent-eval.ts:191  (tenant-default-param)
+          export async function getEvalReport(tenantId: number = 1, personaId?: number): Promise<string> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/agentic/cached-tools.ts:16  (tenant-default-via-??)
+          `firecrawl-search:t${tenantId ?? 0}`,
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/agentic/cached-tools.ts:30  (tenant-default-via-??)
+          `firecrawl-scrape:t${tenantId ?? 0}`,
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/agentic/cached-tools.ts:43  (tenant-default-via-??)
+          `perplexity-search:t${tenantId ?? 0}`,
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/agentic-engines.ts:50  (tenant-default-via-??)
+          const tenantId = params.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/agentic-engines.ts:196  (tenant-default-param)
+          export async function reportTaskFailureInsight(taskName: string, lastError: string, tenantId: number = 1) {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/auto-tuner.ts:474  (tenant-default-param)
+          export async function runTuningCycle(tenantId: number = 1): Promise<TuningSnapshot> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/chat-engine.ts:1974  (tenant-default-via-??)
+          tenantId: conv.tenantId ?? 1,
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:1991  (tenant-default-via-??)
+          const tenantIdForScope = conv.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:2187  (tenant-default-via-??)
+          const tenantForSkills = await storage.getTenant(conv.tenantId ?? 1).catch(() => undefined);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:2254  (tenant-default-via-??)
+          const tenantRecord = await storage.getTenant(conv.tenantId ?? 1);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:2271  (tenant-default-via-??)
+          const userProfile = await getOrCreateProfile(conv.tenantId ?? 1);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:2278  (tenant-default-via-??)
+          const optHints = await getActiveOptimizations(conv.tenantId ?? 1);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:2291  (tenant-default-via-??)
+          const tenantId = conv.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:2538  (tenant-default-via-??)
+          tenantId: conv.tenantId ?? 1,
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:2649  (tenant-default-via-??)
+          recordFailover(conv.tenantId ?? 1, model, true, fallback.id);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:3471  (tenant-default-via-??)
+          intelligentExtractMemory(cleanedResponse, content.trim(), persona?.id, conv.tenantId ?? 1).catch(() => {});
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:3520  (tenant-default-via-??)
+          conv.tenantId ?? 1,
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/chat-engine.ts:1697  (tenant-default-param)
+          async function buildMemorySection(memories: any[], userMessage?: string, tenantId: number = 1, personaId?: number | null): Promise<{ text: s…
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/compaction.ts:657  (tenant-default-via-||)
+          AND (${params.tenantId || 0} = 0 OR c.tenant_id = ${params.tenantId})
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/compaction.ts:668  (tenant-default-via-||)
+          AND (${params.tenantId || 0} = 0 OR c.tenant_id = ${params.tenantId})
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/context-budget.ts:25  (tenant-default-param)
+          export async function runContextBudgetAudit(tenantId: number = 1, personaId?: number): Promise<BudgetReport> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/context-budget.ts:219  (tenant-default-param)
+          export async function runHarnessOptimizer(tenantId: number = 1): Promise<string> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/debate-engine.ts:116  (tenant-default-param)
+          tenantId: number = 1,
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/dream-consolidation.ts:249  (tenant-default-param)
+          export async function runDreamConsolidation(tenantId: number = 1, sessionCount: number = 5): Promise<DreamConsolidationResult> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/glasses-gateway.ts:215  (tenant-default-via-||)
+          const tenantId: number = (req as any).tenantId || 1;
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/heartbeat.ts:799  (tenant-default-via-??)
+          tenantId: task.tenantId ?? 1,
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/heartbeat.ts:889  (tenant-default-via-??)
+          const evalResults = await runAllEvaluators(task.tenantId ?? 1);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/heartbeat.ts:894  (tenant-default-via-??)
+          const report = await evaluateProcesses(task.tenantId ?? 1, false);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/heartbeat.ts:928  (tenant-default-via-??)
+          govResult = await runGovernanceResearchScan(task.tenantId ?? 1);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/heartbeat.ts:931  (tenant-default-via-??)
+          modelResult = await runModelRegistryRefresh(task.tenantId ?? 1);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/heartbeat.ts:982  (tenant-default-via-??)
+          const dreamTenantId = task.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/heartbeat.ts:1543  (tenant-default-via-??)
+          const taskTenantIdForContext = (task as any).tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/heartbeat.ts:1606  (tenant-default-via-??)
+          await notifyAndLog(task.tenantId ?? 1, "task_completed", `Task Completed: ${task.name}`,
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/heartbeat.ts:1615  (tenant-default-via-??)
+          await recordTrustEvent(task.tenantId ?? 1, task.personaId, "task_success", `Completed: ${task.name}`);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/heartbeat.ts:1649  (tenant-default-via-??)
+          await recordTrustEvent(task.tenantId ?? 1, task.personaId, "task_failure", `Failed: ${task.name}`);
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/memory-graph.ts:19  (tenant-default-param)
+          tenantId: number = 1,
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/memory-graph.ts:41  (tenant-default-param)
+          tenantId: number = 1,
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/memory-graph.ts:139  (tenant-default-param)
+          tenantId: number = 1
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/memory-graph.ts:217  (tenant-default-param)
+          tenantId: number = 1,
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/memory-graph.ts:283  (tenant-default-param)
+          export async function getCategoryTree(tenantId: number = 1): Promise<any[]> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/memory-graph.ts:312  (tenant-default-param)
+          export async function getMemoryGraph(tenantId: number = 1): Promise<{
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/memory-graph.ts:350  (tenant-default-param)
+          export async function categorizeExistingMemories(tenantId: number = 1): Promise<number> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/memory-intelligence.ts:162  (tenant-default-param)
+          tenantId: number = 1
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/minerva-planner.ts:238  (tenant-default-via-??)
+          const tenantId = args.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/minerva-planner.ts:481  (tenant-default-via-??)
+          const tenantId = args.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/model-catalog.ts:220  (tenant-default-via-??)
+          const tenantId = opts.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/oauth-subscriptions.ts:1031  (tenant-default-param)
+          export async function seedYouTubeIfMissing(tenantId: number = 1): Promise<void> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/orchestrator-ledger.ts:498  (tenant-default-via-??)
+          const tenantId = opts.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/orchestrator-ledger.ts:466  (tenant-default-param)
+          export async function loadLedgerState(ledgerKey: string, tenantId: number = 1): Promise<RunState | null> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/process-governor.ts:1010  (tenant-default-param)
+          export async function evaluateProcesses(tenantId: number = 1, dryRun: boolean = false): Promise<GovernorReport> {
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/process-governor.ts:1068  (tenant-default-param)
+          export async function getGovernorStatus(tenantId: number = 1): Promise<{
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/providers.ts:929  (tenant-default-via-??)
+          const tenantId = opts.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/providers.ts:463  (tenant-default-via-||)
+          return { client: wrapClientWithCostTracking(c, actualModelId, tenantId || 1, `llm.${model.provider}`), actualModelId };
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/providers.ts:476  (tenant-default-via-||)
+          return { client: wrapClientWithCostTracking(c, actualModelId, tenantId || 1, `llm.${model.provider}`), actualModelId };
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/providers.ts:490  (tenant-default-via-||)
+          return { client: wrapClientWithCostTracking(c, actualModelId, tenantId || 1, `llm.${model.provider}`), actualModelId };
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/providers.ts:497  (tenant-default-via-||)
+          return { client: wrapClientWithCostTracking(subClient, actualModelId, tenantId || 1, `llm.${model.provider}`), actualModelId };
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/providers.ts:502  (tenant-default-via-||)
+          return { client: wrapClientWithCostTracking(fallbackClient, actualModelId, tenantId || 1, `llm.${model.provider}`), actualModelId };
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/quarterly-intelligence.ts:21  (tenant-default-param)
+          export async function runGovernanceResearchScan(tenantId: number = 1): Promise<{
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/quarterly-intelligence.ts:211  (tenant-default-param)
+          export async function runModelRegistryRefresh(tenantId: number = 1): Promise<{
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/recurring-messages.ts:137  (tenant-default-via-??)
+          const tenantId = input.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/replit_integrations/chat/storage.ts:40  (tenant-default-via-??)
+          const tenantId = conv[0]?.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/research-engine.ts:1372  (tenant-default-via-??)
+          const tenantId = opts.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/research-engine.ts:1693  (tenant-default-param)
+          export async function generateResearchDigest(tenantId: number = 1): Promise<{
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/research-report-fulfillment.ts:97  (tenant-default-via-||)
+          const tenantId = params.tenantId || 1;
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/skill-seeker.ts:303  (tenant-default-param)
+          tenantId: number = 1,
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/skill-seeker.ts:736  (tenant-default-param)
+          tenantId: number = 1
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/skill-seeker.ts:771  (tenant-default-param)
+          export async function runSkillSeekerSweep(tenantId: number = 1): Promise<{
+          -> Default-value of literal in a function signature — R74.5 class bug. Make the param required; force callers to pass tenantId explicitly.
+
+[HIGH]    server/skill-synthesizer.ts:99  (tenant-default-via-??)
+          const tenantId = input.tenantId ?? 1;
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/skill-synthesizer.ts:206  (tenant-default-via-??)
+          ${input.tenantId ?? 1}
+          -> Fail-open default to a literal — R74.A class bug. Use the named ADMIN_TENANT_ID constant, or fail-closed (return 401 / throw).
+
+[HIGH]    server/stuck-diagnostics.ts:307  (tenant-default-via-||)
+          tenantId: req.tenantId || 0,
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/stuck-diagnostics.ts:354  (tenant-default-via-||)
+          tenantId: p.metadata.tenantId || 0,
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/stuck-diagnostics.ts:448  (tenant-default-via-||)
+          hungProcesses.push({ type: "http_request", idleSeconds: Math.round(elapsed / 1000), tenantId: req.tenantId || 0 });
+          -> Same as ?? form. Fail-open landmine.
+
+[HIGH]    server/stuck-diagnostics.ts:684  (tenant-default-via-||)
+          tenantId: req.tenantId || 0,
+          -> Same as ?? form. Fail-open landmine.
+
+[MEDIUM]  server/activity-logger.ts:20  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/activity-logger.ts:48  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/adaptive-execution.ts:155  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agent-activity.ts:123  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agent-eval.ts:108  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agent-manager.ts:139  (log-and-swallow-catch)
+          } catch (channelErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agent-manager.ts:307  (log-and-swallow-catch)
+          } catch (hbErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agentic/resume-worker.ts:160  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agentic-engines.ts:180  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agentic-engines.ts:207  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agentic-features.ts:322  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agentic-features.ts:455  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agentic-features.ts:529  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/agentic-features.ts:659  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-asset-capture.ts:149  (log-and-swallow-catch)
+          } catch (dbErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-asset-capture.ts:215  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-memorize.ts:74  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-memorize.ts:226  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-router.ts:316  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-skillify.ts:112  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-transcript.ts:105  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-transcript.ts:171  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-tuner.ts:455  (log-and-swallow-catch)
+          } catch (e) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/auto-tuner.ts:469  (log-and-swallow-catch)
+          } catch (e) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/autonomy.ts:140  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/backup.ts:43  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/browser-tool.ts:268  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/browser-tool.ts:1166  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/cache-gate.ts:117  (log-and-swallow-catch)
+          } catch (writeErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/cache-gate.ts:162  (log-and-swallow-catch)
+          } catch (writeErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/ceo-orchestrator.ts:457  (log-and-swallow-catch)
+          } catch (llmErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/ceo-orchestrator.ts:470  (log-and-swallow-catch)
+          } catch (retryErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/ceo-orchestrator.ts:1170  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:790  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:1432  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:1657  (log-and-swallow-catch)
+          } catch (brainErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:2326  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:2519  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:2561  (log-and-swallow-catch)
+          } catch (wfErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:3103  (log-and-swallow-catch)
+          } catch (diagErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:3148  (log-and-swallow-catch)
+          } catch (triageErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:3371  (log-and-swallow-catch)
+          } catch (cgErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/chat-engine.ts:3427  (log-and-swallow-catch)
+          } catch (egressErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/crews-engine.ts:650  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/crews-engine.ts:695  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/cross-critique.ts:199  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/data-protection.ts:51  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/deep-interview.ts:346  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/delivery-pipeline.ts:203  (log-and-swallow-catch)
+          } catch (alertErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/doc-create.ts:198  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/doc-create.ts:342  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/email.ts:128  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/email.ts:242  (log-and-swallow-catch)
+          } catch (fetchErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/email.ts:258  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/email.ts:297  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/email.ts:337  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/email.ts:360  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/event-bus.ts:69  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/event-bus.ts:106  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/felix-brain.ts:55  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/firecrawl.ts:38  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/google-workspace.ts:1937  (log-and-swallow-catch)
+          } catch (fallbackErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/google-workspace.ts:2018  (log-and-swallow-catch)
+          } catch (repairErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/google-workspace.ts:2065  (log-and-swallow-catch)
+          } catch (pubErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/google-workspace.ts:2094  (log-and-swallow-catch)
+          } catch (userShareErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/google-workspace.ts:2099  (log-and-swallow-catch)
+          } catch (shareErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/google-workspace.ts:2117  (log-and-swallow-catch)
+          } catch (accessErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/google-workspace.ts:2276  (log-and-swallow-catch)
+          } catch (slideErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/google-workspace.ts:2354  (log-and-swallow-catch)
+          } catch (dbErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/google-workspace.ts:2398  (log-and-swallow-catch)
+          } catch (notesErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:193  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:225  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:310  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:374  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:394  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:425  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:475  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:492  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:499  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:513  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:520  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:600  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:640  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:669  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:1134  (log-and-swallow-catch)
+          } catch (emailErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:1184  (log-and-swallow-catch)
+          } catch (emailErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:1909  (log-and-swallow-catch)
+          } catch (parseErr) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:1939  (log-and-swallow-catch)
+          } catch (parseErr) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:2008  (log-and-swallow-catch)
+          } catch (parseErr) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:2234  (log-and-swallow-catch)
+          } catch (chErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/heartbeat.ts:2361  (log-and-swallow-catch)
+          } catch (hmacErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/hooks.ts:233  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/index.ts:256  (log-and-swallow-catch)
+          } catch (updErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/index.ts:269  (log-and-swallow-catch)
+          } catch (createErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/index.ts:279  (log-and-swallow-catch)
+          } catch (whErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/index.ts:283  (log-and-swallow-catch)
+          } catch (whErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/index.ts:344  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/index.ts:362  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/index.ts:375  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/instinct-learning.ts:201  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/internal-resolver.ts:101  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/mcp-server.ts:81  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/memory-intelligence.ts:279  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/minds-engine.ts:465  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/model-catalog.ts:298  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/model-catalog.ts:336  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/mpeg-engine.ts:134  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/mpeg-engine.ts:194  (log-and-swallow-catch)
+          } catch (dlErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/mpeg-engine.ts:198  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/mpeg-engine.ts:217  (log-and-swallow-catch)
+          } catch (drawErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/mpeg-engine.ts:221  (log-and-swallow-catch)
+          } catch (plainErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/mpeg-engine.ts:720  (log-and-swallow-catch)
+          } catch (unexpectedErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/oauth-subscriptions.ts:151  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/oauth-subscriptions.ts:446  (log-and-swallow-catch)
+          } catch (repairErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/oauth-subscriptions.ts:822  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/oauth-subscriptions.ts:1074  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/oauth-subscriptions.ts:1205  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/outcome-tracker.ts:47  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/pdf-create.ts:36  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/pdf-create.ts:252  (log-and-swallow-catch)
+          } catch (imgErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/pdf-create.ts:442  (log-and-swallow-catch)
+          } catch (driveErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/pdf-create.ts:482  (log-and-swallow-catch)
+          } catch (fieldErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/pdf-create.ts:697  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/pdf-create.ts:952  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/process-governor.ts:929  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/process-watchdog.ts:113  (log-and-swallow-catch)
+          try { await entry.onTimeout(); } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/project-brain.ts:200  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/project-brain.ts:384  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/providers.ts:349  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/quarterly-intelligence.ts:16  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/recurring-messages.ts:259  (log-and-swallow-catch)
+          } catch (e) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/research-engine.ts:542  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/research-engine.ts:559  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/research-engine.ts:767  (log-and-swallow-catch)
+          } catch (costErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/research-engine.ts:1010  (log-and-swallow-catch)
+          } catch (embErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/research-engine.ts:1846  (log-and-swallow-catch)
+          } catch (driveErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:111  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:117  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:481  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:489  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:522  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:586  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:2342  (log-and-swallow-catch)
+          } catch (sendErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:2519  (log-and-swallow-catch)
+          } catch (e: any) { console.warn("[contact] Table init:", e.message); }
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:3187  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:4235  (log-and-swallow-catch)
+          } catch (gdocErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:4273  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:4491  (log-and-swallow-catch)
+          } catch (compErr) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:4506  (log-and-swallow-catch)
+          } catch (linkErr) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:4528  (log-and-swallow-catch)
+          } catch (apErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:4588  (log-and-swallow-catch)
+          } catch (archiveErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:4896  (log-and-swallow-catch)
+          } catch (recoveryErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:5264  (log-and-swallow-catch)
+          } catch (delErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:5302  (log-and-swallow-catch)
+          } catch (reflErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:5348  (log-and-swallow-catch)
+          } catch (cgErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:5378  (log-and-swallow-catch)
+          catch (citErr: any) { console.warn(`[citations] persist failed: ${citErr.message}`); }
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:5759  (log-and-swallow-catch)
+          } catch (err2: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:6281  (log-and-swallow-catch)
+          } catch (e) { console.error("[upload] Background embedding error:", e); }
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:6325  (log-and-swallow-catch)
+          } catch (e) { console.error("[upload] Background embedding error:", e); }
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:7654  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:7839  (log-and-swallow-catch)
+          } catch (driveErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/routes.ts:7907  (log-and-swallow-catch)
+          } catch (driveErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/sculptor.ts:150  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/sculptor.ts:306  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/sculptor.ts:415  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:2939  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:3033  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:3102  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:3157  (log-and-swallow-catch)
+          } catch (e: any) { console.log(`[seed] Research schedule migration skipped: ${e.message}`); }
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:3181  (log-and-swallow-catch)
+          } catch (e: any) { console.log(`[seed] Research schedule self-heal skipped: ${e.message}`); }
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:3189  (log-and-swallow-catch)
+          } catch (e: any) { console.log(`[seed] Wiring invariant check skipped: ${e.message}`); }
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:3204  (log-and-swallow-catch)
+          } catch (e: any) { console.log(`[seed] Conv backfill skipped: ${e.message}`); }
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:3874  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:3974  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:4338  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:4474  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:4529  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:4573  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/seed.ts:4600  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/self-improvement.ts:276  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/self-reflection.ts:378  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-evolution.ts:65  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-evolution.ts:180  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-evolution.ts:381  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-seeker.ts:371  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-seeker.ts:396  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-seeker.ts:421  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-seeker.ts:650  (log-and-swallow-catch)
+          } catch (delErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-seeker.ts:671  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-seeker.ts:707  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/skill-seeker.ts:813  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/stability-watchdog.ts:99  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/stability-watchdog.ts:302  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/step-ledger.ts:130  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/storage.ts:244  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/stuck-diagnostics.ts:228  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/stuck-diagnostics.ts:269  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/stuck-diagnostics.ts:314  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/subagents.ts:546  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/telegram.ts:307  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/telegram.ts:361  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/telegram.ts:404  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tool-learning.ts:294  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tool-learning.ts:318  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:5082  (log-and-swallow-catch)
+          } catch (jinaErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:5106  (log-and-swallow-catch)
+          } catch (fcErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:5401  (log-and-swallow-catch)
+          } catch (qaErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:5624  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:6225  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:6244  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:6265  (log-and-swallow-catch)
+          } catch (driveErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:6409  (log-and-swallow-catch)
+          } catch (e: any) { console.warn(`[create_slides] Could not load project context: ${e.message}`); }
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:6852  (log-and-swallow-catch)
+          } catch (delErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:6883  (log-and-swallow-catch)
+          } catch (fixErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:6904  (log-and-swallow-catch)
+          } catch (memErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:6909  (log-and-swallow-catch)
+          } catch (qaErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:7011  (log-and-swallow-catch)
+          } catch (projErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:7670  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:9093  (log-and-swallow-catch)
+          } catch (driveErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:9842  (log-and-swallow-catch)
+          } catch (driveErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:11859  (log-and-swallow-catch)
+          } catch (noteErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tools.ts:11873  (log-and-swallow-catch)
+          } catch (memErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tree-of-thought.ts:126  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/trust-reviewer.ts:210  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/tts-config.ts:71  (log-and-swallow-catch)
+          } catch (err) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/user-modeling.ts:138  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/user-modeling.ts:195  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/watchlist.ts:154  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/watchlist.ts:198  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/watchlist.ts:232  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/webhookHandlers.ts:107  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/webhookHandlers.ts:151  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/webhookHandlers.ts:183  (log-and-swallow-catch)
+          } catch (sigErr: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/webhookHandlers.ts:276  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/webhookHandlers.ts:649  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/whatsapp.ts:122  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/whatsapp.ts:126  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/whatsapp.ts:340  (log-and-swallow-catch)
+          } catch (err: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+
+[MEDIUM]  server/wiring-invariants.ts:494  (log-and-swallow-catch)
+          } catch (e: any) {
+          -> Catch logs but does not rethrow or surface the error. R74 H2 (Stripe webhooks) class bug — caller thinks success, downstream silently broken.
+

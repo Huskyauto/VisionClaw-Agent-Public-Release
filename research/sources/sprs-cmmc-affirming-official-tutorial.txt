@@ -1,0 +1,87 @@
+Welcome to the Affirming Official (AO) for CMMC Tutorial.
+
+If you have received a courtesy email or an informal notification to affirm a CMMC Assessment and need
+assistance, this tutorial will take you step by step in completing the action. We will cover affirming
+CMMC Level 1 and Level 2 Self-Assessments, CMMC Level 2 (C3PAO), and CMMC Level 3 (DIBCAC)
+Assessments.
+
+An AO is defined as “…the senior level representative from within each Organization Seeking
+Assessment (OSA) who is responsible for ensuring the OSA's compliance with the CMMC Program
+requirements and has the authority to affirm the OSA's continuing compliance with the security
+requirements for their respective organizations.” In accordance with 32 Code of Federal Regulations,
+section 170.
+
+If you are not the AO for the entered CAGE, please refer back to the individual who has notified you of
+this action.
+
+As an AO, you will need a Procurement Integrated Enterprise Environment (PIEE) account with the SPRS
+Cyber Vendor User role to complete the affirmation process.
+
+If you need to obtain a PIEE account or need to add the SPRS Cyber Vendor User role, see the SPRS
+Vendor Cyber Reports Access document, listed here:
+https://www.sprs.csd.disa.mil/pdf/SPRS_Access_CyberReports.pdf
+
+To access the CMMC assessments, select Cyber Reports (CMMC & NIST) from the SPRS menu. Use the
+drop-down list to select the CAGE and Hierarchy combination and click the Run Cyber Reports button.
+An asterisk next to your CAGE on the drop-down list confirms you have the Cyber Vendor User access.
+
+Select the CMMC Assessments tab and Acknowledge the pop-up.
+
+Starting with CMMC Level 1 (Self), find the assessment waiting for approval with the CMMC Status Type
+of Pending Affirmation. Select the pencil icon in the Edit column. If there is no pencil icon next to the
+Pending Affirmation record, you do not have Cyber Vendor User role privilege, or the assessment is not
+available for Affirmation.
+
+In this example, the assessment has been entered and ready for your review. Update data as needed
+and select Continue to Affirmation. You will receive a pop-up, select Continue to Affirmation.
+
+Your information is pulled from your PIEE registration and cannot be updated on this screen, this
+information can only be updated within PIEE. There is an option to enter any Additional Email Address(s)
+associated with this assessment; these email addresses will not receive emails or notifications.
+
+Select Continue to Affirmation. A pop-up will appear. Select Continue to Affirmation. A pop-up will
+appear, review the information. If inaccurate, select Cancel to return to the prior screen to make
+updates. If correct, Certify the above statement by selecting the check box and click Affirm.
+
+The record will now reflect Final Level 1 Self-Assessment or No CMMC Status in the CMMC Status Type
+column and a CMMC Unique Identifier (UID) will be assigned. The most recently updated assessment
+will load at the top of the grid.
+Moving on to Affirming CMMC Level 2 (Self) Assessments. Select the CMMC Level 2 (Self) Tab, if an
+assessment is pending affirmation, or ready for its initial affirmation, then the AO can affirm via the Edit
+button or via the "Affirm" button in the CMMC Status Type column. If the Assessment is available for an
+annual affirmation, then the "Affirm" Button will be located in the Affirmation Expiration Date column.
+
+The Review stepper is the same as CMMC Level 1, where the AO information is pulled from PIEE. Select
+Continue to Affirmation. A pop-up will appear, review the information. There are also view/expand
+options at the bottom to see additional assessment information associated with the UID. If inaccurate,
+select Cancel to return to the prior screen to make updates. If correct, Certify the above statement by
+selecting the check box and click Affirm.
+
+The record will now reflect CMMC L2 Final Self-Assessment or CMMC L2 Conditional Final Self-
+Assessment in the CMMC Status Type column and a CMMC Unique Identifier (UID) will be assigned. The
+most recently updated assessment will load at the top of the grid.
+
+Next up is CMMC Level 2 (C3PAO) and CMMC Level 3 (DIBCAC), select either tab. Once SPRS receives
+the assessment, the assessment will need to be Affirmed. If the assessment is pending affirmation, or
+ready for its initial affirmation, then the AO can affirm via the "Affirm" button in the CMMC Status Type
+column. If the Assessment is available for the Annual Affirmation, then the "Affirm" Button will be
+located in the Affirmation Expiration Date column.
+
+An Assessment and Affirmation pop up will appear and will contain the Assessment Details and the
+View/Expand options at the bottom to see additional assessment information associated to the UID. If
+correct, Certify the above statement by selecting the check box and click Affirm. Select Cancel to exit
+without affirming.
+
+The record will now reflect Conditional Level 2 (C3PAO) or Final Level 2 (C3PAO) or Conditional Level 3
+(DIBCAC) or Final Level 3 (DIBCAC) in the CMMC Status Type column. The most recently updated
+assessment will load at the top of the grid. The record will require annual affirmations for three years.
+The Affirm button will become available within the Affirmation Expiration Date column 60-days prior to
+each annual affirmation expiration date and after three years the assessment will become No CMMC
+Status (Expired).
+
+For additional details on entering CMMC Assessments, the CMMC Level 1 and Level 2 Quick Entry
+Guides and CMMC Level 1 and Level 2 Entry Tutorials are on the website listed here:
+https://www.sprs.csd.disa.mil/nistsp.htm
+
+This concludes the Affirming Official (AO) for CMMC Tutorial.
+
