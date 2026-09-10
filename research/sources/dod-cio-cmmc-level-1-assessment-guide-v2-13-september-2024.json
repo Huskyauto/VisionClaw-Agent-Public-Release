@@ -1,0 +1,11 @@
+{
+  "source_url": "https://dodcio.defense.gov/Portals/0/Documents/CMMC/AssessmentGuideL1.pdf",
+  "fetch_query": "What does Level 1 Assessment Guide Version 2.13 state about scope, assessment objects, examine evidence, interviews, testing, and evidence retention?",
+  "webFetch_response": {
+    "answer": "The Level 1 Assessment Guide Version 2.13 states the following regarding the requested topics:\n\n*   **Scope:** The CMMC Assessment Scope must be specified prior to the self-assessment [L127-L128]. It identifies the assets that process, store, or transmit Federal Contract Information (FCI), which are considered \"in-scope\" and must be assessed against Level 1 requirements [L128-L131].\n*   **Assessment Objects:** These are specific items being assessed, including specifications (document-based artifacts like policies/plans), mechanisms (hardware/software/firmware safeguards), activities (protection-related actions), and individuals [L204-L209, L364].\n*   **Examine Evidence:** Examination involves reviewing, inspecting, observing, studying, or analyzing assessment objects to facilitate understanding, achieve clarification, or obtain evidence [L212, L254].\n*   **Interviews:** The interview method involves holding discussions with individuals or groups to facilitate understanding, achieve clarification, or obtain evidence [L213]. They help determine if requirements are implemented and if adequate resourcing, training, and planning exist [L247-L250].\n*   **Testing:** Testing involves exercising assessment objects (activities, mechanisms) under specified conditions to compare actual behavior with expected behavior [L222, L283]. It demonstrates what has or has not been done [L283].\n*   **Evidence Retention:** The guide notes that Organizations Seeking Assessment (OSAs) must maintain records of physical access [L1147]. Regarding the retention of these records (such as sign-in sheets), the document states they should be maintained for the time period defined by the company [L1147, L1181, L1183]. Evidence used for assessment must be in its final form; drafts are not eligible as evidence [L259-L261, L299].",
+    "favicon": "",
+    "title": "",
+    "truncated": false,
+    "url": "https://dodcio.defense.gov/Portals/0/Documents/CMMC/AssessmentGuideL1.pdf"
+  }
+}
