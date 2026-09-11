@@ -20,7 +20,7 @@ const plugin = JSON.parse(fs.readFileSync(".codex-plugin/plugin.json", "utf8")) 
 
 test("release facts distinguish complete registered tools from the public index", () => {
   assert.equal(facts.schemaVersion, 1);
-  assert.equal(facts.releaseDate, "2026-09-09");
+  assert.equal(facts.releaseDate, "2026-09-11");
   assert.equal(facts.metrics.registeredTools, 417);
   assert.equal(facts.metrics.publicDocumentedTools, 386);
   assert.ok(facts.metrics.registeredTools > facts.metrics.publicDocumentedTools);
@@ -32,10 +32,13 @@ test("release facts distinguish complete registered tools from the public index"
 });
 
 test("human-facing totals are explicitly generated from release facts", () => {
+  const generator = fs.readFileSync("scripts/refresh-totals.ts", "utf8");
   assert.match(totals, /release-facts\.json.*machine-readable source/is);
   assert.match(readme, /release-facts\.json/);
   assert.match(roadmap, /release-facts\.json/);
-  assert.match(fs.readFileSync("scripts/refresh-totals.ts", "utf8"), /FACTS_PATH = "docs\/release-facts\.json"/);
+  assert.match(generator, /FACTS_PATH = "docs\/release-facts\.json"/);
+  assert.match(generator, /shared\/models\/commercial-research-frontier\.ts/);
+  assert.match(generator, /explicitly tracked new split-model declarations/i);
   assert.match(fs.readFileSync("scripts/verify-counts.ts", "utf8"), /const FACTS = "docs\/release-facts\.json"/);
 });
 

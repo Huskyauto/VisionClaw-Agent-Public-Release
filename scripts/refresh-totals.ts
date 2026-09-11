@@ -5,7 +5,8 @@
  *
  * Publication-time evidence sources (maintainer DATABASE_URL required):
  *   tools     → static source-union extraction across legacy + migrated tool definitions
- *   tables-D  → rg -c "= pgTable(" shared/schema.ts (declared)
+ *   tables-D  → published shared/schema.ts baseline plus explicitly tracked
+ *               new split-model declarations (declared)
  *   tables-L  → SELECT count(*) FROM information_schema.tables WHERE table_schema='public'
  *   skills    → SELECT count(*) FROM skills
  *   personas  → SELECT count(*) FROM personas WHERE is_active=true
@@ -115,7 +116,7 @@ checkout. Fresh checkouts verify committed facts with \`verify-counts.ts\`.
 | **Skills (DB seeded)** | **${c.dbSeededSkills}** | \`SELECT count(*) FROM skills\` |
 | **Skills (total incl. .agents/skills/)** | **${c.totalSkills}** | DB count + 4 platform agent skills not yet seeded |
 | **Capabilities (active)** | **${c.activeCapabilities}** | \`SELECT count(*) FROM capabilities WHERE is_active=true\` |
-| **Database tables (declared)** | **${c.declaredTables}** | \`rg -c "= pgTable("\` in \`shared/schema.ts\` |
+| **Database tables (declared)** | **${c.declaredTables}** | Published core-schema baseline plus explicitly tracked new split-model declarations |
 | **Database tables (live in \`public\` schema)** | **${c.liveTables}** | \`SELECT count(*) FROM information_schema.tables WHERE table_schema='public'\` |
 | **Governance rules** | **${c.governanceRules}** | \`SELECT count(*) FROM governance_rules\` |
 | **Platform indexes (release aggregate)** | **${c.platformIndexes}** | Live \`pg_indexes\` count minus versioned auth/session infrastructure exclusions |
@@ -169,7 +170,12 @@ async function main() {
     );
   }
   const tools = extractedTools.names.length;
-  const tablesDeclared = parseInt(sh(`rg -c "= pgTable\\(" shared/schema.ts`), 10);
+  // Preserve the published core-schema baseline while counting this new
+  // split-model declaration explicitly. Older shared/models tables predate
+  // the declared-table metric and remain outside its historical baseline.
+  const tablesDeclared =
+    parseInt(sh(`rg -c "= pgTable\\(" shared/schema.ts`), 10) +
+    parseInt(sh(`rg -c "= pgTable\\(" shared/models/commercial-research-frontier.ts`), 10);
   const models = MODEL_REGISTRY.length;
   const indexMetric = loadPlatformIndexMetricManifest();
   const releaseInput = loadReleaseFactsInput();

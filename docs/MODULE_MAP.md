@@ -9,7 +9,7 @@
 | :--- | ---: | ---: |
 | `server/` | 1002 | 278,485 |
 | `client/src/` | 191 | 60,691 |
-| `scripts/` | 236 | 50,248 |
+| `scripts/` | 236 | 50,254 |
 | `shared/` | 17 | 6,660 |
 
 ## Hub modules (highest fan-in)
@@ -211,7 +211,7 @@ Changes to these ripple widest — check importers before editing.
 | :--- | ---: | :--- |
 | [`archive-rescue.tsx`](../client/src/pages/admin/archive-rescue.tsx) | 145 | — |
 
-### `scripts/` — 189 module(s), 43,313 lines
+### `scripts/` — 189 module(s), 43,319 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |

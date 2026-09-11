@@ -25,7 +25,7 @@ export function SeoHead({
   const currentDescription = description.replace(/\b(?:413|414|415|416) tools\b/g, "417 total registered tools");
   const currentOgDescription = ogDescription?.replace(/\b(?:413|414|415|416) tools\b/g, "417 total registered tools");
   const effectiveDescription = useCurrentPlatformDescription
-    ? `R125+155.22+sec: Commercial Research Frontier adds an owner-only, tenant-scoped opportunity portfolio with deterministic scoring, atomic lifecycle validation, and database-enforced evidence integrity. Current platform: 417 tools, 137 capabilities, 18 personas, 168 declared / 245 live tables, 761 indexes, 67 skills, 41 governance rules, and 80 curated models.`
+    ? `R125+155.22+sec: Commercial Research Frontier adds an owner-only, tenant-scoped opportunity portfolio with deterministic scoring, atomic lifecycle validation, and database-enforced evidence integrity. Current platform: 417 tools, 137 capabilities, 18 personas, 168 declared / 246 live tables, 767 indexes, 67 skills, 41 governance rules, and 80 curated models.`
     : currentDescription;
   const effectiveOgDescription = useCurrentPlatformDescription
     ? "R125+155.22+sec: owner-only Commercial Research Frontier foundation with deterministic scoring and fail-closed evidence integrity; production publish remains pending owner approval."
