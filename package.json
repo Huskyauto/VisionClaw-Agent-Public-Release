@@ -94,7 +94,7 @@
     "tsx": "^4.20.5",
     "twitter-api-v2": "^1.29.0",
     "ws": "^8.18.0",
-    "zod": "^3.25.76",
+    "zod": "^4.5.4",
     "zod-validation-error": "^3.5.4"
   },
   "devDependencies": {
