@@ -9,6 +9,7 @@
         "tests/auto-project-concurrency.test.ts",
         "tests/cmmc-checkpoint-monotonic.test.ts",
         "tests/cmmc-prospecting.test.ts",
+        "tests/commercial-research-frontier-page.test.ts",
         "tests/commercial-research-frontier.test.ts",
         "tests/concurrency/admission-control.test.ts",
         "tests/cost/anthropic-ceiling.test.ts",

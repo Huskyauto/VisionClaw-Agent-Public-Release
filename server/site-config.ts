@@ -32,6 +32,7 @@ export function getPublicSiteConfig() {
     platformTagline: siteConfig.platformTagline,
     contactEmail: siteConfig.contactEmail || siteConfig.ownerEmail,
     hvacMissedCallRecoveryEnabled: env.HVAC_MISSED_CALL_PRODUCT_ENABLED !== "0",
+    researchFrontierEnabled: env.RESEARCH_FRONTIER_ENABLED === "1",
   };
 }
 

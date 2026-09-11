@@ -41,7 +41,7 @@ const HEADLINE_STATS = {
   governance: "41",
   models: "80 curated + 1000+",
   loc: "~263k (686 files)",
-  release: "R125+155.22+sec",
+  release: "R125+155.23+sec",
 };
 
 (async () => {
@@ -86,7 +86,7 @@ const HEADLINE_STATS = {
         content:
           "The first item is the current release. Every following item is historical archive material and may preserve the counts and verification evidence recorded at its original release date; see replit.md for the full R-round history with architect findings, FALSE POSITIVE log, and known gaps.",
         bullets: [
-          "R125+155.22+sec (2026-09-11) — Commercial Research Frontier foundation: owner-only tenant-scoped opportunity APIs add deterministic scoring, evidence state, maturity, risks, kill criteria, and smallest next tests. Atomic row-locked PATCH validation and database checks reject malformed evidence, forged scores, invalid bounded lists, and JSON-null bypasses. No outreach, payments, missions, publishing, trading, or production publish.",
+          "R125+155.23+sec (2026-09-11) — Commercial Research Frontier owner workspace: tenant-1 owners can search, filter, inspect, create, and edit the portfolio through a responsive, exact-opt-in workspace with bounded pagination and all 13 score inputs plus the exact deterministic formula. HIGH blank-filter, create-idempotency, and default-on flag failures plus MEDIUM navigation, score-copy, and touch-target gaps were closed before release; authenticated owner-browser create/edit/filter passed after settled search removed rate-limit bursts. No outreach, payments, missions, publishing, trading, or production publish.",
           "R125+155.3 (2026-09-03) — Economical parallel-agent workers: the built-in cheap multi-agent proposer pool and the economical suffix of the mixed pool now use NVIDIA Nemotron 3 Super as their first parallel worker. Runtime overrides and the free-only remap still win; frontier, premium, aggregator, synthesis, tenant, spend-ceiling, and quarantine contracts are unchanged. Verification: 38 focused MoA-pool, pricing, quarantine, and premium-deliverable assertions, TypeScript, stale-string gate, and final independent architect PASS.",
           "R125+155.2+sec13 (2026-09-03) — Cost-aware Nemotron routing and provider quarantine: powerful and reasoning work prefers NVIDIA Nemotron 3 Super when paid OpenRouter capacity is required after existing flat-rate, subscription, integration, and free lanes. Usage is priced consistently at $0.085/M input and $0.40/M output. Provider quarantine is enforced during tier selection and before every direct client credential path. Verification: 15 focused pricing/routing assertions, typecheck, production build, stale-string and wiring gates, application restart, and final independent architect PASS.",
           "R125+155.2+sec12 (2026-09-03) — Tenant-scoped recovery and model-routing hardening: recovery work requires explicit tenant scope, provider failover excludes UI pseudo-model aliases, and the early BWB watchdog persists failure for the server-resolved owning tenant. Verification: focused regressions, TypeScript, production build, stale-string and wiring gates, live preview, and final independent architect review passed.",

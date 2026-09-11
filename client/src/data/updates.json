@@ -1,5 +1,29 @@
 [
   {
+    "version": "Round 125+155.23+sec",
+    "date": "September 11, 2026",
+    "type": "feature",
+    "title": "Commercial Research Frontier owner workspace",
+    "highlights": [
+      {
+        "icon": "LayoutDashboard",
+        "text": "**Standalone owner workspace:** tenant-1 owners can search, filter, inspect, create, and edit the evidence-backed commercial portfolio from a dedicated sidebar entry."
+      },
+      {
+        "icon": "BarChart3",
+        "text": "**Transparent and bounded:** responsive cards, lifecycle and maturity filters, previous/next pagination, clearly scoped metrics, all 13 rubric inputs, and the exact deterministic score formula."
+      },
+      {
+        "icon": "ShieldCheck",
+        "text": "**Findings closed before release:** blank filters no longer break lists; create mode always carries its idempotency key; absent or malformed flags stay disabled; pagination clamps after edits; exact formula wording and 44px controls remain pinned."
+      },
+      {
+        "icon": "CheckCircle2",
+        "text": "**Verified:** 16/16 focused tests, TypeScript, build, restart, real tenant-1 API CRUD, and an authenticated owner-browser create/edit/Parked-filter journey passed with zero probe rows left behind. Settled search avoids per-keystroke rate-limit bursts. No consequential-action controls were added; production publish remains pending explicit owner approval."
+      }
+    ]
+  },
+  {
     "version": "Round 125+155.22+sec",
     "date": "September 11, 2026",
     "type": "feature",

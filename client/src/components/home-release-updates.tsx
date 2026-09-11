@@ -10,18 +10,18 @@ export function HomeReleaseUpdates({ releaseExpanded, toggleRelease }: {
 
   return (
     <>
-        {/* R125+155.22+sec (2026-09-11) — NEW (cyan): Commercial Research Frontier foundation. */}
+        {/* R125+155.23+sec (2026-09-11) — NEW (cyan): Commercial Research Frontier owner workspace. */}
         <button
-          onClick={() => toggleRelease("banner-whats-new-r125_155_22_sec")}
+          onClick={() => toggleRelease("banner-whats-new-r125_155_23_sec")}
           className="w-full text-left rounded-lg bg-gradient-to-r from-cyan-500/10 via-primary/5 to-transparent border border-cyan-500/30 hover:border-cyan-500/50 hover:bg-cyan-500/15 transition-colors px-4 py-3 flex items-start gap-3"
-          data-testid="banner-whats-new-r125_155_22_sec"
+          data-testid="banner-whats-new-r125_155_23_sec"
         >
-          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-sm bg-cyan-600 text-white leading-none shrink-0 mt-0.5">R125+155.22+sec NEW</span>
+          <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-sm bg-cyan-600 text-white leading-none shrink-0 mt-0.5">R125+155.23+sec NEW</span>
           <div className="min-w-0 flex-1">
-            <div className={`text-sm font-semibold leading-tight ${releaseExpanded.has("banner-whats-new-r125_155_22_sec") ? "" : "line-clamp-2"}`}>{"Commercial Research Frontier foundation — an owner-only, tenant-scoped portfolio for practical money-making opportunities with transparent deterministic scoring."}</div>
-            <div className={`text-xs text-muted-foreground mt-0.5 ${releaseExpanded.has("banner-whats-new-r125_155_22_sec") ? "" : "truncate"}`}>{"CRITICAL/HIGH closed: production admin requests advance correctly, disabled routes return 404 before auth, and concurrent lifecycle updates are atomic. Database checks reject forged scores, malformed evidence, blank or oversized lists, and JSON-null bypasses. 10/10 tests and final reviews pass; production publish pending explicit owner approval."}</div>
+            <div className={`text-sm font-semibold leading-tight ${releaseExpanded.has("banner-whats-new-r125_155_23_sec") ? "" : "line-clamp-2"}`}>{"Commercial Research Frontier owner workspace — search, filter, inspect, create, and edit the evidence portfolio with bounded navigation and complete score transparency."}</div>
+            <div className={`text-xs text-muted-foreground mt-0.5 ${releaseExpanded.has("banner-whats-new-r125_155_23_sec") ? "" : "truncate"}`}>{"Owner-only and exact-opt-in · all 13 score factors visible · default-list, create-idempotency, and flag HIGHs closed · settled search avoids rate-limit bursts · authenticated owner create/edit/filter verified · no outreach, payments, missions, publishing, or trading."}</div>
           </div>
-          <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${releaseExpanded.has("banner-whats-new-r125_155_22_sec") ? "rotate-180" : ""}`} />
+          <ChevronDown className={`w-4 h-4 text-muted-foreground shrink-0 mt-0.5 transition-transform ${releaseExpanded.has("banner-whats-new-r125_155_23_sec") ? "rotate-180" : ""}`} />
         </button>
         {/* R125+155.19 (2026-09-09) — DEMOTED (cyan): bounded Human-AI Synergy Trial. */}
         <button
@@ -51,6 +51,14 @@ export function HomeReleaseUpdates({ releaseExpanded, toggleRelease }: {
         </button>
 
         <div id="home-recent-historical-releases" data-testid="home-recent-releases" className={`space-y-5 [&>button]:relative [&>button]:before:absolute [&>button]:before:right-3 [&>button]:before:top-3 [&>button]:before:rounded-sm [&>button]:before:bg-muted [&>button]:before:px-1.5 [&>button]:before:py-0.5 [&>button]:before:text-[10px] [&>button]:before:font-bold [&>button]:before:content-['Historical'] ${showAllUpdates ? "" : "hidden"}`}>
+        <button
+          onClick={() => toggleRelease("banner-whats-new-r125_155_22_sec")}
+          className="w-full text-left rounded-lg bg-gradient-to-r from-cyan-500/10 via-primary/5 to-transparent border border-cyan-500/30 hover:border-cyan-500/50 transition-colors px-4 py-3"
+          data-testid="banner-whats-new-r125_155_22_sec"
+        >
+          <div className="text-sm font-semibold">R125+155.22+sec — Commercial Research Frontier API and database foundation</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">Owner-only CRUD, deterministic scoring, atomic lifecycle validation, and database-enforced evidence integrity.</div>
+        </button>
         {/* R125+155.9+sec (2026-09-06) — historical: always hidden until expanded. */}
         <button
           onClick={() => toggleRelease("banner-whats-new-r125_155_9_sec")}

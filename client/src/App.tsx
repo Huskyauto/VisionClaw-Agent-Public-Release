@@ -59,6 +59,7 @@ const AdminPersonaCostPage = lazy(() => import("@/pages/admin-persona-cost"));
 const AdminRepairLedgerPage = lazy(() => import("@/pages/admin-repair-ledger"));
 const AdminRevenueMissionsPage = lazy(() => import("@/pages/admin-revenue-missions"));
 const AdminIncomeOpportunitiesPage = lazy(() => import("@/pages/admin-income-opportunities"));
+const AdminResearchFrontierPage = lazy(() => import("@/pages/admin-research-frontier"));
 const AdminHumanAiSynergyTrialPage = lazy(() => import("@/pages/admin-human-ai-synergy-trial"));
 const OperatorPage = lazy(() => import("@/pages/operator"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
@@ -241,6 +242,7 @@ function PageRouter() {
         {isAdmin && <Route path="/admin/archive-rescue" component={AdminArchiveRescuePage} />}
         {isAdmin && <Route path="/admin/revenue-missions" component={AdminRevenueMissionsPage} />}
         {isAdmin && <Route path="/admin/income-opportunities" component={AdminIncomeOpportunitiesPage} />}
+         {isPlatformAdmin && config.researchFrontierEnabled && <Route path="/admin/research-frontier" component={AdminResearchFrontierPage} />}
         {isPlatformAdmin && humanAiSynergyTrialEnabled && <Route path="/admin/human-ai-synergy-trial" component={AdminHumanAiSynergyTrialPage} />}
         {isAdmin && <Route path="/admin/persona-cost" component={AdminPersonaCostPage} />}
         {isAdmin && <Route path="/admin/repair-ledger" component={AdminRepairLedgerPage} />}

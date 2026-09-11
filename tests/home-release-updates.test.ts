@@ -15,7 +15,7 @@ test("home initially shows exactly the three newest release cards", () => {
   assert.deepEqual(
     initiallyVisibleIds,
     [
-    "banner-whats-new-r125_155_22_sec",
+      "banner-whats-new-r125_155_23_sec",
       "banner-whats-new-r125_155_19",
       "banner-whats-new-r125_155_18",
     ],

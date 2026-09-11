@@ -12,6 +12,8 @@ import {
   type CommercialResearchFrontierStore,
 } from "../server/routes/commercial-research-frontier";
 
+process.env.RESEARCH_FRONTIER_ENABLED = "1";
+
 const scoreInputs = {
   painUrgency: 4,
   buyerAccess: 3,
@@ -249,23 +251,26 @@ test("production update contract locks before validating and writing", () => {
 
 test("feature flag fails closed before persistence", async () => {
   const previous = process.env.RESEARCH_FRONTIER_ENABLED;
-  process.env.RESEARCH_FRONTIER_ENABLED = "0";
-  let touched = false;
   try {
-    await withRoutes({
-      tenantId: null,
-      owner: false,
-      authenticated: false,
-      store: emptyStore({ list: async () => { touched = true; return { opportunities: [], total: 0 }; } }),
-    }, async baseUrl => {
-      const response = await fetch(`${baseUrl}/api/admin/research-frontier/opportunities`);
-      assert.equal(response.status, 404);
-    });
+    for (const value of [undefined, "0", "true", "garbage"]) {
+      if (value === undefined) delete process.env.RESEARCH_FRONTIER_ENABLED;
+      else process.env.RESEARCH_FRONTIER_ENABLED = value;
+      let touched = false;
+      await withRoutes({
+        tenantId: null,
+        owner: false,
+        authenticated: false,
+        store: emptyStore({ list: async () => { touched = true; return { opportunities: [], total: 0 }; } }),
+      }, async baseUrl => {
+        const response = await fetch(`${baseUrl}/api/admin/research-frontier/opportunities`);
+        assert.equal(response.status, 404, `flag ${String(value)} must stay disabled`);
+      });
+      assert.equal(touched, false);
+    }
   } finally {
     if (previous === undefined) delete process.env.RESEARCH_FRONTIER_ENABLED;
     else process.env.RESEARCH_FRONTIER_ENABLED = previous;
   }
-  assert.equal(touched, false);
 });
 
 test("database failures are logged with operation context while responses stay sanitized", async () => {

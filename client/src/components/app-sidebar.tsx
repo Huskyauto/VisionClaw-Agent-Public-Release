@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQuery, useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, MessageSquare, Settings, Zap, Trash2, Bot, Brain, Users, Heart, BookOpen, Search, X, CreditCard, BarChart3, Download, Loader2, Home, LogOut, LogIn, Mail, Inbox, FolderOpen, Library, Phone, KeyRound, CalendarClock, ChevronDown, Wrench, Shield, FlaskConical, Lightbulb, Radio, Rocket, Send, Activity, Key, Network, ArrowLeftRight, PenTool, ShoppingBag, Store, Package, TrendingUp, FileCode, FileCheck, Github, ShieldCheck, DollarSign, Clapperboard, Layers, Sparkles, Skull, Archive, Gauge, FileText } from "lucide-react";
+import { Plus, MessageSquare, Settings, Zap, Trash2, Bot, Brain, Users, Heart, BookOpen, Search, X, CreditCard, BarChart3, Download, Loader2, Home, LogOut, LogIn, Mail, Inbox, FolderOpen, Library, Phone, KeyRound, CalendarClock, ChevronDown, Wrench, Shield, FlaskConical, Lightbulb, Radio, Rocket, Send, Activity, Key, Network, ArrowLeftRight, PenTool, ShoppingBag, Store, Package, TrendingUp, FileCode, FileCheck, Github, ShieldCheck, DollarSign, Clapperboard, Layers, Sparkles, Skull, Archive, Gauge, FileText, Target } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -592,7 +592,7 @@ export function AppSidebar() {
                 <Rocket className="w-4 h-4" />
                 <span>What's New</span>
                 <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-sm bg-cyan-600 text-white leading-none" data-testid="badge-updates-new">
-                  R125+155.22+sec
+                  R125+155.23+sec
                 </span>
               </a>
             </SidebarMenuButton>
@@ -628,8 +628,9 @@ export function AppSidebar() {
         </NavSection>
 
         {isAdmin && (
-          <NavSection title="Income Opportunities" icon={Lightbulb} defaultOpen={location === "/admin/income-opportunities"} accent badge="NEW" touchFriendly>
+           <NavSection title="Income Opportunities" icon={Lightbulb} defaultOpen={[ "/admin/income-opportunities", "/admin/research-frontier" ].includes(location)} accent badge="NEW" touchFriendly>
             <NavLink path="/admin/income-opportunities" icon={Sparkles} label="Opportunity Bank" badge={`${INCOME_OPPORTUNITIES.length} IDEAS`} touchFriendly />
+             {isPlatformAdmin && config.researchFrontierEnabled && <NavLink path="/admin/research-frontier" icon={Target} label="Research Frontier" touchFriendly />}
             {isPlatformAdmin && humanAiSynergyTrialEnabled && <NavLink path="/admin/human-ai-synergy-trial" icon={FlaskConical} label="Human-AI Synergy Trial" touchFriendly />}
           </NavSection>
         )}
@@ -673,7 +674,7 @@ export function AppSidebar() {
             <NavLink path="/skills" icon={Sparkles} label="Skills Catalog" badge="R125+8.5" />
             <NavLink path="/admin/persona-cost" icon={DollarSign} label="Per-Agent Cost" badge="R98.26" />
             <NavLink path="/memory" icon={Layers} label="Unified Memory" badge="R122" />
-            <NavLink path="/activity?filter=security" icon={ShieldCheck} label="Security Audit" badge="R125+155.22+sec" badgeClass="ml-auto text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm bg-cyan-600 text-white leading-none" />
+            <NavLink path="/activity?filter=security" icon={ShieldCheck} label="Security Audit" badge="R125+155.23+sec" badgeClass="ml-auto text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm bg-cyan-600 text-white leading-none" />
             <NavLink path="/compare" icon={ArrowLeftRight} label="Compare" />
             {hasPayments && <NavLink path="/payments" icon={CreditCard} label="Payments" />}
             <NavLink path="/settings" icon={Settings} label="Settings" />

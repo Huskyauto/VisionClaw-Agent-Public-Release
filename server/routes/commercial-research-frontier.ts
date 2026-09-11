@@ -99,7 +99,7 @@ function productionStore(): CommercialResearchFrontierStore {
   };
 }
 
-const enabled = () => process.env.RESEARCH_FRONTIER_ENABLED !== "0";
+const enabled = () => process.env.RESEARCH_FRONTIER_ENABLED === "1";
 const setNoCache = (res: Response) => res.set("Cache-Control", "private, no-store, max-age=0");
 
 function tenantOrRespond(req: Request, res: Response, getTenant: (req: Request) => number | null): number | null {
