@@ -1,0 +1,116 @@
+CMMC Quick Entry Guide                                                            SPRS V4.0
+
+
+
+
+       Cybersecurity Maturity Model Certification (CMMC)
+
+
+
+
+       CMMC LEVEL 1 SELF-ASSESSMENT
+       QUICK ENTRY GUIDE
+       VERSION 4.0
+
+
+
+   NSLC PORTSMOUTH BLDG. 153-2 PORTSMOUTH NAVAL SHIPYARD, PORTSMOUTH, NH 03804-5000
+
+                         Approved for public release; distribution is unlimited
+CMMC Quick Entry Guide                                                             SPRS V4.0
+
+
+      1. PIEE Access: A “SPRS Cyber Vendor User” role is required to enter CMMC
+              Assessment information. PIEE Access Instructions:
+              https://www.sprs.csd.disa.mil/access.htm
+
+      2. SPRS Application and Module Access:
+         a. PIEE landing page: https://piee.eb.mil
+
+              b. Click “LOG IN”
+
+
+
+
+                                         Screenshot Dtd 09 JAN 2024
+
+
+
+              c. Select SPRS:
+
+
+
+
+              d. Select Cyber Reports:
+
+
+
+
+      3. Cyber Reports Module: Select the desired Hierarchy, identified by the HLO,
+              from the drop down.
+
+
+
+
+              NOTE: An asterisk * indicates the user has the SPRS Cyber Vendor User role
+              (access to add/edit/delete)
+
+      3.1 Add New Assessment: Within the CMMC Assessments tab, select “Add New
+          Level 1 CMMC Self-Assessment”.
+
+
+
+
+Version 4.0                                     DEC 2024                                   1
+CMMC Quick Entry Guide                                                               SPRS V4.0
+
+
+
+      3.2 Enter Assessment Details: Enter assessment data and select “Continue
+          to Affirmation”.
+          NOTE: Compliance with the security requirements specified in FAR clause
+          52.204–21 is required to achieve a “Final Level 1 Self-Assessment”.
+
+
+
+
+              NOTE: CAGE Hierarchy is imported from the System for Award Management (SAM).
+
+
+
+
+    3.3 Transfer to Affirming Official (AO): If the user entering the assessment is not the
+        AO, the assessment can be forwarded via email, to the AO by entering their email
+        and selecting “Transfer to AO”.
+
+
+
+
+Version 4.0                                  DEC 2024                                        2
+CMMC Quick Entry Guide                                                                     SPRS V4.0
+
+
+
+    3.4 Affirm the Assessment: Review the assessment details, certify review of the
+        affirmation statement, and select “Affirm”.
+
+
+
+
+    3.5 Assessment Edit/Delete: A Cyber Vendor User may edit or delete certain CMMC
+        Status Types.
+
+
+
+
+              NOTE: A “Final Level 1 Self-Assessment” will automatically become “No CMMC Status
+              (Expired Assessment)” after 1 year.
+
+              NOTE: “Final Level 1 Self-Assessment” is the only CMMC Status Type that will be visible
+              to Government Personnel.
+
+
+
+
+Version 4.0                                     DEC 2024                                          3
+

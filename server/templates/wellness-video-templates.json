@@ -1,0 +1,179 @@
+{
+  "_meta": {
+    "version": "2.0.0",
+    "purpose": "wellness / wellness video templates for [Your Product]. Used by POST /api/v1/agents/produce-video and by the Bob persona in-chat. Designed for short-form social video (YouTube channel 'Founder Channel', Instagram Reels, TikTok). All narration is first-person founder-voice (Bob).",
+    "voiceDefault": { "voiceProvider": "openai", "voice": "onyx" },
+    "voiceNote": "OpenAI 'onyx' is the stand-in voice for Bob until Bob records his own. When Bob's recorded voice clones become available, swap voiceDefault to that voice ID — narration prompts already assume first-person Bob.",
+    "visualStyle": "Dark teal and cream color palette with slight teal cast in shadows, warm cream highlights. Slightly desaturated, intentional and grounded mood. Real natural light (window > ring light). Real food, real kitchens, real notebooks — not stock-y wellness imagery. Photorealistic. No medication imagery (compliance), no scales, no before/after photos, no posed wellness aesthetic.",
+    "owner": "Bob Washburn — [Your Company]. Channel: 'Founder Channel' (@bobonwellness-program)",
+    "voiceRules": "First-person Bob: 'I tried...', 'here's what worked for me on month 3 of wellness-program...', 'when the scale stopped moving, here's what I did'. Direct, specific, no-BS, compassionate-but-honest. NEVER 'studies show', 'research suggests', 'on your journey'. Always include compliance disclaimer in description: 'For educational purposes only. Always work with your prescribing physician.'",
+    "compliance": "Naming wellness-program/Wegovy/Ozempic/Zepbound when describing Bob's lived experience is OK. Never claim [Your Product] treats, cures, or replaces medication. Never give medical advice. Frame everything as 'what worked for one guy', never 'what you should do'.",
+    "designSystem": "/DESIGN.md (v1.0)"
+  },
+
+  "coaching_tip_60s": {
+    "name": "60-second coaching tip (Bob, founder-voice)",
+    "description": "Daily tip from Bob's lived experience. 4 scenes, ~60s. Mon/Wed/Fri. Best for YouTube Shorts and the Founder Channel channel.",
+    "estimatedSeconds": 60,
+    "resolution": "1080p",
+    "kenBurns": true,
+    "kenBurnsIntensity": 1.12,
+    "transition": "fade",
+    "crossfadeMs": 400,
+    "introText": "{{topic}}",
+    "outroText": "Try it. Tell me what happens. — Bob",
+    "scenes": [
+      {
+        "title": "{{topic}}",
+        "narration": "{{hook}}",
+        "imagePrompt": "Open spiral notebook on a dark wood desk, ink pen mid-page, single shaft of late afternoon window light cutting across the page, dark teal cast in shadows, warm cream highlights, slightly desaturated, intentional and grounded mood, photorealistic, no people"
+      },
+      {
+        "title": "Why this matters",
+        "narration": "{{why}}",
+        "imagePrompt": "Close-up of a thick-walled coffee mug on a kitchen counter, steam rising, dark moody natural light from a single window, dark teal and cream palette, photorealistic, slightly desaturated, no people"
+      },
+      {
+        "title": "Here's what I tried",
+        "narration": "{{action}}",
+        "imagePrompt": "Pair of broken-in walking shoes by a back door, morning light spilling across hardwood floor, dark teal cast in shadows, warm cream highlights, sense of intentional movement, photorealistic, no people"
+      },
+      {
+        "title": "That's it. Try it.",
+        "narration": "{{closing}}",
+        "imagePrompt": "Wide low-angle shot of a quiet pre-dawn horizon, single window of warm light in middle distance, dark teal sky, cream golden glow on the horizon, hopeful and grounded, photorealistic, no people"
+      }
+    ],
+    "fillVariables": {
+      "topic": "Topic of the tip — written as Bob would say it (e.g. 'The hydration mistake that gave me daily headaches')",
+      "hook": "10s opener — first-person, specific, names a real moment from Bob's experience. Example: 'Three months in on wellness-program I started getting these brutal headaches every afternoon...'",
+      "why": "10-15s plain-language explanation of what was actually going on. Bob's voice. No 'studies show'. Example: 'Turned out the drug killed my thirst signal along with my appetite — I'd basically forgotten to drink water.'",
+      "action": "10-15s ONE concrete thing Bob actually did that fixed it. Specific numbers, specific times, specific objects. Example: 'A 32oz tumbler on the desk. Refilled at 9, 12, and 3. That's it. No app, no tracker.'",
+      "closing": "5-10s warm but direct close. No saccharin. Example: 'If you're getting afternoon headaches, try it for a week. Tell me what happens.'"
+    }
+  },
+
+  "motivational_reel_30s": {
+    "name": "30-second motivation reset (Bob, founder-voice)",
+    "description": "Quick honest boost for the hard days. 3 scenes, ~30s. Saturdays. Best for Instagram Reels and TikTok.",
+    "estimatedSeconds": 30,
+    "resolution": "1080p",
+    "kenBurns": true,
+    "kenBurnsIntensity": 1.18,
+    "transition": "fade",
+    "crossfadeMs": 300,
+    "introText": "If today's hard…",
+    "outroText": "— Bob",
+    "scenes": [
+      {
+        "title": "If today's hard",
+        "narration": "{{acknowledge}}",
+        "imagePrompt": "Single warm lamp on a wooden side table at dusk, intimate low light, dark teal shadows, warm cream highlights, calm and quiet mood, photorealistic, no people"
+      },
+      {
+        "title": "Here's what I remember",
+        "narration": "{{reframe}}",
+        "imagePrompt": "Pre-dawn light beginning to break across a dark horizon, single thin band of warm cream light at the edge, dark teal sky, hopeful but quiet mood, photorealistic, no people, no posing"
+      },
+      {
+        "title": "One thing. Right now.",
+        "narration": "{{micro_action}}",
+        "imagePrompt": "Single footprint on a dirt path leading toward warm horizon light, dark teal shadows, cream highlights, sense of forward motion, photorealistic, no people in frame"
+      }
+    ],
+    "fillVariables": {
+      "acknowledge": "8-10s acknowledging the hard day, in Bob's voice. No toxic positivity, no 'this too shall pass' platitudes. Example: 'I had whole weeks where the scale didn't move and I wanted to throw the thing out the window.'",
+      "reframe": "10-12s gentle but honest reframe — what Bob actually told himself. Example: 'Here's what I remember on those days: the scale measures one thing. It does not measure whether I just chose protein over carbs at lunch. It does not measure that I walked when I didn't want to.'",
+      "micro_action": "5-8s ONE tiny specific thing to do in the next hour. Bob's voice. Example: 'Right now: stand up. Drink a glass of water. That's the whole thing.'"
+    }
+  },
+
+  "weekly_summary": {
+    "name": "Weekly check-in (Bob, founder-voice)",
+    "description": "Sunday recap of the week — what Bob's seeing, what he wants you to try next. 5 scenes, ~75s. Best for the channel + email.",
+    "estimatedSeconds": 75,
+    "resolution": "1080p",
+    "kenBurns": true,
+    "kenBurnsIntensity": 1.10,
+    "transition": "fade",
+    "crossfadeMs": 500,
+    "introText": "This Week — From Bob",
+    "outroText": "Talk soon. — Bob",
+    "scenes": [
+      {
+        "title": "This week",
+        "narration": "{{week_overview}}",
+        "imagePrompt": "Open journal on a dark wood desk, handwritten notes visible but unreadable, single mug of black coffee, late afternoon window light, dark teal shadows, warm cream highlights, reflective mood, photorealistic, no people"
+      },
+      {
+        "title": "What's working",
+        "narration": "{{wins}}",
+        "imagePrompt": "Sunlight through a kitchen window onto a small ceramic bowl of fresh berries on a dark wood counter, dark teal palette, warm cream light, intentional and abundant feel, photorealistic, no people"
+      },
+      {
+        "title": "What's hard right now",
+        "narration": "{{friction}}",
+        "imagePrompt": "Quiet path through dark winter trees, soft overcast light, dark teal cast, warm cream highlight on bare branches, contemplative and honest mood, photorealistic, no people"
+      },
+      {
+        "title": "Try this next week",
+        "narration": "{{next_action}}",
+        "imagePrompt": "Pair of broken-in walking shoes neatly placed by a front door, morning light spilling across hardwood, dark teal shadows, warm cream highlights, sense of intentional beginning, photorealistic, no people"
+      },
+      {
+        "title": "Talk soon",
+        "narration": "{{closing}}",
+        "imagePrompt": "Wide quiet pre-dawn landscape with a single warm window of light in the middle distance, dark teal sky, cream golden glow on horizon, hopeful and grounded, photorealistic, no people"
+      }
+    ],
+    "fillVariables": {
+      "week_overview": "10-15s — Bob's honest summary of the week. What he saw in the protocol. Specific. Example: 'This week I heard from a lot of you about the same thing — appetite came back hard around week 6.'",
+      "wins": "15-20s — list 2-3 specific wins Bob noticed (his own or from the community). Not just weight. Habits, mood, energy, food choices. Bob's voice.",
+      "friction": "15-20s — name the hard parts honestly. Bob's voice. No judgment, no 'this too shall pass'. Just naming what's real.",
+      "next_action": "10-15s — ONE specific thing Bob wants you to try this week. Not a list. ONE thing. Example: 'This week I want you to try one protein-first breakfast. Just one. Tell me what changed.'",
+      "closing": "5-10s — warm direct signoff in Bob's voice. Example: 'Talk to you next Sunday. Send me what you tried.'"
+    }
+  },
+
+  "recipe_demo_45s": {
+    "name": "45-second 'what I actually eat' walkthrough (Bob, founder-voice)",
+    "description": "Quick recipe spotlight — what Bob actually eats on wellness-program that doesn't waste his appetite window. 4 scenes, ~45s. Tuesdays/Thursdays. Best for YouTube Shorts and Pinterest.",
+    "estimatedSeconds": 45,
+    "resolution": "1080p",
+    "kenBurns": true,
+    "kenBurnsIntensity": 1.08,
+    "transition": "fade",
+    "crossfadeMs": 350,
+    "introText": "{{recipe_name}}",
+    "outroText": "Save this. Make it this week. — Bob",
+    "scenes": [
+      {
+        "title": "{{recipe_name}}",
+        "narration": "{{intro}}",
+        "imagePrompt": "Overhead shot of {{recipe_name}} plated on a dark ceramic dish on a dark wood table, natural window light, fresh herb garnish, dark teal shadows, warm cream highlights, intentional food photography, photorealistic, no people"
+      },
+      {
+        "title": "Why I eat this",
+        "narration": "{{why_works}}",
+        "imagePrompt": "Close-up of fresh whole-food ingredients laid out on a dark wood cutting board — lean protein, vegetables, fresh herbs — single shaft of window light, dark teal shadows, warm cream highlights, photorealistic, no people"
+      },
+      {
+        "title": "How I make it",
+        "narration": "{{instructions}}",
+        "imagePrompt": "Hands chopping fresh vegetables on a dark wood cutting board, soft kitchen window light, dark teal shadows, warm cream highlights, calm intentional cooking moment, photorealistic, just hands visible (no face)"
+      },
+      {
+        "title": "What it looks like",
+        "narration": "{{plating}}",
+        "imagePrompt": "Finished {{recipe_name}} on a dark ceramic plate, fork lifting one bite, soft natural window light, dark teal palette, warm cream highlights, satisfying and intentional, photorealistic food photography, no people"
+      }
+    ],
+    "fillVariables": {
+      "recipe_name": "Name of the recipe in Bob's voice (e.g. 'The 6-minute protein bowl I make when I have no appetite')",
+      "intro": "8-10s hook — Bob's first-person take on what this is and when he eats it. Example: 'On wellness-program my appetite window is small, so when it opens I eat protein first or I waste it. This is what I make.'",
+      "why_works": "10-12s — Bob's reasoning, not a nutritionist's. Specific to wellness reality (small appetite window, protein-first, satiety). Example: 'It's mostly protein, fast to make, and it actually fills me up — which on this drug is harder than it sounds.'",
+      "instructions": "12-15s — 3 simple steps in Bob's voice. No exact measurements. Example: 'Chicken in the pan. Frozen veg in next. Hot sauce on top. Done in six minutes.'",
+      "plating": "5-8s — what it looks like and why Bob comes back to it. Example: 'Looks like nothing. Tastes like enough. That's the whole game on this drug.'"
+    }
+  }
+}
