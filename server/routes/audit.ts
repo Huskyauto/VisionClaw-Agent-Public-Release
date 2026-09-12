@@ -1,0 +1,1285 @@
+import type { Express, Request, Response } from "express";
+import { db } from "../db";
+import { sql } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import { z } from "zod";
+import { sendEmailDirect } from "../email";
+import { runAudit, AuditFetchError } from "../audit-engine";
+import { enforceBotProtection } from "../lib/bot-protection";
+import { fulfillReadinessAudit } from "../audit-fulfillment";
+import { fulfillExecutiveReport } from "../executive-report-fulfillment";
+import { fulfillSmartLeadsDossiers, SMART_LEADS_MAX_BATCH } from "../smart-leads-fulfillment";
+
+const AUDIT_TENANT_ID = 1; // platform-owner storefront
+
+// In-memory IP rate limiter (mirrors archive-rescue.ts). The /run endpoint
+// makes outbound fetches, so it MUST be throttled to prevent abuse as an
+// SSRF-scan amplifier or DoS vector.
+const RATE_BUCKETS = new Map<string, { count: number; resetAt: number }>();
+function pruneRateBuckets(): void {
+  const now = Date.now();
+  for (const [k, v] of RATE_BUCKETS.entries()) if (v.resetAt < now) RATE_BUCKETS.delete(k);
+  if (RATE_BUCKETS.size > 50_000) {
+    let i = 0;
+    const over = RATE_BUCKETS.size - 50_000;
+    for (const k of RATE_BUCKETS.keys()) { if (i++ >= over) break; RATE_BUCKETS.delete(k); }
+  }
+}
+setInterval(pruneRateBuckets, 10 * 60 * 1000).unref();
+function rateOk(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  const b = RATE_BUCKETS.get(key);
+  if (!b || b.resetAt < now) { RATE_BUCKETS.set(key, { count: 1, resetAt: now + windowMs }); return true; }
+  b.count += 1;
+  return b.count <= limit;
+}
+function hashIp(req: Request): string {
+  // SECURITY: key off the raw TCP socket source, NOT req.ip. req.ip honors
+  // X-Forwarded-For when "trust proxy" is set, so an attacker could rotate that
+  // header to defeat the per-IP cap on this abuse-sensitive public endpoint.
+  // The TCP source can't be spoofed. (Matches orderLookupLimiter in routes.ts.)
+  const src = req.socket?.remoteAddress || req.ip || "unknown";
+  return crypto.createHash("sha256").update(src).digest("hex").slice(0, 16);
+}
+function ownerEmail(): string | null {
+  return process.env.OWNER_ALERT_EMAIL || process.env.OWNER_EMAIL || process.env.SITE_OWNER_EMAIL || process.env.SITE_CONTACT_EMAIL || null;
+}
+
+const auditRunBody = z.object({
+  url: z.string().min(4).max(2000),
+  email: z.string().email().max(320).optional().nullable(),
+});
+
+const CACHE_TTL_MS = 60_000;
+const PDF_CACHE_TTL_MS = 300_000;
+const AUDIO_CACHE_TTL_MS = 600_000;
+const SAMPLE_REPORT_PATH = "attached_assets/visionclaw-self-audit-2026-05-24.md";
+const SAMPLE_PDF_PATH = "attached_assets/visionclaw-self-audit-2026-05-24.pdf";
+const PITCH_AUDIO_PATH = "attached_assets/audit-pitch-bob.mp3";
+
+let productsCache: { ts: number; payload: any } | null = null;
+let sampleCache: { ts: number; body: string; mtimeMs: number } | null = null;
+let samplePdfCache: { ts: number; buf: Buffer; mtimeMs: number } | null = null;
+let pitchAudioCache: { ts: number; buf: Buffer; mtimeMs: number } | null = null;
+
+interface AuditProduct {
+  id: string;
+  name: string;
+  description: string | null;
+  tier: "self-serve" | "done-for-you" | "enterprise" | "unknown";
+  priceId: string | null;
+  unitAmountCents: number | null;
+  currency: string | null;
+  mode: "payment" | "subscription";
+}
+
+function classifyTier(name: string, metadata: any): AuditProduct["tier"] {
+  const meta = metadata && typeof metadata === "object" ? metadata : {};
+  const tierMeta = String(meta.tier || "").toLowerCase();
+  if (tierMeta === "self-serve" || tierMeta === "done-for-you" || tierMeta === "enterprise") {
+    return tierMeta;
+  }
+  const n = (name || "").toLowerCase();
+  if (n.includes("self-serve") || n.includes("self serve")) return "self-serve";
+  if (n.includes("done-for-you") || n.includes("done for you") || n.includes("dfy")) return "done-for-you";
+  if (n.includes("enterprise")) return "enterprise";
+  return "unknown";
+}
+
+export function registerAuditRoutes(app: Express) {
+  app.get("/api/public/audit/products", async (_req: Request, res: Response) => {
+    try {
+      if (productsCache && Date.now() - productsCache.ts < CACHE_TTL_MS) {
+        res.setHeader("X-Cache", "HIT");
+        return res.json(productsCache.payload);
+      }
+      const result: any = await db.execute(sql`
+        SELECT
+          p.id AS product_id,
+          p.name AS product_name,
+          p.description AS product_description,
+          p.metadata AS product_metadata,
+          pr.id AS price_id,
+          pr.unit_amount,
+          pr.currency,
+          pr.recurring
+        FROM stripe.products p
+        LEFT JOIN stripe.prices pr ON pr.product = p.id AND pr.active = true
+        WHERE p.active = true
+          AND (
+            p.metadata->>'kind' = 'audit'
+            OR LOWER(p.name) LIKE '%audit%'
+          )
+        -- R125+11: deterministic ordering when multiple active prices exist
+        -- per product (e.g. historical price rows that didn't get archived,
+        -- or month/annual variants). Frontend picks the FIRST match per tier;
+        -- lowest unit_amount wins so we never accidentally route a customer
+        -- to a higher-priced variant of the same audit tier. metadata.canonical
+        -- = 'true' provides an explicit override for future flexibility.
+        ORDER BY
+          (p.metadata->>'canonical' = 'true') DESC NULLS LAST,
+          pr.unit_amount ASC NULLS LAST,
+          p.id ASC
+      `);
+      const rows = (result.rows || result) as any[];
+      const items: AuditProduct[] = rows.map((r) => ({
+        id: r.product_id,
+        name: r.product_name,
+        description: r.product_description ?? null,
+        tier: classifyTier(r.product_name, r.product_metadata),
+        priceId: r.price_id ?? null,
+        unitAmountCents: r.unit_amount === null || r.unit_amount === undefined ? null : Number(r.unit_amount),
+        currency: r.currency ?? null,
+        mode: r.recurring ? "subscription" : "payment",
+      }));
+      const payload = {
+        generatedAt: new Date().toISOString(),
+        count: items.length,
+        products: items,
+      };
+      productsCache = { ts: Date.now(), payload };
+      res.setHeader("X-Cache", "MISS");
+      res.json(payload);
+    } catch (err: any) {
+      console.error("[audit] products fetch failed:", err?.message);
+      res.status(500).json({ error: "products fetch failed" });
+    }
+  });
+
+  app.get("/api/public/audit/sample", async (_req: Request, res: Response) => {
+    try {
+      const safeRel = SAMPLE_REPORT_PATH.replace(/[^a-zA-Z0-9._/-]/g, "");
+      const cwd = process.cwd();
+      const resolved = path.resolve(cwd, safeRel);
+      const cwdSep = cwd + path.sep;
+      if (!resolved.startsWith(cwdSep)) {
+        return res.status(403).json({ error: "forbidden" });
+      }
+      if (!fs.existsSync(resolved)) {
+        return res.status(404).json({ error: "sample report not found" });
+      }
+      const stat = fs.statSync(resolved);
+      if (sampleCache && sampleCache.mtimeMs === stat.mtimeMs && Date.now() - sampleCache.ts < CACHE_TTL_MS) {
+        res.setHeader("X-Cache", "HIT");
+        res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+        res.setHeader("Cache-Control", "public, max-age=60");
+        return res.send(sampleCache.body);
+      }
+      const body = fs.readFileSync(resolved, "utf-8");
+      sampleCache = { ts: Date.now(), body, mtimeMs: stat.mtimeMs };
+      res.setHeader("X-Cache", "MISS");
+      res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=60");
+      res.send(body);
+    } catch (err: any) {
+      console.error("[audit] sample fetch failed:", err?.message);
+      res.status(500).json({ error: "sample fetch failed" });
+    }
+  });
+
+  app.get("/api/public/audit/sample.pdf", async (req: Request, res: Response) => {
+    // R125+12+sec (architect MEDIUM x2 closed 2026-05-24):
+    //  1. Removed existsSync→statSync→readFileSync TOCTOU race; now uses
+    //     async fs.promises.stat with explicit ENOENT handling (deterministic
+    //     404 instead of transient 500 if file is deleted/replaced mid-flight).
+    //  2. Replaced sync readFileSync (event-loop blocking on 1.4MB under load)
+    //     with async fs.promises.readFile; added ETag + Last-Modified +
+    //     If-None-Match conditional GET to cut repeat-visitor bandwidth.
+    try {
+      const resolved = path.resolve(process.cwd(), SAMPLE_PDF_PATH);
+      let stat: import("fs").Stats;
+      try {
+        stat = await fs.promises.stat(resolved);
+      } catch (e: any) {
+        if (e?.code === "ENOENT") {
+          return res.status(404).json({ error: "sample pdf not found" });
+        }
+        throw e;
+      }
+      const etag = `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`;
+      res.setHeader("ETag", etag);
+      res.setHeader("Last-Modified", stat.mtime.toUTCString());
+      if (req.headers["if-none-match"] === etag) {
+        return res.status(304).end();
+      }
+      let buf: Buffer;
+      if (samplePdfCache && samplePdfCache.mtimeMs === stat.mtimeMs && Date.now() - samplePdfCache.ts < PDF_CACHE_TTL_MS) {
+        buf = samplePdfCache.buf;
+        res.setHeader("X-Cache", "HIT");
+      } else {
+        buf = await fs.promises.readFile(resolved);
+        samplePdfCache = { ts: Date.now(), buf, mtimeMs: stat.mtimeMs };
+        res.setHeader("X-Cache", "MISS");
+      }
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.setHeader("Content-Disposition", 'inline; filename="visionclaw-self-audit-2026-05-24.pdf"');
+      res.setHeader("Content-Length", String(buf.length));
+      res.setHeader("Accept-Ranges", "bytes");
+      res.send(buf);
+    } catch (err: any) {
+      console.error("[audit] sample pdf fetch failed:", err?.message);
+      res.status(500).json({ error: "sample pdf fetch failed" });
+    }
+  });
+
+  // R125+13.2: Founder-pitch audio (Bob Washburn voice via Fish Audio clone,
+  // ref 675fecd02fcc4ad28cd84ca61501ca3e, ~60s, ~920KB MP3). Same async-stat +
+  // ETag/304 + Accept-Ranges pattern as sample.pdf so mobile browsers can scrub
+  // and repeat-visitors don't re-download.
+  app.get("/api/public/audit/pitch.mp3", async (req: Request, res: Response) => {
+    try {
+      const resolved = path.resolve(process.cwd(), PITCH_AUDIO_PATH);
+      let stat: import("fs").Stats;
+      try {
+        stat = await fs.promises.stat(resolved);
+      } catch (e: any) {
+        if (e?.code === "ENOENT") {
+          return res.status(404).json({ error: "pitch audio not found" });
+        }
+        throw e;
+      }
+      const etag = `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`;
+      res.setHeader("ETag", etag);
+      res.setHeader("Last-Modified", stat.mtime.toUTCString());
+      if (req.headers["if-none-match"] === etag) {
+        return res.status(304).end();
+      }
+      let buf: Buffer;
+      if (pitchAudioCache && pitchAudioCache.mtimeMs === stat.mtimeMs && Date.now() - pitchAudioCache.ts < AUDIO_CACHE_TTL_MS) {
+        buf = pitchAudioCache.buf;
+        res.setHeader("X-Cache", "HIT");
+      } else {
+        buf = await fs.promises.readFile(resolved);
+        pitchAudioCache = { ts: Date.now(), buf, mtimeMs: stat.mtimeMs };
+        res.setHeader("X-Cache", "MISS");
+      }
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "public, max-age=600");
+      res.setHeader("Content-Disposition", 'inline; filename="audit-pitch-bob.mp3"');
+      res.setHeader("Content-Length", String(buf.length));
+      res.setHeader("Accept-Ranges", "bytes");
+      res.send(buf);
+    } catch (err: any) {
+      console.error("[audit] pitch audio fetch failed:", err?.message);
+      res.status(500).json({ error: "pitch audio fetch failed" });
+    }
+  });
+
+  // R125+52.20 — Instant AI Readiness Audit (autonomous self-serve fulfillment).
+  // Replaces the dead-end lead form: a visitor submits a URL, we fetch + score
+  // their site live (server/audit-engine.ts) and return a real report on the
+  // spot. Email is optional — when provided we persist it, mirror a lead into
+  // audit_leads, and notify the owner. CSRF auto-skipped (/api/public/ prefix).
+  app.post("/api/public/audit/run", async (req: Request, res: Response) => {
+    if (!rateOk(`audit-run:${hashIp(req)}`, 6, 10 * 60 * 1000)) {
+      return res.status(429).json({ error: "Too many audits from your network — please wait a few minutes and try again." });
+    }
+    // Honeypot + Turnstile (fails open until keys configured). This endpoint
+    // does an expensive outbound fetch of a visitor-supplied URL, so it's the
+    // prime abuse target — proof-of-human gates it once keys are set.
+    if (!(await enforceBotProtection(req, res, { requireTurnstile: true }))) return;
+    const parsed = auditRunBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Please provide a valid website URL." });
+    }
+    const { url, email } = parsed.data;
+    try {
+      const result = await runAudit(url);
+      const ipHash = hashIp(req);
+      const ua = String(req.headers["user-agent"] || "").slice(0, 500);
+      const checksLit = JSON.stringify(result.checks);
+      const recsLit = JSON.stringify(result.recommendations);
+      let reportId: number | null = null;
+      try {
+        const ins: any = await db.execute(sql`
+          INSERT INTO audit_reports
+            (tenant_id, website_url, final_url, overall_score, grade, checks, recommendations, email, ip_hash, user_agent, status)
+          VALUES
+            (${AUDIT_TENANT_ID}, ${result.websiteUrl}, ${result.finalUrl}, ${result.overallScore}, ${result.grade},
+             ${checksLit}::jsonb, ${recsLit}::jsonb, ${email || null}, ${ipHash}, ${ua}, 'completed')
+          RETURNING id
+        `);
+        reportId = ((ins.rows || ins) as any[])[0]?.id ?? null;
+      } catch (e: any) {
+        console.error("[audit] persist failed:", e?.message);
+      }
+
+      // Lead capture + owner notify (only when an email was volunteered).
+      if (email) {
+        const note = `AI Readiness ${result.overallScore}/100 (${result.grade}) for ${result.websiteUrl}`;
+        await db.execute(sql`
+          INSERT INTO audit_leads (tenant_id, email, kind, notes)
+          VALUES (${AUDIT_TENANT_ID}, ${email}, 'audit-run', ${note})
+        `).catch((e: any) => console.error("[audit] lead insert failed:", e?.message));
+        const to = ownerEmail();
+        if (to) {
+          const body = [
+            `New Instant AI Readiness Audit lead.`,
+            ``,
+            `Email: ${email}`,
+            `Site:  ${result.websiteUrl}`,
+            `Score: ${result.overallScore}/100 (grade ${result.grade})`,
+            ``,
+            `Top fixes:`,
+            ...result.recommendations.map((r) => `  - ${r}`),
+            ``,
+            `Report #${reportId ?? "?"}. Strong upsell target for the paid deep audit.`,
+          ].join("\n");
+          sendEmailDirect({ to, subject: `[AUDIT LEAD] ${result.websiteUrl} scored ${result.overallScore} (${result.grade})`, text: body })
+            .catch((e: any) => console.error("[audit] owner notify failed:", e?.message));
+        }
+      }
+
+      res.json({ id: reportId, ...result });
+    } catch (err: any) {
+      if (err instanceof AuditFetchError) {
+        return res.status(422).json({ error: err.message });
+      }
+      console.error("[audit] run failed:", err?.message);
+      res.status(500).json({ error: "The audit could not be completed. Please try again." });
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Operator-facing admin endpoints (/admin/website-audit page).
+// Lets the platform owner run the instant audit AND generate the full paid
+// comprehensive PDF deliverable manually (no Stripe checkout required).
+// ---------------------------------------------------------------------------
+
+interface FullAuditJob {
+  id: string;
+  /** "audit" (default, AI Readiness Audit), "exec-report" (Executive Opportunity Report), or "smart-leads" (Smart Leads dossier batch). */
+  kind?: "audit" | "exec-report" | "smart-leads";
+  status: "running" | "done" | "error";
+  startedAt: number;
+  finishedAt?: number;
+  company?: string;
+  website?: string;
+  filePath?: string;
+  fileName?: string;
+  pages?: number;
+  error?: string;
+  customerEmail?: string;
+  customerName?: string;
+  /** Set when the finished PDF was enqueued into the service review queue. */
+  queuedReviewId?: string;
+}
+const FULL_AUDIT_JOBS = new Map<string, FullAuditJob>();
+// Durable job metadata (same dotfile-in-uploads pattern as the service review
+// queue). Dotfiles are excluded from the servable-uploads sync, so this is
+// never publicly reachable. Survives server restarts within a deploy; jobs
+// found still "running" after a restart are marked failed (the generation
+// process died with the old process).
+// data/local-state/ is gitignored, never synced to servable uploads/, and
+// outside the boot-time uploads dotfile purge in seed.ts.
+const JOBS_STORE_PATH = path.join("data", "local-state", "website-audit-jobs.json");
+let jobsLoaded = false;
+function loadFullAuditJobs(): void {
+  if (jobsLoaded) return;
+  jobsLoaded = true;
+  try {
+    if (!fs.existsSync(JOBS_STORE_PATH)) return;
+    const raw = JSON.parse(fs.readFileSync(JOBS_STORE_PATH, "utf-8"));
+    if (!Array.isArray(raw)) return;
+    for (const j of raw) {
+      if (!j || typeof j.id !== "string") continue;
+      if (j.status === "running") {
+        j.status = "error";
+        j.error = "The server restarted while this audit was generating. Please run it again.";
+        j.finishedAt = Date.now();
+      }
+      FULL_AUDIT_JOBS.set(j.id, j as FullAuditJob);
+    }
+  } catch (e: any) {
+    console.warn("[audit-admin] job store load failed (non-fatal):", e?.message);
+  }
+}
+function saveFullAuditJobs(): void {
+  try {
+    fs.mkdirSync(path.dirname(JOBS_STORE_PATH), { recursive: true });
+    fs.writeFileSync(JOBS_STORE_PATH, JSON.stringify([...FULL_AUDIT_JOBS.values()]));
+  } catch (e: any) {
+    console.warn("[audit-admin] job store save failed (non-fatal):", e?.message);
+  }
+}
+function pruneFullAuditJobs(): void {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  for (const [k, j] of FULL_AUDIT_JOBS.entries()) {
+    if (j.startedAt < cutoff) FULL_AUDIT_JOBS.delete(k);
+  }
+}
+
+const adminInstantBody = z.object({ url: z.string().min(4).max(2000) });
+const adminFullBody = z.object({
+  company: z.string().min(1).max(200),
+  website: z.string().min(4).max(300),
+  industry: z.string().max(200).optional().nullable(),
+  crm: z.string().max(120).optional().nullable(),
+  notes: z.string().max(500).optional().nullable(),
+  // Optional customer contact. When an email is provided, the finished PDF
+  // lands in the service review queue as an offline-paid order so the admin
+  // can proofread + "Approve & ship" (delivery email with download link)
+  // exactly like a Stripe order — no manual download/attach/send dance.
+  customerName: z.string().max(200).optional().nullable(),
+  customerEmail: z.string().email().max(320).optional().nullable().or(z.literal("")),
+});
+
+export function registerAuditAdminRoutes(app: Express, helpers: {
+  authMiddleware: any;
+  getTenantFromRequest: (req: Request) => number | null | Promise<number | null>;
+  isAdminRequest: (req: Request) => boolean;
+  ADMIN_TENANT_ID: number;
+}) {
+  const { authMiddleware, getTenantFromRequest, isAdminRequest, ADMIN_TENANT_ID } = helpers;
+  loadFullAuditJobs();
+
+  async function requireAdmin(req: Request, res: Response): Promise<number | null> {
+    const tenantId = await getTenantFromRequest(req);
+    if (tenantId === null || tenantId !== ADMIN_TENANT_ID || !isAdminRequest(req)) {
+      res.status(403).json({ error: "Admin access required" });
+      return null;
+    }
+    return tenantId;
+  }
+
+  // Instant audit (same engine as the public /audit page, no Turnstile /
+  // public rate limits — operator is authenticated).
+  app.post("/api/admin/audit/run", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const parsed = adminInstantBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Please provide a valid website URL." });
+    try {
+      const result = await runAudit(parsed.data.url);
+      res.json(result);
+    } catch (err: any) {
+      if (err instanceof AuditFetchError) return res.status(422).json({ error: err.message });
+      console.error("[audit-admin] run failed:", err?.message);
+      res.status(500).json({ error: "The audit could not be completed. Please try again." });
+    }
+  });
+
+  // Kick off the full comprehensive PDF audit (the $497 deliverable) as a
+  // background job — generation takes several minutes (7 sections + CoVe).
+  app.post("/api/admin/audit/full", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const parsed = adminFullBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Company name and website are required." });
+    }
+    pruneFullAuditJobs();
+    // One at a time — this is an expensive multi-minute LLM pipeline.
+    for (const j of FULL_AUDIT_JOBS.values()) {
+      if (j.status === "running") {
+        return res.status(409).json({ error: "A comprehensive audit is already running. Wait for it to finish.", jobId: j.id });
+      }
+    }
+    const { company, website, industry, crm, notes } = parsed.data;
+    const custEmail = (parsed.data.customerEmail || "").trim();
+    const custName = (parsed.data.customerName || "").trim();
+    const jobId = crypto.randomUUID();
+    const job: FullAuditJob = {
+      id: jobId, status: "running", startedAt: Date.now(), company, website,
+      customerEmail: custEmail || undefined, customerName: custName || undefined,
+    };
+    FULL_AUDIT_JOBS.set(jobId, job);
+    saveFullAuditJobs();
+    const customerEmail = custEmail || ownerEmail() || "operator@visionclaw";
+    fulfillReadinessAudit({
+      intake: { company, website, industry: industry || undefined, crm: crm || undefined, notes: notes || undefined },
+      customerEmail,
+      orderId: `manual-${jobId.slice(0, 8)}`,
+      tenantId,
+    }).then(async (result) => {
+      job.finishedAt = Date.now();
+      if (result.success && result.filePath) {
+        job.status = "done";
+        job.filePath = result.filePath;
+        job.fileName = result.fileName;
+        job.pages = result.pages;
+        // Customer email provided → land the finished PDF in the service
+        // review queue as an offline-paid order so the admin can proofread
+        // and "Approve & ship" (delivery email + verified download link)
+        // exactly like a Stripe order. No email → old behavior (download).
+        if (custEmail) {
+          try {
+            const { addReviewItem, runQualityChecks } = await import("../service-review-queue");
+            const qa = runQualityChecks({
+              filePath: result.filePath,
+              pageCount: result.pages,
+              depth: "standard",
+              sections: result.sections || [],
+            });
+            const queued = await addReviewItem({
+              sessionId: `manual-${jobId}`,
+              sku: "sample-audit-sku-001",
+              tier: "self-serve",
+              productName: `AI Readiness Audit — ${company}`,
+              customerEmail: custEmail,
+              customerName: custName || custEmail,
+              intake: { company, website, industry: industry || undefined, crm: crm || undefined, notes: notes || undefined },
+              filePath: result.filePath,
+              fileName: result.fileName || "",
+              qa,
+              modelUsed: result.modelUsed,
+              pages: result.pages,
+              payment: "offline (check/cash/invoice)",
+            });
+            job.queuedReviewId = queued.id;
+            console.log(`[audit-admin] Job ${jobId} queued for review as ${queued.id} (customer ${custEmail})`);
+          } catch (queueErr: any) {
+            // Fail-soft: the PDF still exists and is downloadable from the
+            // job card — surface the queue failure instead of losing it.
+            job.error = `PDF generated, but adding to review queue failed: ${String(queueErr?.message || "unknown").slice(0, 200)}`;
+            console.error(`[audit-admin] Queue enqueue failed for job ${jobId}: ${queueErr?.message}`);
+          }
+        }
+      } else {
+        job.status = "error";
+        job.error = result.error || "PDF generation failed";
+      }
+      saveFullAuditJobs();
+    }).catch((err: any) => {
+      job.finishedAt = Date.now();
+      job.status = "error";
+      job.error = err?.message?.slice(0, 300) || "unknown error";
+      saveFullAuditJobs();
+    });
+    res.json({ jobId, status: "running" });
+  });
+
+  app.get("/api/admin/audit/full/:jobId", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    // (job.kind ?? "audit") keeps pre-kind persisted jobs working while
+    // enforcing job-type isolation reciprocally with the exec-report routes.
+    if (!job || (job.kind ?? "audit") !== "audit") return res.status(404).json({ error: "Job not found (jobs are kept for 24h)." });
+    res.json({
+      jobId: job.id,
+      status: job.status,
+      company: job.company,
+      website: job.website,
+      startedAt: new Date(job.startedAt).toISOString(),
+      finishedAt: job.finishedAt ? new Date(job.finishedAt).toISOString() : null,
+      pages: job.pages ?? null,
+      fileName: job.fileName ?? null,
+      error: job.error ?? null,
+      customerEmail: job.customerEmail ?? null,
+      queuedReviewId: job.queuedReviewId ?? null,
+    });
+  });
+
+  app.get("/api/admin/audit/full/:jobId/download", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    if (!job || (job.kind ?? "audit") !== "audit" || job.status !== "done" || !job.filePath) {
+      return res.status(404).json({ error: "PDF not ready or job not found." });
+    }
+    // Path confinement: only serve the exact file the job produced, and only
+    // from inside uploads/ — never a caller-supplied path.
+    const uploadsRoot = path.resolve(process.cwd(), "uploads") + path.sep;
+    const resolved = path.resolve(process.cwd(), job.filePath);
+    if (!resolved.startsWith(uploadsRoot) || !fs.existsSync(resolved)) {
+      return res.status(404).json({ error: "PDF file not found on disk." });
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${(job.fileName || "ai-readiness-audit.pdf").replace(/[^a-zA-Z0-9._-]/g, "_")}"`);
+    const stream = fs.createReadStream(resolved);
+    stream.on("error", (err: any) => {
+      console.error("[audit-admin] download stream failed:", err?.message);
+      if (!res.headersSent) {
+        res.status(err?.code === "ENOENT" ? 404 : 500).json({ error: "PDF could not be read from disk." });
+      } else {
+        res.destroy();
+      }
+    });
+    stream.pipe(res);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Executive Opportunity Report (the "Felix executive report" as a form).
+  // Same job/store machinery as the full audit; shares the one-expensive-job-
+  // at-a-time lane with it on purpose (same free-tier pipeline).
+  // ---------------------------------------------------------------------------
+
+  const execReportBody = z.object({
+    focus: z.enum(["full", "opportunities"]).optional().nullable(),
+    company: z.string().min(1).max(200),
+    website: z.string().min(4).max(300),
+    principalName: z.string().max(120).optional().nullable(),
+    principalEmail: z.string().email().max(320).optional().nullable().or(z.literal("")),
+    description: z.string().max(800).optional().nullable(),
+    industry: z.string().max(200).optional().nullable(),
+    crm: z.string().max(120).optional().nullable(),
+    phone: z.string().max(40).optional().nullable(),
+    notes: z.string().max(500).optional().nullable(),
+  });
+
+  app.post("/api/admin/exec-report/run", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const parsed = execReportBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Company name and website are required." });
+    }
+    pruneFullAuditJobs();
+    for (const j of FULL_AUDIT_JOBS.values()) {
+      if (j.status === "running") {
+        return res.status(409).json({ error: "Another report is already generating. Wait for it to finish.", jobId: j.id });
+      }
+    }
+    const d = parsed.data;
+    const focus: "full" | "opportunities" = d.focus === "opportunities" ? "opportunities" : "full";
+    const reportLabel = focus === "opportunities" ? "Money-Making Opportunities Report" : "Executive Opportunity Report";
+    const principalEmail = (d.principalEmail || "").trim();
+    const principalName = (d.principalName || "").trim();
+    const jobId = crypto.randomUUID();
+    const job: FullAuditJob = {
+      id: jobId, kind: "exec-report", status: "running", startedAt: Date.now(),
+      company: d.company, website: d.website,
+      customerEmail: principalEmail || undefined, customerName: principalName || undefined,
+    };
+    FULL_AUDIT_JOBS.set(jobId, job);
+    saveFullAuditJobs();
+    const customerEmail = principalEmail || ownerEmail() || "operator@visionclaw";
+    fulfillExecutiveReport({
+      intake: {
+        focus,
+        company: d.company, website: d.website,
+        principalName: principalName || undefined,
+        principalEmail: principalEmail || undefined,
+        description: d.description || undefined,
+        industry: d.industry || undefined,
+        crm: d.crm || undefined,
+        phone: d.phone || undefined,
+        notes: d.notes || undefined,
+      },
+      customerEmail,
+      orderId: `manual-${jobId.slice(0, 8)}`,
+      tenantId,
+    }).then(async (result) => {
+      job.finishedAt = Date.now();
+      if (result.success && result.filePath) {
+        job.status = "done";
+        job.filePath = result.filePath;
+        job.fileName = result.fileName;
+        job.pages = result.pages;
+        // Principal email provided → review queue as an offline-paid order,
+        // exactly like the full audit: proofread there, then "Approve & ship".
+        if (principalEmail) {
+          try {
+            const { addReviewItem, runQualityChecks } = await import("../service-review-queue");
+            const qa = runQualityChecks({
+              filePath: result.filePath,
+              pageCount: result.pages,
+              depth: "standard",
+              sections: result.sections || [],
+            });
+            const queued = await addReviewItem({
+              sessionId: `manual-${jobId}`,
+              sku: "sample-exec-report-sku-001",
+              tier: "self-serve",
+              productName: `${reportLabel} — ${d.company}`,
+              customerEmail: principalEmail,
+              customerName: principalName || principalEmail,
+              intake: {
+                company: d.company, website: d.website,
+                industry: d.industry || undefined, crm: d.crm || undefined,
+                notes: [d.description, d.notes].filter(Boolean).join(" | ") || undefined,
+              },
+              filePath: result.filePath,
+              fileName: result.fileName || "",
+              qa,
+              modelUsed: result.modelUsed,
+              pages: result.pages,
+              payment: "offline (check/cash/invoice)",
+            });
+            job.queuedReviewId = queued.id;
+            console.log(`[exec-report-admin] Job ${jobId} queued for review as ${queued.id} (customer ${principalEmail})`);
+          } catch (queueErr: any) {
+            job.error = `PDF generated, but adding to review queue failed: ${String(queueErr?.message || "unknown").slice(0, 200)}`;
+            console.error(`[exec-report-admin] Queue enqueue failed for job ${jobId}: ${queueErr?.message}`);
+          }
+        }
+      } else {
+        job.status = "error";
+        job.error = result.error || "PDF generation failed";
+      }
+      saveFullAuditJobs();
+    }).catch((err: any) => {
+      job.finishedAt = Date.now();
+      job.status = "error";
+      job.error = err?.message?.slice(0, 300) || "unknown error";
+      saveFullAuditJobs();
+    });
+    res.json({ jobId, status: "running" });
+  });
+
+  app.get("/api/admin/exec-report/:jobId", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    if (!job || job.kind !== "exec-report") return res.status(404).json({ error: "Job not found (jobs are kept for 24h)." });
+    res.json({
+      jobId: job.id,
+      status: job.status,
+      company: job.company,
+      website: job.website,
+      startedAt: new Date(job.startedAt).toISOString(),
+      finishedAt: job.finishedAt ? new Date(job.finishedAt).toISOString() : null,
+      pages: job.pages ?? null,
+      fileName: job.fileName ?? null,
+      error: job.error ?? null,
+      customerEmail: job.customerEmail ?? null,
+      queuedReviewId: job.queuedReviewId ?? null,
+    });
+  });
+
+  app.get("/api/admin/exec-report/:jobId/download", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    if (!job || job.kind !== "exec-report" || job.status !== "done" || !job.filePath) {
+      return res.status(404).json({ error: "PDF not ready or job not found." });
+    }
+    // Path confinement — identical to the audit download route.
+    const uploadsRoot = path.resolve(process.cwd(), "uploads") + path.sep;
+    const resolved = path.resolve(process.cwd(), job.filePath);
+    if (!resolved.startsWith(uploadsRoot) || !fs.existsSync(resolved)) {
+      return res.status(404).json({ error: "PDF file not found on disk." });
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${(job.fileName || "executive-opportunity-report.pdf").replace(/[^a-zA-Z0-9._-]/g, "_")}"`);
+    const stream = fs.createReadStream(resolved);
+    stream.on("error", (err: any) => {
+      console.error("[exec-report-admin] download stream failed:", err?.message);
+      if (!res.headersSent) {
+        res.status(err?.code === "ENOENT" ? 404 : 500).json({ error: "PDF could not be read from disk." });
+      } else {
+        res.destroy();
+      }
+    });
+    stream.pipe(res);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Smart Leads, Zero Research — dossier batch as a form (wedge SOP:
+  // data/output-skills/wedge-smart-leads-sop.md). Same job/store machinery and
+  // one-expensive-job-at-a-time lane as the full audit and exec report.
+  // ---------------------------------------------------------------------------
+
+  const smartLeadsBody = z.object({
+    customerOneLiner: z.string().min(5).max(500),
+    customerCompany: z.string().max(200).optional().nullable(),
+    customerEmail: z.string().email().max(320).optional().nullable().or(z.literal("")),
+    leads: z.array(z.object({
+      domain: z.string().max(300).optional().nullable(),
+      email: z.string().max(320).optional().nullable(),
+      name: z.string().max(120).optional().nullable(),
+      title: z.string().max(120).optional().nullable(),
+      linkedin: z.string().max(300).optional().nullable(),
+    })).min(1).max(SMART_LEADS_MAX_BATCH),
+  });
+
+  // Lead FINDER — the discovery half of the wedge: "what kind of businesses +
+  // where" → real nearby businesses from Google Places, ready to feed into the
+  // dossier form. Fixed Google endpoint only (no user-supplied URLs).
+  const leadFindBody = z.object({
+    businessType: z.string().min(2).max(120),
+    location: z.string().min(2).max(160),
+    zip: z.string().max(12).optional().nullable(),
+    maxResults: z.number().int().min(1).max(20).optional().nullable(),
+  });
+  app.post("/api/admin/smart-leads/find", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    if (!rateOk(`sl-find:${hashIp(req)}`, 20, 10 * 60 * 1000)) {
+      return res.status(429).json({ error: "Too many searches — wait a few minutes." });
+    }
+    const parsed = leadFindBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Tell me the kind of business and the city/area to search." });
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: "Google Maps key is not configured on this environment." });
+    const { businessType, location } = parsed.data;
+    // Optional ZIP narrows the search to one part of town (towns can span
+    // several ZIP codes). It just sharpens the search text Google sees.
+    const zip = (parsed.data.zip || "").trim().replace(/[^0-9-]/g, "").slice(0, 10);
+    const where = zip ? `${location} ${zip}` : location;
+    const maxResults = parsed.data.maxResults ?? 12;
+    const RESULT_FIELDS = "places.displayName,places.websiteUri,places.formattedAddress,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.businessStatus,places.types";
+    const placesFetch = async (path: string, fieldMask: string, body: any): Promise<any[] | null> => {
+      const resp = await fetch(`https://places.googleapis.com/v1/${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": fieldMask },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        const detail = (await resp.text().catch(() => "")).slice(0, 300);
+        console.error(`[smart-leads-find] Places ${path} ${resp.status}: ${detail}`);
+        return null;
+      }
+      const data: any = await resp.json();
+      return Array.isArray(data?.places) ? data.places : [];
+    };
+    const toResult = (p: any) => ({
+      name: String(p?.displayName?.text || "").slice(0, 160),
+      website: typeof p?.websiteUri === "string" ? p.websiteUri.slice(0, 300) : null,
+      address: String(p?.formattedAddress || "").slice(0, 240),
+      phone: typeof p?.nationalPhoneNumber === "string" ? p.nationalPhoneNumber.slice(0, 40) : null,
+      rating: typeof p?.rating === "number" ? p.rating : null,
+      reviews: typeof p?.userRatingCount === "number" ? p.userRatingCount : null,
+    });
+    // Types that mean "the shopping center itself" — never a tenant lead.
+    const CONTAINER_TYPES = new Set(["shopping_mall", "shopping_center", "plaza"]);
+    // Name check stays narrow (unequivocal center phrases only) so a real
+    // tenant like "Corner Square Cafe" isn't wrongly dropped — Google types
+    // are the authoritative signal.
+    const isContainerPlace = (p: any) =>
+      (Array.isArray(p?.types) && p.types.some((t: any) => CONTAINER_TYPES.has(String(t)))) ||
+      /\b(mall|shopping center|shopping centre|strip plaza)\b/i.test(String(p?.displayName?.text || ""));
+    // "Tenants in strip malls" mode: the user wants the businesses INSIDE the
+    // centers, not the centers themselves. Google's text search takes "strip
+    // mall" literally, so we do it in two hops: find the centers, then list
+    // the individual businesses at each center's spot.
+    const containerMatch = businessType.match(/\b(strip malls?|shopping centers?|shopping centres?|malls?|plazas?)\b/i);
+    try {
+      if (containerMatch) {
+        const centers = await placesFetch("places:searchText", "places.displayName,places.location",
+          { textQuery: `${containerMatch[0]} near ${where}`, maxResultCount: 5 });
+        if (centers === null) return res.status(502).json({ error: "The business search service returned an error — try again in a minute." });
+        const seen = new Set<string>();
+        const tenants: any[] = [];
+        for (const c of centers.slice(0, 4)) {
+          const lat = c?.location?.latitude, lng = c?.location?.longitude;
+          if (typeof lat !== "number" || typeof lng !== "number") continue;
+          const nearby = await placesFetch("places:searchNearby", RESULT_FIELDS, {
+            maxResultCount: 20,
+            rankPreference: "POPULARITY",
+            locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: 250 } },
+          });
+          // A failed nearby lookup must not silently shrink the lead list.
+          if (nearby === null) return res.status(502).json({ error: "The business search service returned an error — try again in a minute." });
+          for (const p of nearby) {
+            if (p?.businessStatus === "CLOSED_PERMANENTLY" || isContainerPlace(p)) continue;
+            const r = toResult(p);
+            if (!r.name) continue;
+            const key = `${r.name.toLowerCase()}|${r.address.toLowerCase()}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            tenants.push(r);
+          }
+          if (tenants.length >= maxResults) break;
+        }
+        return res.json({ results: tenants.slice(0, maxResults), query: `businesses inside ${containerMatch[0]} near ${where}` });
+      }
+      const places = await placesFetch("places:searchText", RESULT_FIELDS,
+        { textQuery: `${businessType} near ${where}`, maxResultCount: Math.min(maxResults, 20) });
+      if (places === null) return res.status(502).json({ error: "The business search service returned an error — try again in a minute." });
+      const results = places
+        .filter((p: any) => p?.businessStatus !== "CLOSED_PERMANENTLY")
+        .slice(0, maxResults)
+        .map(toResult)
+        .filter((r: any) => r.name);
+      res.json({ results, query: `${businessType} near ${where}` });
+    } catch (err: any) {
+      console.error(`[smart-leads-find] search failed: ${err?.message}`);
+      res.status(502).json({ error: "Business search failed — try again in a minute." });
+    }
+  });
+
+  app.post("/api/admin/smart-leads/run", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const parsed = smartLeadsBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: `Your one-liner (what you sell and to whom) plus 1-${SMART_LEADS_MAX_BATCH} leads are required.` });
+    }
+    const d = parsed.data;
+    const leads = d.leads
+      .map((l) => ({
+        domain: (l.domain || "").trim() || undefined,
+        email: (l.email || "").trim() || undefined,
+        name: (l.name || "").trim() || undefined,
+        title: (l.title || "").trim() || undefined,
+        linkedin: (l.linkedin || "").trim() || undefined,
+      }))
+      .filter((l) => l.domain || l.email || l.name);
+    if (leads.length === 0) {
+      return res.status(400).json({ error: "Every lead needs at least a company domain, a contact email, or a name." });
+    }
+    pruneFullAuditJobs();
+    for (const j of FULL_AUDIT_JOBS.values()) {
+      if (j.status === "running") {
+        return res.status(409).json({ error: "Another report is already generating. Wait for it to finish.", jobId: j.id });
+      }
+    }
+    const customerEmail = (d.customerEmail || "").trim();
+    const customerCompany = (d.customerCompany || "").trim();
+    const jobId = crypto.randomUUID();
+    const job: FullAuditJob = {
+      id: jobId, kind: "smart-leads", status: "running", startedAt: Date.now(),
+      company: customerCompany || undefined,
+      website: leads.map((l) => l.domain || l.email || l.name).filter(Boolean).slice(0, 3).join(", "),
+      customerEmail: customerEmail || undefined, customerName: customerCompany || undefined,
+    };
+    FULL_AUDIT_JOBS.set(jobId, job);
+    saveFullAuditJobs();
+    fulfillSmartLeadsDossiers({
+      intake: { customerOneLiner: d.customerOneLiner, customerCompany: customerCompany || undefined, leads },
+      customerEmail: customerEmail || ownerEmail() || "operator@visionclaw",
+      orderId: `manual-${jobId.slice(0, 8)}`,
+      tenantId,
+    }).then(async (result) => {
+      job.finishedAt = Date.now();
+      if (result.success && result.filePath) {
+        job.status = "done";
+        job.filePath = result.filePath;
+        job.fileName = result.fileName;
+        job.pages = result.pages;
+        // Customer email provided → review queue as an offline-paid order,
+        // exactly like the exec report: proofread there, then "Approve & ship".
+        if (customerEmail) {
+          try {
+            const { addReviewItem, runQualityChecks } = await import("../service-review-queue");
+            const qa = runQualityChecks({
+              filePath: result.filePath,
+              pageCount: result.pages,
+              depth: "standard",
+              sections: result.sections || [],
+            });
+            const queued = await addReviewItem({
+              sessionId: `manual-${jobId}`,
+              sku: "sample-leads-dossier-sku-001",
+              tier: "self-serve",
+              productName: `Smart Leads Dossiers — ${customerCompany || customerEmail} (${leads.length} lead${leads.length === 1 ? "" : "s"})`,
+              customerEmail,
+              customerName: customerCompany || customerEmail,
+              intake: {
+                company: customerCompany || undefined,
+                notes: d.customerOneLiner,
+                website: job.website,
+              },
+              filePath: result.filePath,
+              fileName: result.fileName || "",
+              qa,
+              modelUsed: result.modelUsed,
+              pages: result.pages,
+              payment: "offline (check/cash/invoice)",
+            });
+            job.queuedReviewId = queued.id;
+            console.log(`[smart-leads-admin] Job ${jobId} queued for review as ${queued.id} (customer ${customerEmail})`);
+          } catch (queueErr: any) {
+            job.error = `PDF generated, but adding to review queue failed: ${String(queueErr?.message || "unknown").slice(0, 200)}`;
+            console.error(`[smart-leads-admin] Queue enqueue failed for job ${jobId}: ${queueErr?.message}`);
+          }
+        }
+      } else {
+        job.status = "error";
+        job.error = result.error || "PDF generation failed";
+      }
+      saveFullAuditJobs();
+    }).catch((err: any) => {
+      job.finishedAt = Date.now();
+      job.status = "error";
+      job.error = err?.message?.slice(0, 300) || "unknown error";
+      saveFullAuditJobs();
+    });
+    res.json({ jobId, status: "running" });
+  });
+
+  app.get("/api/admin/smart-leads/:jobId", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    if (!job || job.kind !== "smart-leads") return res.status(404).json({ error: "Job not found (jobs are kept for 24h)." });
+    res.json({
+      jobId: job.id,
+      status: job.status,
+      company: job.company,
+      website: job.website,
+      startedAt: new Date(job.startedAt).toISOString(),
+      finishedAt: job.finishedAt ? new Date(job.finishedAt).toISOString() : null,
+      pages: job.pages ?? null,
+      fileName: job.fileName ?? null,
+      error: job.error ?? null,
+      customerEmail: job.customerEmail ?? null,
+      queuedReviewId: job.queuedReviewId ?? null,
+    });
+  });
+
+  app.get("/api/admin/smart-leads/:jobId/download", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    if (!job || job.kind !== "smart-leads" || job.status !== "done" || !job.filePath) {
+      return res.status(404).json({ error: "PDF not ready or job not found." });
+    }
+    // Path confinement — identical to the audit download route.
+    const uploadsRoot = path.resolve(process.cwd(), "uploads") + path.sep;
+    const resolved = path.resolve(process.cwd(), job.filePath);
+    if (!resolved.startsWith(uploadsRoot) || !fs.existsSync(resolved)) {
+      return res.status(404).json({ error: "PDF file not found on disk." });
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${(job.fileName || "smart-leads-dossiers.pdf").replace(/[^a-zA-Z0-9._-]/g, "_")}"`);
+    const stream = fs.createReadStream(resolved);
+    stream.on("error", (err: any) => {
+      console.error("[smart-leads-admin] download stream failed:", err?.message);
+      if (!res.headersSent) {
+        res.status(err?.code === "ENOENT" ? 404 : 500).json({ error: "PDF could not be read from disk." });
+      } else {
+        res.destroy();
+      }
+    });
+    stream.pipe(res);
+  });
+
+  // ==========================================================================
+  // DFY ($1,997 Done-For-You) — customer intake form + free admin kit runner.
+  // The intake form collects every fact the fix-kit AI needs (address, hours,
+  // services, FAQs…) so llms.txt / JSON-LD / meta tags come out COMPLETE
+  // instead of omitting everything the website doesn't state.
+  // ==========================================================================
+
+  // Public: load a form by its unguessable token (no auth — token IS the credential).
+  app.get("/api/public/dfy-intake/:token", async (req: Request, res: Response) => {
+    if (!rateOk(`dfy-intake-get:${hashIp(req)}`, 30, 10 * 60 * 1000)) {
+      return res.status(429).json({ error: "Too many requests — please wait a few minutes." });
+    }
+    try {
+      const { getDfyIntakeByToken } = await import("../dfy-intake");
+      const form = await getDfyIntakeByToken(String(req.params.token || ""));
+      if (!form) return res.status(404).json({ error: "This form link is invalid or has been removed." });
+      res.json({
+        company: form.company,
+        website: form.website,
+        customerName: form.customerName,
+        status: form.status,
+        // Prefill on revisit so the customer can amend their answers.
+        responses: form.status === "submitted" ? form.responses : {},
+      });
+    } catch (err: any) {
+      console.error("[dfy-intake] load failed:", err?.message);
+      res.status(500).json({ error: "Could not load the form. Please try again." });
+    }
+  });
+
+  // Public: submit (or amend) answers.
+  app.post("/api/public/dfy-intake/:token", async (req: Request, res: Response) => {
+    if (!rateOk(`dfy-intake-post:${hashIp(req)}`, 10, 10 * 60 * 1000)) {
+      return res.status(429).json({ error: "Too many submissions — please wait a few minutes." });
+    }
+    try {
+      const { submitDfyIntake } = await import("../dfy-intake");
+      const result = await submitDfyIntake(String(req.params.token || ""), req.body?.responses);
+      if (!result.form) return res.status(404).json({ error: "This form link is invalid or has been removed." });
+      if (!result.ok) {
+        return res.status(400).json({ error: "Some required questions are still blank.", missing: result.missing });
+      }
+      // Let the owner know answers arrived (fail-soft).
+      try {
+        const to = ownerEmail();
+        if (to) {
+          await sendEmailDirect({
+            to,
+            subject: `DFY intake submitted — ${result.form.company}`,
+            text: `The Done-For-You intake form for ${result.form.company} (${result.form.website}) was just submitted${result.form.customerEmail ? ` by ${result.form.customerEmail}` : ""}.\n\nOpen the Website Audit page → Step 3 to generate the Fix Kit with these answers.`,
+          });
+        }
+      } catch (e: any) { console.warn("[dfy-intake] owner notify failed:", e?.message); }
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[dfy-intake] submit failed:", err?.message);
+      res.status(500).json({ error: "Could not save your answers. Please try again." });
+    }
+  });
+
+  // Admin: create an intake form link to send to a customer.
+  app.post("/api/admin/dfy-intake", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const body = z.object({
+      company: z.string().min(1).max(200),
+      website: z.string().min(4).max(500),
+      customerName: z.string().max(200).optional().nullable(),
+      customerEmail: z.string().email().max(320).optional().nullable(),
+      orderId: z.string().max(200).optional().nullable(),
+    }).safeParse(req.body);
+    if (!body.success) return res.status(400).json({ error: "Company and website are required." });
+    try {
+      const { createDfyIntakeForm } = await import("../dfy-intake");
+      const form = await createDfyIntakeForm({ tenantId, ...body.data });
+      res.json({ ok: true, id: form.id, token: form.token, path: `/dfy-intake/${form.token}` });
+    } catch (err: any) {
+      console.error("[dfy-intake] create failed:", err?.message);
+      res.status(500).json({ error: "Could not create the intake form." });
+    }
+  });
+
+  // Admin: list intake forms (status + links).
+  app.get("/api/admin/dfy-intake", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    try {
+      const { listDfyIntakeForms } = await import("../dfy-intake");
+      const forms = await listDfyIntakeForms(tenantId);
+      res.json({
+        forms: forms.map((f) => ({
+          id: f.id,
+          company: f.company,
+          website: f.website,
+          customerName: f.customerName,
+          customerEmail: f.customerEmail,
+          status: f.status,
+          answeredCount: Object.keys((f.responses as any) || {}).length,
+          path: `/dfy-intake/${f.token}`,
+          createdAt: f.createdAt,
+          submittedAt: f.submittedAt,
+        })),
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || "Could not list intake forms." });
+    }
+  });
+
+  // Admin: printable (paper) questionnaire PDF — blank, or personalized with
+  // ?formId=N. For low-computer-literacy customers: print → they hand-write →
+  // admin types the answers into the intake form ("Enter answers" button).
+  app.get("/api/admin/dfy-intake/pdf", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    try {
+      let form = null;
+      const formId = Number(req.query.formId);
+      if (Number.isInteger(formId) && formId > 0) {
+        const { getDfyIntakeById } = await import("../dfy-intake");
+        form = await getDfyIntakeById(tenantId, formId);
+        if (!form) return res.status(404).json({ error: "Intake form not found." });
+      }
+      const { renderDfyIntakeQuestionnairePdf } = await import("../dfy-intake-pdf");
+      const result = await renderDfyIntakeQuestionnairePdf(form);
+      if (!result.ok) return res.status(502).json({ error: result.error });
+      const slug = form ? form.company.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) : "blank";
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="ai-setup-questionnaire-${slug || "blank"}.pdf"`);
+      res.setHeader("Content-Length", String(result.buf.length));
+      res.send(result.buf);
+    } catch (err: any) {
+      console.error("[dfy-intake] questionnaire PDF failed:", err?.message);
+      res.status(500).json({ error: "Could not generate the questionnaire PDF." });
+    }
+  });
+
+  // Admin: run the $1,997 Done-For-You Fix Kit for FREE (validation give-aways).
+  // No Stripe involvement anywhere on this path. The kit lands in the service
+  // review queue (HITL) exactly like a paid order.
+  const dfyRunInFlight = new Set<string>();
+  app.post("/api/admin/audit/dfy", authMiddleware, async (req: Request, res: Response) => {
+    const tenantId = await requireAdmin(req, res);
+    if (tenantId === null) return;
+    const body = z.object({
+      company: z.string().min(1).max(200),
+      website: z.string().min(4).max(500),
+      industry: z.string().max(200).optional().nullable(),
+      customerName: z.string().max(200).optional().nullable(),
+      customerEmail: z.string().email().max(320).optional().nullable(),
+      intakeFormId: z.number().int().positive().optional().nullable(),
+    }).safeParse(req.body);
+    if (!body.success) return res.status(400).json({ error: "Company and website are required (and email must be valid if given)." });
+    const { company, website, industry, customerName, customerEmail, intakeFormId } = body.data;
+    const sessionKey = `admin-dfy:${website.toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
+    if (dfyRunInFlight.has(sessionKey)) {
+      return res.status(409).json({ error: "A Fix Kit is already being generated for this website — check the review queue in a few minutes." });
+    }
+    dfyRunInFlight.add(sessionKey);
+    const sessionId = `${sessionKey}:${Date.now()}`;
+    setImmediate(async () => {
+      try {
+        const { generateAuditFixKit } = await import("../audit-fix-kit");
+        const { getDfyIntakeById, findSubmittedDfyIntake, intakeFactsFromForm } = await import("../dfy-intake");
+        // Attach customer-stated facts: explicit form pick wins, else newest
+        // submitted form matching this website/email.
+        let intakeFacts: Record<string, string> | undefined;
+        let intakeSource = "none";
+        try {
+          const form = intakeFormId
+            ? await getDfyIntakeById(tenantId, intakeFormId)
+            : await findSubmittedDfyIntake({ tenantId, website, customerEmail });
+          if (form && form.status === "submitted") {
+            intakeFacts = intakeFactsFromForm(form);
+            intakeSource = `form #${form.id}`;
+          }
+        } catch (e: any) { console.warn("[admin-dfy] intake lookup failed (continuing without):", e?.message); }
+        const kit = await generateAuditFixKit({
+          website, company,
+          industry: industry || undefined,
+          tenantId, orderId: sessionId, intakeFacts,
+        });
+        const ok = kit.success && !!kit.filePath && !!kit.fileName;
+        const { addReviewItem } = await import("../service-review-queue");
+        await addReviewItem({
+          sessionId,
+          sku: "sample-audit-sku-001",
+          tier: "done-for-you",
+          productName: `Done-For-You Fix Kit — ${company}`,
+          customerEmail: customerEmail || ownerEmail() || "operator@visionclaw",
+          customerName: customerName || customerEmail || "Validation run",
+          intake: {
+            company, website,
+            industry: industry || undefined,
+            customerIntake: intakeFacts ? `${Object.keys(intakeFacts).length} answers from intake ${intakeSource}` : "no intake form on file",
+          },
+          filePath: kit.filePath || "",
+          fileName: kit.fileName || "",
+          qa: ok
+            ? { passed: kit.issues.length === 0, issues: kit.issues.map((i) => `Fix Kit: ${i}`) }
+            : { passed: false, issues: [`Fix Kit generation FAILED: ${kit.error || "unknown"}`] },
+          status: ok ? undefined : "failed",
+          modelUsed: kit.modelUsed,
+          payment: "free (validation give-away)",
+        });
+        console.log(`[admin-dfy] Kit ${ok ? "ready for review" : "FAILED"} for ${website} (intake: ${intakeSource})`);
+      } catch (bgErr: any) {
+        console.error(`[admin-dfy] Crashed for ${website}: ${bgErr?.message}`);
+        try {
+          const { addReviewItem } = await import("../service-review-queue");
+          await addReviewItem({
+            sessionId,
+            sku: "sample-audit-sku-001",
+            tier: "done-for-you",
+            productName: `Done-For-You Fix Kit — ${company}`,
+            customerEmail: customerEmail || ownerEmail() || "operator@visionclaw",
+            customerName: customerName || "Validation run",
+            intake: { company, website },
+            filePath: "",
+            fileName: "",
+            qa: { passed: false, issues: [`Fix Kit generation crashed: ${String(bgErr?.message || "unknown").slice(0, 300)}`] },
+            status: "failed",
+          });
+        } catch (recoveryErr: any) {
+          console.error(`[admin-dfy] UNRECOVERABLE: crash record for ${sessionId} could not be queued (${recoveryErr?.message}). Original crash: ${bgErr?.message}`);
+          // Durable alert: the API already returned started:true, so without this
+          // the failure is invisible unless someone watches logs.
+          const to = ownerEmail();
+          if (to) {
+            sendEmailDirect({
+              to,
+              subject: `[DFY FAILED] Fix Kit run for ${company} crashed and could not be recorded`,
+              text: `The free DFY run for ${company} (${website}) crashed (${String(bgErr?.message || "unknown").slice(0, 300)}), and writing the failure card to the review queue ALSO failed (${String(recoveryErr?.message || "unknown").slice(0, 300)}).\n\nNo review card exists for session ${sessionId} — re-run it from the Website Audit page.`,
+            }).catch((e: any) => console.error(`[admin-dfy] double-failure owner alert also failed: ${e?.message}`));
+          }
+        }
+      } finally {
+        dfyRunInFlight.delete(sessionKey);
+      }
+    });
+    res.json({ ok: true, started: true, sessionId });
+  });
+}
