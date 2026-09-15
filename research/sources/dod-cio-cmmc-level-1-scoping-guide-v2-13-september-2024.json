@@ -1,0 +1,11 @@
+{
+  "source_url": "https://dodcio.defense.gov/Portals/0/Documents/CMMC/ScopingGuideL1.pdf",
+  "fetch_query": "CMMC Level 1 scoping guide Version 2.13 requirements for identifying FCI assets people locations contractors external service providers security protection assets boundaries and inventory",
+  "webFetch_response": {
+    "answer": "To appropriately scope a CMMC Level 1 self-assessment, Organizations Seeking Assessment (OSAs) must consider the following elements that process, store, or transmit Federal Contract Information (FCI) [L134-L136]:\n\n*   **People:** Includes employees, contractors, vendors, and external service provider personnel [L138-L139].\n*   **Technology:** Includes servers, client computers, mobile devices, network appliances (firewalls, switches, APs, routers), VoIP devices, applications, virtual machines, and database systems [L141-L143].\n*   **Facilities:** Includes physical office locations, satellite offices, server rooms, datacenters, manufacturing plants, and secured rooms [L145-L146].\n*   **External Service Providers (ESP):** Defined as external people, technology, or facilities utilized by the OSA for the provision and management of comprehensive IT and/or cybersecurity services [L148-L150].\n\nAssets that process, store, or transmit FCI and are not categorized as \"Specialized Assets\" (such as IoT, IIoT, OT, GFE, Restricted Information Systems, or Test Equipment) must be included in the CMMC Assessment Scope [L53-L54, L76-L80, L152-L153]. There are no documentation requirements for defining these boundaries (e.g., In-Scope or Out-of-Scope) for Level 1 assessments [L48-L49].",
+    "favicon": "",
+    "title": "",
+    "truncated": false,
+    "url": "https://dodcio.defense.gov/Portals/0/Documents/CMMC/ScopingGuideL1.pdf"
+  }
+}

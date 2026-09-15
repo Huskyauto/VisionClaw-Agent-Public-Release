@@ -1,0 +1,5 @@
+{
+  "version": 2,
+  "note": "Public mirror ships an empty output-skills registry. The owner's curated output-skills are not included — add your own entries here.",
+  "skills": []
+}
