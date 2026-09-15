@@ -532,6 +532,7 @@
         "tests/release-static-metadata.test.ts",
         "tests/revenue-idea-catalog.test.ts",
         "tests/revenue-idea-start-flow.test.ts",
+        "tests/scripts/release-round.test.ts",
         "tests/scripts/weekly-maintenance.test.ts"
       ]
     }

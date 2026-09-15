@@ -9,7 +9,7 @@
 | :--- | ---: | ---: |
 | `server/` | 1010 | 280,479 |
 | `client/src/` | 194 | 61,574 |
-| `scripts/` | 239 | 50,340 |
+| `scripts/` | 239 | 50,345 |
 | `shared/` | 17 | 6,689 |
 
 ## Hub modules (highest fan-in)
@@ -258,7 +258,7 @@ Changes to these ripple widest — check importers before editing.
 | [`benchmark-ling-full.ts`](../scripts/benchmark-ling-full.ts) | 311 | — |
 | _…and 150 more (smaller modules)_ | | |
 
-### `scripts/lib/` — 49 module(s), 7,002 lines
+### `scripts/lib/` — 49 module(s), 7,007 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
