@@ -21,6 +21,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { formatReleaseRound, readCurrentRelease } from "./lib/release-round";
 
 // CLI contract: --dry-run (derive + log planned tag/release, NO GitHub writes)
 // is the ONLY accepted flag. Any other flag is an operator error → exit 1
@@ -48,25 +49,14 @@ function deriveRound(): { tag: string; heading: string; body: string } {
   if (process.env.MIRROR_TAG) {
     return { tag: process.env.MIRROR_TAG, heading: process.env.MIRROR_TAG, body: "Manual tag (MIRROR_TAG override)." };
   }
-  const full = readFileSync(resolve(process.cwd(), "replit.md"), "utf8");
-  const section = full.match(/^## (R[\d.+]+(?:\+sec[\d-]*)?) — (.+?) \(([^)]+)\)\s*$/m);
-  if (section) {
-    const round = section[1];
-    const tag = "r" + round.slice(1).replace(/\+sec[\d-]*$/, "").replace(/\+/g, ".");
-    const body = `**${round}** (${section[3]})\n\n${section[2]}\n\n_Sanitized public snapshot — see docs/schema-snapshot.sql for the diffable schema DDL of this release._`;
+  try {
+    const { round, title, date } = readCurrentRelease(resolve(process.cwd(), "replit.md"));
+    const tag = formatReleaseRound(round).tag;
+    const body = `**${round}** (${date})\n\n${title}\n\n_Sanitized public snapshot — see docs/schema-snapshot.sql for the diffable schema DDL of this release._`;
     return { tag, heading: `${round} — public mirror snapshot`, body };
+  } catch (error) {
+    fail(1, error instanceof Error ? error.message : String(error));
   }
-  // Backward-compatible fallback for older replit.md layouts.
-  const anchor = full.indexOf("**Recent rounds");
-  const md = anchor >= 0 ? full.slice(anchor) : full;
-  // First bullet under "Recent rounds": - **R125+137.28** (date) — prose...
-  const m = md.match(/^- \*\*(R[\d.+]+(?:\+sec[\d-]*)?)\*\* \(([^)]+)\) — ([\s\S]*?)(?=\n- \*\*R|\n\n)/m);
-  if (!m) fail(1, "could not derive current round from replit.md — set MIRROR_TAG to override");
-  const round = m[1]; // e.g. R125+137.28 or R125+140+sec
-  // Tag is semver-ish: drop any +sec suffix, then + → . (R125+140+sec → r125.140)
-  const tag = "r" + round.slice(1).replace(/\+sec[\d-]*$/, "").replace(/\+/g, ".");
-  const body = `**${round}** (${m[2]})\n\n${m[3].trim()}\n\n_Sanitized public snapshot — see docs/schema-snapshot.sql for the diffable schema DDL of this release._`;
-  return { tag, heading: `${round} — public mirror snapshot`, body };
 }
 
 async function gh(path: string, init?: RequestInit): Promise<{ status: number; json: any }> {
