@@ -7,6 +7,9 @@ import { formatReleaseRound, readCurrentRelease } from "../../scripts/lib/releas
 
 test("formats parent and security rounds without collisions", () => {
   assert.deepEqual(formatReleaseRound("R128"), { tag: "r128", packageVersion: "128.0.0" });
+  assert.deepEqual(formatReleaseRound("R130.1"), { tag: "r130.1", packageVersion: "130.1.0" });
+  assert.deepEqual(formatReleaseRound("R130+1"), { tag: "r130-plus1", packageVersion: "130.0.0-plus.1" });
+  assert.deepEqual(formatReleaseRound("R130+1+sec2"), { tag: "r130-plus1-sec2", packageVersion: "130.0.0-plus.1.sec.2" });
   assert.deepEqual(formatReleaseRound("R128+sec"), { tag: "r128-sec", packageVersion: "128.0.0-sec" });
   assert.deepEqual(formatReleaseRound("R128+sec2"), { tag: "r128-sec2", packageVersion: "128.0.0-sec.2" });
   assert.deepEqual(formatReleaseRound("R125+155.2+sec12-3"), {
@@ -44,7 +47,36 @@ test("requires the explicit current marker to match a release section", () => {
 
   const mismatch = join(dir, "mismatch.md");
   writeFileSync(mismatch, "## R128 — Parent (September 11, 2026)\n\nCurrent release: **R128+sec2**\n");
-  assert.throws(() => readCurrentRelease(mismatch), /no matching section/);
+  assert.throws(() => readCurrentRelease(mismatch), /first release section/);
+
+  const patch = join(dir, "patch.md");
+  writeFileSync(patch, "## R130.1 — File review recovery (September 16, 2026)\n\nCurrent release: **R130.1**\n");
+  assert.deepEqual(readCurrentRelease(patch), {
+    round: "R130.1",
+    title: "File review recovery",
+    date: "September 16, 2026",
+  });
+
+  const stale = join(dir, "stale.md");
+  writeFileSync(stale, [
+    "## R130.1 — File review recovery (September 16, 2026)",
+    "",
+    "## R129+sec — Older security release (September 15, 2026)",
+    "",
+    "Current release: **R129+sec**",
+    "",
+  ].join("\n"));
+  assert.throws(() => readCurrentRelease(stale), /first release section/);
+
+  const duplicate = join(dir, "duplicate.md");
+  writeFileSync(duplicate, [
+    "## R130.1 — File review recovery (September 16, 2026)",
+    "",
+    "Current release: **R130.1**",
+    "Current release: **R130.1**",
+    "",
+  ].join("\n"));
+  assert.throws(() => readCurrentRelease(duplicate), /exactly one current release marker/);
 });
 
 test("mirror package stamping aborts instead of publishing a stale version", () => {

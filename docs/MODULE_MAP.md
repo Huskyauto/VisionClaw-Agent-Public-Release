@@ -9,7 +9,7 @@
 | :--- | ---: | ---: |
 | `server/` | 1019 | 284,991 |
 | `client/src/` | 195 | 61,784 |
-| `scripts/` | 241 | 50,717 |
+| `scripts/` | 241 | 50,734 |
 | `shared/` | 17 | 6,943 |
 
 ## Hub modules (highest fan-in)
@@ -259,7 +259,7 @@ Changes to these ripple widest — check importers before editing.
 | [`benchmark-ling-full.ts`](../scripts/benchmark-ling-full.ts) | 311 | — |
 | _…and 152 more (smaller modules)_ | | |
 
-### `scripts/lib/` — 49 module(s), 7,007 lines
+### `scripts/lib/` — 49 module(s), 7,024 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
@@ -300,9 +300,9 @@ Changes to these ripple widest — check importers before editing.
 | [`bwb-audio-fingerprint.ts`](../scripts/lib/bwb-audio-fingerprint.ts) | 68 | Content-fingerprint sidecar for pre-synthesized Built With Bob narration audio |
 | [`wedge-lifecycle-policy.ts`](../scripts/lib/wedge-lifecycle-policy.ts) | 66 | — |
 | [`tenant-audit-checkpoint.ts`](../scripts/lib/tenant-audit-checkpoint.ts) | 64 | — |
+| [`release-round.ts`](../scripts/lib/release-round.ts) | 59 | — |
 | [`bwb-script-runner.ts`](../scripts/lib/bwb-script-runner.ts) | 54 | Resolve how to run one of the BWB weekly-recap chain scripts as a child |
 | [`bwb-transient-classify.ts`](../scripts/lib/bwb-transient-classify.ts) | 54 | Built With Bob weekly recap — transient-vs-deterministic failure classifier. |
-| [`triage-verdict-match.ts`](../scripts/lib/triage-verdict-match.ts) | 43 | pure, fail-CLOSED resolution of a |
 | _…and 9 more (smaller modules)_ | | |
 
 ### `server/` — 352 module(s), 166,487 lines
