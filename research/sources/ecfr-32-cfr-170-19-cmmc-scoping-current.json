@@ -1,0 +1,11 @@
+{
+  "source_url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-G/part-170/subpart-D/section-170.19",
+  "fetch_query": "32 CFR 170.19 CMMC scoping Level 1 FCI assets specialized assets security protection assets external service providers",
+  "webFetch_response": {
+    "answer": "Per 32 CFR 170.19, the requirements for CMMC Level 1 scoping regarding these assets are as follows:\n\n*   **FCI Assets:** OSA information systems that process, store, or transmit Federal Contract Information (FCI) are in scope for CMMC Level 1 and must be self-assessed [L507].\n*   **Specialized Assets:** These are assets that can process, store, or transmit FCI but are unable to be fully secured (e.g., IoT, IIoT, OT, GFE, Restricted Information Systems, and Test Equipment). They are not part of the Level 1 CMMC Assessment Scope and are not assessed against CMMC security requirements [L513].\n*   **External Service Providers (ESP):** When scoping a Level 1 self-assessment, OSAs should consider the ESPs within their environment that process, store, or transmit FCI [L515].\n*   **Security Protection Assets:** The provided text does not define \"Security Protection Assets\" within the context of CMMC Level 1 scoping; this term is explicitly defined and categorized for CMMC Level 2 and Level 3 assessments [L527, L568].",
+    "favicon": "https://assets.ecfr.gov/assets/favicon/favicon-32x32-601e211398bdd3b5d26f99ae1ddae16e940b6a6223cb83f429419e6709f596f2.png",
+    "title": "\n    eCFR :: 32 CFR 170.19 -- CMMC scoping.\n  ",
+    "truncated": false,
+    "url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-G/part-170/subpart-D/section-170.19"
+  }
+}

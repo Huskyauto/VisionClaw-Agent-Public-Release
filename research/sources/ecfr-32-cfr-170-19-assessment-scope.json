@@ -1,0 +1,7 @@
+{
+  "answer": "The CMMC Level 1 assessment-scope requirements are as follows:\n\n*   **Requirements/Scope:** Prior to a Level 1 self-assessment, the Organization Seeking Assessment (OSA) must specify the CMMC Assessment Scope [L505]. Information systems that process, store, or transmit Federal Contract Information (FCI) are in scope and must be self-assessed [L507].\n*   **Assets/Technology/People/Facilities/ESPs:** To define the scope, OSAs should consider the people, technology, facilities, and External Service Providers (ESP) within their environment that process, store, or transmit FCI [L515].\n*   **CUI Applicability:** CUI does not apply to Level 1 assessment scoping; Level 1 is specifically concerned with FCI [L507]. Systems that do not process, store, or transmit FCI (including specific VDI configurations) are out of scope, as are \"Specialized Assets\" (such as IoT/IIoT devices, OT, GFE, restricted systems, and test equipment) [L511-L513].",
+  "favicon": "https://assets.ecfr.gov/assets/favicon/favicon-32x32-601e211398bdd3b5d26f99ae1ddae16e940b6a6223cb83f429419e6709f596f2.png",
+  "title": "\n    eCFR :: 32 CFR 170.19 -- CMMC scoping.\n  ",
+  "truncated": false,
+  "url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-G/part-170/subpart-D/section-170.19"
+}
