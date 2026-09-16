@@ -21,6 +21,7 @@ import { getClientForModel, getAvailableModels, getAvailableModelsForTenant, MOD
 // only invoked by the chat-engine import path).
 import { startHeartbeat, isHeartbeatRunning, activeTaskTracker, notifyHeartbeatActivity } from "./heartbeat";
 import { buildSystemPrompt, stripThinkTags, windowMessages, updateDailyLog, parseXmlToolCalls, parseInlineToolCalls, buildFelixProtocol } from "./chat-engine";
+import { detectIncompleteOutcome } from "./chat-response-validation";
 import { stampResolvedProjectToolContext, type ResolvedProjectToolContext } from "./lib/trusted-project-context";
 import { buildRecentUserRoutingContext, getCmmcAuthoritativeSourceLock, getMandatoryContextTools } from "./lib/tool-routing-context";
 import { intelligentExtractMemory } from "./memory-intelligence";
@@ -3934,6 +3935,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     });
 
     const missingFiles = new Set<string>();
+    const conversationAttachmentUrls = new Set<string>();
     for (const m of allMessages) {
       if (m.role === "assistant") continue;
       const attachMatch = m.content.match(/^<!-- attachments:(\[[\s\S]*?\]) -->\n?/);
@@ -3941,6 +3943,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       try {
         const atts: { url: string; name: string; type: string }[] = JSON.parse(attachMatch[1]);
         for (const a of atts) {
+          if (typeof a.url === "string" && a.url.length > 0) conversationAttachmentUrls.add(a.url);
           if (a.type.startsWith("image/") && a.url.startsWith("/uploads/")) {
             const safeName = path.basename(a.url);
             const localPath = path.join(UPLOADS_DIR, safeName);
@@ -4583,8 +4586,10 @@ ${buildFelixProtocol()}`
       let totalToolCalls = 0;
       let toolBudgetSynthesisInjected = false;
       let budgetNudgeInjected = false;
+      let attachmentDeferralRetries = 0;
+      let maxToolRound = MAX_TOOL_ROUNDS;
 
-      round_loop: for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      round_loop: for (let round = 0; round <= maxToolRound; round++) {
         // R87 — FIRST_COMPLETED guard: if the client is gone, stop iterating.
         if ((req as any)._clientDisconnected?.()) {
           console.log(`[sse] round ${round}: client disconnected — exiting round_loop`);
@@ -5249,6 +5254,39 @@ ${buildFelixProtocol()}`
           }
         }
         if (!hasToolCalls || toolCallCount === 0) {
+          const attachmentDeferral = detectIncompleteOutcome(
+            content.trim(),
+            roundContent.trim(),
+            [],
+            {
+              attachmentCount: conversationAttachmentUrls.size,
+              currentAttachmentCount: parsedAttachments.length,
+            },
+          );
+          if (attachmentDeferral && attachmentDeferralRetries < 1) {
+            attachmentDeferralRetries++;
+            // The promise may occur on the normal final round. Grant exactly
+            // one additional iteration so `continue` always reaches recovery.
+            maxToolRound++;
+            console.warn(`[attachment-completion-gate] Round ${round}: ${attachmentDeferral.reason}. Continuing once with a stronger work model.`);
+            apiMessages.push({ role: "assistant", content: roundContent });
+            apiMessages.push({
+              role: "user",
+              content: "SYSTEM ATTACHMENT COMPLETION GATE: Your previous response only promised to read or review the attached files. Do the work now in this same turn. Use the attached file content already present in this conversation and call the available file-reading tools if more content is needed. Deliver the requested comprehensive analysis directly. Do not announce what you are about to do, ask another intake question, or stop at a progress update.",
+            });
+            try {
+              const recovery = await getClientForModel(HIGH_END_WORK_MODEL_ID, conv.tenantId, { requiresTools: useTools });
+              activeClient = recovery.client;
+              activeModelId = recovery.actualModelId;
+              // Keep the requested registry id separate from the provider's
+              // actual bound id, matching the existing failover convention.
+              currentRegistryModelId = HIGH_END_WORK_MODEL_ID;
+              res.write(`data: ${JSON.stringify({ type: "thinking_progress", message: "Continuing the attached-file review and preparing the complete report...", round })}\n\n`);
+            } catch (recoveryError: unknown) {
+              console.warn(`[attachment-completion-gate] Stronger model binding failed; retrying with the current model: ${String(errorMessage(recoveryError)).slice(0, 160)}`);
+            }
+            continue;
+          }
           // R125+ — near-empty completion: a response of ≤1 meaningful char (a lone
           // whitespace/stray token) with no tool calls is a silent no-op, not an
           // answer (observed in prod: gemini emitted exactly 1 char after a multi-min
@@ -5698,7 +5736,6 @@ ${buildFelixProtocol()}`
 
       if (persona?.id === 2 && executedTools.length > 0) {
         try {
-          const { detectIncompleteOutcome } = await import("./chat-engine");
           const incompleteOutcome = detectIncompleteOutcome(content.trim(), fullResponse.trim(), executedTools.map(t => ({ name: t.name, input: t.input, output: t.output })));
           if (incompleteOutcome) {
             console.log(`[completion-gate] SSE: Incomplete outcome detected: ${incompleteOutcome.reason}`);

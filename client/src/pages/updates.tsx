@@ -44,6 +44,18 @@ function iconFor(name: string): LucideIcon {
 
 const UPDATES: UpdateEntry[] = [
   {
+    version: "R130.1",
+    date: "2026-09-16",
+    title: "Attached-file review completion recovery.",
+    type: "fix",
+    highlights: [
+      { icon: "FileCheck", text: "A request to review uploaded files can no longer end with a promise such as “Let me read/review them”; browser chat continues the work in the same turn." },
+      { icon: "RotateCcw", text: "Recovery is bounded to one additional model round and may bind the stronger work model without changing tenant scope or tool-safety enforcement." },
+      { icon: "Target", text: "Current attachments and explicitly referenced historical uploads are recognized, while stale attachments cannot hijack unrelated repository-file requests." },
+      { icon: "CheckCircle2", text: "Verified with 7 focused regressions, TypeScript, production build, and an independent closure review with no remaining CRITICAL, HIGH, or MEDIUM findings." },
+    ],
+  },
+  {
     version: "R130",
     date: "2026-09-15",
     title: "Readiness-gated plan repair shadow.",

@@ -20,7 +20,7 @@ grade against the totals doc.
 | Claim reviewers often get wrong | Current reality (2026-09-16) |
 | :--- | :--- |
 | "`server/tools.ts` is a 20,000+ line monolith" | **9,684 lines.** An active strangler-fig split is migrating tools into `server/tools/domains/` (**84 domain packages, 245 modules** so far). The 20k figure is historical. |
-| "`server/routes.ts` is monolithic" | **7,401 lines**, with **77 extracted route modules** in `server/routes/`. Extraction is ongoing by design (strangler-fig, one domain per session, revert-don't-limp). |
+| "`server/routes.ts` is monolithic" | **7,438 lines**, with **77 extracted route modules** in `server/routes/`. Extraction is ongoing by design (strangler-fig, one domain per session, revert-don't-limp). |
 | "Typecheck is failing / burning down" | not verified in this snapshot — run `npm run check` to confirm. |
 | "100+ direct dependencies" | **78 runtime dependencies** (+ 71 dev-only). Audited weekly (dependency audit + SAST + transitive CVE check). |
 

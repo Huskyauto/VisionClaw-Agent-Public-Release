@@ -25,10 +25,10 @@ export function SeoHead({
   const currentDescription = description.replace(/\b(?:413|414|415|416) tools\b/g, "417 total registered tools");
   const currentOgDescription = ogDescription?.replace(/\b(?:413|414|415|416) tools\b/g, "417 total registered tools");
   const effectiveDescription = useCurrentPlatformDescription
-    ? `R130 adds readiness-gated plan repair observations: deterministic strategy-readiness checks and failed-subgraph repair recommendations that remain report-only and default off. Current platform: 417 tools, 177 declared / 255 live tables, 812 live indexes (557 non-PK), 137 capabilities, 68 total platform skills, 107 reference surfaces, 18 personas, 41 governance rules. No production activation or deployment occurred.`
+    ? `R130.1 prevents attached-file reviews from ending on promise-only responses by granting one bounded continuation with the existing attachment context. Current platform: 417 tools, 177 declared / 255 live tables, 812 live indexes (557 non-PK), 137 capabilities, 68 total platform skills, 107 reference surfaces, 18 personas, 41 governance rules. No deployment occurred.`
     : currentDescription;
   const effectiveOgDescription = useCurrentPlatformDescription
-    ? "R130 readiness-gated plan repair: deterministic strategy-readiness checks and failed-subgraph recommendations, report-only and default off."
+    ? "R130.1 attached-file review recovery: promise-only responses continue once and deliver the requested analysis."
     : (currentOgDescription || effectiveDescription);
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export function SeoHead({
       // Any release-specific R-tag in here drifts within hours of every round
       // and rewrites itself on every SPA unmount. Live counts + release notes
       // are surfaced through /trust and /api/public/trust.
-      const fallback = "Deploy an 18-agent AI team with strict tenant isolation, deterministic plan-readiness checks, and report-only failed-subgraph repair recommendations. Live platform stats and current release notes are at /trust.";
+      const fallback = "Deploy an 18-agent AI team with strict tenant isolation and bounded attached-file review recovery that prevents promise-only responses from ending the turn. Live platform stats and current release notes are at /trust.";
       setMeta("name", "description", fallback);
       setMeta("property", "og:title", `${pName} — Your Autonomous AI Corporation`);
       setMeta("property", "og:description", fallback);

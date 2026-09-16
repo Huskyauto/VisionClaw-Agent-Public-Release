@@ -270,12 +270,20 @@ export default function HomePage() {
 
         {[
           {
+            id: "banner-whats-new-r130_1",
+            version: "R130.1",
+            title: "Attached-file review completion recovery.",
+            detail: "Promise-only file reviews cannot end the turn · one bounded continuation · current and referenced historical uploads · completed analyses and unrelated file work remain unaffected.",
+            badge: "bg-cyan-600",
+            card: "border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 via-primary/5 to-transparent hover:border-cyan-500/50",
+          },
+          {
             id: "banner-whats-new-r130",
             version: "R130",
             title: "Readiness-gated plan repair shadow.",
             detail: "Deterministic strategy readiness · coherent dependency checks · explicit verification evidence · failed-subgraph mapping · structural escalation recommendations · report-only and default off.",
-            badge: "bg-cyan-600",
-            card: "border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 via-primary/5 to-transparent hover:border-cyan-500/50",
+            badge: "bg-sky-600",
+            card: "border-sky-500/30 bg-gradient-to-r from-sky-500/10 via-primary/5 to-transparent hover:border-sky-500/50",
           },
           {
             id: "banner-whats-new-r129_sec",

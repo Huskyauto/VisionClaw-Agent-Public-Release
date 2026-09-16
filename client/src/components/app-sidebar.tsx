@@ -592,7 +592,7 @@ export function AppSidebar() {
                 <Rocket className="w-4 h-4" />
                 <span>What's New</span>
                 <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-sm bg-cyan-600 text-white leading-none" data-testid="badge-updates-new">
-                  R130
+                  R130.1
                 </span>
               </a>
             </SidebarMenuButton>

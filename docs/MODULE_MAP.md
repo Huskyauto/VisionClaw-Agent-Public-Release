@@ -7,9 +7,9 @@
 
 | Area | Modules | Lines |
 | :--- | ---: | ---: |
-| `server/` | 1019 | 284,908 |
-| `client/src/` | 195 | 61,764 |
-| `scripts/` | 241 | 50,716 |
+| `server/` | 1019 | 284,991 |
+| `client/src/` | 195 | 61,784 |
+| `scripts/` | 241 | 50,717 |
 | `shared/` | 17 | 6,943 |
 
 ## Hub modules (highest fan-in)
@@ -161,7 +161,7 @@ Changes to these ripple widest — check importers before editing.
 | [`auth-utils.ts`](../client/src/lib/auth-utils.ts) | 18 | Redirect to login with a toast notification |
 | [`utils.ts`](../client/src/lib/utils.ts) | 7 | — |
 
-### `client/src/pages/` — 103 module(s), 48,120 lines
+### `client/src/pages/` — 103 module(s), 48,140 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
@@ -171,7 +171,7 @@ Changes to these ripple widest — check importers before editing.
 | [`projects.tsx`](../client/src/pages/projects.tsx) | 2,012 | — |
 | [`audit.tsx`](../client/src/pages/audit.tsx) | 1,337 | R125+13.4: pull UTM + referer from the URL once on mount; share across all |
 | [`research.tsx`](../client/src/pages/research.tsx) | 1,287 | — |
-| [`home.tsx`](../client/src/pages/home.tsx) | 1,213 | — |
+| [`home.tsx`](../client/src/pages/home.tsx) | 1,221 | — |
 | [`admin-ecosystem-health.tsx`](../client/src/pages/admin-ecosystem-health.tsx) | 1,088 | — |
 | [`heartbeat.tsx`](../client/src/pages/heartbeat.tsx) | 1,023 | — |
 | [`agentic.tsx`](../client/src/pages/agentic.tsx) | 939 | — |
@@ -213,7 +213,7 @@ Changes to these ripple widest — check importers before editing.
 | :--- | ---: | :--- |
 | [`archive-rescue.tsx`](../client/src/pages/admin/archive-rescue.tsx) | 145 | — |
 
-### `scripts/` — 192 module(s), 43,709 lines
+### `scripts/` — 192 module(s), 43,710 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
@@ -240,7 +240,7 @@ Changes to these ripple widest — check importers before editing.
 | [`autonomy-ladder-eval.ts`](../scripts/autonomy-ladder-eval.ts) | 487 | Opt-in ASI-style scaffold-ablation evaluator. |
 | [`comprehensive-features-r74.6.ts`](../scripts/comprehensive-features-r74.6.ts) | 473 | — |
 | [`firstmovers-deck.ts`](../scripts/firstmovers-deck.ts) | 472 | — |
-| [`build-features-doc.ts`](../scripts/build-features-doc.ts) | 460 | Comprehensive Features Doc — PDF + text + Drive upload + project_files registration + owner email. |
+| [`build-features-doc.ts`](../scripts/build-features-doc.ts) | 461 | Comprehensive Features Doc — PDF + text + Drive upload + project_files registration + owner email. |
 | [`generate-comprehensive-features.ts`](../scripts/generate-comprehensive-features.ts) | 445 | — |
 | [`generate-comprehensive-features-r94.ts`](../scripts/generate-comprehensive-features-r94.ts) | 433 | — |
 | [`prompt-staleness-audit.ts`](../scripts/prompt-staleness-audit.ts) | 428 | Prompt Staleness Audit — Task #134 |
@@ -305,12 +305,12 @@ Changes to these ripple widest — check importers before editing.
 | [`triage-verdict-match.ts`](../scripts/lib/triage-verdict-match.ts) | 43 | pure, fail-CLOSED resolution of a |
 | _…and 9 more (smaller modules)_ | | |
 
-### `server/` — 352 module(s), 166,404 lines
+### `server/` — 352 module(s), 166,487 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
 | [`tools.ts`](../server/tools.ts) | 9,684 | R110.21.1 — top-level static import. Two arrow-function call sites |
-| [`routes.ts`](../server/routes.ts) | 7,401 | Legacy insert schemas live in their domain route modules. |
+| [`routes.ts`](../server/routes.ts) | 7,438 | Legacy insert schemas live in their domain route modules. |
 | [`chat-engine.ts`](../server/chat-engine.ts) | 4,673 | — |
 | [`seed.ts`](../server/seed.ts) | 4,112 | — |
 | [`heartbeat.ts`](../server/heartbeat.ts) | 3,166 | — |

@@ -47,7 +47,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **The app runs with just one LLM key and a Postgres database.** Everything else — email, payments, voice, Drive — is optional and appears automatically when you add the key.
 
-**Latest — R130 (September 15, 2026):** **Readiness-gated plan repair shadow.** Exact-opt-in deterministic checks assess whether plan strategy evidence, dependencies, and verification are mature enough, then map genuine failures to the current dependent subgraph and recommend local repair or strategy reopening. The lane remains report-only, default off, and cannot alter execution or authorization.
+**Latest — R130.1 (September 16, 2026):** **Attached-file review completion recovery.** Browser chat now detects when an agent promises to read or review uploaded files but attempts to end the turn without doing the work. It grants one bounded continuation with the existing attachment context, while completed analyses and unrelated file requests remain unaffected.
 
 Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **417 total registered tools · 386 public documented tools · 68 total skills · 137 active capabilities · 18 personas · 177 declared / 255 live tables · 41 governance rules · 812 platform indexes · 80 curated AI models · 6 AI providers · 6 deployment targets.** The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 

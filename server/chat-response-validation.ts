@@ -3,12 +3,58 @@ interface IncompleteOutcomeResult {
   originalLength: number;
 }
 
+interface IncompleteOutcomeContext {
+  attachmentCount?: number;
+  currentAttachmentCount?: number;
+}
+
 export function detectIncompleteOutcome(
   userMessage: string,
   response: string,
-  toolsUsed: { name: string; input: any; output: any }[]
+  toolsUsed: { name: string; input: any; output: any }[],
+  context: IncompleteOutcomeContext = {},
 ): IncompleteOutcomeResult | null {
   const responseLen = response.length;
+
+  const attachmentCount = Number.isInteger(context.attachmentCount) && Number(context.attachmentCount) > 0
+    ? Number(context.attachmentCount)
+    : 0;
+  const currentAttachmentCount = Number.isInteger(context.currentAttachmentCount) && Number(context.currentAttachmentCount) >= 0
+    ? Number(context.currentAttachmentCount)
+    : attachmentCount;
+  const explicitlyReferencesUploads = /\b(attach(?:ed|ment|ments)?|upload(?:ed|s)?)\b/i.test(userMessage);
+  const referencesFiles = /\b(files?|documents?|articles?)\b/i.test(userMessage);
+  const requestedAttachmentReview = attachmentCount > 0
+    && (explicitlyReferencesUploads || (currentAttachmentCount > 0 && referencesFiles))
+    && /\b(review|read|analy[sz]e|assess|evaluate|inspect|examine|summari[sz]e|report|opinion)\b/i.test(userMessage);
+  const attachmentDeferralPatterns = [
+    /\b(?:I(?:'|’)ll|I will|I need to|I(?:'m| am) (?:going to|starting to|about to))[^.!?\n]{0,50}\b(?:review|read|open|check|inspect|examine|analy[sz](?:e|ing)|go through|look through)\b/i,
+    /\bLet me[^.!?\n]{0,40}\b(?:review|read|open|check|inspect|examine|analy[sz](?:e|ing)|go through|look through)\b/i,
+  ];
+  const lastDeferralMatch = attachmentDeferralPatterns
+    .flatMap((pattern) => [
+      ...response.matchAll(new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`)),
+    ])
+    .sort((a, b) => (b.index ?? -1) - (a.index ?? -1))[0];
+  let contentAfterLastDeferral = "";
+  if (lastDeferralMatch) {
+    const suffix = response.slice((lastDeferralMatch.index ?? 0) + lastDeferralMatch[0].length);
+    const boundary = suffix.match(/[.!?;:](?:\s+|$)|\n{2,}/);
+    if (boundary?.index !== undefined) {
+      contentAfterLastDeferral = suffix.slice(boundary.index + boundary[0].length).trim();
+    }
+  }
+  if (
+    requestedAttachmentReview
+    && toolsUsed.length === 0
+    && lastDeferralMatch
+    && contentAfterLastDeferral.length < 120
+  ) {
+    return {
+      reason: `Promised to read or review ${attachmentCount} attached files instead of delivering the requested analysis`,
+      originalLength: responseLen,
+    };
+  }
 
   // Empty (or near-empty) reply after ANY tool use is ALWAYS incomplete — the
   // user sees tool-activity chrome ("Used N tools") with no written answer and

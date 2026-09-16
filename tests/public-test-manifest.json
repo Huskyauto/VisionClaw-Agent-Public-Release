@@ -102,6 +102,7 @@
         "tests/unit/capability-evidence-shadow.test.ts",
         "tests/unit/chat-default-model.test.ts",
         "tests/unit/chat-deliverables.test.ts",
+        "tests/unit/chat-response-validation.test.ts",
         "tests/unit/chronicle-precision.test.ts",
         "tests/unit/claude-bridge-parsing.test.ts",
         "tests/unit/claude-model-mapping.test.ts",
