@@ -57,6 +57,10 @@ const SCAN = [
   "docs/TRUST-RECEIPTS.md",
   "docs/PRODUCTION-SAFETY.md",
   "QUICKSTART_DOCKER.md",
+  "client/src/components/seo-head.tsx",
+  "client/src/pages/landing.tsx",
+  "replit.md",
+  "scripts/build-features-doc.ts",
 ];
 
 function parseSot(): Map<string, number> {
@@ -135,6 +139,22 @@ function main() {
         .split("\n")
         .map((l) => (/^\|\s*\*\*R\d/.test(l) ? "" : l))
         .join("\n");
+    } else if (rel === "client/src/pages/landing.tsx") {
+      // Landing contains historical release prose. Gate only its current
+      // platform-summary lines selected by stable, explicit copy markers.
+      const withoutJsxComments = raw.replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+      text = withoutJsxComments
+        .split("\n")
+        .filter((line) => /Platform Online —|Platform totals remain|^\s*18 personas, \d+ declared|Database tables", v:|active capabilities<\/span>|tools · \d+ curated models|Curated AI Models \+ 1000\+ Daily Discovery|418 total registered tools;|Start with 5 free conversations/.test(line))
+        .join("\n");
+    } else if (rel === "replit.md") {
+      // Release history is intentionally frozen; the aggregate is current SoT.
+      text = raw.split("\n").filter((line) => line.startsWith("**Aggregate (")).join("\n");
+    } else if (rel === "scripts/build-features-doc.ts") {
+      const start = raw.indexOf("const HEADLINE_STATS = {");
+      const end = raw.indexOf("\n};", start);
+      if (start < 0 || end < 0) throw new Error("verify-counts: HEADLINE_STATS block missing");
+      text = raw.slice(start, end);
     }
     for (const m of METRICS) {
       const canonical = sot.get(m.key);

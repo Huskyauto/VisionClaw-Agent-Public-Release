@@ -37,10 +37,10 @@ const HEADLINE_STATS = {
   referenceSurfaces: "107",
   personas: "18",
   capabilities: "138",
-  tables: "180 declared / 258 live",
-  indexes: "823 live / 572 non-PK",
+  tables: "178 declared / 258 live",
+  indexes: "825 live / 573 non-PK",
   governance: "41",
-  models: "80 curated + 1000+",
+  models: "79 curated + 1000+",
   loc: "~263k (686 files)",
   release: "R132.2",
 };

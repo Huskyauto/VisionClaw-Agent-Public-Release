@@ -90,7 +90,7 @@ evidence required before deferred ideas become active work.
 
 ## Current platform totals
 
-**418 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 137 active capabilities · 177 declared / 255 live tables · 806 platform indexes · 41 governance rules · 80 curated AI models in the core registry plus daily catalog discovery against 1000+ models on OpenRouter · ~320k LOC across 1,100+ TypeScript files.** ([authoritative release facts](docs/release-facts.json))
+**418 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 138 active capabilities · 178 declared / 258 live tables · 825 platform indexes · 41 governance rules · 79 curated AI models in the core registry plus daily catalog discovery against 1000+ models on OpenRouter · ~320k LOC across 1,100+ TypeScript files.** ([authoritative release facts](docs/release-facts.json))
 
 Machine-readable source: [docs/release-facts.json](docs/release-facts.json).
 

@@ -49,7 +49,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **Latest — R130.3 (September 16, 2026):** **Waitlist-ready TypeSafe Jev advisory integration.** A fixed `https://api.typesafe.ai/v1/systemone` / `jev-latest` lane makes one bounded no-retry request only when the `TYPESAFE_API_KEY` secret and exact `TYPESAFE_JEV_ENABLED=1` are present. Typed Noul/Choice/Score advisory output is Felix+Minerva only, with no database, action, or approval authority; admin Tools shows Awaiting API key. Five focused tests, TypeScript, production build, wiring audit, app restart, and final independent re-review CLEAR. No live provider call, deployment, or activation occurred.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **418 total registered tools · 386 public documented tools · 68 total skills · 138 active capabilities · 18 personas · 179 declared / 257 live tables · 41 governance rules · 815 platform indexes · 80 curated AI models · 6 AI providers · 6 deployment targets.** The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **418 total registered tools · 386 public documented tools · 68 total skills · 138 active capabilities · 18 personas · 178 declared / 258 live tables · 41 governance rules · 825 platform indexes · 79 curated AI models · 6 AI providers · 6 deployment targets.** The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 ---
 
@@ -241,7 +241,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
       <p align="center"><sub><b>Landing hero</b> — value prop in one line, with three real CTAs.</sub></p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/images/tour-command-center.jpg"><img src="docs/images/tour-command-center.jpg" alt="Command Center — 18 agents, 418 total registered tools, 80 curated models + 1000+ daily catalog, live workflows" /></a>
+      <a href="docs/images/tour-command-center.jpg"><img src="docs/images/tour-command-center.jpg" alt="Command Center — 18 agents, 418 total registered tools, 79 curated models + 1000+ daily catalog, live workflows" /></a>
       <p align="center"><sub><b>Command Center</b> — live counts, recent ops with status pills, capability chips.</sub></p>
     </td>
   </tr>
@@ -287,7 +287,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | Skills | 68 total (63 DB-seeded skills + 5 platform agent skills) |
 | Frontend Pages | 40+ |
 | API Endpoints | 300+ |
-| Database Tables | 179 declared / 257 live |
+| Database Tables | 178 declared / 258 live |
 
 ---
 
@@ -321,7 +321,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
         ┌──────────┐   ┌────────────┐   ┌────────────┐
         │ PostgreSQL│   │ Google     │   │ 6 AI       │
         │ + pgvector│   │ Drive      │   │ Providers  │
-        │ 179 declared / 257 live tables │   │ Storage    │   │ 80 curated │
+        │ 178 declared / 258 live tables │   │ Storage    │   │ 79 curated │
         └──────────┘   └────────────┘   └────────────┘
 ```
 
@@ -365,7 +365,7 @@ Every agent has a defined role, personality, skill set, and operating rules. The
 
 ### AI & Intelligence
 
-- **80 Curated AI Models in the Core Registry** with cost-aware auto-routing across OpenAI, Anthropic, Google Gemini, xAI Grok, OpenRouter, and Perplexity. Bring your own provider credentials — API billing is governed by each provider's own terms.
+- **79 Curated AI Models in the Core Registry** with cost-aware auto-routing across OpenAI, Anthropic, Google Gemini, xAI Grok, OpenRouter, and Perplexity. Bring your own provider credentials — API billing is governed by each provider's own terms.
 - **Adaptive Model Discovery (R73)** — a daily background task scans OpenRouter's full catalog of 1000+ models, tier-classifies each by completion price (reasoning / powerful / balanced / fast), probes the Replit gateway for new releases, and emails the owner a ranked digest of new models worth adding to the registry. Hard caps prevent inbox spam (10 alerts/run max), lifetime dedupe prevents re-alerts, and silent days mean nothing changed.
 - **Streaming Responses** via Server-Sent Events (SSE) — real-time token-by-token output
 - **Thinking Mode** — explainable reasoning with decision traces for complex problems
@@ -509,7 +509,7 @@ server/                       # Express backend
     middleware/               # Extracted dispatch middleware (policy, telemetry, tenant seam)
   routes.ts                   # 300+ API endpoints
   site-config.ts              # Centralized env-driven configuration
-  seed.ts                     # Database seeding (179 declared / 257 live tables, 41 rules, 18 personas)
+  seed.ts                     # Database seeding (178 declared / 258 live tables, 41 rules, 18 personas)
   heartbeat.ts                # Background task scheduler with model-catalog sync (R73)
   model-catalog.ts            # Daily OpenRouter catalog scan + gateway probe (R73)
   orchestrator-ledger.ts      # Per-tenant cost ledger with pg_advisory locks (R73.B)
@@ -523,7 +523,7 @@ server/                       # Express backend
   email.ts                    # Email server and tenant inboxes
   scaffolding.ts              # 75 corporate operation scaffolds
 shared/
-  schema.ts                   # Drizzle ORM schema (179 declared / 257 live — see docs/CURRENT_PLATFORM_TOTALS.md)
+  schema.ts                   # Drizzle ORM schema (178 declared / 258 live — see docs/CURRENT_PLATFORM_TOTALS.md)
 scripts/
   clean-for-release.sh        # Sanitize codebase for public release
 FORK-SETUP.md                 # Detailed setup instructions
