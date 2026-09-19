@@ -1,0 +1,13 @@
+# Replit Publish: keep development-only content out of the production image.
+.git/
+public-mirror/
+
+# User-provided source material belongs in the development workspace, not the
+# production image. Preserve every asset referenced directly by production
+# runtime code: audit samples, the default BWB hero, and the VisionClaw logo.
+attached_assets/*
+!attached_assets/visionclaw-self-audit-2026-05-24.md
+!attached_assets/visionclaw-self-audit-2026-05-24.pdf
+!attached_assets/audit-pitch-bob.mp3
+!attached_assets/Bob_on_Mounjaro_—_Channel_Avatar_1777847875921.png
+!attached_assets/Vision_Claw_Logo_Final-01_1776037691274.png
