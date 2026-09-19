@@ -1,0 +1,12 @@
+date,channel,format,topic,hook,cta,status
+2026-07-06,LinkedIn,Text post,"Why autonomy needs guardrails","Most AI agents fail closed on the wrong things. Here's the fix.",Read the safety matrix,Draft
+2026-07-06,X,Thread,"5 ways tenant isolation breaks","A single missing WHERE clause leaks every customer. Thread:",Follow for more,Draft
+2026-07-07,Newsletter,Long-form,"Shipping receipts, not promises","We publish the exact command to verify every claim.",Browse the trust receipts,Scheduled
+2026-07-08,LinkedIn,Carousel,"From idea to deliverable in one pipeline","6 stages, 2 quality gates, 0 silent failures.",See an example output,Draft
+2026-07-09,X,Single post,"Our CI has 6 hard gates","Build, typecheck, security tests, docker boot, silent-failure budget, supply-chain.",Star the repo,Draft
+2026-07-10,Blog,Tutorial,"Add your first agent tool","A 4-step recipe with a copy-paste template.",Read adding-a-tool,Scheduled
+2026-07-13,LinkedIn,Text post,"What 'fail closed' actually means","Safety controls refuse; quality controls degrade. Opposite directions on purpose.",Read why,Draft
+2026-07-14,Newsletter,Long-form,"The cost of pretending CI is green","We'd rather show a number we're driving down.",See the burn-down,Draft
+2026-07-15,X,Thread,"Multi-provider routing, explained","One request, the cheapest capable model. Here's how.",Follow,Draft
+2026-07-16,LinkedIn,Carousel,"16 personas, one corporation","Each persona is a specialist with its own safety profile.",Meet the team,Draft
+2026-07-17,Blog,Case study,"A real delivery, end to end","Stripe webhook to delivered file, replay-safe.",Read the evidence,Scheduled
