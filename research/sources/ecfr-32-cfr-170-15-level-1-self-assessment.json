@@ -1,0 +1,7 @@
+{
+  "answer": "The substantive text regarding SPRS submission requirements and the evidence-retention rule for § 170.15 is as follows:\n\n**SPRS Submission Fields:**\nThe Level 1 self-assessment results submitted to the Supplier Performance Risk System (SPRS) must include, at minimum, the following items [L503]:\n*   (A) CMMC Level [L505]\n*   (B) CMMC Status Date [L507]\n*   (C) CMMC Assessment Scope [L509]\n*   (D) All industry CAGE code(s) associated with the information system(s) addressed by the CMMC Assessment Scope [L511]\n*   (E) Compliance result [L513]\n\n**Evidence-Retention Rule:**\nThe artifacts used as evidence for the assessment must be retained by the OSA for six (6) years from the CMMC Status Date [L556].",
+  "favicon": "https://assets.ecfr.gov/assets/favicon/favicon-32x32-601e211398bdd3b5d26f99ae1ddae16e940b6a6223cb83f429419e6709f596f2.png",
+  "title": "\n    eCFR :: 32 CFR 170.15 -- CMMC Level 1 self-assessment and affirmation requirements.\n  ",
+  "truncated": false,
+  "url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-G/part-170/subpart-D/section-170.15"
+}
