@@ -1,0 +1,43 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: visionclaw
+      POSTGRES_USER: visionclaw
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U visionclaw"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://visionclaw:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/visionclaw
+      NODE_ENV: production
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env (use: openssl rand -hex 32)}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      SITE_PLATFORM_NAME: ${SITE_PLATFORM_NAME:-VisionClaw}
+      SITE_COMPANY_NAME: ${SITE_COMPANY_NAME:-}
+      SITE_OWNER_EMAIL: ${SITE_OWNER_EMAIL:-}
+      STRIPE_LIVE_SECRET_KEY: ${STRIPE_LIVE_SECRET_KEY:-}
+      STRIPE_LIVE_PUBLISHABLE_KEY: ${STRIPE_LIVE_PUBLISHABLE_KEY:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+      BROWSERLESS_API_KEY: ${BROWSERLESS_API_KEY:-}
+
+volumes:
+  pgdata:
