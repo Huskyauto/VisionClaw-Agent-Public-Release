@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="640" viewBox="0 0 1080 640" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <rect width="1080" height="640" rx="14" fill="#09090b"/>
+  <rect x="1" y="1" width="1078" height="638" rx="13" fill="none" stroke="#27272a" stroke-width="2"/>
+
+  <!-- title bar -->
+  <rect x="2" y="2" width="1076" height="44" rx="12" fill="#18181b"/>
+  <rect x="2" y="24" width="1076" height="22" fill="#18181b"/>
+  <line x1="2" y1="46" x2="1078" y2="46" stroke="#27272a" stroke-width="2"/>
+  <circle cx="28" cy="24" r="6" fill="#ef4444"/>
+  <circle cx="48" cy="24" r="6" fill="#f59e0b"/>
+  <circle cx="68" cy="24" r="6" fill="#10b981"/>
+  <text x="90" y="29" font-size="13" fill="#a1a1aa">visionclaw_loop_system.md</text>
+  <text x="1052" y="29" font-size="13" fill="#34d399" text-anchor="end">production · live</text>
+
+  <!-- heading -->
+  <text x="40" y="86" font-size="26" font-weight="bold" fill="#fafafa">THE ANATOMY OF A VISIONCLAW LOOP</text>
+  <text x="40" y="112" font-size="14" fill="#a1a1aa">Agents that prompt themselves — triggered on schedule, verified by a separate model, hard-stopped by budget.</text>
+
+  <!-- stage cards: 3 cols x 2 rows -->
+  <!-- card template: w=326 h=170, x at 40 / 377 / 714, y at 136 / 322 -->
+
+  <!-- 01 Trigger -->
+  <g>
+    <rect x="40" y="136" width="326" height="170" rx="10" fill="#18181b" stroke="#27272a"/>
+    <rect x="56" y="152" width="30" height="20" rx="4" fill="none" stroke="#10b981"/>
+    <text x="71" y="167" font-size="12" fill="#34d399" text-anchor="middle">01</text>
+    <text x="96" y="167" font-size="15" font-weight="bold" fill="#fafafa">Trigger</text>
+    <text x="56" y="194" font-size="12" fill="#a1a1aa">Loops start themselves — no human prompt.</text>
+    <text x="56" y="222" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Heartbeat + scheduled tasks</tspan></text>
+    <text x="56" y="246" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Jury queue drainer</tspan></text>
+    <text x="56" y="270" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Nightly research &amp; audits</tspan></text>
+  </g>
+
+  <!-- 02 Execution -->
+  <g>
+    <rect x="377" y="136" width="326" height="170" rx="10" fill="#18181b" stroke="#27272a"/>
+    <rect x="393" y="152" width="30" height="20" rx="4" fill="none" stroke="#10b981"/>
+    <text x="408" y="167" font-size="12" fill="#34d399" text-anchor="middle">02</text>
+    <text x="433" y="167" font-size="15" font-weight="bold" fill="#fafafa">Execution</text>
+    <text x="393" y="194" font-size="12" fill="#a1a1aa">16 personas act with chunk-and-parallel.</text>
+    <text x="393" y="222" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Up to 8 parallel agents</tspan></text>
+    <text x="393" y="246" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Long jobs split into ≤5-min chunks</tspan></text>
+    <text x="393" y="270" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Fresh context per subagent</tspan></text>
+  </g>
+
+  <!-- 03 Verification -->
+  <g>
+    <rect x="714" y="136" width="326" height="170" rx="10" fill="#18181b" stroke="#27272a"/>
+    <rect x="730" y="152" width="30" height="20" rx="4" fill="none" stroke="#10b981"/>
+    <text x="745" y="167" font-size="12" fill="#34d399" text-anchor="middle">03</text>
+    <text x="770" y="167" font-size="15" font-weight="bold" fill="#fafafa">Verification</text>
+    <text x="730" y="194" font-size="12" fill="#a1a1aa">A separate model grades every output.</text>
+    <text x="730" y="222" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Completion-verify vs goal contract</tspan></text>
+    <text x="730" y="246" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Chain-of-Verification (CoVe)</tspan></text>
+    <text x="730" y="270" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">MoA jury κ concordance routing</tspan></text>
+  </g>
+
+  <!-- 04 Stop Rules -->
+  <g>
+    <rect x="40" y="322" width="326" height="170" rx="10" fill="#18181b" stroke="#27272a"/>
+    <rect x="56" y="338" width="30" height="20" rx="4" fill="none" stroke="#10b981"/>
+    <text x="71" y="353" font-size="12" fill="#34d399" text-anchor="middle">04</text>
+    <text x="96" y="353" font-size="15" font-weight="bold" fill="#fafafa">Stop Rules</text>
+    <text x="56" y="380" font-size="12" fill="#a1a1aa">Success, failure, AND budget terminate.</text>
+    <text x="56" y="408" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Checkable loop contracts</tspan></text>
+    <text x="56" y="432" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Atomic daily budget claim</tspan></text>
+    <text x="56" y="456" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">2-failed-attempts circuit breaker</tspan></text>
+  </g>
+
+  <!-- 05 Memory -->
+  <g>
+    <rect x="377" y="322" width="326" height="170" rx="10" fill="#18181b" stroke="#27272a"/>
+    <rect x="393" y="338" width="30" height="20" rx="4" fill="none" stroke="#10b981"/>
+    <text x="408" y="353" font-size="12" fill="#34d399" text-anchor="middle">05</text>
+    <text x="433" y="353" font-size="15" font-weight="bold" fill="#fafafa">Memory</text>
+    <text x="393" y="380" font-size="12" fill="#a1a1aa">Checkpoints to disk; crashes resume.</text>
+    <text x="393" y="408" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Checkpoint / resume pipeline</tspan></text>
+    <text x="393" y="432" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Step ledger audit trail</tspan></text>
+    <text x="393" y="456" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Confidence-scored Memory V2</tspan></text>
+  </g>
+
+  <!-- 06 Briefing -->
+  <g>
+    <rect x="714" y="322" width="326" height="170" rx="10" fill="#18181b" stroke="#27272a"/>
+    <rect x="730" y="338" width="30" height="20" rx="4" fill="none" stroke="#10b981"/>
+    <text x="745" y="353" font-size="12" fill="#34d399" text-anchor="middle">06</text>
+    <text x="770" y="353" font-size="15" font-weight="bold" fill="#fafafa">Briefing</text>
+    <text x="730" y="380" font-size="12" fill="#a1a1aa">Frozen instructions read on every run.</text>
+    <text x="730" y="408" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">133 skills across 3 registries</tspan></text>
+    <text x="730" y="432" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">Per-persona operating contracts</tspan></text>
+    <text x="730" y="456" font-size="12" fill="#34d399">▸ <tspan fill="#d4d4d8">SHA-256-pinned runbook registry</tspan></text>
+  </g>
+
+  <!-- cycle strip -->
+  <rect x="40" y="512" width="1000" height="46" rx="10" fill="#18181b" stroke="#27272a"/>
+  <text x="64" y="541" font-size="14" fill="#d4d4d8">
+    <tspan fill="#34d399">↻ TRIGGER</tspan>
+    <tspan fill="#52525b"> → </tspan><tspan>EXECUTE</tspan>
+    <tspan fill="#52525b"> → </tspan><tspan fill="#34d399">VERIFY</tspan>
+    <tspan fill="#52525b"> → </tspan><tspan>STOP / RETRY</tspan>
+    <tspan fill="#52525b"> → </tspan><tspan fill="#34d399">CHECKPOINT</tspan>
+    <tspan fill="#52525b"> → </tspan><tspan>LEARN</tspan>
+  </text>
+  <text x="1016" y="541" font-size="12" fill="#71717a" text-anchor="end">every loop · every run · no exceptions</text>
+
+  <!-- footnote -->
+  <text x="40" y="596" font-size="12" fill="#71717a">Verifier disagreement (κ &lt; 0.5) escalates to human review automatically — verification theater is itself monitored.</text>
+  <text x="1040" y="596" font-size="12" fill="#34d399" text-anchor="end">agenticcorporation.net</text>
+</svg>
