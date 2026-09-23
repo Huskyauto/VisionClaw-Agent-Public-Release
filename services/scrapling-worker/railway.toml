@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/livez"
+healthcheckTimeout = 10
+restartPolicyType = "ON_FAILURE"
