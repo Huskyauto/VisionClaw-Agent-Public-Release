@@ -2136,7 +2136,7 @@ export default function LandingPage() {
             <img src={vcLogoPath} alt={pn} className="h-16 sm:h-20 w-auto mx-auto mb-4 dark:brightness-[1.15] dark:contrast-[1.1]" data-testid="img-tech-hero-logo" />
           </RevealOnScroll>
           <RevealOnScroll>
-            <Badge variant="secondary" className="gap-1.5 animate-[fadeIn_0.6s_ease-out]" data-testid="badge-hero-status">
+            <Badge variant="secondary" className="max-w-full whitespace-normal text-left gap-1.5 animate-[fadeIn_0.6s_ease-out]" data-testid="badge-hero-status">
               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                 <span>Platform Online — 18 Agents, 425 Tools, 190 Declared / 271 Live Tables, 876 Platform Indexes (611 non-PK), 79 Curated Models + Daily Catalog Discovery, 141 Capabilities, 68 Total Platform Skills, 41 Governance Rules. Development snapshot; {SOURCE_UPDATE_SUMMARY}</span>
               {/* Archived release history belongs in replit.md and must not ship as a second public platform narrative.
