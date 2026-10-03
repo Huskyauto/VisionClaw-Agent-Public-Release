@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "releaseDate": "2026-10-03",
+  "evidenceEnvironment": "development",
+  "metrics": {
+    "registeredTools": 425,
+    "publicDocumentedTools": 386,
+    "activePersonas": 18,
+    "dbSeededSkills": 63,
+    "totalSkills": 68,
+    "activeCapabilities": 141,
+    "declaredTables": 190,
+    "liveTables": 271,
+    "governanceRules": 41,
+    "platformIndexes": 876,
+    "nonPrimaryKeyIndexes": 611,
+    "aiProviders": 6,
+    "coreRegistryModels": 79
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "minCoverage": 0.8,
+  "runs": [
+    {
+      "taskId": "context-brief-1",
+      "modelId": "model-a",
+      "harnessId": "baseline-harness",
+      "completionScore": 0.8,
+      "process": {
+        "toolUse": 0.8,
+        "stateConsistency": 0.8,
+        "robustness": 0.8
+      },
+      "securityScore": 1
+    },
+    {
+      "taskId": "context-brief-2",
+      "modelId": "model-a",
+      "harnessId": "baseline-harness",
+      "completionScore": 0.9,
+      "process": {
+        "toolUse": 0.9,
+        "stateConsistency": 0.9,
+        "robustness": 0.9
+      },
+      "securityScore": 1
+    }
+  ]
+}

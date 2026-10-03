@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a new capability for the platform.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea? Great. Help frame it so it's actionable.
+        See [ROADMAP.md](https://github.com/Huskyauto/VisionClaw-Agent-Public-Release/blob/main/ROADMAP.md) first to check it isn't already planned.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the user need, not the implementation.
+      placeholder: "When my AI team finishes a deliverable, I have no way to..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      placeholder: A new tool, a UI change, a new persona, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or related libraries/products you looked at.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which area is this in?
+      multiple: true
+      options:
+        - Frontend / UI
+        - Agent orchestration
+        - Tools / integrations
+        - Memory / knowledge
+        - Cost / metering
+        - Voice / glasses
+        - Multi-tenancy / auth
+        - Documentation
+        - Other

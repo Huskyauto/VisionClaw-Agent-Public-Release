@@ -1,0 +1,130 @@
+name: External PR review gate
+
+# This workflow deliberately uses pull_request_target for the review decision,
+# but NEVER checks out or executes pull-request code. The workflow is read from
+# the trusted base branch and only reads GitHub metadata.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: external-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  trusted-review:
+    name: Trusted maintainer review (current commit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Classify PR and verify current-commit approval
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pullRequest = context.payload.pull_request;
+            if (!pullRequest?.number || !pullRequest.head?.sha) {
+              core.setFailed("Pull-request metadata is incomplete; refusing to approve.");
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const number = pullRequest.number;
+            const currentHead = pullRequest.head.sha;
+            const baseRepo = pullRequest.base?.repo?.full_name;
+            const headRepo = pullRequest.head?.repo?.full_name;
+            const isExternal = Boolean(headRepo && baseRepo && headRepo !== baseRepo);
+            const trustedReviewer = owner.toLowerCase();
+
+            const [files, reviews] = await Promise.all([
+              github.paginate(github.rest.pulls.listFiles, {
+                owner,
+                repo,
+                pull_number: number,
+                per_page: 100,
+              }),
+              github.paginate(github.rest.pulls.listReviews, {
+                owner,
+                repo,
+                pull_number: number,
+                per_page: 100,
+              }),
+            ]);
+
+            const latestReviewByUser = new Map();
+            for (const review of reviews) {
+              const login = review.user?.login?.toLowerCase();
+              if (!login || !review.submitted_at) continue;
+              const previous = latestReviewByUser.get(login);
+              if (
+                !previous ||
+                new Date(review.submitted_at).getTime() >
+                  new Date(previous.submitted_at).getTime()
+              ) {
+                latestReviewByUser.set(login, review);
+              }
+            }
+
+            const trustedReview = latestReviewByUser.get(trustedReviewer);
+            const approvedCurrentCommit =
+              trustedReview?.state === "APPROVED" &&
+              trustedReview.commit_id === currentHead;
+
+            const highRiskPatterns = [
+              /^\.github\/(?:workflows|actions)\//i,
+              /^\.github\/(?:CODEOWNERS|dependabot\.ya?ml)$/i,
+              /(^|\/)(?:package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.ya?ml)$/i,
+              /(^|\/)(?:Dockerfile(?:\.[^/]+)?|docker-compose(?:\.[^/]+)?\.ya?ml|compose(?:\.[^/]+)?\.ya?ml)$/i,
+              /(^|\/)(?:deploy|deployment|infra|k8s|kubernetes|helm|terraform)(?:\/|$)/i,
+              /(^|\/)(?:\.replit|replit\.nix|artifact\.toml|Procfile|fly\.toml|railway\.toml|render\.ya?ml|vercel\.json|netlify\.toml)$/i,
+              /(^|\/)migrations?(?:\/|$)/i,
+              /^server\//i,
+              /^shared\/(?:schema|auth|security|permissions?)(?:[./-]|$)/i,
+              /^client\/.*(?:auth|oauth|session|login|credential|permission|security)/i,
+              /^scripts\//i,
+              /(^|\/)\.env(?:\.|$)/i,
+              /(^|\/)(?:SECURITY|CONTRIBUTING)\.md$/i,
+            ];
+            const highRiskFiles = files
+              .map((file) => file.filename)
+              .filter((filename) => highRiskPatterns.some((pattern) => pattern.test(filename)));
+
+            const safe = (value) =>
+              String(value ?? "")
+                .replace(/[\r\n|`<>]/g, " ")
+                .slice(0, 240);
+
+            await core.summary
+              .addHeading("External PR intake")
+              .addTable([
+                [
+                  { data: "Field", header: true },
+                  { data: "Value", header: true },
+                ],
+                ["Source", safe(headRepo || "unknown") + (isExternal ? " (external fork)" : " (same repository)")],
+                ["Head commit", safe(currentHead)],
+                ["Changed files", String(files.length)],
+                ["High-risk paths", highRiskFiles.length ? highRiskFiles.map(safe).join(", ") : "none detected"],
+                ["Trusted reviewer", safe(owner)],
+                [
+                  "Approval",
+                  approvedCurrentCommit
+                    ? "approved on the current head commit"
+                    : "missing or stale for the current head commit",
+                ],
+              ])
+              .addRaw(
+                "This check does not execute contributor code. CI, security checks, and a maintainer review are all required before replay into the private project."
+              )
+              .write();
+
+            if (!approvedCurrentCommit) {
+              core.setFailed(
+                `A trusted maintainer must approve the exact current commit (${currentHead}) before this PR can be adopted.`
+              );
+            }

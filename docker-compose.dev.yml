@@ -1,0 +1,90 @@
+# R120 — Developer compose profile (cost-conscious contributors)
+#
+# Stand up VisionClaw end-to-end on a contributor's laptop without burning
+# OpenAI / Anthropic / xAI tokens. Provides:
+#
+#   - pgvector/pg16 Postgres (same image CI uses, so schema parity is exact)
+#   - Ollama for local LLM + embedding inference (free, GPU-optional)
+#   - The VisionClaw app, with OLLAMA_BASE_URL pre-wired
+#
+# Usage:
+#   cp .env.example .env.dev   # fill in DEV_POSTGRES_PASSWORD + SESSION_SECRET
+#   docker compose -f docker-compose.dev.yml --env-file .env.dev up
+#
+# Tear down:
+#   docker compose -f docker-compose.dev.yml down -v
+#
+# After `up`, pull a model on first boot:
+#   docker compose -f docker-compose.dev.yml exec ollama ollama pull llama3.2:3b
+#   docker compose -f docker-compose.dev.yml exec ollama ollama pull nomic-embed-text
+#
+# The app falls back to live API providers when an Ollama model isn't pulled,
+# so partial setups still work — contributors only pay for what they actually
+# exercise.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: visionclaw_dev
+      POSTGRES_USER: visionclaw
+      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD:-devpass}
+    ports:
+      - "5433:5432"   # 5433 host-side to avoid clashing with a local pg
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U visionclaw"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    # GPU support is opt-in — uncomment if you have nvidia-container-toolkit
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://visionclaw:${DEV_POSTGRES_PASSWORD:-devpass}@db:5432/visionclaw_dev
+      SESSION_SECRET: ${SESSION_SECRET:-dev-only-change-me}
+      NODE_ENV: development
+      # Local LLM stack — agent will try Ollama first, fall back to live APIs
+      # if the requested model isn't pulled locally.
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_DEFAULT_MODEL: ${OLLAMA_DEFAULT_MODEL:-llama3.2:3b}
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      # Live provider keys are opt-in for dev — agent gracefully degrades
+      # when missing (uses Ollama for everything it can serve locally).
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      # R120 RLS — set 1 to enable strict tenant context enforcement in dev.
+      # 0 (default) keeps audit-mode policies, so the existing test fixtures
+      # that don't set app.current_tenant still work.
+      STRICT_RLS: ${STRICT_RLS:-0}
+
+volumes:
+  pgdata_dev:
+  ollama_models:
