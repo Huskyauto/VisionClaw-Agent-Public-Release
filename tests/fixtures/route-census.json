@@ -1,0 +1,7 @@
+{
+  "_comment": "Route census \u2014 fail-closed conservation gate for the routes.ts decomposition. Update this file IN THE SAME PR/change as any route move so the diff itself proves conservation: a pure move shows `total` UNCHANGED and `routesTsInline` DECREASED. `inlineCeiling` may only ever ratchet DOWN. Counts BOTH `app.METHOD(` and `<name>Router.METHOD(` registration styles across server/routes.ts + server/routes/**; the shared draft (app.-only, mirror baseline 659) undercounted router-style modules \u2014 corrected here against the real main tree. Baseline is the test's own regex computation (authoritative gate), not an external grep.",
+  "_reconciliation": "CI repair verified against the last census commit: 15 genuine additions, zero removals. Additions: three API outboxes, API conversation follow-up, three browser-library routes, four browser-workspace routes, income-opportunity list, two owner-recovery routes, verifier-memory diagnostic. All are in domain modules; inline count and ceiling remain unchanged.",
+  "total": 796,
+  "routesTsInline": 171,
+  "inlineCeiling": 171
+}
