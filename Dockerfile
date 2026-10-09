@@ -1,7 +1,10 @@
 # ---- Stage 1: build ----
 # Keep this pin and the runtime pin aligned with CI and the package engine floor;
 # jsdom 29 requires Node 22.13+ on the Node 22 release line.
-FROM node:22.22.0-slim AS build
+# CI may select an independently verified cache copy of this same image.
+# Normal local/production builds keep the original Docker Hub default.
+ARG NODE_IMAGE=node:22.22.0-slim
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 
 # Install build deps separately so layer caches well
@@ -11,7 +14,7 @@ WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 # Fail before downloads if a future Replit install reintroduces private URLs.
 COPY tests/deployment/portable-install.test.cjs ./tests/deployment/portable-install.test.cjs
-RUN node --test tests/deployment/portable-install.test.cjs
+RUN node --test --test-name-pattern="^every locked tarball" tests/deployment/portable-install.test.cjs
 RUN npm ci --no-audit --no-fund
 
 # Copy sources and produce the production bundle
@@ -28,7 +31,7 @@ RUN rm -rf node_modules/ffprobe-static/bin/darwin node_modules/ffprobe-static/bi
 
 
 # ---- Stage 2: runtime ----
-FROM node:22.22.0-slim AS runtime
+FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production \

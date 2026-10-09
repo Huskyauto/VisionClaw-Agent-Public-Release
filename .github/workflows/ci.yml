@@ -125,7 +125,9 @@ jobs:
       postgres:
         # pgvector image bundles the 'vector' extension that our schema needs;
         # vanilla postgres:16 makes db:push fail with 'type "vector" does not exist'.
-        image: pgvector/pgvector:pg16
+        # Google cache digest verified against the original Docker Hub pg16
+        # manifest. Avoid shared-runner Docker Hub rate limits, not test gates.
+        image: mirror.gcr.io/pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: visionclaw_test
@@ -235,7 +237,8 @@ jobs:
         # Match the docker-compose.yml image (pgvector) so the smoke test exercises
         # the SAME pgvector-backed path a real `docker compose up` user gets —
         # vanilla postgres:16 lacks the 'vector' extension our schema needs.
-        image: pgvector/pgvector:pg16
+        # Exact same upstream image as the database test job.
+        image: mirror.gcr.io/pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: visionclaw_smoke
@@ -251,7 +254,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Build container image
-        run: docker build -t visionclaw:ci .
+        # Digest verified against Docker Hub's Node 22.22.0-slim manifest.
+        # Override only CI; Dockerfile's normal production default is unchanged.
+        run: docker build --build-arg NODE_IMAGE=mirror.gcr.io/library/node:22.22.0-slim@sha256:dd9d21971ec4395903fa6143c2b9267d048ae01ca6d3ea96f16cb30df6187d94 -t visionclaw:ci .
       - name: Boot container and probe /healthz
         run: |
           # Smoke test boots the container against a real Postgres service,
