@@ -76,7 +76,7 @@ while true; do
   # flag. Reuses the proven scripts/git-push.sh path. Fail-safe + non-fatal:
   # the flag is cleared BEFORE the run so a crash never re-triggers forever, and
   # any failure is logged loud but never kills the private auto-push loop.
-  #   touch .local/.push-public-mirror              → build + force-push public repo
+  #   touch .local/.push-public-mirror              → build + append public snapshot
   #   echo dry-run > .local/.push-public-mirror     → build + verify only (no push)
   PMIRROR_FLAG=".local/.push-public-mirror"
   if [ -f "$PMIRROR_FLAG" ]; then
@@ -84,10 +84,10 @@ while true; do
     rm -f "$PMIRROR_FLAG"
     # Only EMPTY (touch) = real push, exact "dry-run" = verify-only. Any other
     # non-empty value (typo, partial/non-atomic write) is REJECTED rather than
-    # silently treated as a real force-push to the public repo.
+    # silently treated as a real push to the public repo.
     case "$PMIRROR_MODE" in
       "")
-        echo "[auto-push] $(date -Iseconds) public-mirror flag — building + force-pushing public mirror..."
+        echo "[auto-push] $(date -Iseconds) public-mirror flag — building + appending public mirror snapshot..."
         if GIT_TERMINAL_PROMPT=0 PUBLIC_MIRROR_TOKEN="${GITHUB_PERSONAL_ACCESS_TOKEN_2:-}" bash scripts/build-public-mirror.sh 2>&1; then
           echo "[auto-push] public-mirror push ok"
         else
