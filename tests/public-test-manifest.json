@@ -310,7 +310,6 @@
         "tests/security/csrf-token-cache-control.test.ts",
         "tests/security/daily-note-task-write-scope.test.ts",
         "tests/security/dashboard-health-auth.test.ts",
-        "tests/security/delegation-contract-skill.test.ts",
         "tests/security/delegation-supervisor-phase1.test.ts",
         "tests/security/delivery-container-integrity.test.ts",
         "tests/security/delivery-contract-bootstrap.test.ts",
@@ -368,11 +367,11 @@
         "tests/security/plan-lobster-policy-gate.test.ts",
         "tests/security/plan-proposal-tenant-scope.test.ts",
         "tests/security/platform-managed-knowledge-guard.test.ts",
-        "tests/security/pre-build-capability-delta-gate.test.ts",
         "tests/security/proposal-verifier-isolation-routing.test.ts",
         "tests/security/public-chat-boundary.test.ts",
         "tests/security/public-chat-budget.test.ts",
         "tests/security/public-operational-routes.test.ts",
+        "tests/security/public-release-sales-contract.test.ts",
         "tests/security/publish-preflight.test.ts",
         "tests/security/recipe-atomic-write.test.ts",
         "tests/security/recipe-validator.test.ts",
@@ -725,7 +724,10 @@
         "tests/scripts/release-round.test.ts",
         "tests/scripts/standby-fork-guard.test.ts",
         "tests/scripts/weekly-maintenance.test.ts",
-        "tests/scripts/youtube-transcript-fallback.test.ts"
+        "tests/scripts/youtube-transcript-fallback.test.ts",
+        "tests/security/delegation-contract-skill.test.ts",
+        "tests/security/pre-build-capability-delta-gate.test.ts",
+        "tests/security/private-workspace-publisher-contract.test.ts"
       ]
     }
   ]

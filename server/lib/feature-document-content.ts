@@ -30,7 +30,7 @@ export function buildFeatureDocumentText({
   txtLines.push(`VISIONCLAW AGENT PLATFORM — COMPREHENSIVE FEATURES — ${today}`);
   txtLines.push("================================================================");
   txtLines.push("");
-  txtLines.push("[Your Company] | EIN: [YOUR-EIN] | [Your City, ST]");
+  txtLines.push("VisionClaw | Open-source multi-tenant AI agent workspace");
   txtLines.push("Owner: Bob Washburn | huskyauto@gmail.com");
   txtLines.push("Production: https://agenticcorporation.net");
   txtLines.push("QR Code: https://agenticcorporation.net  (Drive asset REDACTED_DRIVE_FILE_ID)");

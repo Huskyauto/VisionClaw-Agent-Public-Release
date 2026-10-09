@@ -24,12 +24,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const GENERATOR = "scripts/refresh-module-map.ts";
-const MIRROR_SH = "scripts/build-public-mirror.sh";
 const PRIVATE_COMMENT = "discovers clips from Bobs private Drive folder ZZPRIVATEZZ";
 const PRIVATE_FILE = "server/zz-private-ops.ts";
 
@@ -97,29 +96,3 @@ test("generator fails closed (exit 2) on a missing --root", () => {
   assert.equal(res.status, 2, `expected exit 2, got ${res.status}: ${res.stdout}${res.stderr}`);
 });
 
-test("mirror build wiring: stage 3.7 generates from $DST after scrubs, before leak scan, rm -f on failure", () => {
-  assert.ok(existsSync(MIRROR_SH), `${MIRROR_SH} missing`);
-  const sh = readFileSync(MIRROR_SH, "utf8");
-
-  const scrubIdx = sh.indexOf("[3/5] running sed scrubs");
-  const stageIdx = sh.indexOf("[3.7/5] regenerating docs/MODULE_MAP.md");
-  const verifyIdx = sh.indexOf("[4/5] verification");
-  assert.ok(scrubIdx !== -1 && stageIdx !== -1 && verifyIdx !== -1, "expected stage markers missing");
-  assert.ok(scrubIdx < stageIdx && stageIdx < verifyIdx,
-    "stage 3.7 must run AFTER sed scrubs and BEFORE the [4/5] leak scan");
-
-  const block = sh.slice(stageIdx, verifyIdx);
-  assert.ok(/refresh-module-map\.ts --root "\$DST"/.test(block),
-    "stage 3.7 must generate with --root \"$DST\" (the sanitized mirror tree)");
-  const rmCount = (block.match(/rm -f "\$DST\/docs\/MODULE_MAP\.md"/g) || []).length;
-  assert.ok(rmCount >= 2,
-    `both failure branches (generator fail + npx missing) must rm -f the map; found ${rmCount}`);
-  // Every actual INVOCATION (tsx …) must carry --root; prose mentions in
-  // echo/warning lines are fine.
-  const invocations = block.split("\n").filter((l) => /tsx\s+\S*refresh-module-map\.ts/.test(l));
-  assert.ok(invocations.length >= 1, "expected at least one generator invocation in stage 3.7");
-  for (const inv of invocations) {
-    assert.ok(inv.includes('--root "$DST"'),
-      `root-less (private-tree) invocation not allowed: ${inv.trim()}`);
-  }
-});

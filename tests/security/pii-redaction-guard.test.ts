@@ -33,8 +33,11 @@ test("does NOT treat an SSA-invalid range as an SSN", () => {
 });
 
 test("composes secret scanning (e.g. AWS-style key) and redacts it", () => {
-  const r = redactPiiForStorage("key REDACTED_AWS_KEY in note");
-  assert.ok(!r.redacted.includes("REDACTED_AWS_KEY"), r.redacted);
+  // Assemble the documented synthetic example at runtime so source export
+  // scrubbing does not replace the test input before the scanner sees it.
+  const exampleKey = ["AK", "IA", "IOSFODNN7EXAMPLE"].join("");
+  const r = redactPiiForStorage(`key ${exampleKey} in note`);
+  assert.ok(!r.redacted.includes(exampleKey), r.redacted);
   assert.ok(r.redactedClasses.includes("secret"));
 });
 

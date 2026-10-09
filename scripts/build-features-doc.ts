@@ -287,12 +287,12 @@ const HEADLINE_STATS = {
         ],
       },
       {
-        title: "Company",
+        title: "Project",
         bullets: [
-          "[Your Company]",
-          "EIN: [YOUR-EIN]",
-          "[Your City, State]",
-          "Owner: Bob Washburn",
+          "VisionClaw open-source project",
+          "Self-hosted, bring your own keys",
+          "Open-source workspace and runtime",
+          "Created by Robert Washburn",
           "Email: huskyauto@gmail.com",
           "Production URL: https://agenticcorporation.net",
           "QR Code asset (Drive file ID): REDACTED_DRIVE_FILE_ID",
@@ -304,8 +304,8 @@ const HEADLINE_STATS = {
       title: "VisionClaw Agent Platform",
       subtitle: `Comprehensive Features — ${today}`,
       companyLines: [
-        "[Your Company] | EIN: [YOUR-EIN]",
-        "Owner: Bob Washburn | [Your City, ST]",
+        "VisionClaw | Open-source multi-tenant AI agent workspace",
+        "Created by Robert Washburn | Open-source release",
         "https://agenticcorporation.net | huskyauto@gmail.com",
       ],
       coverStats: stats,

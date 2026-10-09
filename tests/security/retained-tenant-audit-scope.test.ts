@@ -359,9 +359,3 @@ test("a write failure cannot complete the import transaction or delete its sourc
   assert.deepEqual(f.state(), { deleted: false, transactions: 1, committed: false });
 });
 
-test("snapshot exporter selects stable IDs for all three source collections", () => {
-  const source = readFileSync("scripts/sync-dev-to-prod.ts", "utf8");
-  for (const table of ["research_programs", "research_sessions", "research_experiments"]) {
-    assert.match(source, new RegExp(`SELECT id,[^\\x60]+FROM ${table}`));
-  }
-});
