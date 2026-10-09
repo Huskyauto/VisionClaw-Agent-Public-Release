@@ -1,0 +1,159 @@
+name: BWB Chapter Render Farm
+
+# run-name embeds the orchestrator job_id so the orchestrator can correlate
+# the dispatched run deterministically (by name) instead of by timestamp.
+run-name: bwb-render-${{ inputs.job_id }}
+
+# Free, true multi-container fan-out for BWB video renders.
+# Each chapter renders in its OWN GitHub-hosted runner (separate container,
+# ~7 GB RAM), then a final job stitches the chapters. ffmpeg is apt-installed
+# per job (not guaranteed preinstalled on ubuntu-latest).
+#
+# Triggered by the orchestrator (scripts/bwb-render-github.ts) which:
+#   1. pre-renders all scene images + narration audio ON the app box
+#      (where the keys live — NO secrets ever reach CI),
+#   2. tars them + a manifest + the pure-ffmpeg renderer into a bundle,
+#   3. uploads the bundle as a GitHub Release asset,
+#   4. dispatches this workflow with the bundle URL + chapter count,
+#   5. polls the run and downloads the final-video artifact.
+#
+# This workflow needs ZERO secrets and ZERO app dependencies — only the
+# bundle (assets + render-chapter-ffmpeg.mjs) and preinstalled ffmpeg/node.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_url:
+        description: "Direct download URL for the render bundle (.tar.gz)"
+        required: true
+      num_chapters:
+        description: "Number of chapters to fan out"
+        required: true
+      job_id:
+        description: "Orchestrator-supplied render job id (for run correlation)"
+        required: true
+
+permissions:
+  contents: read
+
+# Allow only one render at a time per job_id; don't cancel in-flight renders.
+concurrency:
+  group: bwb-render-${{ github.event.inputs.job_id }}
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+      bundle_url: ${{ steps.validate.outputs.bundle_url }}
+    steps:
+      - id: validate
+        name: Validate bundle_url (must be THIS repo's release-asset API)
+        # workflow_dispatch inputs are user-controlled. We send GITHUB_TOKEN as a
+        # Bearer header when fetching the bundle, so the URL MUST be locked to this
+        # repo's GitHub release-asset API or the token could be exfiltrated to an
+        # attacker-supplied host. Bind inputs via env (never inline) to avoid
+        # shell-injection, validate, and fail closed. Downstream jobs consume the
+        # validated output, never the raw input.
+        env:
+          BUNDLE_URL: ${{ github.event.inputs.bundle_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          expected="^https://api\.github\.com/repos/${REPO}/releases/assets/[0-9]+$"
+          if ! [[ "$BUNDLE_URL" =~ $expected ]]; then
+            echo "::error::bundle_url rejected: must match https://api.github.com/repos/${REPO}/releases/assets/<id>" >&2
+            exit 1
+          fi
+          echo "bundle_url=$BUNDLE_URL" >> "$GITHUB_OUTPUT"
+          echo "bundle_url validated"
+      - id: gen
+        name: Build chapter matrix
+        env:
+          NUM_CHAPTERS: ${{ github.event.inputs.num_chapters }}
+        run: |
+          set -euo pipefail
+          n="$NUM_CHAPTERS"
+          if ! [[ "$n" =~ ^[0-9]+$ ]] || [ "$n" -lt 1 ] || [ "$n" -gt 24 ]; then
+            echo "invalid num_chapters: $n" >&2; exit 1
+          fi
+          arr=$(seq 1 "$n" | jq -R 'tonumber' | jq -cs .)
+          echo "matrix=$arr" >> "$GITHUB_OUTPUT"
+          echo "render-farm: $n chapters -> $arr"
+
+  render:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        chapter: ${{ fromJson(needs.setup.outputs.matrix) }}
+    name: render chapter ${{ matrix.chapter }}
+    steps:
+      - name: Echo runner memory (proves separate container)
+        run: free -h && nproc
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg && ffmpeg -version | head -1
+      - name: Download + extract bundle
+        env:
+          BUNDLE_URL: ${{ needs.setup.outputs.bundle_url }}
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/octet-stream" \
+            "$BUNDLE_URL" -o bundle.tar.gz
+          mkdir -p bundle
+          tar -xzf bundle.tar.gz -C bundle
+          ls -la bundle
+      - name: Render chapter ${{ matrix.chapter }}
+        run: node bundle/render-chapter-ffmpeg.mjs --chapter ${{ matrix.chapter }} --bundle bundle --out chapter-${{ matrix.chapter }}.mp4
+      - name: Upload chapter artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chapter-${{ matrix.chapter }}
+          path: chapter-${{ matrix.chapter }}.mp4
+          retention-days: 1
+          if-no-files-found: error
+
+  concat:
+    needs: [setup, render]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    name: stitch final video
+    steps:
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg && ffmpeg -version | head -1
+      - name: Download + extract bundle (for renderer + manifest)
+        env:
+          BUNDLE_URL: ${{ needs.setup.outputs.bundle_url }}
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/octet-stream" \
+            "$BUNDLE_URL" -o bundle.tar.gz
+          mkdir -p bundle
+          tar -xzf bundle.tar.gz -C bundle
+      - name: Download all chapter artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: chapters
+          pattern: chapter-*
+          merge-multiple: true
+      - name: Stitch chapters -> final.mp4
+        run: |
+          set -euo pipefail
+          cp bundle/manifest.json chapters/manifest.json
+          ls -la chapters
+          node bundle/render-chapter-ffmpeg.mjs --concat chapters --out final.mp4
+          ls -la final.mp4
+      - name: Upload final video
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-video
+          path: final.mp4
+          retention-days: 1
+          if-no-files-found: error

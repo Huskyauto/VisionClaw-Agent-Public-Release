@@ -1,0 +1,7 @@
+{
+  "_comment": "Route census \u2014 fail-closed conservation gate for the routes.ts decomposition. Update this file IN THE SAME PR/change as any route move so the diff itself proves conservation: a pure move shows `total` UNCHANGED and `routesTsInline` DECREASED. `inlineCeiling` may only ever ratchet DOWN. Counts BOTH `app.METHOD(` and `<name>Router.METHOD(` registration styles across server/routes.ts + server/routes/**; the shared draft (app.-only, mirror baseline 659) undercounted router-style modules \u2014 corrected here against the real main tree. Baseline is the test's own regex computation (authoritative gate), not an external grep.",
+  "_reconciliation": "Verified against the previous 796-route census: seven genuine additions, zero removals, all in server/routes/treasury-paper.ts. GET /api/treasury/paper/comparisons, /runs, /runs/:id, /status; POST /api/treasury/paper/comparisons/import, /runs, /runs/:id/review (all paths under /api/treasury/paper). The shared platform-admin/owner-tenant guard remains intact. Inline count and ceiling stay 171; no route or security gate was removed.",
+  "total": 803,
+  "routesTsInline": 171,
+  "inlineCeiling": 171
+}

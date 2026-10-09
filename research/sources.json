@@ -1,0 +1,66 @@
+[
+  {
+    "key": "ecfr-cmmc-l1-self-assessment",
+    "title": "32 CFR § 170.15 — CMMC Level 1 self-assessment and affirmation requirements",
+    "url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-G/part-170/subpart-D/section-170.15",
+    "publicationDate": "Current text retrieved August 2026",
+    "tier": 1,
+    "evidencePath": "research/sources/ecfr-32-cfr-170-15-level-1-self-assessment.txt"
+  },
+  {
+    "key": "ecfr-cmmc-scope",
+    "title": "32 CFR § 170.19 — CMMC assessment scope",
+    "url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-G/part-170/subpart-D/section-170.19",
+    "publicationDate": "Current text retrieved August 2026",
+    "tier": 1,
+    "evidencePath": "research/sources/ecfr-32-cfr-170-19-assessment-scope.json"
+  },
+  {
+    "key": "ecfr-cmmc-affirmation",
+    "title": "32 CFR § 170.22 — CMMC affirmation requirements",
+    "url": "https://www.ecfr.gov/current/title-32/subtitle-A/chapter-I/subchapter-G/part-170/subpart-D/section-170.22",
+    "publicationDate": "Current text retrieved August 2026",
+    "tier": 1,
+    "evidencePath": "research/sources/ecfr-32-cfr-170-22-affirmation.json"
+  },
+  {
+    "key": "far-basic-safeguarding",
+    "title": "FAR 52.204-21 — Basic Safeguarding of Covered Contractor Information Systems",
+    "url": "https://www.ecfr.gov/current/title-48/chapter-1/subchapter-H/part-52/subpart-52.2/section-52.204-21",
+    "publicationDate": "Current text retrieved August 2026",
+    "tier": 1,
+    "evidencePath": "research/sources/ecfr-48-cfr-52-204-21-basic-safeguarding.txt"
+  },
+  {
+    "key": "dod-l1-assessment-guide",
+    "title": "CMMC Assessment Guide — Level 1, Version 2.13",
+    "url": "https://dodcio.defense.gov/Portals/0/Documents/CMMC/AssessmentGuideL1v2.pdf",
+    "publicationDate": "September 2024",
+    "tier": 1,
+    "evidencePath": "research/sources/dod-cio-cmmc-level-1-assessment-guide-v2.13.txt"
+  },
+  {
+    "key": "dod-l1-scoping-guide",
+    "title": "CMMC Assessment Scope — Level 1, Version 2.13",
+    "url": "https://dodcio.defense.gov/Portals/0/Documents/CMMC/ScopingGuideL1.pdf",
+    "publicationDate": "September 2024",
+    "tier": 1,
+    "evidencePath": "research/sources/dod-cio-cmmc-level-1-scoping-guide-v2-13-september-2024.json"
+  },
+  {
+    "key": "sprs-l1-quick-entry",
+    "title": "CMMC Level 1 Self-Assessment Quick Entry Guide, Version 4.0",
+    "url": "https://www.sprs.csd.disa.mil/pdf/CMMCQuickEntryGuide.pdf",
+    "publicationDate": "December 2024",
+    "tier": 1,
+    "evidencePath": "research/sources/sprs-cmmc-level-1-quick-entry-guide-v4.txt"
+  },
+  {
+    "key": "dfars-cmmc-contract-clause",
+    "title": "DFARS 252.204-7021 — Contractor Compliance with the Cybersecurity Maturity Model Certification Level Requirement",
+    "url": "https://www.acquisition.gov/dfars/252.204-7021-contractor-compliance-cybersecurity-maturity-model-certification-level-requirements.",
+    "publicationDate": "NOV 2025 clause; current page checked August 2026",
+    "tier": 1,
+    "evidencePath": "research/sources/acquisition-gov-dfars-252-204-7021.txt"
+  }
+]
