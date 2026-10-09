@@ -157,7 +157,7 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d visionclaw_test \
             -c "CREATE EXTENSION IF NOT EXISTS vector;"
       - name: Download the same-revision production startup bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ci-startup-bundle
           path: dist
