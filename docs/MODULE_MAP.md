@@ -8,7 +8,7 @@
 | Area | Modules | Lines |
 | :--- | ---: | ---: |
 | `server/` | 1182 | 309,155 |
-| `client/src/` | 208 | 62,478 |
+| `client/src/` | 208 | 62,480 |
 | `scripts/` | 258 | 51,251 |
 | `shared/` | 25 | 7,915 |
 
@@ -168,13 +168,13 @@ Changes to these ripple widest — check importers before editing.
 | [`chat-stream-errors.ts`](../client/src/lib/chat-stream-errors.ts) | 14 | Recoverable tool failures are shown in the tool trace, not as chat-fatal alerts. |
 | [`utils.ts`](../client/src/lib/utils.ts) | 7 | — |
 
-### `client/src/pages/` — 109 module(s), 49,640 lines
+### `client/src/pages/` — 109 module(s), 49,642 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
 | [`settings.tsx`](../client/src/pages/settings.tsx) | 4,229 | — |
 | [`chat.tsx`](../client/src/pages/chat.tsx) | 3,473 | — |
-| [`landing.tsx`](../client/src/pages/landing.tsx) | 2,612 | — |
+| [`landing.tsx`](../client/src/pages/landing.tsx) | 2,614 | — |
 | [`projects.tsx`](../client/src/pages/projects.tsx) | 2,023 | — |
 | [`audit.tsx`](../client/src/pages/audit.tsx) | 1,339 | R125+13.4: pull UTM + referer from the URL once on mount; share across all |
 | [`home.tsx`](../client/src/pages/home.tsx) | 1,294 | — |

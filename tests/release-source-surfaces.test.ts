@@ -85,4 +85,5 @@ test("public current-count table and architecture diagram agree with dated relea
 test("private backup wording preserves the automatic-push hold", () => {
   if (!isPrivateSource) return; // Private backup instructions are not exported.
   assert.match(read("README.md"), /Private source backup:[\s\S]{0,70}Auto Git Push is on HOLD/);
+  assert.match(read("replit.md"), /^## R136\.2 — .+ \(October 14, 2026\)$/m);
 });

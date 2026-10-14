@@ -1996,7 +1996,7 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between gap-4 h-14">
           <a href="/landing" className="flex shrink-0 items-center gap-2 hover:opacity-80 transition-opacity" data-testid="link-landing-logo">
-            <img src={vcLogoPath} alt={pn} className="h-8 w-auto dark:brightness-[1.15] dark:contrast-[1.1]" data-testid="img-landing-logo" />
+            <img src={vcLogoPath} alt={pn} className="h-auto w-20 sm:h-8 sm:w-auto dark:brightness-[1.15] dark:contrast-[1.1]" data-testid="img-landing-logo" />
           </a>
           <div className="hidden md:flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [&>button]:shrink-0">
             {navTabs.map((tab) => (
@@ -2027,21 +2027,23 @@ export default function LandingPage() {
               Shop
             </Button>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <ViewToggle mode={viewMode} setMode={handleModeChange} />
             <ThemeToggle />
             <Button
               variant="ghost"
+              className="px-2 text-xs sm:px-4 sm:text-sm"
               onClick={() => navigate("/login")}
               data-testid="button-landing-signin"
             >
               Sign In
             </Button>
             <Button
+              className="px-2 text-xs sm:px-4 sm:text-sm"
               onClick={() => navigate("/signup")}
               data-testid="button-landing-signup"
             >
-              Sign Up Free
+              Sign Up<span className="hidden sm:inline"> Free</span>
             </Button>
           </div>
         </div>
