@@ -144,6 +144,8 @@ export async function getApiV1TurnStatus(tenantId: number, conversationId: numbe
     reason: apiV1ConversationRuns.failureReason,
     failedAt: apiV1ConversationRuns.failedAt,
     completedReply: apiV1ConversationRuns.completedReply,
+    resolvedModel: apiV1ConversationRuns.resolvedModel,
+    observedModel: apiV1ConversationRuns.observedModel,
   })
     .from(apiV1ConversationRuns).where(and(eq(apiV1ConversationRuns.tenantId, tenantId),
       eq(apiV1ConversationRuns.conversationId, conversationId))).limit(1);
@@ -241,6 +243,7 @@ export async function claimApiV1FollowUp(tenantId: number, conversationId: numbe
 export async function finishApiV1Turn(
   tenantId: number, conversationId: number, status: "complete" | "failed",
   failureReason?: FelixExpertFailureReason,
+  modelReceipt?: { model: string; observedModel?: string },
 ) {
   let reason: string | null = status === "failed" ? (failureReason ?? "processing_error") : null;
   let reply: string | null = null;
@@ -264,6 +267,8 @@ export async function finishApiV1Turn(
   const rows = await db.update(apiV1ConversationRuns).set({
     status, failureReason: reason, failedAt: status === "failed" ? new Date() : null,
     completedReply: status === "complete" ? reply : null, updatedAt: new Date(),
+    resolvedModel: status === "complete" ? modelReceipt?.model ?? null : null,
+    observedModel: status === "complete" ? modelReceipt?.observedModel ?? null : null,
   })
     .where(and(eq(apiV1ConversationRuns.tenantId, tenantId),
       eq(apiV1ConversationRuns.conversationId, conversationId),

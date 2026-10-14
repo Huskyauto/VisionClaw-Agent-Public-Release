@@ -190,7 +190,7 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
       // canonical memoryEntrySafeCols (re-exported from storage.ts) so the
       // response shape EXACTLY matches what storage.getMemoryEntry returned —
       // no client contract change, zero N+1, no cross-tenant fetch.
-      const tenantClause = tenantId === ADMIN_TENANT_ID
+      const tenantClause = isPlatformAdmin(req)
         ? sql`TRUE`
         : eq(memoryEntries.tenantId, tenantId);
       const linkedEntries = await db.select(memoryEntrySafeCols).from(memoryEntries).where(

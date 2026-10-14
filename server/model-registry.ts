@@ -53,6 +53,7 @@ export const RETIRED_MODEL_IDS = new Set([
 ]);
 
 export const MODEL_REGISTRY: ModelInfo[] = [
+  { id: "cheaperinference/gpt-5.6-luna", label: "CheaperInference Luna (paid)", provider: "cheaperinference", tier: "reasoning", description: "Owner-only wallet fallback after free/subscription lanes, sharing a $20 UTC-day cap. Standard Chat Completions, not Pro; automatic selection requires the owner's exact opt-in policy.", capabilities: ["code", "tools"], costClass: "paid", trainingRegime: "unknown" },
   { id: "auto", label: "Auto Select", provider: "replit", tier: "balanced", description: "Intelligently routes to the best model for each task", costClass: "free", trainingRegime: "unknown" },
   // Openference Auto Agent lane — catalog verified live 2026-08-22. Local ids
   // remain normalized; providers.ts maps them to the exact upstream spelling.
@@ -272,6 +273,7 @@ export const MODEL_MAX_OUTPUT: Record<string, number> = {
   "claude-opus-5-5": 128000,
   "claude-haiku-4-5": 32768,
   "claude-haiku-5-5": 128000,
+  "cheaperinference/gpt-5.6-luna": 8192,
   "openference/deepseek-v4-pro": 384000,
   "openference/deepseek-v4-pro-0813": 384000,
   "openference/deepseek-v4-flash-vision-exp": 384000,
@@ -336,6 +338,7 @@ export const MODEL_MAX_OUTPUT: Record<string, number> = {
 
 export function isOwnerOnlyFinalDecisionModel(modelId: string): boolean {
   return (
+    modelId.startsWith("cheaperinference/") ||
     modelId === "gpt-6-astra" ||
     modelId === "claude-fable-5-1" ||
     modelId === "tencent/hy4-preview"
@@ -351,6 +354,7 @@ export function isSyntheticEvaluationModel(modelId: string): boolean {
 }
 
 export function getMaxOutputTokens(modelId: string): number {
+  if (modelId.startsWith("cheaperinference/")) return 8192;
   return MODEL_MAX_OUTPUT[modelId] || 16384;
 }
 
@@ -358,6 +362,7 @@ export function getMaxOutputTokens(modelId: string): number {
 // the metered-cost policy. Never send the selected model's output ceiling to
 // the actual model (e.g. DeepSeek 384k -> GPT 32k).
 export function getRoutedMaxOutputTokens(requestedModelId: string, actualModelId: string): number {
+  if (requestedModelId.startsWith("cheaperinference/")) return 8192;
   if (!actualModelId || actualModelId === requestedModelId) return getMaxOutputTokens(requestedModelId);
   if (MODEL_MAX_OUTPUT[actualModelId]) return MODEL_MAX_OUTPUT[actualModelId];
   // Some providers report the same model under an unprefixed display name.

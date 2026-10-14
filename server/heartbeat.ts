@@ -418,7 +418,7 @@ async function tick() {
     const runnableTasks = allDueTasks.filter((t: HeartbeatTask) => {
       if ((t.type === "reflection" || t.type === "memory_consolidation") && !hasRecentActivity()) {
         const nextRun = getNextCronRun(t.cronExpression);
-        storage.markHeartbeatTaskRun(t.id, nextRun).catch((e: unknown) => console.warn(`[heartbeat] defer markHeartbeatTaskRun task=${t.id} failed: ${errorMessage(e)}`));
+        storage.markHeartbeatTaskRun(t.id, nextRun, Number(t.tenantId)).catch((e: unknown) => console.warn(`[heartbeat] defer markHeartbeatTaskRun task=${t.id} failed: ${errorMessage(e)}`));
         return false;
       }
       // Hard cross-process floor on reflection cadence (Bob 2026-06-06): never run
@@ -429,13 +429,13 @@ async function tick() {
         const sinceLast = Date.now() - new Date(t.lastRunAt).getTime();
         if (sinceLast < MIN_REFLECTION_INTERVAL_MS) {
           const nextRun = getNextCronRun(t.cronExpression);
-          storage.markHeartbeatTaskRun(t.id, nextRun).catch((e: unknown) => console.warn(`[heartbeat] defer markHeartbeatTaskRun task=${t.id} failed: ${errorMessage(e)}`));
+          storage.markHeartbeatTaskRun(t.id, nextRun, Number(t.tenantId)).catch((e: unknown) => console.warn(`[heartbeat] defer markHeartbeatTaskRun task=${t.id} failed: ${errorMessage(e)}`));
           return false;
         }
       }
       if (t.type === "dream_consolidation" && (Date.now() - lastSystemActivity) < IDLE_THRESHOLD_MS) {
         const deferral = new Date(Date.now() + 15 * 60 * 1000);
-        storage.markHeartbeatTaskRun(t.id, deferral).catch((e: unknown) => console.warn(`[heartbeat] defer markHeartbeatTaskRun task=${t.id} failed: ${errorMessage(e)}`));
+        storage.markHeartbeatTaskRun(t.id, deferral, Number(t.tenantId)).catch((e: unknown) => console.warn(`[heartbeat] defer markHeartbeatTaskRun task=${t.id} failed: ${errorMessage(e)}`));
         return false;
       }
       // Maintenance-script crons run ONLY on the always-on production deploy.
@@ -489,7 +489,7 @@ async function tick() {
         const sinceLast = Date.now() - new Date(t.lastRunAt).getTime();
         if (sinceLast < MIN_SELF_INITIATIVE_INTERVAL_MS) {
           const nextRun = getNextCronRun(t.cronExpression);
-          storage.markHeartbeatTaskRun(t.id, nextRun).catch((e: unknown) => console.warn(`[heartbeat] defer markHeartbeatTaskRun task=${t.id} failed: ${errorMessage(e)}`));
+          storage.markHeartbeatTaskRun(t.id, nextRun, Number(t.tenantId)).catch((e: unknown) => console.warn(`[heartbeat] defer markHeartbeatTaskRun task=${t.id} failed: ${errorMessage(e)}`));
           return false;
         }
       }
@@ -667,10 +667,10 @@ async function resolveTaskModel(task: HeartbeatTask, persona: Persona | null): P
 async function scheduleNextRunOrDisable(task: HeartbeatTask) {
   if (task.runOnce) {
     await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-    await storage.markHeartbeatTaskRun(task.id, new Date());
+    await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
   } else {
     const nextRun = getNextCronRun(task.cronExpression);
-    await storage.markHeartbeatTaskRun(task.id, nextRun);
+    await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
   }
 }
 
@@ -681,7 +681,7 @@ async function scheduleIdeaBrowserFailureRetryOrDisable(task: HeartbeatTask) {
   }
   const nextCron = getNextCronRun(task.cronExpression);
   const boundedRetry = new Date(Date.now() + 60 * 60 * 1000);
-  await storage.markHeartbeatTaskRun(task.id, boundedRetry < nextCron ? boundedRetry : nextCron);
+  await storage.markHeartbeatTaskRun(task.id, boundedRetry < nextCron ? boundedRetry : nextCron, Number(task.tenantId));
 }
 
 function taskTenantId(task: HeartbeatTask): number {
@@ -715,7 +715,7 @@ async function runMaintenanceScript(task: HeartbeatTask, persona: Persona | null
   const finish = async (status: "success" | "error", output: string) => {
     const durationMs = Date.now() - started;
     const nextRun = getNextCronRun(task.cronExpression);
-    await storage.markHeartbeatTaskRun(task.id, nextRun);
+    await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
     await storage.createHeartbeatLog({
       taskId: task.id, taskName: task.name, status,
       input: `maintenance:${key}`, output: retainDiagnosticOutput(output || ""),
@@ -844,7 +844,7 @@ async function executeTask(task: HeartbeatTask) {
   if (task.type === "reflection" || task.type === "memory_consolidation") {
     if (!hasRecentActivity()) {
       const nextRun = getNextCronRun(task.cronExpression);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       return;
     }
     if (task.type === "reflection") {
@@ -854,7 +854,7 @@ async function executeTask(task: HeartbeatTask) {
 
   if (task.type !== "cloud_backup" && task.type !== "memory_backup") {
     if (!trackAICall()) {
-      await storage.markHeartbeatTaskRun(task.id, new Date());
+      await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       return;
     }
   }
@@ -890,6 +890,7 @@ async function executeTask(task: HeartbeatTask) {
     const wd = await import("./process-watchdog");
     wd.register({
       runId: watchdogRunId,
+      tenantId: task.tenantId,
       kind: "heartbeat-task",
       label: task.name,
       hardCapMs: taskTimeout + 30_000,
@@ -975,7 +976,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const durationMs = Date.now() - syncStart;
       const cronExpr = (task as any).cronExpression || (task as any).cron_expression || "30 4 * * *";
       const nextRun = getNextCronRun(cronExpr);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       const summary = `Scanned ${result.totalModels} OpenRouter models, kept ${result.diff.scanned} after filter, ` +
         `${result.diff.added.length} new, ${result.diff.registryNotInCatalog.length} missing-from-catalog, ` +
         `${result.probeResults.length} gateway probes (${result.probeResults.filter(p => p.gatewayLive).length} live), ` +
@@ -992,7 +993,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const durationMs = Date.now() - syncStart;
       const cronExpr = (task as any).cronExpression || (task as any).cron_expression || "30 4 * * *";
       const nextRun = getNextCronRun(cronExpr);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: "error",
         input: `OpenRouter catalog sync`, output: message.slice(0, 2000),
@@ -1015,7 +1016,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const summary = res.enabled
         ? `expired=${res.expired} claimed=${res.claimed} drafted=${res.drafted} skippedBudget=${res.skippedBudget} errors=${res.errors}`
         : "kill switch COMMITMENT_DRAFTER=off — skipped";
-      await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression));
+      await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression), Number(task.tenantId));
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: res.errors > 0 ? "error" : "success",
         input: "Commitment drafter pass", output: summary.slice(0, 2000),
@@ -1059,10 +1060,10 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
         : `Generated ${result.insights} insights`;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
         const nextRun = getNextCronRun(task.cronExpression);
-        await storage.markHeartbeatTaskRun(task.id, nextRun);
+        await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       }
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: result.error ? "error" : "success",
@@ -1103,9 +1104,9 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
         : `skipped: ${res.skippedReason}`;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
-        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression));
+        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression), Number(task.tenantId));
       }
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name,
@@ -1147,9 +1148,9 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
         : `skipped: ${res.skippedReason}`;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
-        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression));
+        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression), Number(task.tenantId));
       }
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name,
@@ -1207,7 +1208,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
         outcome = `nudge emailed (last current=${status.currentWeight ?? "none"}, ${lastSeen})`;
       }
       const durationMs = Date.now() - wiStart;
-      await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression));
+      await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression), Number(task.tenantId));
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: "success",
         input: "BWB Monday weigh-in check", output: outcome.slice(0, 2000),
@@ -1279,11 +1280,11 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const summary = `ingested=${ing.newlyStored} newProjects=${ing.createdProjectIds.length} fetched=${ing.fetched}${ing.errors.length ? ` ingestErrors=${ing.errors.length}` : ""}${scoreSummary}${opportunitySummary}`;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
         const nextCron = getNextCronRun(task.cronExpression);
         const boundedRetry = new Date(Date.now() + 60 * 60 * 1000);
-        await storage.markHeartbeatTaskRun(task.id, runHadErrors && boundedRetry < nextCron ? boundedRetry : nextCron);
+        await storage.markHeartbeatTaskRun(task.id, runHadErrors && boundedRetry < nextCron ? boundedRetry : nextCron, Number(task.tenantId));
       }
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name,
@@ -1374,11 +1375,11 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const summary = `ingested=${ing.newlyStored} newProjects=${ing.createdProjectIds.length} fetched=${ing.fetched}${ing.errors.length ? ` ingestErrors=${ing.errors.length}` : ""}${scoreSummary}${opportunitySummary}${weeklySummary}`;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
         const nextCron = getNextCronRun(task.cronExpression);
         const boundedRetry = new Date(Date.now() + 60 * 60 * 1000);
-        await storage.markHeartbeatTaskRun(task.id, anyErrors && boundedRetry < nextCron ? boundedRetry : nextCron);
+        await storage.markHeartbeatTaskRun(task.id, anyErrors && boundedRetry < nextCron ? boundedRetry : nextCron, Number(task.tenantId));
       }
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name,
@@ -1427,9 +1428,9 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const durationMs = Date.now() - scanStart;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
-        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression));
+        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression), Number(task.tenantId));
       }
       const summary = (result.proposed
         ? `proposed mission #${result.missionId}: ${result.reason}`
@@ -1468,9 +1469,9 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const durationMs = Date.now() - riStart;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
-        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression));
+        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression), Number(task.tenantId));
       }
       const summary = `experiments=${result.scannedExperiments} newEvidence=${result.newEvidence} paused=${result.pausedEnrollments} skipped=${result.skipped}` +
         (result.errors.length ? ` errors=${result.errors.length}: ${result.errors.slice(0, 3).join("; ")}` : "");
@@ -1532,7 +1533,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       });
     }
     const nextRun = getNextCronRun(task.cronExpression);
-    await storage.markHeartbeatTaskRun(task.id, nextRun);
+    await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
     activeTaskTracker.delete(task.id);
     return;
   }
@@ -1577,7 +1578,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       console.error(`[heartbeat] Quarterly intelligence failed: ${errorMessage(err)}`);
     }
     const nextRun = getNextCronRun(task.cronExpression);
-    await storage.markHeartbeatTaskRun(task.id, nextRun);
+    await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
     activeTaskTracker.delete(task.id);
     return;
   }
@@ -1595,7 +1596,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       if (lastDreamTime && (dreamStart - new Date(lastDreamTime).getTime()) < 3_600_000) {
         console.log(`[heartbeat] Dream consolidation skipped — last successful run was ${Math.round((dreamStart - new Date(lastDreamTime).getTime()) / 60000)}m ago (min 60m between runs)`);
         const nextRun = getNextCronRun(task.cronExpression);
-        await storage.markHeartbeatTaskRun(task.id, nextRun);
+        await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
         activeTaskTracker.delete(task.id);
         return;
       }
@@ -1606,10 +1607,10 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
 
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
         const nextRun = getNextCronRun(task.cronExpression);
-        await storage.markHeartbeatTaskRun(task.id, nextRun);
+        await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       }
 
       await storage.createHeartbeatLog({
@@ -1643,7 +1644,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const archivedStale = await storage.archiveStaleMemories(90);
       const prunedLogs = await storage.pruneHeartbeatLogs(10000);
       const nextRun = getNextCronRun(task.cronExpression);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       const durationMs = Date.now() - mhStart;
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: "success",
@@ -1689,7 +1690,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
         else knSkipped++;
       }
       const nextRun = getNextCronRun(task.cronExpression);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       const durationMs = Date.now() - ebStart;
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: "success",
@@ -1761,7 +1762,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       }
 
       const nextRun = getNextCronRun(task.cronExpression);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       const durationMs = Date.now() - chStart;
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name,
@@ -1812,7 +1813,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       }
 
       const nextRun = getNextCronRun(task.cronExpression);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       const durationMs = Date.now() - haStart;
       const totals = (report as any).totals || {};
       await storage.createHeartbeatLog({
@@ -1859,10 +1860,10 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
 
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
         const nextRun = getNextCronRun(task.cronExpression);
-        await storage.markHeartbeatTaskRun(task.id, nextRun);
+        await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       }
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: "success",
@@ -1894,9 +1895,9 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const durationMs = Date.now() - start;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
-        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression));
+        await storage.markHeartbeatTaskRun(task.id, getNextCronRun(task.cronExpression), Number(task.tenantId));
       }
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name,
@@ -1930,7 +1931,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
     const now = Date.now();
     if (now - lastBackupTimestamps.cloud < 3600000) {
       const nextRun = getNextCronRun(task.cronExpression);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       console.log(`[heartbeat] Skipping "${task.name}" — in-memory cooldown (last ran ${Math.round((now - lastBackupTimestamps.cloud) / 60000)}min ago, min: 60min)`);
       return;
     }
@@ -2034,10 +2035,10 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const durationMs = Date.now() - start;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
         const nextRun = getNextCronRun(task.cronExpression);
-        await storage.markHeartbeatTaskRun(task.id, nextRun);
+        await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       }
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: "success",
@@ -2074,7 +2075,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
         const skipMsg = `Skipped: no GITHUB_TOKEN / GITHUB_PERSONAL_ACCESS_TOKEN_2 secret configured (fork scanner needs read:public_repo).`;
         console.log(`[heartbeat] ${task.name}: ${skipMsg}`);
         const nextRun = getNextCronRun(task.cronExpression);
-        await storage.markHeartbeatTaskRun(task.id, nextRun);
+        await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
         await storage.createHeartbeatLog({
           taskId: task.id, taskName: task.name, status: "success",
           input: null, output: skipMsg, model: task.model,
@@ -2093,7 +2094,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
         const authMsg = `Skipped: GitHub auth failed (${forksRes.status}). Token is missing scopes or expired — please refresh GITHUB_TOKEN secret.`;
         console.warn(`[heartbeat] ${task.name}: ${authMsg}`);
         const nextRun = getNextCronRun(task.cronExpression);
-        await storage.markHeartbeatTaskRun(task.id, nextRun);
+        await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
         await storage.createHeartbeatLog({
           taskId: task.id, taskName: task.name, status: "success",
           input: null, output: authMsg, model: task.model,
@@ -2183,7 +2184,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
 
       const durationMs = Date.now() - start;
       const nextRun = getNextCronRun(task.cronExpression);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: "success",
         input: `Scanned ${forks.length} forks of ${publicRepo}`,
@@ -2215,7 +2216,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
     const now = Date.now();
     if (now - lastBackupTimestamps.memory < 6 * 3600000) {
       const nextRun = getNextCronRun(task.cronExpression);
-      await storage.markHeartbeatTaskRun(task.id, nextRun);
+      await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       console.log(`[heartbeat] Skipping "${task.name}" — in-memory cooldown (last ran ${Math.round((now - lastBackupTimestamps.memory) / 60000)}min ago, min: 360min)`);
       return;
     }
@@ -2226,10 +2227,10 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
       const durationMs = Date.now() - start;
       if (task.runOnce) {
         await storage.updateHeartbeatTask(task.id, { enabled: false }, taskTenantId(task));
-        await storage.markHeartbeatTaskRun(task.id, new Date());
+        await storage.markHeartbeatTaskRun(task.id, new Date(), Number(task.tenantId));
       } else {
         const nextRun = getNextCronRun(task.cronExpression);
-        await storage.markHeartbeatTaskRun(task.id, nextRun);
+        await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
       }
       await storage.createHeartbeatLog({
         taskId: task.id, taskName: task.name, status: "success",
@@ -2257,7 +2258,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
   if (Date.now() < creditExhaustedUntil) {
     console.log(`[heartbeat] Skipping "${task.name}" — credit exhaustion backoff (${Math.ceil((creditExhaustedUntil - Date.now()) / 1000)}s remaining)`);
     const nextRun = getNextCronRun(task.cronExpression);
-    await storage.markHeartbeatTaskRun(task.id, nextRun);
+    await storage.markHeartbeatTaskRun(task.id, nextRun, Number(task.tenantId));
     return;
   }
 
@@ -2640,7 +2641,7 @@ async function processDelegations(task: HeartbeatTask, output: string, persona: 
         targetName = persona?.name || "system";
       }
 
-      const existingTasks = await storage.getHeartbeatTasks(undefined, ALL_TENANTS);
+      const existingTasks = await storage.getHeartbeatTasks(undefined, tenantId);
       const activeDelegations = existingTasks.filter(t => t.enabled && t.type === 'delegation');
       if (activeDelegations.length >= MAX_ACTIVE_DELEGATION_TASKS) {
         console.warn(`[heartbeat] Delegation cap reached (${activeDelegations.length}/${MAX_ACTIVE_DELEGATION_TASKS}) — blocking new task "${del.taskName}"`);
@@ -2685,7 +2686,7 @@ async function processDelegations(task: HeartbeatTask, output: string, persona: 
       });
 
       try {
-        await db.execute(sql`UPDATE heartbeat_tasks SET approval_status = 'pending' WHERE id = ${newTask.id}`);
+        await db.execute(sql`UPDATE heartbeat_tasks SET approval_status = 'pending' WHERE id = ${newTask.id} AND tenant_id = ${tenantId}`);
       } catch (apprErr) {
         // Loud — silent failure leaves the new task at default approval_status,
         // which can let it run unapproved (or block forever, depending on
@@ -3158,7 +3159,7 @@ ${delegationGuidance}${scratchpadContext}${scaffoldInjection}`;
     });
 
     try {
-      await db.execute(sql`UPDATE heartbeat_tasks SET approval_status = 'pending' WHERE id = ${newTask.id}`);
+      await db.execute(sql`UPDATE heartbeat_tasks SET approval_status = 'pending' WHERE id = ${newTask.id} AND tenant_id = ${tenantId}`);
     } catch (_silentErr) { logSilentCatch("server/heartbeat.ts", _silentErr); }
 
     try {

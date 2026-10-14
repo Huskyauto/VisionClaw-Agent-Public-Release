@@ -643,7 +643,7 @@ export async function runFelixLoop(opts: { tenantId?: number; force?: boolean } 
         // don't block proposal creation.
         if (newProposalId) {
           import("./surprise-scorer")
-            .then(m => m.stampArgsEmbedding(newProposalId, { kind, target, target_args: p.target_args || {}, summary }))
+            .then(m => m.stampArgsEmbedding(newProposalId, { kind, target, target_args: p.target_args || {}, summary }, tenantId))
             .catch(_e => logSilentCatch("server/felix-loop.ts:stampArgsEmbedding", _e));
         }
         drafted++;
@@ -681,13 +681,13 @@ export async function runFelixLoop(opts: { tenantId?: number; force?: boolean } 
           proposals_drafted = ${drafted},
           tokens_used = ${(usage.prompt_tokens || 0) + (usage.completion_tokens || 0)},
           cost_cents = ${costCents}
-      WHERE id = ${runId}
+      WHERE id = ${runId} AND tenant_id = ${tenantId}
     `);
 
     return { runId, proposalsDrafted: drafted, mode, contextSummary: ctx.summary };
   } catch (e: any) {
     await db
-      .execute(sql`UPDATE felix_loop_runs SET ended_at = NOW(), error = ${e.message?.slice(0, 1000) || "unknown"} WHERE id = ${runId}`)
+      .execute(sql`UPDATE felix_loop_runs SET ended_at = NOW(), error = ${e.message?.slice(0, 1000) || "unknown"} WHERE id = ${runId} AND tenant_id = ${tenantId}`)
       .catch((updateErr: any) => {
         // The recovery write itself failed. Don't mask the original error
         // (returned below) — but log so the recovery failure is visible.

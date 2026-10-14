@@ -2,8 +2,11 @@ import { sql } from "drizzle-orm";
 import { verifierWorkerEnabled } from "./bounded-verifier-worker";
 
 export type VerifierQueueScope = "all" | "only-verifier" | "exclude-verifier";
-export function webVerifierQueueScope(value: unknown): VerifierQueueScope {
-  return verifierWorkerEnabled(value) ? "exclude-verifier" : "all";
+export function webVerifierQueueScope(
+  value: unknown, workspace: unknown = process.env.PROPOSAL_VERIFIER_WORKSPACE_ENABLED,
+  production = process.env.NODE_ENV === "production",
+): VerifierQueueScope {
+  return verifierWorkerEnabled(value) || (production && workspace === "1") ? "exclude-verifier" : "all";
 }
 
 /** Internal queue role, not a tenant or caller-selected execution permission. */

@@ -164,6 +164,7 @@ export async function generateBinaryQuestions(
       `each under a short dimension label.\n\n` +
       `Task:\n${task}\n\n${rubric}${ref}\n\n` +
       `Return ONLY a JSON array: [{"dimension":"<short label>","question":"<yes/no question>","weight":<optional number>}]`;
+    // Stateless completion: no tenant-owned provider resource is read or written.
     const comp = await replitOpenai.chat.completions.create({
       model: opts.model,
       messages: [{ role: "user", content: prompt }],
@@ -211,6 +212,7 @@ export async function answerBinaryQuestions(
       `answer satisfies the question. Give one short evidence phrase per verdict.\n\n` +
       `Task:\n${task}\n\nCandidate answer:\n${output}\n\nQuestions:\n${qBlock}\n\n` +
       `Return ONLY a JSON array: [{"id":"<id>","verdict":true|false,"evidence":"<short>"}]`;
+    // Stateless completion: no tenant-owned provider resource is read or written.
     const comp = await replitOpenai.chat.completions.create({
       model: opts.model,
       messages: [{ role: "user", content: prompt }],

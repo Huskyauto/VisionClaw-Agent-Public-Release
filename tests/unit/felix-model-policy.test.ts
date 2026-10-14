@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { selectFelixModel, getFelixExpertLanes } from "../../server/felix-model-policy";
 import { resolveFelixExpertLane, FelixExpertUnavailableError } from "../../server/felix-expert-route";
-test("owner Felix agent-to-agent turns pin only Replit GPT-5.4 with no external fallback", () => {
+test("owner Felix agent turns prefer Luna subscription with the existing Replit fallback", () => {
   const context = { tenantId: 1, ownerTenantId: 1, personaId: 2, enabled: true };
   assert.deepEqual(getFelixExpertLanes({ ...context, source: "api-v1" }), [
+    { modelId: "gpt-5.6-luna", actualModelId: "gpt-5.6-luna", providerLane: "profundo" },
     { modelId: "gpt-5.4", actualModelId: "gpt-5.4", providerLane: "replit" },
   ]);
-  assert.equal(getFelixExpertLanes({ ...context, source: "a2a" })?.length, 1);
+  assert.equal(getFelixExpertLanes({ ...context, source: "a2a" })?.length, 2);
   assert.equal(getFelixExpertLanes({ ...context, source: "web" }), null);
   assert.equal(getFelixExpertLanes({ ...context, source: "api-v1", tenantId: 3 }), null);
   assert.equal(getFelixExpertLanes({ ...context, source: "api-v1", personaId: 3 }), null);
@@ -46,21 +47,21 @@ test("expert route crosses providers without accepting a lower-model substitutio
   );
 });
 
-test("Felix's Replit pin accepts only GPT-5.4 and exhausts without another provider", async () => {
+test("Felix's subscription-first route detects substitution and exhausts without a new paid provider", async () => {
   const lanes = getFelixExpertLanes({ tenantId: 1, ownerTenantId: 1, personaId: 2, source: "api-v1", enabled: true })!;
   const resolved = await resolveFelixExpertLane(lanes, 0, async () =>
     ({ client: {} as never, actualModelId: "gpt-5.4" }));
   assert.equal(resolved.registryModelId, "gpt-5.4");
-  assert.equal(resolved.index, 0);
+  assert.equal(resolved.index, 1);
   const seen: string[] = [];
   await assert.rejects(resolveFelixExpertLane(lanes, 0, async (lane) => {
     seen.push(lane.providerLane);
     throw new Error("Replit unavailable");
   }), FelixExpertUnavailableError);
-  assert.deepEqual(seen, ["replit"]);
+  assert.deepEqual(seen, ["profundo", "replit"]);
   await assert.rejects(resolveFelixExpertLane(lanes, 0, async () =>
     ({ client: {} as never, actualModelId: "gpt-5.6-sol" })), FelixExpertUnavailableError);
-  await assert.rejects(resolveFelixExpertLane(lanes, 1, async () => {
+  await assert.rejects(resolveFelixExpertLane(lanes, 2, async () => {
     assert.fail("must not retry inference or choose another provider");
   }), FelixExpertUnavailableError);
 });
@@ -68,15 +69,15 @@ test("Felix's Replit pin accepts only GPT-5.4 and exhausts without another provi
 const owner = { tenantId: 1, ownerTenantId: 1, personaId: 2 };
 
 test("owner Felix's default Flash or gpt-5.4 route is lifted without changing others", () => {
-  assert.equal(selectFelixModel("deepseek/deepseek-v4.1-flash", owner), "gpt-5.6-sol");
-  assert.equal(selectFelixModel("gpt-5.4", owner), "gpt-5.6-sol");
+  assert.equal(selectFelixModel("deepseek/deepseek-v4.1-flash", owner), "gpt-5.6-luna");
+  assert.equal(selectFelixModel("gpt-5.4", owner), "gpt-5.6-luna");
   assert.equal(selectFelixModel("deepseek/deepseek-v4.1-flash", { ...owner, tenantId: 3 }), "deepseek/deepseek-v4.1-flash");
   assert.equal(selectFelixModel("deepseek/deepseek-v4.1-flash", { ...owner, personaId: 4 }), "deepseek/deepseek-v4.1-flash");
 });
 
 test("legacy Felix Flash thread gets a quality floor while an explicit stronger choice remains intact", () => {
-  assert.equal(selectFelixModel("deepseek/deepseek-v4.1-flash", owner), "gpt-5.6-sol");
-  assert.equal(selectFelixModel("gpt-5.4", owner), "gpt-5.6-sol");
+  assert.equal(selectFelixModel("deepseek/deepseek-v4.1-flash", owner), "gpt-5.6-luna");
+  assert.equal(selectFelixModel("gpt-5.4", owner), "gpt-5.6-luna");
   assert.equal(selectFelixModel("claude-sonnet-5", owner), "claude-sonnet-5");
   assert.equal(selectFelixModel("gpt-5.6-luna", owner), "gpt-5.6-luna");
   assert.equal(selectFelixModel("deepseek/deepseek-v4.1-flash", { ...owner, enabled: false }), "deepseek/deepseek-v4.1-flash");

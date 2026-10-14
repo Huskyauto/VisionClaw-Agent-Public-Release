@@ -89,7 +89,7 @@ export async function distillIntent(
     const analysis = await analyzeConversation(conversationId, tenantId);
 
     const recentMsgs = await db.select().from(messages)
-      .where(eq(messages.conversationId, conversationId))
+      .where(and(eq(messages.conversationId, conversationId), eq(messages.tenantId, tenantId)))
       .orderBy(desc(messages.createdAt))
       .limit(12);
 
@@ -199,7 +199,7 @@ async function analyzeConversation(conversationId: number, tenantId: number): Pr
   if (!conv.length) throw new Error(`Conversation ${conversationId} not found`);
 
   const msgs = await db.select().from(messages)
-    .where(eq(messages.conversationId, conversationId))
+    .where(and(eq(messages.conversationId, conversationId), eq(messages.tenantId, tenantId)))
     .orderBy(messages.createdAt);
 
   const orderedTools: ToolCall[] = [];
@@ -327,7 +327,7 @@ ${suggestedName ? `Suggested skill name: "${suggestedName}"` : ""}
 Recent conversation excerpt (last messages):`;
 
     const recentMsgs = await db.select().from(messages)
-      .where(eq(messages.conversationId, conversationId))
+      .where(and(eq(messages.conversationId, conversationId), eq(messages.tenantId, tenantId)))
       .orderBy(desc(messages.createdAt))
       .limit(20);
 

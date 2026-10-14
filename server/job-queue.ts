@@ -427,14 +427,20 @@ export async function failJob(
   id: number,
   attempts: number,
   errorMsg: string,
+  tenantId: number | null,
   opts: { rollbackNote?: string; failureClass?: FailureClass; stopRetry?: boolean } = {},
 ): Promise<void> {
+  if (tenantId !== null && (!Number.isSafeInteger(tenantId) || tenantId <= 0)) {
+    throw new Error("failJob requires the claimed job's tenant scope");
+  }
   // Look up max_attempts to decide retry vs terminal. The `attempts` we
   // check/write against is the caller-supplied one (from claim time), not
   // a re-read, to keep the fencing invariant tight.
   const [row]: any = await db.execute(sql`
     SELECT max_attempts FROM agent_jobs WHERE id = ${id}
+      AND tenant_id IS NOT DISTINCT FROM ${tenantId}
   `).then((r: any) => r.rows || r);
+  if (!row) return;
   const maxAttempts = (row as any)?.max_attempts ?? 3;
 
   const failureClass = opts.failureClass ?? classifyFailure(errorMsg);
@@ -458,6 +464,7 @@ export async function failJob(
           completed_at = NOW(),
           lease_until = NULL
       WHERE id = ${id}
+        AND tenant_id IS NOT DISTINCT FROM ${tenantId}
         AND status = 'running'
         AND attempts = ${attempts}
         AND lease_until IS NOT NULL
@@ -480,6 +487,7 @@ export async function failJob(
         next_run_at = ${nextRunAt},
         lease_until = NULL
     WHERE id = ${id}
+      AND tenant_id IS NOT DISTINCT FROM ${tenantId}
       AND status = 'running'
       AND attempts = ${attempts}
       AND lease_until IS NOT NULL

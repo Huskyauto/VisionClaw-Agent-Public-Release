@@ -10,6 +10,13 @@ type WhatsAppHelpers = {
 export function registerWhatsAppRoutes(app: Express, helpers: WhatsAppHelpers) {
   const { getTenantFromRequest, ADMIN_TENANT_ID, requirePlatformAdmin } = helpers;
 
+  // The legacy undefined slot is exclusively the platform owner's connection,
+  // not an ALL_TENANTS selector. Keep its stored session, but require role proof.
+  app.use("/api/whatsapp/my", (req, res, next) => {
+    if (getTenantFromRequest(req) === ADMIN_TENANT_ID && !requirePlatformAdmin(req, res)) return;
+    next();
+  });
+
   app.get("/api/whatsapp/status", async (req, res) => {
     try {
       if (!requirePlatformAdmin(req, res)) return;

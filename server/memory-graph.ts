@@ -668,7 +668,8 @@ export async function getMemoryGraph(tenantId: number = 1): Promise<{
     const linkCountResult = await db.execute(
       sql`SELECT count(*)::int as count FROM memory_links ml
           JOIN memory_entries me ON ml.source_memory_id = me.id
-          WHERE me.tenant_id = ${tenantId}`
+          JOIN memory_entries target ON ml.target_memory_id = target.id
+          WHERE me.tenant_id = ${tenantId} AND target.tenant_id = ${tenantId}`
     );
     const totalLinks = ((linkCountResult as any).rows || linkCountResult)[0]?.count || 0;
 
@@ -683,8 +684,8 @@ export async function getMemoryGraph(tenantId: number = 1): Promise<{
     }));
 
     return { categories, totalMemories, totalLinks, topCategories };
-  } catch {
-    return { categories: [], totalMemories: 0, totalLinks: 0, topCategories: [] };
+  } catch (error) {
+    throw new Error("Memory graph unavailable", { cause: error });
   }
 }
 

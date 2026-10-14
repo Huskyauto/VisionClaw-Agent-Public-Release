@@ -75,7 +75,7 @@ function TypewriterHero() {
     "scans platform security against OWASP standards",
     "renders premium product photos with gpt-image-2",
     "signs every customer download with HMAC URLs",
-    "ranks 425 registered tools by per-tenant performance",
+    `ranks ${releaseFacts.metrics.registeredTools} registered tools by per-tenant performance`,
     "writes in your brand voice with build_voice_profile + score_post (R79 MarTech)",
     "drafts hooks across 6 angles and post formats (PAS/AIDA/STAR/4Ps) for any platform",
     "audits its own reasoning chains for causal validity (KisMATH R77.5)",
@@ -283,7 +283,7 @@ const CAPABILITY_SECTIONS = [
       { icon: Eye, label: "Live Vision Streaming", detail: "Meta Ray-Ban glasses stream point-of-view video frames over a tenant-isolated gateway. Felix and the specialist agents see what you see — read signs, identify products, analyze environments in real time." },
       { icon: Mic, label: "Sub-Second Voice Replies", detail: "Gemini Live handles bidirectional audio with conversational latency. Ask a question while walking; get an answer before you finish the next step. Full conversation history persists into your tenant memory." },
       { icon: Key, label: "Per-Tenant Glasses Keys", detail: "Each pair of glasses authenticates with its own scoped key (`vc_glasses_*`). Gateway enforces tenant isolation, rate limits, and revocation — no cross-tenant data leakage even on shared hardware." },
-      { icon: Smartphone, label: "Hands-Free Workflow", detail: "Trigger governed voice-safe actions across the 425-tool platform: 'log this expense', 'add to project notes', 'remind me at 3pm'. The glasses become a thin client to your full AI corporation." },
+      { icon: Smartphone, label: "Hands-Free Workflow", detail: `Trigger governed voice-safe actions across the ${releaseFacts.metrics.registeredTools}-tool registry: 'log this expense', 'add to project notes', 'remind me at 3pm'. Available actions depend on your permissions and setup.` },
     ],
   },
   {
@@ -687,7 +687,7 @@ const CAPABILITY_SECTIONS = [
       { icon: Layers, label: "Virtual Port Channels", detail: "6 independent traffic lanes (chat, webhook, API, upload, SSE, static) with per-channel concurrency limits and queue depths. Heavy orchestrations never starve lightweight API calls." },
       { icon: Zap, label: "Port Recovery Engine", detail: "5-retry startup with exponential backoff, stale process detection, aggressive port clearing, and graceful 7-step shutdown sequence. Server self-heals after crashes." },
       { icon: Key, label: "OAuth Token Lifecycle", detail: "4-source cascade (Connector → OAuth → Database → Env), 3 overlapping refresh loops (5/10/30 min), in-flight dedupe, demo mode with shortened intervals, and email alerts after 2+ failures." },
-      { icon: Database, label: "Centralized Tool Registry", detail: "Single source of truth for all 425 registered tools — categories, speed class, product output and network tracking. The public documentation index exposes 386 tools; trusted-only tools remain restricted." },
+      { icon: Database, label: "Centralized Tool Registry", detail: `Single source of truth for ${releaseFacts.metrics.registeredTools} registered tools — categories, speed class, product output and network tracking. The public documentation index exposes ${releaseFacts.metrics.publicDocumentedTools} tools; trusted-only tools remain restricted.` },
     ],
   },
 ];
@@ -953,7 +953,7 @@ function BusinessTransformationSection() {
       label: "People",
       title: "Every person does specialist-grade work",
       desc: `Generic AI makes everyone a little faster. ${pn} makes everyone able to do work that used to need a specialist — because it already knows your context, terminology, and standards, output ships instead of needing a rewrite.`,
-      native: "18 specialist agents · per-tenant profile injected into every conversation · brand-voice tools that learn how you write",
+      native: `${releaseFacts.metrics.activePersonas} specialist agents · per-tenant profile injected into every conversation · brand-voice tools that learn how you write`,
     },
     {
       icon: Workflow,
@@ -1064,7 +1064,7 @@ function BusinessPlatformSection() {
   const pn = config.platformName;
   const features = [
     { icon: Brain, title: "Specialist Agents", desc: "Strategy, research, writing, build, sales, analytics, finance, legal, and operations roles work as one coordinated system." },
-    { icon: Wrench, title: "Real Tool Use", desc: "Create PDFs, write files, browse sites, send emails, query memory, upload assets, and run workflows inside the same system — 425 governed tools total, managed by a centralized Tool Registry." },
+    { icon: Wrench, title: "Real Tool Use", desc: `Create PDFs, write files, browse sites, send emails, query memory, upload assets, and run workflows through ${releaseFacts.metrics.registeredTools} registered tools, subject to permissions and setup.` },
     { icon: FileCheck, title: "CMMC Level 1 readiness", desc: "Assess all 15 official requirements and 59 objectives with objective-level determinations, scope-based Not Applicable rationales, immutable evidence snapshots, and controlled report delivery." },
     { icon: Database, title: "Project Continuity", desc: "Every conversation, asset, note, and file lives inside a retrievable project record so work survives across sessions." },
     { icon: ShieldCheck, title: "Approval Controls", desc: "Low-risk work runs immediately. Higher-risk actions, like new outreach or irreversible changes, stop for human sign-off." },
@@ -1076,12 +1076,12 @@ function BusinessPlatformSection() {
     { icon: Palette, title: "Presentation Self-Correction", desc: "Vision-based QA scores every slide. If quality drops below threshold, the system autonomously rebuilds layouts, fixes text overflow, and re-delivers polished results." },
     { icon: Mic, title: "Parallel Video Production", desc: "Request a promotional video, explainer, or demo reel and get a finished MP4 — built with parallel chapter workers (up to 6x faster), narrated, with transitions, motion effects, and background music — delivered to your Google Drive only when you explicitly opt in." },
     { icon: Rocket, title: "Always-On Infrastructure", desc: "Six independent traffic lanes keep your AI team responsive even under heavy load. Automatic crash recovery, token refresh, and health monitoring mean zero downtime during critical work." },
-    { icon: Layers, title: "Tool Registry System", desc: "Every tool is cataloged in a centralized registry with categories, speed class, and product tracking. The current development census verifies 425 unique registered tools with no duplicate names; the filtered public index has 386." },
+    { icon: Layers, title: "Tool Registry System", desc: `Every tool is cataloged by category, speed class, and product tracking. The development census has ${releaseFacts.metrics.registeredTools} registered tools; the filtered public documentation index has ${releaseFacts.metrics.publicDocumentedTools}.` },
     { icon: ShieldCheck, title: "Pause for Approval, Resume Where It Stopped", desc: "Long-running plans can pause for your sign-off and pick up exactly where they left off — no replay, no lost context. Stale approvals expire automatically so nothing stalls forever." },
     { icon: DollarSign, title: "Revenue-vs-Cost Self-Regulation", desc: "Your AI watches its own profit margins. When spend rises faster than revenue, it automatically downgrades to cheaper models and lighter tools — protecting profitability without you lifting a finger." },
     { icon: Activity, title: "Per-Agent Spending Visibility", desc: "Every tool call, model call, and orchestration is recorded against the agent that ran it. See in real time who's expensive, who's efficient, and where the spend is going." },
     { icon: Users, title: "Panel-of-Experts Mode", desc: "For high-stakes questions, your AI doesn't ask one model — it asks four in parallel and has a senior model (Claude Opus) synthesize the best answer. You get ensemble-quality reasoning at a transparent, ledgered cost." },
-    { icon: Eye, title: "Wearable AI (Smart Glasses)", desc: "Pair Meta Ray-Ban smart glasses with your tenant. Your AI team sees what you see, hears what you hear, and replies using a governed voice-safe subset of the 425-tool platform." },
+    { icon: Eye, title: "Wearable AI (Smart Glasses)", desc: `Pair supported Meta Ray-Ban smart glasses with your tenant and use a governed voice-safe subset of the ${releaseFacts.metrics.registeredTools}-tool registry.` },
     { icon: Brain, title: "Knows You Personally", desc: "Each tenant has a personal profile that the AI reads into every conversation — preferences, context, terminology, current projects. No more re-explaining who you are or what you're working on." },
     { icon: Sparkles, title: "Self-Healing Conversations", desc: "Long sessions never die mid-thought. When context fills up, the system automatically trims oversized tool results and continues — and 3-phase dreaming consolidates important threads into permanent memory while you sleep." },
     { icon: FileCode, title: "Self-Improving Codebase", desc: "Nightly research can propose real code improvements — but every proposal is shadow-compiled in an isolated workspace and reviewed before it can touch the live system. You see the diff, the verifier verdict, and click Approve. One-click revert restores the original if anything misbehaves." },
@@ -1107,7 +1107,7 @@ function BusinessPlatformSection() {
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <Badge variant="outline" className="mb-2 border-teal-500/30 text-teal-700 dark:text-teal-300">R128+sec2</Badge>
+                  <Badge variant="outline" className="mb-2 border-teal-500/30 text-teal-700 dark:text-teal-300">Governed workspace</Badge>
                   <h3 className="text-xl font-semibold mb-2">Tenant-authority closure and explicit video delivery.</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     Your work stays with the right workspace from relationship records through research and operational updates.
@@ -1220,7 +1220,7 @@ function BusinessCompareSection() {
               <CardContent className="pt-6 pb-6 px-5 space-y-4">
                 <h3 className="text-lg font-semibold">{pn}</h3>
                 <ul className="space-y-3">
-                  {["Executes tasks through 425 connected tools and 18 agent roles", "Stores project memory, notes, and assets for continuity", "Uses checks and retries for incomplete work", "Uses approval gates where business risk is real", "Reports recovery failures rather than promising guaranteed completion", "Designed for repeatable operating leverage"].map(item => (
+                  {[`Executes tasks through ${releaseFacts.metrics.registeredTools} registered tools and ${releaseFacts.metrics.activePersonas} agent roles, subject to permissions`, "Stores project memory, notes, and assets for continuity", "Uses checks and retries for incomplete work", "Uses approval gates where business risk is real", "Reports recovery failures rather than promising guaranteed completion", "Designed for repeatable operating leverage"].map(item => (
                     <li key={item} className="flex items-start gap-2.5 text-sm text-muted-foreground">
                       <div className="w-2 h-2 rounded-full bg-emerald-400/80 shrink-0 mt-1.5" />
                       {item}
@@ -1280,7 +1280,7 @@ function BusinessTrustSection() {
                     "Paid orders are durable and replay-safe: database-backed retention preserves unresolved requests and repairs safe retries instead of losing a customer order (R126+sec).",
                     "Owner-reviewed files recover from durable tenant-scoped storage and deliver exactly once, so a missing local cache cannot strand an approved customer report (R126+sec).",
                     "Employment-decision and protected-affiliation language is conservatively screened before delivery, keeping the service out of hiring, firing, discipline, compensation, and worker-ranking decisions (R126+sec).",
-                    "PDF inspection is bounded and killable, with cleanup for failed or replaced attachments; exact-off manual review still governs audit fulfillment, while the store is open for listed products (R126+sec).",
+                    "PDF inspection is bounded and killable, with cleanup for failed or replaced attachments; explicit manual review still governs audit fulfillment, while the store is open for listed products (R126+sec).",
                     "Owner-paid final decisions stay owner-controlled and fully accounted (R125+155.9+sec). Claude Fable 5.1 never enters customer routing, automatic tiers, juries, or autonomous loops; every result stays hidden unless an authenticated platform admin explicitly selects it and its provider usage is durably recorded.",
                     "Capability evidence can recommend human review but never grant authority; Built With Bob oversight records no content; Astra budgets adapt before spend; and deep-research citations must resolve to server-owned sources (R125+155.9+sec).",
                     "Independent AI jury seats now exhaust flat and subscription providers first; paid recovery is owner-only, kill-switched, limited to two distinct providers, and reserved against a daily ceiling before use (R125+155.2+sec11). Failed providers stay visible for audit but never count as votes.",
@@ -1911,7 +1911,7 @@ function TenantAuthorityClosureSection() {
         <RevealOnScroll>
           <div className="text-center mb-12">
             <Badge variant="secondary" className="mb-4 gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5" /> R128+sec2
+              <ShieldCheck className="w-3.5 h-3.5" /> Approval-gated
             </Badge>
             <h2 className="text-3xl font-bold mb-3">Tenant-authority closure and explicit video delivery.</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -1964,6 +1964,7 @@ export default function LandingPage() {
   const uptimeHours = Math.floor((Date.now() - new Date("2025-10-01").getTime()) / 3600000);
 
   const techNavTabs = [
+    { id: "section-recent-updates", label: "Latest Updates" },
     { id: "section-demo", label: "Demo" },
     { id: "section-capabilities", label: "Features" },
     { id: "section-agents", label: "Agents" },
@@ -1971,6 +1972,7 @@ export default function LandingPage() {
     { id: "section-pricing", label: "Pricing" },
   ];
   const bizNavTabs = [
+    { id: "section-recent-updates", label: "Latest Updates" },
     { id: "section-biz-who", label: "Who It's For" },
     { id: "section-biz-pains", label: "Pain Points" },
     { id: "section-biz-transformation", label: "The Shift" },
@@ -1993,10 +1995,10 @@ export default function LandingPage() {
       />
       <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between gap-4 h-14">
-          <a href="/landing" className="flex items-center gap-2 hover:opacity-80 transition-opacity" data-testid="link-landing-logo">
+          <a href="/landing" className="flex shrink-0 items-center gap-2 hover:opacity-80 transition-opacity" data-testid="link-landing-logo">
             <img src={vcLogoPath} alt={pn} className="h-8 w-auto dark:brightness-[1.15] dark:contrast-[1.1]" data-testid="img-landing-logo" />
           </a>
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [&>button]:shrink-0">
             {navTabs.map((tab) => (
               <Button
                 key={tab.id}
@@ -2025,7 +2027,7 @@ export default function LandingPage() {
               Shop
             </Button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <ViewToggle mode={viewMode} setMode={handleModeChange} />
             <ThemeToggle />
             <Button
@@ -2245,8 +2247,7 @@ export default function LandingPage() {
               <Badge variant="secondary" className="mb-4">Platform Capabilities</Badge>
               <h2 className="text-3xl font-bold mb-3">Everything Your Business Needs</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Not just a chatbot — a self-evolving AI corporation with 420 tools across 23 categories (R125+4 added `research` for academic_search/arxiv/pubmed/openalex/crossref) (R98.16 cross-pollinated 8 features from the IJFW project: a new `run_command` shell tool with large-output auto-summarization, wave-table parallelism on plan_deliverable so deliverable pipelines actually run in parallel, an actionable `translateLlmError` helper that turns provider stack traces into one-line user fixes, a `sanitizeUntrusted` heading + system-tag defang against prompt-injection-via-captured-content, atomicWriteFileSync with parent-dir fsync at 6 critical persistence sites for true power-loss durability, plus a +sec-2 architect sweep that closed 6 findings — CRITICAL secret-redaction in the error translator, HIGH SSRF jail extended for CGNAT/multicast/IPv6/internal cluster TLDs, output-sandbox switched to atomic write, retrieve_hint absolute-path leak removed, and tmp-file cleanup on rename failure; R98.14 completed the 7-workstream Felix Deliverable Reliability Plan with durable resumable long-video jobs that survive chat-turn boundaries, a nightly golden-path regression net, a reference learner that studies real-world exemplars from a YouTube/web URL and absorbs their style, and quality-instinct cards baked into Felix's persona prompt as concrete checkable rules per format; R98.13 added a deterministic plan→pipeline router and a vision/audio quality grader with bounded auto-revise; R98.7 added the Felix self-thinking loop with failure-pattern memory + a sentrux-inspired structural quality sensor + a voluntary self-check loop; R96 added the Camofox stealth-browser microservice plus a four-tier web-access ladder with auto-escalation), multi-agent orchestration (Crews, Flows, Minds),
-                full business operations suite, document and video production, parallel MPEG engine, nightly autoresearch, 3-layer failure recovery, and production-grade infrastructure.
+                {DEVELOPMENT_PLATFORM_SUMMARY} Governed specialist workflows support research, business operations, documents, video and recovery. Availability depends on permissions and configuration; development counts are not a production certification.
               </p>
             </div>
           </RevealOnScroll>
@@ -2273,11 +2274,11 @@ export default function LandingPage() {
               const SectionIcon = section.icon;
               const isCurrentToolsSection = section.title.startsWith("413 Enterprise AI Tools");
               const displayedTitle = isCurrentToolsSection
-                ? "425 Registered AI Tools"
+                ? `${releaseFacts.metrics.registeredTools} Registered AI Tools`
                 : section.title;
               const displayedSubtitle = isCurrentToolsSection
                 ? `${DEVELOPMENT_PLATFORM_SUMMARY} Recent improvements cover privacy, memory efficiency and durable recovery; see the changelog for verification limits.`
-                : section.subtitle.replace(/(?:7[6-9]|80) curated AI models/, `${releaseFacts.metrics.coreRegistryModels} curated AI models`);
+                : section.subtitle.replace(/\b\d+ curated AI models/, `${releaseFacts.metrics.coreRegistryModels} curated AI models`);
               return (
                 <RevealOnScroll key={section.title} delay={sIdx * 80}>
                 <div data-testid={`capability-section-${sIdx}`}>
@@ -2422,6 +2423,7 @@ export default function LandingPage() {
               // The historical card body starts at the R125+137.94 snapshot;
                 // Keep its visible KPI on the authoritative current tool total.
                 const displayedValue = label === "Production tools" ? String(releaseFacts.metrics.registeredTools) : value;
+                const displayedLabel = label === "Production tools" ? "Registered tools" : label;
               const displayedSub = label === "Production tools"
                 ? `${DEVELOPMENT_PLATFORM_SUMMARY} ${SOURCE_UPDATE_SUMMARY}`
                 : sub;
@@ -2430,7 +2432,7 @@ export default function LandingPage() {
                   <CardContent className="pt-5 pb-5 px-4 space-y-2">
                     <Icon className="w-5 h-5 text-primary" />
                     <div className="text-2xl font-bold">{displayedValue}</div>
-                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-sm font-medium">{displayedLabel}</div>
                     <div className="text-xs text-muted-foreground leading-relaxed">{displayedSub}</div>
                   </CardContent>
                 </Card>

@@ -309,6 +309,7 @@ async function runToolStep(plan: PlanRow, step: any, priorResults: StepResult[])
       runId: watchdogRunId,
       kind: "plan-step",
       label: `plan #${plan.id} step ${step.n} tool ${toolName}`,
+      tenantId: authTenant,
       hardCapMs: toolWatchdogHardCapMs,
       meta: {
         planId: plan.id,
@@ -563,6 +564,7 @@ async function runStep(
       runId: watchdogRunId,
       kind: "plan-step",
       label: `plan #${plan.id} step ${step.n} (${step.agent})`,
+      tenantId: plan.tenant_id,
       hardCapMs: PLAN_STEP_MAX_TOTAL_MS + 10_000,
       meta: { planId: plan.id, stepN: step.n, agent: step.agent },
     });

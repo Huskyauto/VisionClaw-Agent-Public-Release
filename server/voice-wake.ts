@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import fs from "fs";
 import path from "path";
+import { requirePlatformAdmin } from "./auth";
 
 import { logSilentCatch } from "./lib/silent-catch";
 const VOICE_WAKE_PATH = path.join(process.cwd(), "data", "voicewake.json");
@@ -46,12 +47,14 @@ function normalizeTriggers(raw: string[]): string[] {
   return [...new Set(normalized)];
 }
 
-export function handleVoiceWakeGet(_req: Request, res: Response) {
+export function handleVoiceWakeGet(req: Request, res: Response) {
+  if (!requirePlatformAdmin(req, res)) return;
   const data = loadWakeData();
   res.json({ triggers: data.triggers });
 }
 
 export function handleVoiceWakeSet(req: Request, res: Response) {
+  if (!requirePlatformAdmin(req, res)) return;
   const { triggers } = req.body;
   if (!Array.isArray(triggers) || !triggers.every((t: any) => typeof t === "string")) {
     return res.status(400).json({ error: "triggers must be an array of strings" });

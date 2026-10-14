@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Building2, Code2, ArrowRight, Mail } from "lucide-react";
 import { SeoHead } from "@/components/seo-head";
+import releaseFacts from "../../../docs/release-facts.json";
 
 type Tier = {
   id: string;
@@ -29,8 +30,8 @@ const TIERS: Tier[] = [
     cta: { label: "Start Free — No Credit Card", href: "/signup" },
     features: [
       "5 conversations on the hosted instance",
-      "All 18 specialist agents",
-      "Access to all 420 registered tools",
+      `${releaseFacts.metrics.activePersonas} registered specialist roles (availability depends on access)`,
+      `Access to ${releaseFacts.metrics.registeredTools} registered tools (availability depends on role and configuration)`,
       "PDF, Excel, Slides, Word output",
       "3-layer failure recovery",
       "No payment info required",
@@ -65,7 +66,7 @@ const TIERS: Tier[] = [
       external: true,
     },
     features: [
-      "100% of the source — 420 registered tools, 18 personas, 68 total skills, 178 declared / 258 live tables, 825 platform indexes, 41 governance rules, AES-256-GCM encryption at rest for credentials, HMAC-SHA256 hashed auth secrets",
+      `Source snapshot — ${releaseFacts.metrics.registeredTools} registered tools, ${releaseFacts.metrics.activePersonas} personas, ${releaseFacts.metrics.totalSkills} platform skills, ${releaseFacts.metrics.declaredTables} declared / ${releaseFacts.metrics.liveTables} live development tables, ${releaseFacts.metrics.platformIndexes} development indexes, ${releaseFacts.metrics.governanceRules} governance rules, AES-256-GCM encryption at rest for credentials, HMAC-SHA256 hashed auth secrets`,
       "One-click deploy to Replit, Render, Railway, or Docker",
       "BYO API keys (OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity)",
       "Use your own ChatGPT Plus via OAuth — $0 inference",

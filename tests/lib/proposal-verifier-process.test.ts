@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
@@ -89,6 +90,29 @@ async function waitForChildSpawn(): Promise<void> {
 describe("verifyProposalIsolated", () => {
   const originalLaneFlag = process.env.HEAVY_WORK_LANE_ENABLED;
   const originalConsoleError = console.error;
+
+  it("the actual staged TypeScript process inherits its admitted 3 GiB heap", async () => {
+    const root = await mkdtemp(join(tmpdir(), "visionclaw-verifier-"));
+    try {
+      await mkdir(join(root, "scripts"));
+      await writeFile(join(root, "scripts/proposal-verifier-child.ts"), `
+        import { getHeapStatistics } from "node:v8";
+        console.log("PROPOSAL_VERIFY_RESULT:" + JSON.stringify({
+          status: "passed", durationMs: 0,
+          details: String(getHeapStatistics().heap_size_limit / 1024 ** 2)
+        }));
+      `);
+      const run = runtime(mockChild(), {
+        spawn,
+        readCgroupMemory: () => ({ maxBytes: 8 * 1024 ** 3, currentBytes: 1 * 1024 ** 3 }),
+      });
+      const result = await __verifyProposalIsolatedForTest(1, 2, run.value,
+        undefined, { workspaceRoot: root });
+      assert.ok(Number(result.details) >= 3072,
+        `actual compiler heap ${result.details} MiB did not honor the admitted limit`);
+      assert.equal(run.releaseCalls.length, 1);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
 
   before(() => {
     process.env.HEAVY_WORK_LANE_ENABLED = "0";

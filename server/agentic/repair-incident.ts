@@ -127,7 +127,7 @@ export const FIX_CONCORDANCE_FLOOR = 0.5;
  * must never commit.
  */
 const PROTECTED_SURFACE_RE =
-  /(^|[\/\\])(tests?|__tests__|e2e)[\/\\]|\.(test|spec)\.[cm]?[jt]sx?$|[\/\\]safety[\/\\]|[\/\\]security[\/\\]|intent[-_]?gate|destructive-tool-policy|ahb[-_]?regression|safety[-_]?profile|guarded-tool-executor/i;
+  /(^|[\/\\])(tests?|__tests__|e2e)[\/\\]|\.(test|spec)\.[cm]?[jt]sx?$|[\/\\]safety[\/\\]|[\/\\]security[\/\\]|intent[-_]?gate|destructive-tool-policy|ahb[-_]?regression|safety[-_]?profile|guarded-tool-executor|workspace[-_]verifier|workspace-proposal-verifier|proposal-verifier|verifier-job-scope|verifier-memory-source|bounded-verifier-worker|artifact-authority|research-proposals\.ts/i;
 
 /**
  * Error-text markers that mean a guard fired CORRECTLY (refusal / policy block /

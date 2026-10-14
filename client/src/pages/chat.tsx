@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth";
 import { uploadFile } from "@/lib/upload";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,8 @@ function extractChartsFromTools(tools: ToolCallInfo[]): ChartData[] {
   }
   return charts;
 }
+
+const DEFAULT_PUBLIC_WAKE_TRIGGERS = ["visionclaw", "hey claw", "computer"];
 
 const getAuthUrl = (url: string) => {
   if (!url.startsWith("/uploads/")) return url;
@@ -1418,6 +1421,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [museProgress, setMuseProgress] = useState<{ conversationId: number; status: string } | null>(null);
   const [streamThinking, setStreamThinking] = useState("");
   const [streamThinkingDone, setStreamThinkingDone] = useState(false);
   const [toolCalls, setToolCalls] = useState<ToolCallInfo[]>([]);
@@ -1517,8 +1521,11 @@ export default function ChatPage() {
     queryKey: ["/api/personas"],
   });
 
+  const { tenant: voiceWakeTenant } = useAuth();
+  const canManageVoiceWake = voiceWakeTenant?.id === 1 && voiceWakeTenant?.isAdmin === true;
   const { data: voiceWakeData } = useQuery<{ triggers: string[] }>({
     queryKey: ["/api/voice/wake"],
+    enabled: canManageVoiceWake,
   });
 
   const activePersona = personasList?.find((p) => p.isActive);
@@ -2590,6 +2597,9 @@ export default function ChatPage() {
             if (data.suggestedQuestions && Array.isArray(data.suggestedQuestions)) {
               setSuggestedQuestions(data.suggestedQuestions);
             }
+            if (data.museContext && ["pending", "unavailable", "unconfirmed"].includes(data.museContext.status)) {
+              setMuseProgress({ conversationId: Number(conversationId), status: data.museContext.status });
+            }
             if (data.titleUpdate) {
               queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
             }
@@ -2818,6 +2828,12 @@ export default function ChatPage() {
             </TooltipTrigger>
             <TooltipContent>Change model</TooltipContent>
           </Tooltip>
+          {museProgress?.conversationId === Number(conversationId) && (
+            <span role="status" className="text-xs text-muted-foreground" data-testid="muse-context-status">
+              {museProgress.status === "pending" ? "Muse queued — reply pending" :
+                museProgress.status === "unconfirmed" ? "Muse queue receipt unconfirmed" : "Muse context unavailable"}
+            </span>
+          )}
           {showModelSelect && (
             <Select
               value={conv?.model || "gpt-5.4"}
@@ -3333,7 +3349,7 @@ export default function ChatPage() {
             setTalkModeActive(false);
             queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
           }}
-          wakeTriggers={voiceWakeData?.triggers}
+          wakeTriggers={canManageVoiceWake ? voiceWakeData?.triggers : DEFAULT_PUBLIC_WAKE_TRIGGERS}
         />
       )}
 

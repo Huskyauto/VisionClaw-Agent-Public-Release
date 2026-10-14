@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -537,10 +538,13 @@ function SubscriptionConnections() {
 
 function VoiceWakeSettings() {
   const { toast } = useToast();
+  const { tenant } = useAuth();
+  const canManageVoiceWake = tenant?.id === 1 && tenant?.isAdmin === true;
   const [newTrigger, setNewTrigger] = useState("");
 
   const { data, isLoading } = useQuery<{ triggers: string[] }>({
     queryKey: ["/api/voice/wake"],
+    enabled: canManageVoiceWake,
   });
 
   const mutation = useMutation({
@@ -567,6 +571,8 @@ function VoiceWakeSettings() {
   const removeTrigger = (trigger: string) => {
     mutation.mutate(triggers.filter((t) => t !== trigger));
   };
+
+  if (!canManageVoiceWake) return null;
 
   return (
     <Card>

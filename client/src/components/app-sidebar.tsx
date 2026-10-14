@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { Globe } from "lucide-react";
 import { useQuery, useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, MessageSquare, Settings, Zap, Trash2, Bot, Brain, Users, Heart, BookOpen, Search, X, CreditCard, BarChart3, Download, Loader2, Home, LogOut, LogIn, Mail, Inbox, FolderOpen, Library, Phone, KeyRound, CalendarClock, ChevronDown, Wrench, Shield, FlaskConical, Lightbulb, Radio, Rocket, Send, Activity, Key, Network, ArrowLeftRight, PenTool, ShoppingBag, Store, Package, TrendingUp, FileCode, FileCheck, Github, ShieldCheck, DollarSign, Clapperboard, Layers, Sparkles, Skull, Archive, Gauge, FileText, Target, ClipboardCheck } from "lucide-react";
@@ -517,6 +518,7 @@ export function AppSidebar() {
               <a href="/treasury" onClick={(e) => { e.preventDefault(); navigateTo("/treasury"); }}>
                 <TrendingUp className="w-4 h-4" />
                 <span>Treasury</span>
+                {isPlatformAdmin && <span className="ml-auto rounded-sm bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary" data-testid="badge-treasury-paper">PAPER PILOT</span>}
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -578,7 +580,7 @@ export function AppSidebar() {
         <NavSection title="Tools" icon={Wrench} defaultOpen={["/skills", "/skills-marketplace", "/personality-files", "/content-writing", "/analytics", "/email", "/whatsapp", "/whatsapp-approval", "/telegram", "/mcp", "/webhook-triggers", "/channel-routing", "/admin/tools/typesafe-jev"].some(p => location === p)}>
             <NavLink path="/skills" icon={Zap} label="Skills" />
             <NavLink path="/skills-marketplace" icon={Download} label="Skill Store" />
-            <NavLink path="/content-writing" icon={PenTool} label="Content Writing" />
+            <NavLink path="/content-writing" icon={PenTool} label="Content Writing" badge="UPDATED" />
             <NavLink path="/personality-files" icon={Brain} label="Personality Files" />
             <NavLink path="/analytics" icon={BarChart3} label="Analytics" />
             {hasEmail && <NavLink path="/email" icon={Mail} label="Email" />}
@@ -600,6 +602,7 @@ export function AppSidebar() {
           </NavSection>
 
         <SidebarMenu>
+          <NavLink path="/landing" icon={Globe} label="Website & Latest Features" badge="UPDATED" />
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
@@ -641,7 +644,7 @@ export function AppSidebar() {
           <NavLink path="/capability-map" icon={Network} label="Capability Map" badge="NEW" />
           <NavLink path="/replay" icon={Activity} label="Workflow Replay" badge="NEW" />
           {isAdmin && <NavLink path="/team" icon={Users} label="Team" />}
-          {isAdmin && <NavLink path="/api-keys" icon={Key} label="API Keys" />}
+          {isAdmin && <NavLink path="/api-keys" icon={Key} label="API Keys & Agent Access" />}
           <NavLink path="/activity" icon={Activity} label="Activity Log" />
         </NavSection>
 
@@ -685,13 +688,13 @@ export function AppSidebar() {
             <NavLink path="/operator" icon={Inbox} label="Operator Inbox" badge="New" />
             <NavLink path="/heartbeat" icon={Heart} label="Heartbeat Engine" />
             <NavLink path="/code-health" icon={Activity} label="Code Health" />
-            <NavLink path="/code-proposals" icon={FileCode} label="Code Proposals" badge="New" />
+            <NavLink path="/code-proposals" icon={FileCode} label="Code Proposals & Verifier" badge="SOURCE" />
             <NavLink path="/agentic" icon={Radio} label="Agentic Ops" />
             <NavLink path="/architecture" icon={Network} label="Architecture" />
             <NavLink path="/graph-explorer" icon={Network} label="GraphRAG Explorer" badge="R75" />
             <NavLink path="/admin/proposed-skills" icon={FileCheck} label="Proposed Skills" badge="R98.21" />
             <NavLink path="/admin/ab-runs" icon={BarChart3} label="A/B Runs" badge="R98.21" />
-            <NavLink path="/admin/ecosystem-health" icon={Activity} label="Ecosystem Health" badge="R125+72" />
+            <NavLink path="/admin/ecosystem-health" icon={Activity} label="Ecosystem & Model Diagnostics" badge="UPDATED" />
             <NavLink path="/admin/goal-ledger" icon={Activity} label="Goal Ledger" badge="R125+5" />
             <NavLink path="/admin/sandbox" icon={FlaskConical} label="Simulation Sandbox" badge="NEW" />
             <NavLink path="/admin/zombie-detector" icon={Skull} label="Zombie Detector" badge="R125+8.7" />
@@ -703,7 +706,7 @@ export function AppSidebar() {
             <NavLink path="/activity?filter=security" icon={ShieldCheck} label="Security Audit" badge={CURRENT_SOURCE_RELEASE} badgeClass="ml-auto text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-sm bg-cyan-600 text-white leading-none" />
             <NavLink path="/compare" icon={ArrowLeftRight} label="Compare" />
             {hasPayments && <NavLink path="/payments" icon={CreditCard} label="Payments" />}
-            <NavLink path="/settings" icon={Settings} label="Settings" />
+            <NavLink path="/settings" icon={Settings} label="Models, Integrations & Settings" badge="UPDATED" />
           </NavSection>
         )}
 

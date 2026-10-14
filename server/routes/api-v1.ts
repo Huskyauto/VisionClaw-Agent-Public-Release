@@ -858,7 +858,7 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
 
         const turn = processMessage(conversationId, parsed.data.message, { tenantId, source: "api-v1" })
           .then(async (result) => {
-            if (!(await sparkLine.finishApiV1Turn(tenantId, conversationId, "complete"))) {
+            if (!(await sparkLine.finishApiV1Turn(tenantId, conversationId, "complete", undefined, result))) {
               throw new Error("API turn did not complete with a persisted reply");
             }
             return result;
@@ -1331,6 +1331,7 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
           JOIN conversations c ON c.id = m.conversation_id
           WHERE m.conversation_id = ${conversationId}
             AND c.tenant_id = ${tenantId}
+            AND m.tenant_id = ${tenantId}
           ORDER BY m.id DESC
           LIMIT 50
         `);
@@ -1345,8 +1346,14 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
         let failureReason: string | null = null;
         let failedAt: Date | null = null;
         let completedReply: string | null = null;
+        let servedModel: string | null = null;
+        let resolvedModel: string | null = null;
         if (isMarkedApiConversation) {
           const runStatus = await sparkLine.getApiV1TurnStatus(tenantId, conversationId);
+          if (runStatus?.status === "complete") {
+            servedModel = runStatus.observedModel;
+            resolvedModel = runStatus.resolvedModel;
+          }
           if (runStatus?.status === "idle") status = "pending";
           else if (runStatus?.status === "running") status = "running";
           else if (runStatus?.status === "complete") status = "complete";
@@ -1371,7 +1378,12 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
           status,
           title: conv.title,
           personaId: conv.personaId,
-          model: conv.model,
+          model: servedModel || resolvedModel || conv.model,
+          modelPreference: conv.model,
+          observedModel: servedModel,
+          resolvedModel,
+          modelEvidence: servedModel ? "provider_reported" : resolvedModel ? "route_resolved" : "saved_preference_only",
+          modelMetadataNote: "Only provider_reported identifies a model from an inference response. Historical saved preferences and route selection are not served-model proof.",
           lastUserMessage: lastUser
             ? { id: lastUser.id, content: lastUser.content, createdAt: lastUser.created_at }
             : null,
@@ -1521,6 +1533,7 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
           JOIN conversations c ON c.id = m.conversation_id
           WHERE m.conversation_id = ${conversationId}
             AND c.tenant_id = ${tenantId}
+            AND m.tenant_id = ${tenantId}
             AND m.role = 'assistant'
           ORDER BY m.id DESC
           LIMIT 1

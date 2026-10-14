@@ -1139,6 +1139,9 @@ export async function exchangeYouTubeCode(
 }
 
 export async function seedYouTubeIfMissing(tenantId: number = 1): Promise<void> {
+  // Bootstrap secrets belong to the platform owner, never to a customer's
+  // missing grant. Fail before querying, reading credentials or refreshing.
+  if (!isPlatformGoogleConnectorTenant(tenantId)) return;
   try {
     const existing = await db.execute(sql`
       SELECT id FROM oauth_subscriptions WHERE provider = 'youtube' AND tenant_id = ${tenantId}

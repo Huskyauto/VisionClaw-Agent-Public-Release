@@ -13,14 +13,17 @@ test("current sales and trust surfaces use authoritative skill totals and distin
   for (const currentSurface of [pricing, landing]) {
     assert.doesNotMatch(currentSurface, /\b67 total skills\b/i);
   }
-  assert.match(pricing, new RegExp(`\\b${releaseFacts.metrics.totalSkills} (?:total )?(?:platform )?skills\\b`, "i"));
+  assert.match(pricing, /import releaseFacts from ["']\.\.\/\.\.\/\.\.\/docs\/release-facts\.json["']/);
+  assert.match(pricing, /\$\{releaseFacts\.metrics\.totalSkills\} platform skills/);
+  assert.equal(releaseFacts.metrics.totalSkills, 68);
   assert.match(landing, /import releaseFacts from ["']\.\.\/\.\.\/\.\.\/docs\/release-facts\.json["']/);
   assert.match(landing, /\{releaseFacts\.metrics\.totalSkills\} platform skills/);
   assert.match(seo, /import \{ CURRENT_PLATFORM_DESCRIPTION \} from "@\/components\/prepublication-notice"/);
   assert.match(seo, /const effectiveDescription = useCurrentPlatformDescription\s+\? CURRENT_PLATFORM_DESCRIPTION/);
   assert.match(publicationNotice, /facts\.metrics\.totalSkills\} platform skills/);
   assert.match(publicationNotice, /Development evidence, not production telemetry/);
-  assert.match(publicationNotice, /Production verification.*remain incomplete/);
+  assert.match(publicationNotice, /Production verifier completion/);
+  assert.match(publicationNotice, /aggregate metered-AI budget remain unverified/);
   assert.equal(releaseFactsInput.platformAgentSkills, 5);
   assert.match(refreshTotals, /releaseInput\.platformAgentSkills/);
   assert.doesNotMatch(refreshTotals, /skills=.*\(\+4=/);

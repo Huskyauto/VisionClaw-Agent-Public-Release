@@ -102,9 +102,9 @@ export async function syncWeeklyRunCardsFromDrive(opts: { tenantId: number }): P
       // Pull the report content for the ranking note (best-effort).
       let rankingNote = "";
       if (fileId) {
-        const tmpPath = `uploads/tmp-ideabrowser-sync-${runDate}.md`;
+        const tmpPath = `tmp-ideabrowser-sync-${runDate}.md`;
         try {
-          const dl = await downloadFromDrive({ fileId, savePath: tmpPath });
+          const dl = await downloadFromDrive({ fileId, savePath: tmpPath, tenantId });
           if (dl.success && dl.path) {
             const abs = path.resolve(process.cwd(), dl.path);
             rankingNote = extractRankingNote(fs.readFileSync(abs, "utf-8"));

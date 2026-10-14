@@ -19,6 +19,11 @@ import { hasIncomeClaudeApiGrant } from "./lib/income-claude-route";
 import { hasIncomeOpenaiApiGrant } from "./lib/income-openai-route";
 import { hasOwnerJuryApiGrant } from "./lib/owner-jury-api-route";
 import { assertStandardComputeAccess, standardComputeModelId, standardComputeReady, validateStandardComputeCompletion } from "./lib/standard-compute";
+import { assertCheaperInferenceAccess, cheaperInferenceReady, cheaperInferenceCostFields,
+  guardCheaperInferenceRequest, CHEAPER_INFERENCE_MODEL_ID, CHEAPER_INFERENCE_UPSTREAM_MODEL,
+  CHEAPER_INFERENCE_BASE_URL } from "./lib/cheaper-inference";
+import { cheaperAutomaticAllowed, getCheaperCatalog, catalogUsageCost,
+  cheaperRequestMaximum, runCheaperBudgeted } from "./lib/cheaper-inference-automatic";
 
 export const COST_LEDGER_RECORDED = Symbol.for("visionclaw.cost-ledger-recorded");
 import { normalizeRetiredModelId, wrapClientWithParamAdaptation } from "./lib/param-adaptation";
@@ -118,6 +123,7 @@ export function buildPatchedCreate(
   tenantResolver: () => number,
   providerLabel: string,
   recordCostOverride?: (entry: any) => Promise<boolean>,
+  billingFieldsOverride?: (label: string, usage: any) => { costUsd?: number },
 ) {
   return async function patchedCreate(params: any, options?: any) {
     params = { ...(params || {}) };
@@ -248,6 +254,7 @@ export function buildPatchedCreate(
             // claude-* ids served via Profundo would be priced as metered
             // Anthropic spend AND increment the Anthropic daily breaker.
             ...(isFlatRate ? { costUsd: 0 } : {}),
+            ...(billingFieldsOverride ?? cheaperInferenceCostFields)(providerLabel, result?.usage),
           });
           Object.defineProperty(result, COST_LEDGER_RECORDED, {
             value: recorded === true,
@@ -259,6 +266,8 @@ export function buildPatchedCreate(
           }
         } else if (mandatoryFableAccounting) {
           throw new Error("missing mandatory Claude Fable 5.1 usage");
+        } else if (providerLabel === "llm.cheaperinference") {
+          console.warn("[providers] CheaperInference omitted token usage; cost accounting unavailable");
         }
       } catch (e: any) {
         if (result && typeof result === "object") {
@@ -348,8 +357,12 @@ export function buildPatchedCreate(
                 cacheWriteTokens,
                 operation: "chat.completions.create.stream",
                 ...(isFlatRate ? { costUsd: 0 } : {}),
+                ...(billingFieldsOverride ?? cheaperInferenceCostFields)(providerLabel, lastUsage),
               });
             }
+          }
+          if (!ledgerRecorded && providerLabel === "llm.cheaperinference") {
+            console.warn("[providers] CheaperInference stream usage was not recorded; cost accounting unavailable");
           }
           markStreamLedgerRecorded(ledgerRecorded);
         } catch (e: any) {
@@ -570,6 +583,7 @@ export const replitOpenai = new OpenAI({
 }
 
 export const PROVIDER_CONFIG: Record<string, { name: string; baseUrl: string; description: string }> = {
+  cheaperinference: { name: "CheaperInference", baseUrl: CHEAPER_INFERENCE_BASE_URL, description: "Owner-selected Luna reasoning; metered wallet billing, not a flat-rate lane" },
   replit: { name: "Replit AI (Built-in)", baseUrl: "", description: "Built-in - GPT-5.4, GPT-5.1, no API key needed" },
   openai: { name: "OpenAI", baseUrl: "https://api.openai.com/v1", description: "GPT-5, GPT-5.4, GPT-6 Luna" },
   anthropic: { name: "Anthropic", baseUrl: "https://api.anthropic.com/v1", description: "Claude Opus 4.6, Sonnet 4.6, Haiku 4.5" },
@@ -1609,6 +1623,7 @@ export async function getClientForModel(
     // pinned flat lane but before any OAuth/API-key fallback, so a caller can
     // prove that global ALLOW_METERED_LLM cannot spend on its behalf.
     forbidMeteredFallback?: boolean;
+    allowMeteredFallback?: boolean;
   },
 ): Promise<{ client: OpenAI; actualModelId: string }> {
   const normalizedModelId = normalizeModelId(modelId);
@@ -1625,9 +1640,10 @@ export async function getClientForModel(
   const explicitOwnerOnlyModel = isOwnerOnlyFinalDecisionModel(modelId);
   const explicitOwnerModelAuthorized =
     explicitOwnerOnlyModel &&
-    options?.explicitOwnerSelection === true &&
-    options?.platformAdminVerified === true &&
-    tenantId === (await import("./auth")).ADMIN_TENANT_ID;
+    ((options?.explicitOwnerSelection === true &&
+      options?.platformAdminVerified === true &&
+      tenantId === (await import("./auth")).ADMIN_TENANT_ID) ||
+      (modelId.startsWith("cheaperinference/") && cheaperAutomaticAllowed(tenantId)));
   if (explicitOwnerOnlyModel && !explicitOwnerModelAuthorized) {
     const haveModelfarm = !!(
       process.env.AI_INTEGRATIONS_OPENAI_API_KEY &&
@@ -1642,6 +1658,57 @@ export async function getClientForModel(
       `[providers] ${modelId} denied outside explicit admin selection → free modelfarm gpt-5.4`,
     );
     return { client: getReplit(), actualModelId: mapReplitToOpenAI("gpt-5.4") || "gpt-5.4" };
+  }
+
+  if (modelId.startsWith("cheaperinference/")) {
+    if (currentTenantId() !== null && currentTenantId() !== tenantId) throw new Error("CheaperInference tenant scope mismatch");
+    assertCheaperInferenceAccess(tenantId, options ?? {});
+    if (options?.providerLane || options?.forbidMeteredFallback || options?.allowMeteredFallback === false ||
+        !isProviderHealthy("cheaperinference")) {
+      throw new Error("CheaperInference cannot override a pinned/free-only lane or an unhealthy provider");
+    }
+    const upstream = modelId.slice("cheaperinference/".length);
+    const entry = (await getCheaperCatalog()).find(m => m.id === upstream && m.endpoint === "/v1/chat/completions");
+    if (!entry) throw new Error("CheaperInference chat model is absent from the live text catalog");
+    const client = new OpenAI({
+      apiKey: process.env.CHEAPER_INFERENCE_API_KEY!.trim(),
+      baseURL: CHEAPER_INFERENCE_BASE_URL, timeout: 60_000, maxRetries: 0,
+    });
+    const rawCreate = client.chat.completions.create.bind(client.chat.completions);
+    // Expose only the guarded operation; no raw HTTP, Responses/Pro or other SDK APIs.
+    const closedClient = { chat: { completions: { create: async (params: any, requestOptions: any = {}) => {
+      assertCheaperInferenceAccess(tenantId, options ?? {});
+      if (currentTenantId() !== null && currentTenantId() !== tenantId) throw new Error("CheaperInference tenant scope mismatch");
+      if (!isProviderHealthy("cheaperinference")) throw new Error("CheaperInference is temporarily unavailable");
+      const snapshot = (await getCheaperCatalog()).find(m => m.id === upstream &&
+        m.endpoint === "/v1/chat/completions");
+      if (!snapshot) throw new Error("CheaperInference catalog no longer authorizes this chat model");
+      const automatic = cheaperAutomaticAllowed(tenantId) &&
+        !(options?.explicitOwnerSelection === true && options?.platformAdminVerified === true);
+      if (automatic && snapshot.discount < 40) throw new Error("CheaperInference automatic model does not meet the 40% catalog discount floor");
+      const payload = guardCheaperInferenceRequest({
+        ...params, ...(automatic ? { min_discount_percent: 40 } : {}),
+      }, upstream);
+      delete payload.service_tier;
+      const create = buildPatchedCreate(rawCreate, () => upstream, () => tenantId!, "llm.cheaperinference",
+        undefined, (_label, usage) => {
+          const cost = catalogUsageCost(usage, snapshot);
+          if (cost === undefined) throw new Error("CheaperInference omitted valid billing evidence");
+          return { costUsd: cost };
+        });
+      try {
+        // SDK body/path/header overrides must not bypass the validated request.
+        return await runCheaperBudgeted(tenantId!, cheaperRequestMaximum(payload, snapshot),
+          () => create(payload, { signal: requestOptions?.signal, maxRetries: 0, timeout: 60_000 }),
+          usage => catalogUsageCost(usage, snapshot));
+      } catch (error: any) {
+        if ([401, 403, 429].includes(error?.status) || error?.status >= 500) {
+          markProviderUnhealthyOnce("cheaperinference", error, "CheaperInference request failed");
+        }
+        throw error;
+      }
+    } } } } as unknown as OpenAI;
+    return { client: closedClient, actualModelId: upstream };
   }
 
   // Normalize provider-prefixed ids (e.g. "openai/gpt-4.1-mini",
@@ -1721,17 +1788,25 @@ export async function getClientForModel(
 
     const replitKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     const replitBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-    if (mapped && !REPLIT_MODELFARM_UNSUPPORTED.has(modelId) && replitKey && replitKey.length > 5 && replitBaseUrl && replitBaseUrl.length > 5) {
+    if (mapped && !REPLIT_MODELFARM_UNSUPPORTED.has(modelId) && replitKey && replitKey.length > 5 && replitBaseUrl && replitBaseUrl.length > 5 &&
+        (!cheaperAutomaticAllowed(tenantId) || isProviderHealthy("replit"))) {
       const replitClient = getReplit();
       console.log(`[providers] Replit model ${modelId} → modelfarm integration (${mapped}, $0 cost)`);
       return { client: replitClient, actualModelId: mapped };
     }
 
-    if (mapped && options?.forbidMeteredFallback) {
+    if (mapped && (options?.forbidMeteredFallback || options?.allowMeteredFallback === false)) {
       throw new Error(
         `[providers] metered fallback forbidden for "${modelId}"; ` +
         `the requested model is unavailable on a flat/free lane`,
       );
+    }
+    if (mapped && cheaperAutomaticAllowed(tenantId) && !options?.meteredOverride &&
+        !options?.costExemptLane && !options?.explicitOwnerSelection) {
+      const next = await getModelForTierAsync(model?.tier ?? "balanced", tenantId,
+        { allowMeteredFallback: options?.allowMeteredFallback });
+      if (next === modelId) throw new Error("Automatic routing could not advance to an available transport");
+      return getClientForModel(next, tenantId, options);
     }
 
     // $0 policy (Bob 2026-06-16): reaching here with a KNOWN model (`mapped`
@@ -1875,7 +1950,15 @@ export async function getClientForModel(
   // data/model-tiers.json. Only :flagship (once-weekly BWB recap, ≤3 Opus calls) stays
   // metered by default. Full metered restore: ALLOW_METERED_LLM=true (+ revert tiers).
   const costExemptCall = !!options?.costExemptLane;
-  if (!meteredLlmEnabled() && !costExemptCall && !options?.meteredOverride) {
+  if (cheaperAutomaticAllowed(tenantId) && !options?.forbidMeteredFallback &&
+      !costExemptCall && !options?.meteredOverride && !options?.explicitOwnerSelection) {
+    const next = await getModelForTierAsync(model.tier, tenantId,
+      { allowMeteredFallback: options?.allowMeteredFallback });
+    if (next === modelId) throw new Error("Automatic routing could not advance to an available transport");
+    return getClientForModel(next, tenantId, options);
+  }
+  if (options?.forbidMeteredFallback || options?.allowMeteredFallback === false ||
+      (!meteredLlmEnabled() && !costExemptCall && !options?.meteredOverride)) {
     const freeId = "gpt-5.4";
     const mappedFree = mapReplitToOpenAI(freeId) || freeId;
     console.warn(
@@ -2245,7 +2328,8 @@ export async function getModelForTierAsync(
         logAutoRoute(tier, c.model, "replit→openai OAuth");
         return c.model;
       }
-      if (mapped && isProviderHealthy("replit")) {
+      if (mapped && isProviderHealthy("replit") &&
+          process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
         logAutoRoute(tier, c.model, "replit modelfarm ($0 marginal)");
         return c.model;
       }
@@ -2271,7 +2355,8 @@ export async function getModelForTierAsync(
 
   if (freeTierOnly) {
     for (const c of candidates) {
-      if (c.provider === "replit" && isProviderHealthy("replit")) {
+      if (c.provider === "replit" && isProviderHealthy("replit") &&
+          process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
         logAutoRoute(tier, c.model, "replit modelfarm (free-tier-only mode — no paid lane)");
         return c.model;
       }
@@ -2292,7 +2377,22 @@ export async function getModelForTierAsync(
     throw new Error(`[auto-route] no healthy zero-marginal lane available for tier=${tier}`);
   }
 
-  // Pass 2: metered lanes require all three authorizers: the global kill switch,
+  // Owner-approved exception, after all free/flat lanes; per-call false is a floor.
+  if (options?.allowMeteredFallback !== false && cheaperAutomaticAllowed(tenantId) &&
+      isProviderHealthy("cheaperinference")) {
+    try {
+      const candidate = (await getCheaperCatalog()).find(m =>
+        m.id === CHEAPER_INFERENCE_UPSTREAM_MODEL && m.endpoint === "/v1/chat/completions");
+      if (candidate && candidate.discount >= 40) {
+        logAutoRoute(tier, CHEAPER_INFERENCE_MODEL_ID, "CheaperInference owner wallet ($20 shared UTC-day cap)");
+        return CHEAPER_INFERENCE_MODEL_ID;
+      }
+    } catch (error) {
+      console.warn("[auto-route] CheaperInference paid fallback not admitted: catalog unavailable", error);
+    }
+  }
+
+  // Pass 2: other metered lanes require all three authorizers: the global kill switch,
   // an explicit caller opt-in, and an authenticated tenant. Global credentials
   // are owner-only; other tenants must supply their own provider credential.
   // GPT-6 Luna is the bounded cheap fallback; Sol remains explicit-only.
@@ -2363,6 +2463,7 @@ export async function getAvailableModelsForTenant(tenantId: number, isAdmin: boo
   const userKeyProviders = new Set(keys.filter((k) => k.enabled).map((k) => k.provider));
 
   const enabledProviders = new Set<string>();
+  if (tenantId === 1 && isAdmin && cheaperInferenceReady()) enabledProviders.add("cheaperinference");
   if (hasOpenferenceKey()) enabledProviders.add("openference");
 
   if (isAdmin) {
@@ -2390,6 +2491,7 @@ export async function getAvailableModelsForTenant(tenantId: number, isAdmin: boo
   const models = MODEL_REGISTRY.filter(
     (m) =>
       enabledProviders.has(m.provider) &&
+      (m.provider !== "cheaperinference" || (tenantId === 1 && isAdmin)) &&
       !RETIRED_MODEL_IDS.has(m.id) &&
       !isSyntheticEvaluationModel(m.id) &&
       (!isOwnerOnlyFinalDecisionModel(m.id) || isAdmin),
@@ -2397,6 +2499,21 @@ export async function getAvailableModelsForTenant(tenantId: number, isAdmin: boo
   if (!models.find(m => m.id === "auto")) {
     const auto = MODEL_REGISTRY.find(m => m.id === "auto");
     if (auto) models.unshift(auto);
+  }
+  if (tenantId === 1 && isAdmin && cheaperInferenceReady()) {
+    try {
+      for (const entry of (await getCheaperCatalog()).filter(m => m.endpoint === "/v1/chat/completions")) {
+        const id = `cheaperinference/${entry.id}`;
+        if (!models.some(m => m.id === id)) models.push({
+          id, label: `${entry.id} (CheaperInference, paid)`, provider: "cheaperinference",
+          tier: "powerful", costClass: "paid",
+          description: `Owner wallet; ${entry.discount}% catalog discount. ${entry.vision ? "Vision supported." : "Text only."}`,
+          capabilities: entry.vision ? ["vision"] : [],
+        });
+      }
+    } catch (error) {
+      console.warn("[providers] CheaperInference catalog unavailable; existing picker remains usable", error);
+    }
   }
   return models;
 }

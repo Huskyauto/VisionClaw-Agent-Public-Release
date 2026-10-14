@@ -180,7 +180,7 @@ export async function listHeadingTrees(opts: ListTreeOptions): Promise<{
     SELECT t.collection_id, t.doc_path, t.doc_title, t.total_headings,
            t.total_lines, t.tree, c.name AS collection_name
     FROM doc_heading_trees t
-    LEFT JOIN doc_collections c ON c.id = t.collection_id
+    LEFT JOIN doc_collections c ON c.id = t.collection_id AND c.tenant_id = ${opts.tenantId}
     WHERE ${where}
     ORDER BY t.updated_at DESC
     LIMIT ${limit}

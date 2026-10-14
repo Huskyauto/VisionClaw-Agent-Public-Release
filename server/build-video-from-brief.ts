@@ -429,8 +429,8 @@ export async function buildVideoFromBrief(input: BuildVideoFromBriefInput): Prom
       const { downloadFromDrive } = await import("./google-drive");
       const fileId = input.userImageDriveFileId.trim();
       const safeId = fileId.replace(/[^A-Za-z0-9_-]/g, "");
-      const savePath = `uploads/hero-${safeId}`;
-      const dl = await downloadFromDrive({ fileId, savePath });
+      const savePath = `hero-${safeId}`;
+      const dl = await downloadFromDrive({ fileId, savePath, tenantId: input.tenantId });
       if (!dl.success || !dl.path) {
         return { success: false, message: `Failed to download Drive file ${fileId}: ${dl.error || "unknown error"}. Check the file ID and that the Drive integration has access.`, error: "drive_download_failed" };
       }

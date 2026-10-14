@@ -501,7 +501,7 @@ export async function verifyTicketResult(ticketId: number, tenantId: number): Pr
         const msgRes = await db.execute(sql`
           SELECT m.role, m.content FROM messages m
           JOIN conversations c ON c.id = m.conversation_id AND c.tenant_id = ${tenantId}
-          WHERE m.conversation_id = ${run.conversationId}
+          WHERE m.conversation_id = ${run.conversationId} AND m.tenant_id = ${tenantId}
           ORDER BY m.created_at DESC
           LIMIT 10
         `);

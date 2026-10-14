@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { generateImage, type ImageQuality } from "./client";
+import { generateImage, type ImageQuality, type ImageModel, type ImageSize } from "./client";
 import type { ImagePurpose } from "../../image-quality-decider";
 import { getTenantFromRequest } from "../../auth";
 
@@ -17,10 +17,12 @@ export function registerImageRoutes(app: Express): void {
         return res.status(401).json({ error: "Authentication required" });
       }
 
-      const { prompt, purpose, quality } = req.body as {
+      const { prompt, purpose, quality, model, size } = req.body as {
         prompt?: string;
         purpose?: ImagePurpose;
         quality?: ImageQuality;
+        model?: ImageModel;
+        size?: ImageSize;
       };
 
       if (!prompt) {
@@ -28,6 +30,7 @@ export function registerImageRoutes(app: Express): void {
       }
 
       const dataUrl = await generateImage(prompt, {
+        tenantId, model, size,
         purpose,
         quality,
         callerLabel: `api/generate-image:tenant=${tenantId}`,

@@ -127,15 +127,24 @@ export async function updateProjectBrain(
   conversationId: number,
   userMessage: string,
   assistantResponse: string,
-  personaName?: string
+  personaName: string | undefined,
+  tenantId: number,
 ): Promise<void> {
   try {
-    ensureBrainDir();
+    if (!Number.isSafeInteger(tenantId) || tenantId <= 0) throw new Error("Project brain tenant is required");
 
-    const pRes = await db.execute(sql`SELECT name, status, description FROM projects WHERE id = ${projectId}`);
+    const pRes = await db.execute(sql`
+      SELECT p.name, p.status, p.description
+      FROM projects p
+      JOIN conversations c ON c.project_id = p.id AND c.tenant_id = p.tenant_id
+      WHERE p.id = ${projectId} AND p.tenant_id = ${tenantId}
+        AND c.id = ${conversationId} AND c.tenant_id = ${tenantId}
+        AND c.deleted_at IS NULL
+    `);
     const pRows = (pRes as any).rows || pRes;
     const project = Array.isArray(pRows) ? pRows[0] : null;
     if (!project) return;
+    ensureBrainDir();
 
     const filePath = brainFilePath(projectId);
     let brain: BrainSection;
@@ -373,7 +382,8 @@ export async function backfillProjectBrains(): Promise<void> {
             conv.id,
             userMsgs.join("\n---\n"),
             assistMsgs.join("\n---\n"),
-            conv.title
+            conv.title,
+            proj.tenant_id,
           );
         }
       }

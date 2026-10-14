@@ -744,7 +744,7 @@ async function publishToFacebook(
       let videoBuffer: Buffer;
       if (driveFileId) {
         const { downloadFromDrive } = await import("./google-drive");
-        const dl = await downloadFromDrive({ fileId: driveFileId });
+        const dl = await downloadFromDrive({ fileId: driveFileId, tenantId: connection.tenantId });
         if (!dl.success || !dl.path) {
           return { success: false, platform: "facebook", error: `Drive download failed: ${dl.error || driveFileId}` };
         }
@@ -867,7 +867,7 @@ async function publishToYouTube(
     let videoBuffer: Buffer;
     if (driveFileId) {
       const { downloadFromDrive } = await import("./google-drive");
-      const dl = await downloadFromDrive({ fileId: driveFileId });
+      const dl = await downloadFromDrive({ fileId: driveFileId, tenantId: connection.tenantId });
       if (!dl.success || !dl.path) {
         return { success: false, platform: "youtube", error: `Drive download failed: ${dl.error || driveFileId}` };
       }

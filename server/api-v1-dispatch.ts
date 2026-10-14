@@ -89,7 +89,7 @@ export async function dispatchApiV1Task(
   queueMicrotask(() => {
     void invokeApiV1Process(process, tenantId, conversation.id, input.task, options.instinctReadDraft)
       .then(async result => {
-        if (!(await finishApiV1Turn(tenantId, conversation.id, "complete")))
+        if (!(await finishApiV1Turn(tenantId, conversation.id, "complete", undefined, result)))
           throw new Error("API turn did not complete with a persisted reply");
         resolveTurn(result);
       })
@@ -111,8 +111,8 @@ export function launchApiV1FollowUp(
   const process = options.process || processMessage;
   queueMicrotask(() => {
     void invokeApiV1Process(process, tenantId, conversationId, message, options.instinctReadDraft)
-      .then(async () => {
-        if (!(await finishApiV1Turn(tenantId, conversationId, "complete")))
+      .then(async result => {
+        if (!(await finishApiV1Turn(tenantId, conversationId, "complete", undefined, result)))
           throw new Error("API turn did not complete with a persisted reply");
         await options.onSettled?.("complete");
       })

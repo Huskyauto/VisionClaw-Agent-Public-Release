@@ -94,7 +94,7 @@ export async function prepareHeartbeatStartup() {
         continue;
       }
       if (isOverdue || isRunaway) {
-        await storage.markHeartbeatTaskRun(t.id, correctNext);
+        await storage.markHeartbeatTaskRun(t.id, correctNext, Number(t.tenantId));
         console.log(`[heartbeat] Startup fix: "${t.name}" next_run_at was ${nextRunDate.toISOString()}, reset to ${correctNext.toISOString()}`);
       }
     }

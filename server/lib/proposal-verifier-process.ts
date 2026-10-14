@@ -1,5 +1,5 @@
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import { reportDiagnostic } from "./safe-diagnostic";
@@ -7,6 +7,7 @@ import { tryAcquireHeavyWorkLane, HeavyWorkDeferred } from "./heavy-work-lane";
 import { readEffectiveVerifierMemory, summarizeUnavailableVerifierMemory } from "./verifier-memory-source";
 import { sanitizeSpawnEnv } from "../safety/spawn-env-guard";
 import type { VerifyResult } from "../proposal-verifier";
+import { validateWorkspaceSnapshot, type WorkspaceProposalSnapshot } from "./workspace-verifier-contract";
 
 const CHILD_TIMEOUT_MS = 210_000;
 const MAX_PROTOCOL_BYTES = 8 * 1024;
@@ -118,19 +119,23 @@ function logChildObservation(
   }
 }
 
-function getChildCommand(production: boolean, bundleExists: (p: string) => boolean, heapMb: number): { command: string; args: string[] } {
-  if (production) {
+function getChildCommand(
+  production: boolean, bundleExists: (p: string) => boolean, heapMb: number, snapshotRoot?: string,
+): { command: string; args: string[] } {
+  if (production && !snapshotRoot) {
     const bundlePath = path.resolve(process.cwd(), "dist/proposal-verifier-child.cjs");
     if (!bundleExists(bundlePath)) throw new Error("Proposal verifier child bundle is missing; refusing to verify in-process");
     return { command: process.execPath, args: [`--max-old-space-size=${heapMb}`, bundlePath] };
   }
 
-  const tsxCli = path.resolve(process.cwd(), "node_modules/tsx/dist/cli.mjs");
-  const sourcePath = path.resolve(process.cwd(), "scripts/proposal-verifier-child.ts");
-  if (!bundleExists(tsxCli) || !bundleExists(sourcePath)) {
+  const tsxLoader = path.resolve(process.cwd(), "node_modules/tsx/dist/loader.mjs");
+  const sourcePath = path.resolve(snapshotRoot ?? process.cwd(), "scripts/proposal-verifier-child.ts");
+  if (!bundleExists(tsxLoader) || !bundleExists(sourcePath)) {
     throw new Error("Proposal verifier development runner is unavailable");
   }
-  return { command: process.execPath, args: [`--max-old-space-size=${heapMb}`, tsxCli, sourcePath] };
+  // The tsx CLI respawns Node and drops this heap flag. Import its trusted
+  // loader into the admitted process instead; kill/timeout now own computation.
+  return { command: process.execPath, args: [`--max-old-space-size=${heapMb}`, "--import", tsxLoader, sourcePath] };
 }
 
 function validVerifyResult(value: unknown): value is VerifyResult {
@@ -148,6 +153,7 @@ async function verifyWithRuntime(
   runtime: ProposalVerifierRuntime,
   leaseDeadlineMs?: number,
   strictSourceBase = false,
+  workspace?: { root: string; signal?: AbortSignal },
 ): Promise<VerifyResult> {
   if (!Number.isSafeInteger(proposalId) || proposalId <= 0) {
     throw new Error("verifyProposalIsolated: proposalId must be a positive integer");
@@ -228,12 +234,16 @@ async function verifyWithRuntime(
       logAdmissionDeferral("lease_expired");
       throw new HeavyWorkDeferred("proposal verification: job lease nearly expired");
     }
-    const { command, args } = getChildCommand(runtime.production, runtime.childBundleExists, childHeapMb);
+    const { command, args } = getChildCommand(runtime.production, runtime.childBundleExists, childHeapMb, workspace?.root);
     args.push(String(proposalId), String(tenantId));
     if (strictSourceBase) args.push("--strict-source-base");
+    if (workspace) args.push("--workspace-snapshot");
     const child = runtime.spawn(command, args, {
-      cwd: process.cwd(),
-      env: sanitizeSpawnEnv(process.env),
+      cwd: workspace?.root ?? process.cwd(),
+      env: sanitizeSpawnEnv(workspace
+        ? { ...Object.fromEntries(["PATH", "HOME", "TMPDIR", "LANG"].filter(key => process.env[key] !== undefined)
+          .map(key => [key, process.env[key]])), NODE_ENV: "production" }
+        : process.env),
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -242,7 +252,15 @@ async function verifyWithRuntime(
       catch { reportDiagnostic("[proposal-verifier] Child termination failed; close/error path remains authoritative"); }
     };
     logChildObservation("child_spawn_requested", childHeapMb);
-    const result = await awaitChildResult(child, runtime, remainingMs, () => laneLost);
+    const abort = () => killActiveChild?.();
+    workspace?.signal?.addEventListener("abort", abort, { once: true });
+    if (workspace?.signal?.aborted) abort();
+    let result: VerifyResult;
+    try {
+      result = await awaitChildResult(child, runtime, remainingMs, () => laneLost);
+    } finally {
+      workspace?.signal?.removeEventListener("abort", abort);
+    }
     logChildObservation("child_result", childHeapMb, result.status);
     return result;
   } finally {
@@ -367,13 +385,35 @@ export async function verifyProposalIsolated(
   return verifyWithRuntime(proposalId, tenantId, defaultRuntime, leaseDeadlineMs, options.strictSourceBase === true);
 }
 
+/** Trusted workspace runner only: computation-only snapshot, production gates. */
+export async function verifyWorkspaceSnapshotIsolated(
+  value: WorkspaceProposalSnapshot, root: string, signal?: AbortSignal,
+): Promise<VerifyResult> {
+  const snapshot = validateWorkspaceSnapshot(value);
+  if (!/^visionclaw-verifier-[a-zA-Z0-9]+$/.test(path.basename(root))) {
+    throw new Error("Workspace verifier requires private staging");
+  }
+  const input = path.join(root, ".workspace-verifier-request.json");
+  writeFileSync(input, JSON.stringify(snapshot), { mode: 0o600, flag: "wx" });
+  try {
+    if (signal?.aborted) throw new HeavyWorkDeferred("Workspace verifier stopped");
+    return await verifyWithRuntime(snapshot.proposalId, snapshot.tenantId,
+      { ...defaultRuntime, production: true }, snapshot.leaseUntil, true, { root, signal });
+  } finally {
+    unlinkSync(input);
+  }
+}
+
 /** Injection seam for deterministic process/lane/timeout tests; not used by production callers. */
 export async function __verifyProposalIsolatedForTest(
   proposalId: number,
   tenantId: number,
   runtime: ProposalVerifierRuntime,
   leaseDeadlineMs?: number,
-  options: { strictSourceBase?: boolean } = {},
+  options: { strictSourceBase?: boolean; workspaceRoot?: string; signal?: AbortSignal } = {},
 ): Promise<VerifyResult> {
-  return verifyWithRuntime(proposalId, tenantId, runtime, leaseDeadlineMs, options.strictSourceBase === true);
+  return verifyWithRuntime(proposalId, tenantId,
+    options.workspaceRoot ? { ...runtime, production: true } : runtime,
+    leaseDeadlineMs, options.strictSourceBase === true,
+    options.workspaceRoot ? { root: options.workspaceRoot, signal: options.signal } : undefined);
 }

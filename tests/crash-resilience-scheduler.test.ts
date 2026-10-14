@@ -41,7 +41,7 @@ test("queue failure keeps a retryable maintenance attempt pending", () => {
   const failJobSource = jobQueueSource.slice(failJobStart, failJobEnd);
   assert.match(failJobSource, /SET status = 'pending'[\s\S]*?WHERE id = \$\{id\}[\s\S]*?AND status = 'running'[\s\S]*?AND attempts = \$\{attempts\}/);
   assert.match(failJobSource, /attempts >= maxAttempts/);
-  assert.match(jobWorkerSource, /await failJob\(job\.id, job\.attempts, msg\)/);
+  assert.match(jobWorkerSource, /await failJob\(job\.id, job\.attempts, msg, job\.tenantId\)/);
 });
 
 test("weekly lease renewal is fenced by tenant, job, attempt, status, and live expiry", () => {
@@ -71,7 +71,7 @@ test("email provider rejection is retryable; ambiguous acceptance is not claimed
 
 test("missing or uncertain weekly email never closes the queue as succeeded", () => {
   assert.match(jobWorkerSource, /result\.emailOutcome !== "accepted"\)\s*\{\s*throw new WeeklyEmailNeedsReview/);
-  assert.match(jobWorkerSource, /err instanceof WeeklyEmailNeedsReview[\s\S]*?failJob\(job\.id,\s*job\.attempts,\s*err\.message,\s*\{\s*stopRetry:\s*true/);
+  assert.match(jobWorkerSource, /err instanceof WeeklyEmailNeedsReview[\s\S]*?failJob\(job\.id,\s*job\.attempts,\s*err\.message,\s*job\.tenantId,\s*\{\s*stopRetry:\s*true/);
   assert.match(jobQueueSource, /const goTerminal = opts\.stopRetry === true \|\| !policy\.retryable/);
   assert.match(jobQueueSource, /if \(priorState === "ambiguous" \|\| priorState === "started"\) return "ambiguous"/);
 });

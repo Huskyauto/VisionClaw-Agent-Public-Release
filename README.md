@@ -47,16 +47,29 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **The app runs with just one LLM key and a Postgres database.** Everything else — email, payments, voice, Drive — is optional and appears automatically when you add the key.
 
-**Latest revision — R135.9+sec (October 8, 2026): Owner integrations, model updates and review hardening.** Restricted owner Copilot chat, subscription-first jury recovery, scoped Haiku 5.5 drafting, Muse Spark 1.3 selection, a daily Beam availability watch, owner-only global skill export and compatible dependency patches. Forks need their own credentials, entitlements and opt-in configuration; source availability is not live publication or universal verification.
+**Latest source update — R136.2 (October 14, 2026): Current features, navigation, reliability and repository documentation.** Treasury stock/crypto paper replays, optional AgentID sign-in, Robert personal support, model-route evidence, opt-in capped owner paid fallback, correction-aware conversation recovery, tenant/file hardening and portable builds. Forks need their own credentials, entitlements and feature configuration; source availability is not website publication or universal verification.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **427 total registered tools · 386 public documented tools · 68 total skills · 144 active capabilities · 18 personas · 194 declared / 275 live development tables · 41 governance rules · 885 platform indexes · 85 curated AI models · 6 AI providers · 6 deployment targets.** These are an October 8 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **427 total registered tools · 386 public documented tools · 68 total skills · 144 active capabilities · 18 personas · 194 declared / 275 live development tables · 41 governance rules · 885 platform indexes · 86 curated AI models · 6 AI providers · 6 deployment targets.** These are an October 8 **development evidence snapshot**, not live production telemetry. Documentation was reconciled October 14 without relabeling historical measurements as fresh telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+
+### October 9–14 source updates
+
+- **Treasury:** owner-only historical stock/crypto paper replays, explicit fees/slippage, frozen strategy presets and persisted benchmark evidence. No real-money orders, broker connection or profitability certification.
+- **AgentID:** optional agent sign-in with OIDC validation, state/nonce/PKCE, session rotation and token-expiry enforcement. Agents receive non-admin trial scope. Human sign-in remains available; full authenticated production lifecycle verification is not claimed.
+- **Robert:** personal/emotional-life specialist with private tenant context. Shared installation defaults contain no private owner history; persona synchronization preserves names and environment-local identities.
+- **Model evidence and cost controls:** requested, resolved and provider-reported models are distinct. Routine/demanding owner model preferences retain authorized fallbacks. CheaperInference is an opt-in paid owner fallback with shared $20 UTC-day reserve-before-spend accounting; it is not an application-wide daily limit, a free lane or permission to change all users' routing.
+- **Conversation recovery:** progress-based stream deadlines, correction-aware compaction, recent-context budgeting, fenced approval leases and advisory history comparisons. No automatic opaque-action replay or new paid retries.
+- **Account/file boundaries:** tenant-bound storage/Drive operations, owner-only voice configuration with UI masking, scoped watchdog/approval evidence and content-bound verifier snapshots. Production verifier success and capacity remain unverified.
+- **Advisory coordination:** Muse's owner outbox/poll workflow is partial; queueing is not delivery proof. A Cue/Felix setup document is not a new active integration or verified cross-conversation reply channel.
+- **Portable builds:** public npm tarballs, Node 22.22+, explicit public-test classification and sanitized append-only mirror updates. Research material is tested before adoption: REA informed an AST import check, while REA runtime installation, HERMES and permanent worktree swarms remain unimplemented.
+
+[Full feature/status matrix and source-folder guide](docs/platform-update-2026-10-14.md). Owner integrations are optional; forks must supply their own services. Historical release notes below remain historical.
 
 **R136.1 development pilot:** Treasury adds owner-only historical stock/crypto paper replays
 with Bitcoin/Ethereum/Solana choices; frozen trend/reversion/breakout/rolling-RSI presets, measured costs/returns, next-open fills, matched benchmark
 and optional Jev shadow/model interpretation. No real orders, broker connection,
 automatic strategy promotion or promised profitable trading.
 
-### Recent source improvements and their limits
+### Earlier October 4–8 source improvements and their limits
 
 - **Owner juries across topics:** subscription-first recovery preserves successful answers and seat-owned evidence. Explicit model identity contracts remain pinned; failed seats do not become fake successes. Standard Compute supplies bounded pinned-model fallback, not an opaque smart-routing verdict. Native paid exceptions require separate authority and conservative reservations; account quotas are finite.
 - **Chat-only GitHub Copilot:** official SDK, trusted owner-authored question, fresh isolated subprocess, shared 20-attempt daily quota, one concurrent request and 120-second deadline. No file/shell/MCP tools, ambient customer context, retries, provider fallback or default-model changes. Forks configure their own GitHub subscription access.
@@ -291,16 +304,16 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 
 ---
 
-## Platform at a Glance
+## Platform at a Glance — October 8 Development Evidence
 
-> Authoritative counts live in [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md). If any number on this page conflicts with that doc, the truth doc wins.
+> This is the dated development snapshot, not live production telemetry. Counts agree with [docs/release-facts.json](docs/release-facts.json) and [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md); documentation was reconciled October 14.
 
 | Metric | Count |
 |--------|-------|
 | AI Agents (Personas) | 18 |
-| Tools (total registered) | 418 |
+| Tools (total registered) | 427 |
 | Tools (public documented) | 386 |
-| AI Models in Core Registry | 79 curated |
+| AI Models in Core Registry | 86 curated |
 | Daily Catalog Discovery | 1000+ models scanned on OpenRouter |
 | AI Providers | 6 (OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity) |
 | Governance Rules | 41 |
@@ -309,7 +322,8 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | Skills | 68 total (63 DB-seeded skills + 5 platform agent skills) |
 | Frontend Pages | 40+ |
 | API Endpoints | 300+ |
-| Database Tables | 182 declared / 262 live |
+| Database Tables | 194 declared / 275 live development |
+| Platform Indexes | 885 (616 non-PK) |
 
 ---
 
@@ -340,12 +354,14 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
                                │
               ┌────────────────┼────────────────┐
               ▼                ▼                ▼
-        ┌──────────┐   ┌────────────┐   ┌────────────┐
-        │ PostgreSQL│   │ Google     │   │ 6 AI       │
-        │ + pgvector│   │ Drive      │   │ Providers  │
-        │ 194 declared / 275 live tables │   │ Storage    │   │ 85 curated │
-        └──────────┘   └────────────┘   └────────────┘
+        ┌────────────┐   ┌────────────┐   ┌────────────┐
+        │ PostgreSQL │   │ Google     │   │ 6 AI       │
+        │ + pgvector │   │ Drive      │   │ providers  │
+        │ D194/L275  │   │ storage    │   │ 86 curated │
+        └────────────┘   └────────────┘   └────────────┘
 ```
+
+Database diagram: D = declared tables; L = live development tables. Counts use the October 8 evidence snapshot, not live production telemetry.
 
 **Example flow:** You say "Research competitor pricing and build me a comparison spreadsheet."
 1. The **Chat Engine** routes to **Felix** (CEO) who sees this needs research + document production
@@ -387,7 +403,7 @@ Every agent has a defined role, personality, skill set, and operating rules. The
 
 ### AI & Intelligence
 
-- **85 Curated AI Models in the Development Registry** with configured routing across supported providers. Bring your own provider credentials — availability and billing are governed by provider and account terms, not a promise of universally free inference.
+- **86 Curated AI Models in the Development Registry** with configured routing across supported providers. Bring your own provider credentials — availability and billing are governed by provider and account terms, not a promise of universally free inference.
 - **Adaptive Model Discovery (R73)** — a daily background task scans OpenRouter's full catalog of 1000+ models, tier-classifies each by completion price (reasoning / powerful / balanced / fast), probes the Replit gateway for new releases, and emails the owner a ranked digest of new models worth adding to the registry. Hard caps prevent inbox spam (10 alerts/run max), lifetime dedupe prevents re-alerts, and silent days mean nothing changed.
 - **Streaming Responses** via Server-Sent Events (SSE) — real-time token-by-token output
 - **Thinking Mode** — explainable reasoning with decision traces for complex problems

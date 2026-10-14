@@ -461,7 +461,7 @@ export async function readFileHandler(
             const driveId = extractDriveFileId(pf.fileUrl);
             if (driveId) {
               await requireTenantDriveFileAccess(ctx.tenantId!, driveId, pf.projectId);
-              const dl = await downloadFromDrive({ fileId: driveId, tenantId: ctx.tenantId, reuseExisting: true });
+              const dl = await downloadFromDrive({ fileId: driveId, tenantId: ctx.tenantId!, reuseExisting: true });
               if (dl.success && dl.path) {
                 const relative = dl.path.replace(/^\/?uploads\//, "");
                 const recovered = path.resolve(UPLOADS_ROOT, relative);
@@ -732,7 +732,7 @@ export async function googleDriveHandler(
       } catch (e: any) {
         return { error: `google_drive delete blocked: metadata lookup failed (fail-closed) — ${e?.message || e}` };
       }
-      return gd.deleteDriveFile(params.fileId);
+      return gd.deleteDriveFile(params.fileId, ctx.tenantId);
     }
     case "share": {
       if (!params.fileId) return { error: "fileId is required for share" };

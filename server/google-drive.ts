@@ -1340,24 +1340,19 @@ export async function listDriveFiles(params?: {
 export async function downloadFromDrive(params: {
   fileId: string;
   savePath?: string;
-  tenantId?: number;
+  tenantId: number;
   /** Internal recovery only: reuse an existing cache after trusted remote authorization. */
   reuseExisting?: boolean;
 }): Promise<{ success: boolean; path?: string; size?: number; error?: string }> {
   try {
+    await requireTenantDriveFileAccess(params.tenantId, params.fileId);
     const metaResult = await driveJson(`/drive/v3/files/${encodeURIComponent(params.fileId)}?fields=id,name,mimeType,size`);
     if (metaResult.error) {
       return { success: false, error: metaResult.error.message || JSON.stringify(metaResult.error) };
     }
 
-    const savePath = params.savePath || `uploads/${metaResult.name || `drive_${params.fileId}`}`;
-    const cwd = process.cwd();
-    const uploadsMatch = savePath.match(/^\/?uploads\/(.+)$/);
-    const resolved = params.tenantId != null
-      ? tenantDriveDownloadPath(UPLOADS_DIR, params.tenantId, `${params.fileId}-${metaResult.name || "download"}`, params.savePath)
-      : uploadsMatch
-      ? resolveUploadsChild(uploadsMatch[1])
-      : path.resolve(cwd, savePath);
+    const savePath = params.savePath || `${params.fileId}-${metaResult.name || "download"}`;
+    const resolved = tenantDriveDownloadPath(UPLOADS_DIR, params.tenantId, `${params.fileId}-${metaResult.name || "download"}`, params.savePath);
     if (!isPathWithin(UPLOADS_DIR, resolved)) {
       return { success: false, error: `Path traversal blocked: ${savePath}` };
     }
@@ -1407,9 +1402,11 @@ export async function readDriveFileBytes(fileId: string): Promise<Buffer> {
   return bytes;
 }
 
-export async function deleteDriveFile(fileId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteDriveFile(fileId: string, tenantId: number): Promise<{ success: boolean; error?: string }> {
   try {
-    await driveRequest(`/drive/v3/files/${fileId}`, { method: "DELETE" });
+    await requireTenantDriveFileAccess(tenantId, fileId);
+    const response = await driveRequest(`/drive/v3/files/${encodeURIComponent(fileId)}`, { method: "DELETE" });
+    if (!response.ok) return { success: false, error: `Drive deletion failed with HTTP ${response.status}` };
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -1813,7 +1810,8 @@ export async function searchDriveFiles(params: {
     // BEFORE running any query. Same pattern as ensureProjectFolder.
     if (params.projectId) {
       const { projects } = await import("@shared/schema");
-      const [proj] = await db.select({ tenantId: projects.tenantId }).from(projects).where(eq(projects.id, params.projectId)).limit(1);
+      const [proj] = await db.select({ tenantId: projects.tenantId }).from(projects)
+        .where(and(eq(projects.id, params.projectId), eq(projects.tenantId, params.tenantId))).limit(1);
       if (!proj) {
         return { success: false, error: `searchDriveFiles: project ${params.projectId} not found` };
       }

@@ -171,7 +171,7 @@ export interface IStorage {
   updateHeartbeatTask(id: number, data: Partial<InsertHeartbeatTask>, tenantId: TenantScope): Promise<HeartbeatTask | undefined>;
   deleteHeartbeatTask(id: number, tenantId: number): Promise<void>;
   fixStaleBackupSchedules(): Promise<number>;
-  markHeartbeatTaskRun(id: number, nextRunAt: Date): Promise<void>;
+  markHeartbeatTaskRun(id: number, nextRunAt: Date, tenantId: number): Promise<void>;
   getHeartbeatLogs(limit: number | undefined, personaId: number | undefined, tenantId: TenantScope): Promise<HeartbeatLog[]>;
   createHeartbeatLog(data: InsertHeartbeatLog): Promise<HeartbeatLog>;
   getHeartbeatTasksByPersona(personaId: number, tenantId?: number): Promise<HeartbeatTask[]>;
@@ -707,7 +707,10 @@ export class DatabaseStorage implements IStorage {
     if (victims.length === 0) return;
     await db.update(conversationFacts)
       .set({ status: "expired" })
-      .where(inArray(conversationFacts.id, victims.map(v => v.id)));
+      .where(and(
+        inArray(conversationFacts.id, victims.map(v => v.id)),
+        eq(conversationFacts.tenantId, tenantId),
+      ));
   }
 
   // ─── Daily Notes ─────────────────────────────────────────
@@ -1134,10 +1137,13 @@ export class DatabaseStorage implements IStorage {
     `);
     return ((result as any).rows || []).length;
   }
-  async markHeartbeatTaskRun(id: number, nextRunAt: Date) {
-    await db.update(heartbeatTasks)
+  async markHeartbeatTaskRun(id: number, nextRunAt: Date, tenantId: number) {
+    if (!Number.isSafeInteger(tenantId) || tenantId <= 0) throw new Error("Heartbeat task tenant is required");
+    const updated = await db.update(heartbeatTasks)
       .set({ lastRunAt: new Date(), nextRunAt })
-      .where(eq(heartbeatTasks.id, id));
+      .where(and(eq(heartbeatTasks.id, id), eq(heartbeatTasks.tenantId, tenantId)))
+      .returning({ id: heartbeatTasks.id });
+    if (updated.length !== 1) throw new Error("Heartbeat task not found or not updated for this tenant");
   }
   // R74.13d C1 follow-up: tenant scoping. heartbeat_logs has no tenant_id
   // column (would require a schema migration), so scope via task_id ↦

@@ -35,6 +35,7 @@ export type WatchdogKind =
 
 export interface InflightEntry {
   runId: string;
+  tenantId?: number;
   kind: WatchdogKind;
   label: string;
   startedAt: number;
@@ -64,6 +65,7 @@ let orphanCount = 0;
  */
 export function register(args: {
   runId: string;
+  tenantId: number;
   kind: WatchdogKind;
   label: string;
   hardCapMs: number;
@@ -79,6 +81,7 @@ export function register(args: {
   const abortCtrl = new AbortController();
   inflight.set(args.runId, {
     runId: args.runId,
+    tenantId: Number.isSafeInteger(args.tenantId) && args.tenantId > 0 ? args.tenantId : undefined,
     kind: args.kind,
     label: args.label,
     startedAt: Date.now(),
@@ -120,11 +123,15 @@ export async function forceCancel(runId: string, reason: string): Promise<boolea
   console.log(`[watchdog] CANCELLED runId=${runId} kind=${entry.kind} label="${entry.label}" reason="${reason}" elapsed=${Date.now() - entry.startedAt}ms`);
   // Best-effort attention-bus notification so Felix sees the cancellation.
   try {
+    if (typeof entry.tenantId !== "number" || !Number.isSafeInteger(entry.tenantId) || entry.tenantId <= 0) {
+      console.warn("[watchdog] cancellation event skipped: missing valid tenant scope");
+      return true; // Cancellation still succeeds; never publish under an admin fallback.
+    }
     const { emitEvent } = await import("./event-bus");
     await emitEvent({
       type: "process.cancelled",
       source: "process-watchdog",
-      tenantId: 1,
+      tenantId: entry.tenantId,
       data: {
         runId: entry.runId,
         kind: entry.kind,
@@ -174,10 +181,14 @@ async function scanOnce(): Promise<void> {
         activeTaskTracker.delete(taskId);
         try {
           const { emitEvent } = await import("./event-bus");
+          if (!Number.isSafeInteger(info.tenantId) || info.tenantId <= 0) {
+            console.warn("[watchdog] orphan event skipped: missing valid tenant scope");
+            continue;
+          }
           await emitEvent({
             type: "process.stuck",
             source: "process-watchdog",
-            tenantId: 1,
+            tenantId: info.tenantId,
             data: {
               runId: `heartbeat-task-${taskId}`,
               kind: "heartbeat-task",

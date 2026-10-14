@@ -147,8 +147,8 @@ test("approval resume claims remain durable and recoverable across a process res
   );
   assert.match(
     source,
-    /resume:claim_recovered/,
-    "a restart without an in-memory continuation must terminally recover the run",
+    /resume:claim_review_required/,
+    "a missing local continuation must record uncertainty, not terminalize a possibly live remote worker",
   );
   assert.match(
     source,

@@ -111,7 +111,7 @@ export async function completeRun(runId: number, tenantId: number, result: any) 
   const rows = await db.update(agentRuns).set({
     status: "completed",
     result,
-    state: sql`COALESCE(${agentRuns.state}, '{}'::jsonb) - 'resumeClaimedAt'`,
+    state: sql`COALESCE(${agentRuns.state}, '{}'::jsonb) - 'resumeClaimedAt' - 'resumeOwnerId' - 'resumeLeaseUntil'`,
     recoveryEventSequence: sql`${agentRuns.recoveryEventSequence} + 1`,
     completedAt: new Date(),
     updatedAt: new Date(),
@@ -147,7 +147,7 @@ export async function failRun(runId: number, tenantId: number, error: string) {
   const rows = await db.update(agentRuns).set({
     status: "failed",
     error,
-    state: sql`COALESCE(${agentRuns.state}, '{}'::jsonb) - 'resumeClaimedAt'`,
+    state: sql`COALESCE(${agentRuns.state}, '{}'::jsonb) - 'resumeClaimedAt' - 'resumeOwnerId' - 'resumeLeaseUntil'`,
     recoveryEventSequence: sql`${agentRuns.recoveryEventSequence} + 1`,
     completedAt: new Date(),
     updatedAt: new Date(),

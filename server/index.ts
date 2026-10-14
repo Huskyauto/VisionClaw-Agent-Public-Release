@@ -250,6 +250,23 @@ app.post(
 import { virtualPortMiddleware } from "./virtual-ports";
 app.use(virtualPortMiddleware());
 
+// Signed service requests must be bounded BEFORE the ordinary upload parser.
+app.use("/internal/workspace-verifier", (req, res, next) => {
+  const type = req.headers["content-type"];
+  const encoding = req.headers["content-encoding"];
+  if (req.method !== "POST" || typeof type !== "string"
+    || !/^application\/json(?:;|$)/i.test(type)
+    || (encoding !== undefined && encoding !== "identity")) {
+    res.setHeader("Connection", "close");
+    res.status(415).json({ error: "Uncompressed JSON service requests required" });
+    return;
+  }
+  next();
+}, express.json({
+  limit: "128kb",
+  verify: (req, _res, buf) => { req.rawBody = buf; },
+}));
+
 app.use(
   express.json({
     limit: "50mb",

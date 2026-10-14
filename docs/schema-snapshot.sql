@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JudNPf3oqERo4QcEyno7AOaXzhjbUqCZE3cK8Kvu5RjhzD2OTCpDvPgGiddYHTC
+\restrict S5mUwO8Jbju3qwkhhQxfd28PanDxcrgV26IDdjdI7IrVvz435W63u5Qjwvul6EJ
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -1281,7 +1281,9 @@ CREATE TABLE public.api_v1_conversation_runs (
     updated_at timestamp without time zone DEFAULT now() NOT NULL,
     failure_reason text,
     failed_at timestamp without time zone,
-    completed_reply text
+    completed_reply text,
+    resolved_model text,
+    observed_model text
 );
 
 
@@ -22536,5 +22538,5 @@ ALTER TABLE public.skill_optimization_versions ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JudNPf3oqERo4QcEyno7AOaXzhjbUqCZE3cK8Kvu5RjhzD2OTCpDvPgGiddYHTC
+\unrestrict S5mUwO8Jbju3qwkhhQxfd28PanDxcrgV26IDdjdI7IrVvz435W63u5Qjwvul6EJ
 

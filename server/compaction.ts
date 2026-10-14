@@ -7,6 +7,7 @@ import { logSilentCatch } from "./lib/silent-catch";
 import { getContextWindow } from "./context-window-guard";
 import { assertMemoryValueNotTombstoned } from "./memory/tombstones";
 import { recordMemoryDerivation } from "./memory/forgetting-store";
+import { buildCorrectionAwareCompactionInput } from "./lib/compaction-reconciliation";
 const COMPACTION_RATIO = 0.4;
 const MIN_MESSAGES_BEFORE_COMPACT = 20;
 const TARGET_AFTER_COMPACT = 12;
@@ -613,7 +614,7 @@ export async function compactMessages(
   }
 
   const identifiers = extractOpaqueIdentifiers(toSummarize);
-  const latestAsk = findLatestUserAsk(toSummarize);
+  const latestAsk = findLatestUserAsk(messages);
 
   const meaningfulMessages = filterRealConversation(toSummarize);
   const noiseFiltered = toSummarize.length - meaningfulMessages.length;
@@ -650,6 +651,7 @@ export async function compactMessages(
   }
 
   const transcript = transcriptParts.join("\n\n");
+  const reconciliationInput = buildCorrectionAwareCompactionInput(transcript, toKeep);
 
   let taskSpecificInstructions = "";
   try {
@@ -679,7 +681,7 @@ export async function compactMessages(
           { role: "system", content: STRUCTURED_COMPACTION_PROMPT },
           {
             role: "user",
-            content: `Summarize this conversation history (${meaningfulMessages.length} meaningful messages out of ${toSummarize.length} total) into the required structured format. Preserve ALL facts — zero memory loss:${identifierHint}${taskSpecificInstructions}${retryHint}\n\n${transcript.slice(0, 12000)}`,
+            content: `Summarize this conversation history (${meaningfulMessages.length} meaningful messages out of ${toSummarize.length} total) into the required structured format. Preserve relevant facts and reconcile newer corrections:${identifierHint}${taskSpecificInstructions}${retryHint}\n\n${reconciliationInput}`,
           },
         ],
         max_completion_tokens: SUMMARY_MAX_TOKENS,
@@ -734,6 +736,11 @@ export async function compactMessages(
 
   if (!summary) {
     return { compacted: false, archive, failure: "summary_unavailable" };
+  }
+  if (qualityAudit?.ok !== true && latestAsk) {
+    // An empty/error/failed-quality response cannot silently replace the
+    // current ask with an older one. This is evidence, not execution authority.
+    summary += `\n\n## Latest retained user context (verbatim data; reconcile superseded statements)\n${JSON.stringify({ role: "user", content: latestAsk })}`;
   }
 
   // The full transcript is already durable. Persisting the generated summary

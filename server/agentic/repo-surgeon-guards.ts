@@ -166,6 +166,7 @@ export function isSensitiveSurface(files: string[]): { sensitive: boolean; hits:
  * tenant-isolation findings actually live.
  */
 const HARD_HITL_SURFACE_RE = [
+  /workspace[-_]verifier|workspace-proposal-verifier|proposal-verifier|verifier-job-scope|verifier-memory-source|bounded-verifier-worker|artifact-authority|research-proposals\.ts/i,
   /(^|[\/\\])server[\/\\]auth\.ts$/i,
   /(^|[\/\\])server[\/\\]replit_integrations[\/\\]auth/i,
   /(^|[\/\\])server[\/\\]replitAuth\.ts$/i,
@@ -208,6 +209,7 @@ export function isHardHitlSurface(files: string[]): { hard: boolean; hits: strin
  *  fix (adds a `WHERE tenant_id` clause / ownership check) carries none of these
  *  markers, so it stays eligible for autopilot. Over-trigger = HITL = safe. */
 const HARD_CONTENT_RE = [
+  /workspace[-_]verifier|workspace-proposal-verifier|PROPOSAL_VERIFIER_WORKSPACE_ENABLED|WORKSPACE_VERIFIER_CONTEXT_SHA256/i,
   // payments
   /\bstripe\b/i, /\bcoinbase\b/i, /\bpayments?\b/i, /\bpaymentintent\b/i, /\bbilling\b/i,
   /\binvoice\b/i, /\bcheckout\b/i, /\bsubscriptions?\b/i, /\bprice[_]?id\b/i, /\brefunds?\b/i,

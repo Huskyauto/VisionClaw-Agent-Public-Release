@@ -1,3 +1,4 @@
+import releaseFacts from "../../../docs/release-facts.json";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -346,7 +347,7 @@ function computeQualVerdict(a: Record<QualAxisId, number>): QualVerdict {
     } else {
       category = "Process Automation";
       categoryDesc = "Runs a multi-step process across several systems that follows recognizable patterns.";
-      vca = "VisionClaw runs this as an autonomous workflow with its 396-tool action layer + delegation.";
+      vca = `VisionClaw supports this through its ${releaseFacts.metrics.registeredTools}-tool registry and governed delegation.`;
     }
   }
 
@@ -807,6 +808,7 @@ export default function AuditPage() {
               <p className="text-lg italic text-foreground" data-testid="text-founder-quote">
                 "I built a 396-tool AI platform alone. Then I audited it myself and scored 60/100. Here's the audit you can run on yours."
               </p>
+              <p className="text-xs text-muted-foreground">Historical founding snapshot. Current development registry: {releaseFacts.metrics.registeredTools} tools.</p>
               <footer className="text-sm text-muted-foreground">— Bob Washburn, VisionClaw</footer>
             </blockquote>
           </CardContent>
@@ -1092,7 +1094,7 @@ export default function AuditPage() {
             <CardHeader>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardTitle data-testid="text-tier-monitoring">Audit Monitoring</CardTitle>
-                <Badge variant="secondary" data-testid="badge-monitoring-coming">Coming Q3</Badge>
+                <Badge variant="secondary" data-testid="badge-monitoring-coming">Planned — not yet available</Badge>
               </div>
               <CardDescription>Quarterly re-audit + drift alerts</CardDescription>
             </CardHeader>
@@ -1138,16 +1140,16 @@ export default function AuditPage() {
           <Card className="flex flex-col" data-testid="pricing-card-enterprise">
             <CardHeader>
               <CardTitle data-testid="text-tier-enterprise">Enterprise</CardTitle>
-              <CardDescription>I + team, ongoing</CardDescription>
+              <CardDescription>Scoped enterprise assessment</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 space-y-3 text-sm">
-              <div className="text-3xl font-bold" data-testid="text-price-enterprise">Custom</div>
+              <div className="text-3xl font-bold" data-testid="text-price-enterprise">Starts at $4,997</div>
+              <p className="text-muted-foreground">Per assessment. Final scope, timing and price agreed in a written quote.</p>
               <ul className="space-y-1.5 text-muted-foreground">
-                <li>5-day turnaround</li>
-                <li>C-suite presentation + 30-day re-audit</li>
-                <li>Per-tenant guaranteed</li>
-                <li>12-month unlimited re-audit window</li>
-                <li>Your NDA</li>
+                <li>Review of agreed AI systems and workflows</li>
+                <li>Executive findings and prioritized remediation plan</li>
+                <li>Follow-up review and presentation scoped in the quote</li>
+                <li>NDA and data-handling terms agreed before access</li>
               </ul>
             </CardContent>
             <CardContent>

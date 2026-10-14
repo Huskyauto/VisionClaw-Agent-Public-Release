@@ -84,7 +84,10 @@ export async function stampArgsEmbedding(proposalId: number, p: {
   target: string | null;
   target_args: any;
   summary?: string;
-}): Promise<void> {
+}, tenantId: number): Promise<void> {
+  if (!Number.isSafeInteger(tenantId) || tenantId <= 0) {
+    throw new Error("stampArgsEmbedding requires tenant scope");
+  }
   try {
     const blob = buildArgsBlob(p);
     const emb = await generateEmbedding(blob);
@@ -93,7 +96,7 @@ export async function stampArgsEmbedding(proposalId: number, p: {
     await db.execute(sql`
       UPDATE felix_proposals
       SET args_embedding = ${vec}::vector
-      WHERE id = ${proposalId} AND args_embedding IS NULL
+      WHERE id = ${proposalId} AND tenant_id = ${tenantId} AND args_embedding IS NULL
     `);
   } catch (e) {
     logSilentCatch("server/surprise-scorer.ts:stampArgsEmbedding", e);
@@ -121,7 +124,7 @@ export async function scoreProposalSurprise(proposalId: number, tenantId: number
 
     // Stamp args embedding lazily if it wasn't set at create-time (back-fill).
     if (!p.args_embedding) {
-      await stampArgsEmbedding(proposalId, p);
+      await stampArgsEmbedding(proposalId, p, tenantId);
     }
 
     // Embed the actual outcome. A null/invalid return = embedding service

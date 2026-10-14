@@ -100,7 +100,7 @@ async function findOrCreateConversationForPhone(phone: string, channel: "sms" | 
   // winner. Re-pairing within a single tenant (multiple rows, same tenant) is
   // fine: we pick that tenant's most recent row.
   const paired: any = await db.execute(sql`
-    SELECT id, content::jsonb AS info
+    SELECT id, tenant_id, content::jsonb AS info
     FROM agent_knowledge
     WHERE category = 'messaging_pairing'
       AND title = ${`${channel}:${phone}`}
@@ -111,10 +111,11 @@ async function findOrCreateConversationForPhone(phone: string, channel: "sms" | 
   for (const row of (paired.rows || [])) {
     const info = row?.info;
     if (!info?.conversationId || !info?.tenantId) continue;
+    if (row.tenant_id !== info.tenantId) continue;
     // Verify the conversationId in the pairing actually belongs to the claimed
     // tenantId — an internally-consistent pairing is the minimum bar.
     const convCheck: any = await db.execute(sql`
-      SELECT tenant_id FROM conversations WHERE id = ${info.conversationId} LIMIT 1
+      SELECT tenant_id FROM conversations WHERE id = ${info.conversationId} AND tenant_id = ${info.tenantId} LIMIT 1
     `).catch(() => ({ rows: [] }));
     const actualTenantId = convCheck.rows?.[0]?.tenant_id;
     if (actualTenantId !== info.tenantId) {

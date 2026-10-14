@@ -45,7 +45,7 @@ async function main(): Promise<void> {
         ),
         complete: (job, result) => queue.completeJob(job.id, job.attempts, job.tenantId, result),
         defer: job => queue.deferJobForHeavyLane(job.id, job.attempts, job.tenantId!, 120_000),
-        fail: (job, reason) => queue.failJob(job.id, job.attempts, reason),
+        fail: (job, reason) => queue.failJob(job.id, job.attempts, reason, job.tenantId),
       });
       if (state !== lastState) {
         console.info(`[verifier-worker] state=${state}`);

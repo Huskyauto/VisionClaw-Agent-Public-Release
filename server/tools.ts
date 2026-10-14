@@ -1782,6 +1782,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           platform: { type: "string", enum: ["x", "linkedin", "instagram", "facebook", "blog", "general"], description: "Target platform (affects recommended dimensions/style)" },
           folder_label: { type: "string", description: "Google Drive folder name for organization (default: 'Social Media Images')" },
           purpose: { type: "string", enum: ["customer_pdf", "customer_slide", "customer_video_scene", "marketing", "social_post", "ad_creative", "brand_asset", "ecommerce_product", "thumbnail", "preview", "internal_debug", "bulk_batch", "scratch"], description: "R74.11 cost-aware quality routing. Customer-facing → premium model (gpt-image-2). Internal/preview → economy model (Gemini Flash). Omit when unknown to default to high quality." },
+          image_model: { type: "string", enum: ["cheaperinference/nano-banana", "cheaperinference/grok-imagine"], description: "Owner only: fixed-unit paid square image via CheaperInference, sharing the $20 UTC-day cap. No references/edits. Omit for the existing quality cascade." },
           reference_image_paths: { type: "array", items: { type: "string" }, description: "R99.1 — Optional list of local image file paths to attach as references. When provided, the call routes through gpt-image-2's multi-image edits endpoint so the model literally sees the references (not just a text description). Hard cap 4 images per call. Used by Felix Visual Continuity (mpeg-engine) to keep recurring characters and environments visually consistent across scenes." },
         },
         required: ["prompt"],
@@ -5284,7 +5285,7 @@ RULES:
 
           if (params.driveFileId) {
             const { downloadFromDrive } = await import("./google-drive");
-            const dlResult = await downloadFromDrive({ fileId: params.driveFileId });
+            const dlResult = await downloadFromDrive({ fileId: params.driveFileId, tenantId: params._tenantId });
             if (!dlResult.success || !dlResult.path) return { error: `Failed to download file from Google Drive: ${dlResult.error || params.driveFileId}` };
             const fsMod2 = await import("fs");
             videoBuffer = fsMod2.readFileSync(dlResult.path);
@@ -7244,14 +7245,17 @@ RULES:
       }
 
       try {
-        const dataUrl = await retryWithBackoff(
-          () => generateImage(fullPrompt, {
+        const makeImage = () => generateImage(fullPrompt, {
+            tenantId: params._tenantId,
+            model: params.image_model,
             purpose: params.purpose,
             callerLabel: "generate_social_image",
             ...(refPaths.length > 0 ? { referenceImagePaths: refPaths } : {}),
-          }),
-          { retries: 3, delayMs: 8000, label: "generate_social_image" },
-        );
+          });
+        // Ambiguous wallet requests must not be retried by the outer helper.
+        const dataUrl = params.image_model?.startsWith("cheaperinference/")
+          ? await makeImage()
+          : await retryWithBackoff(makeImage, { retries: 3, delayMs: 8000, label: "generate_social_image" });
         const base64Data = dataUrl.split(",")[1];
         const mimeMatch = dataUrl.match(/data:([^;]+);/);
         const mimeType = mimeMatch?.[1] || "image/png";

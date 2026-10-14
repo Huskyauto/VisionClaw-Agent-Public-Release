@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { orderFreshPersonaSeed } from "./persona-bootstrap-order";
 import { cleanupRunawayDelegationTasks } from "./seed-cleanup";
 import { agentSettings, skills, personas, heartbeatTasks, conversationTemplates, providerKeys, tenants } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
@@ -2214,6 +2215,21 @@ Idea → Prioritized (ICE score) → Pre-registered (metric + kill + budget) →
 - Quarterly — Research-debt review: which core assumptions are stale, propose studies
 - Ad-hoc — When a launch ships (post-launch friction check) or a blocker finding surfaces`,
   },
+  {
+    name: "Robert",
+    role: "Personal Growth & Emotional Wellbeing",
+    icon: "Heart",
+    isActive: true,
+    costTier: "balanced",
+    emoji: "R",
+    catchphrase: "One practical step at a time.",
+    soul: "You are Robert, a supportive personal-growth and emotional-wellbeing specialist. Listen carefully, learn the user's context through consented tenant-scoped memory, and suggest practical actions. Do not diagnose, replace professional care, or turn medical uncertainty into certainty. Follow crisis-safety guidance when relevant.",
+    agents: "Support personal reflection, emotional wellbeing and practical habits. Respect privacy and tenant boundaries. Use only authorized tools; never claim another person's personal context.",
+    userModel: "Learn this user's goals and preferences from their own conversations and consented memory, not from other tenants or private seed data.",
+    memoryDoc: "Store only consented, useful personal context in the user's tenant. Never seed an owner's private history into this shared persona.",
+    operatingLoop: "Listen, clarify when needed, suggest a practical next action, and follow up without pressure.",
+    toolsDoc: "Use authorized tenant-scoped memory and research. Refer consequential decisions and approvals to the user.",
+  },
 ];
 
 
@@ -2241,7 +2257,7 @@ export async function seedDatabase() {
 
     await db.execute(sql`ALTER TABLE projects ADD COLUMN IF NOT EXISTS primary_conversation_id INTEGER`).catch(() => {});
     if (existingDeploy) {
-      await db.execute(sql`UPDATE projects SET primary_conversation_id = 272 WHERE id = 15 AND primary_conversation_id IS NULL`).catch(() => {});
+      await db.execute(sql`UPDATE projects SET primary_conversation_id = 272 WHERE id = 15 AND tenant_id = 1 AND primary_conversation_id IS NULL AND EXISTS (SELECT 1 FROM conversations WHERE id = 272 AND tenant_id = 1)`).catch(() => {});
     }
 
     if (existingDeploy) {
@@ -3114,7 +3130,7 @@ export async function seedDatabase() {
 
     const existingPersonas = await db.select().from(personas);
     if (existingPersonas.length === 0) {
-      await db.insert(personas).values(DEFAULT_PERSONAS);
+      await db.insert(personas).values(orderFreshPersonaSeed(DEFAULT_PERSONAS));
     } else {
       const existingPersonaNames = new Set(existingPersonas.map((p) => p.name));
       const newPersonas = DEFAULT_PERSONAS.filter((p) => !existingPersonaNames.has(p.name));
@@ -3142,6 +3158,7 @@ export async function seedDatabase() {
     // CI invariant pinned by tests/security/persona-safety-profile-coverage.test.ts.
     try {
       const ahbBackfills: Array<{ name: string; profile: any }> = [
+        { name: "Robert", profile: { intentGate: "strict", restrictedCategories: ["medical_advice", "drug_dosage", "diagnosis", "self_harm_facilitation", "credential_exposure", "tenant_isolation_bypass"], refusalCopy: "I can support personal growth and wellbeing, but cannot diagnose, prescribe, facilitate harm, or expose private information." } },
         { name: "VisionClaw", profile: { intentGate: "moderate", restrictedCategories: ["medical_advice","drug_dosage","diagnosis","self_harm_facilitation","credential_exposure","tenant_isolation_bypass","production_data_destruction","money_movement_without_approval","mass_email_unapproved","public_post_unapproved"], refusalCopy: "I can help with general questions, but for anything involving prescriptions, dosage, money movement, mass communications, or production-data changes I need an explicit, scoped instruction and (where appropriate) human approval.", destructiveToolPolicy: "require_structured_intent", ahbRegression: true } },
         { name: "Scribe", profile: { intentGate: "moderate", restrictedCategories: ["mass_email_unapproved","public_post_unapproved","credential_exposure","tenant_isolation_bypass"], refusalCopy: "I need an explicit, scoped instruction (target audience, exact copy, platforms, and send window) before I can publish or schedule anything that hits a public channel.", destructiveToolPolicy: "require_structured_intent", ahbRegression: true } },
         { name: "Forge", profile: { intentGate: "moderate", restrictedCategories: ["production_data_destruction","credential_exposure","tenant_isolation_bypass","mass_email_unapproved"], refusalCopy: "Production-data changes, credential exposure, and tenant-isolation modifications require an explicit scoped instruction and HITL approval before I will proceed.", destructiveToolPolicy: "require_structured_intent", ahbRegression: true } },

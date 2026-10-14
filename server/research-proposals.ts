@@ -13,6 +13,8 @@ import {
   extractArtifactAuthorityReceipt,
   validateArtifactAuthorityReceipt,
 } from "./lib/artifact-authority";
+import { readWorkspaceVerificationContext } from "./lib/workspace-verifier-contract";
+import { captureVerifierSource } from "./lib/workspace-verifier-source";
 import { parseProposalDiff, findExactMatch } from "./lib/proposal-diff";
 import { redactPiiForStorage } from "./storage-helpers/pii-redaction-guard";
 import { assertMemoryValueNotTombstoned } from "./memory/tombstones";
@@ -371,7 +373,7 @@ export async function replayHighValueFindings(opts: {
            re.result, re.metric_value, re.model AS exp_model,
            rp.name AS program_name, rp.model AS program_model
     FROM research_experiments re
-    JOIN research_programs rp ON rp.id = re.program_id
+    JOIN research_programs rp ON rp.id = re.program_id AND rp.tenant_id = re.tenant_id
     WHERE re.status = 'keep'
       AND re.replayed_at IS NULL
       AND re.metric_value ~ '^[0-9]+$'
@@ -530,6 +532,17 @@ export async function safeApplyProposal(proposalId: number, tenantId: number): P
       reverted: false,
     };
   }
+  let compilerContextSha256: string | undefined;
+  try {
+    compilerContextSha256 = readWorkspaceVerificationContext(String(proposal.verification_details || ""));
+    if (compilerContextSha256 && captureVerifierSource().hash !== compilerContextSha256) {
+      return { success: false, stage: "artifact_authority",
+        error: "Apply blocked: compiler source context changed; re-run verification", reverted: false };
+    }
+  } catch {
+    return { success: false, stage: "artifact_authority",
+      error: "Apply blocked: workspace verification context unavailable", reverted: false };
+  }
   const authorityValidation = validateArtifactAuthorityReceipt(authorityReceipt, {
     authorityId: "research-proposal-tsc-heldout",
     tenantId,
@@ -539,6 +552,7 @@ export async function safeApplyProposal(proposalId: number, tenantId: number): P
       targetFile: cleanTarget,
       sourceSha256: artifactAuthoritySha256Text(originalContent),
       proposal: { oldCode, newCode },
+      ...(compilerContextSha256 ? { compilerContextSha256 } : {}),
     },
     requiredVerdict: "accepted",
   });
@@ -764,7 +778,7 @@ async function generateResearchDigestUncoordinated(tenantId: number = 1): Promis
         rs.experiments_crashed, rs.summary, rs.model, rs.started_at, rs.ended_at,
         rp.name as program_name
       FROM research_sessions rs
-      JOIN research_programs rp ON rs.program_id = rp.id
+      JOIN research_programs rp ON rs.program_id = rp.id AND rp.tenant_id = rs.tenant_id
       WHERE rs.tenant_id = ${tenantId} AND rs.started_at >= ${sevenDaysAgo}::timestamp
       ORDER BY rs.started_at DESC
     `);
@@ -774,8 +788,8 @@ async function generateResearchDigestUncoordinated(tenantId: number = 1): Promis
       SELECT re.id, re.session_id, re.hypothesis, re.approach, re.result, re.metric_value, re.status, re.model,
         rp.name as program_name
       FROM research_experiments re
-      JOIN research_sessions rs ON re.session_id = rs.id
-      JOIN research_programs rp ON rs.program_id = rp.id
+      JOIN research_sessions rs ON re.session_id = rs.id AND re.tenant_id = rs.tenant_id
+      JOIN research_programs rp ON rs.program_id = rp.id AND rp.tenant_id = rs.tenant_id
       WHERE rs.tenant_id = ${tenantId} AND re.status = 'keep' AND rs.started_at >= ${sevenDaysAgo}::timestamp
       ORDER BY re.metric_value DESC
     `);

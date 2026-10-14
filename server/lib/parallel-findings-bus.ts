@@ -34,6 +34,7 @@ export async function publishFinding(opts: {
    * an append-only discovery. Siblings read it via readSlot/readBoard. */
   slotKey?: string;
 }): Promise<FindingRow> {
+  if (!Number.isSafeInteger(opts.tenantId) || opts.tenantId <= 0) throw new Error("Finding tenant is required");
   const conf = typeof opts.confidence === "number" ? Math.max(0, Math.min(1, opts.confidence)) : 0.7;
   const slotKey = opts.slotKey ? String(opts.slotKey).slice(0, 200) : null;
   const r = await db.execute(sql`
@@ -120,6 +121,7 @@ export async function claimSlot(opts: {
   subtaskId: string;
   slotKey: string;
 }): Promise<{ won: boolean; owner: string }> {
+  if (!Number.isSafeInteger(opts.tenantId) || opts.tenantId <= 0) throw new Error("Claim tenant is required");
   const slotKey = String(opts.slotKey).slice(0, 200);
   const r = await db.execute(sql`
     INSERT INTO parallel_job_findings (tenant_id, job_id, subtask_id, finding, confidence, slot_key, claim)

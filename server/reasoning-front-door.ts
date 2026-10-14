@@ -96,7 +96,8 @@ function buildPrompt(input: FrontDoorInput, categories: string[]): string {
   ].join("\n");
 }
 
-async function pickClassifierClient(): Promise<{ client: any; modelId: string } | null> {
+async function pickClassifierClient(tenantId?: number): Promise<{ client: any; modelId: string } | null> {
+  if (typeof tenantId !== "number" || !Number.isSafeInteger(tenantId) || tenantId <= 0) return null;
   try {
     const available = await getAvailableModels();
     const availableIds = new Set(available.map(m => m.id));
@@ -106,11 +107,11 @@ async function pickClassifierClient(): Promise<{ client: any; modelId: string } 
       const prov = MODEL_REGISTRY.find(m => m.id === cm)?.provider;
       if (prov && unhealthy.has(prov)) continue;
       try {
-        const r = await getClientForModel(cm);
+        const r = await getClientForModel(cm, tenantId);
         return { client: r.client, modelId: r.actualModelId };
       } catch (_e) { logSilentCatch("server/reasoning-front-door.ts", _e); }
     }
-    const r = await getClientForModel("gemini-2.5-flash");
+    const r = await getClientForModel("gemini-2.5-flash", tenantId);
     return { client: r.client, modelId: r.actualModelId };
   } catch (_e) {
     logSilentCatch("server/reasoning-front-door.ts", _e);
@@ -137,7 +138,7 @@ export async function runReasoningFrontDoor(input: FrontDoorInput): Promise<Fron
   // The whole pipeline — including client discovery, which itself awaits — runs
   // inside `work` so the deadline bounds EVERYTHING, not just the network call.
   const work = (async (): Promise<FrontDoorPlan | null> => {
-    const picked = await pickClassifierClient();
+    const picked = await pickClassifierClient(input.tenantId);
     if (!picked) return null;
 
     const resp: any = await picked.client.chat.completions.create(

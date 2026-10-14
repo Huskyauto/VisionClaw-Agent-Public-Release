@@ -135,6 +135,7 @@ export async function checkAndAutoCreateProject(
       const msgRes = await tx.execute(sql`
         SELECT role, LEFT(content, 300) as content FROM messages
         WHERE conversation_id = ${conversationId}
+          AND tenant_id = ${tenantId}
         ORDER BY id ASC LIMIT 20
       `);
       const msgRows = queryRows(msgRes);

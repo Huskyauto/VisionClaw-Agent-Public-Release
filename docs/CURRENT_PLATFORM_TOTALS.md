@@ -36,7 +36,7 @@ checkout. Fresh checkouts verify committed facts with `verify-counts.ts`.
 | **Platform indexes (release aggregate)** | **885** | Live `pg_indexes` count minus versioned auth/session infrastructure exclusions |
 | **Non-PK indexes (evidence database)** | **616** | `SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'` |
 | **AI providers** | **6** | OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity |
-| **AI models (core registry)** | **85 curated** | `MODEL_REGISTRY.length` in `server/model-registry.ts` |
+| **AI models (core registry)** | **86 curated** | `MODEL_REGISTRY.length` in `server/model-registry.ts` |
 
 ---
 

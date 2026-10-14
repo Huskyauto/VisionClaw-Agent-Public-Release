@@ -1,6 +1,7 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import { cachedString } from "../../cache-gate";
 import { decideImageQuality, logQualityDecision, type ImagePurpose } from "../../image-quality-decider";
+import { generateCheaperImage } from "../../lib/cheaper-inference-images";
 
 export const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -11,10 +12,13 @@ export const ai = new GoogleGenAI({
 });
 
 export type ImageQuality = "fast" | "high";
-export type ImageModel = "auto" | "gpt-image-2" | "gemini" | "dalle-3";
+export type ImageModel = "auto" | "gpt-image-2" | "gemini" | "dalle-3" |
+  "cheaperinference/nano-banana" | "cheaperinference/grok-imagine";
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024" | "1792x1024" | "auto";
 
 export interface GenerateImageOptions {
+  /** Trusted calling scope; never copied from body tenantId. */
+  tenantId?: number;
   quality?: ImageQuality;
   model?: ImageModel;
   size?: ImageSize;
@@ -228,7 +232,8 @@ export async function generateImage(prompt: string, opts: GenerateImageOptions =
   // R74.11 — If caller passes a `purpose` (or aux signals) instead of explicit
   // `quality`, the decider picks the right tier for the workload's cost
   // profile. Explicit `quality` still wins if both are provided.
-  const { model = "auto", size = "1536x1024" } = opts;
+  const { model = "auto" } = opts;
+  const size = opts.size ?? (model.startsWith("cheaperinference/") ? "1024x1024" : "1536x1024");
   let quality: ImageQuality;
   if (opts.quality) {
     // Caller forced a specific tier — log it so audits show every decision uniformly.
@@ -263,6 +268,12 @@ export async function generateImage(prompt: string, opts: GenerateImageOptions =
   // Falls back to the refs-less cascade if the edits endpoint fails so a
   // single API hiccup never kills a render.
   const refPathsRaw = Array.isArray(opts.referenceImagePaths) ? opts.referenceImagePaths.filter(p => typeof p === "string" && p.length > 0) : [];
+  if (model.startsWith("cheaperinference/")) {
+    if (refPathsRaw.length || (size !== "auto" && size !== "1024x1024")) {
+      throw new Error("Fixed-unit CheaperInference image models support square generation, not references/edits");
+    }
+    return generateCheaperImage(prompt, model.slice("cheaperinference/".length), opts.tenantId!);
+  }
   if (refPathsRaw.length > 0) {
     try {
       return await tryProvider("gpt-image-2 (refs)", () => generateImageGptImage2WithRefs(prompt, refPathsRaw, size));

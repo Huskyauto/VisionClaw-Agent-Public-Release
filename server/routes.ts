@@ -9,6 +9,7 @@ import { sql, eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { storage, ALL_TENANTS } from "./storage";
 import { DEFAULT_CHAT_MODEL_ID, DEFAULT_CHAT_MODEL_LABEL, HIGH_END_WORK_MODEL_ID } from "./chat-model-default";
+import { selectOwnerWorkModel } from "./felix-model-policy";
 import { getConversationForPlatformAdmin } from "./platform-admin-conversations";
 import { seedDatabase } from "./seed";
 import { ownerTenantId } from "./agentic/autonomous-budget";
@@ -42,6 +43,8 @@ import { isManagedSkillSecurityError } from "./lib/managed-skill-safety";
 import { registerHumanAiSynergyRoutes } from "./routes/human-ai-synergy";
 import { registerCommercialResearchFrontierRoutes } from "./routes/commercial-research-frontier";
 import { registerInstinctOwnerRecoveryRoutes } from "./routes/instinct-owner-recovery";
+import { streamWithProgressDeadline } from "./lib/stream-progress-deadline";
+import { observePreparedHistory } from "./lib/prompt-history-comparison";
 import {
   MAX_STARTUP_UPLOAD_RESTORE_FILES,
   shouldRestoreStartupUpload,
@@ -62,6 +65,7 @@ import { PROVIDERS_SUPPORTING_TOOLS, getAllToolDefinitions } from "./tools";
 import { reflectOnResponse, refineResponse } from "./self-reflection";
 import { registerCodeProposalsRoutes } from "./routes/code-proposals";
 import { registerRepairHandoffRoute } from "./source-repair-handoff";
+import { registerWorkspaceVerifierRoutes } from "./routes/workspace-verifier";
 import { registerEventsRoutes } from "./routes/events";
 import { registerGoalLedgerRoutes } from "./routes/goal-ledger";
 import { registerSandboxRoutes } from "./routes/sandbox";
@@ -3813,6 +3817,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       validate: validateModelForTenant,
       platformAdminVerified: isPlatformAdmin(req),
     });
+    model = selectOwnerWorkModel(model, {
+      tenantId, ownerTenantId: ownerTenantId(), personaId: conv.personaId ?? null, content,
+    });
+    const { requestMuseContext } = await import("./muse-context");
+    const museContext = await requestMuseContext({
+      tenantId, ownerTenantId: ownerTenantId(), conversationId: conv.id, content, source: "web",
+    }, async (message) => {
+      const { sendSparkMessage } = await import("./spark-line");
+      return sendSparkMessage(tenantId, 2, message, conv.id);
+    });
+    res.write(`data: ${JSON.stringify({ museContext })}\n\n`);
 
     const isThinkingMode = !!conv.thinking;
     let thinkingLevel = (conv as any).thinkingLevel || (isThinkingMode ? "medium" : "off");
@@ -4370,6 +4385,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       })
     );
+
+    observePreparedHistory({ tenantId, conversationId, channel: "sse" }, allMessages, chatMessages);
 
     // SSE headers + keepalive are now opened EARLY (see "EARLY SSE STREAM OPEN"
     // above), so streamAborted / globalKeepalive are already declared and the
@@ -5019,9 +5036,8 @@ ${buildFelixProtocol()}`
         // loop wraps stream-creation + iteration so we can attempt up to 4 swaps
         // (covers the full Gemini 1M → Claude Opus 1M → Nemotron 1M → Grok 4.20 2M chain).
         const _bigCtxTried = new Set<string>();
-        let firstChunkReceived = false;
-        let streamTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
         let thinkingCleared = false;
+        let streamProgressTimedOut = false;
         let toolMarkupStreamFilter = createToolMarkupStreamFilter();
 
         escalation_retry: for (let _escAttempt = 0; _escAttempt < 4; _escAttempt++) {
@@ -5031,28 +5047,25 @@ ${buildFelixProtocol()}`
         thinkBuffer = "";
         for (const k of Object.keys(toolCallBuffers)) delete toolCallBuffers[Number(k) as any];
         hasToolCalls = false;
-        firstChunkReceived = false;
         thinkingCleared = false;
+        streamProgressTimedOut = false;
         toolMarkupStreamFilter = createToolMarkupStreamFilter();
-        if (streamTimeoutTimer) { clearTimeout(streamTimeoutTimer); streamTimeoutTimer = null; }
-        streamTimeoutTimer = setTimeout(() => {
-          if (!firstChunkReceived && !streamAborted) {
-            console.error(`[sse-round] Round ${round}: TIMEOUT — no chunks received in ${STREAM_FIRST_CHUNK_TIMEOUT / 1000}s (hadSlowTool=${hadSlowTool}), aborting stream`);
-            streamAborted = true;
-            try { if (stream && typeof stream.controller?.abort === "function") stream.controller.abort(); } catch (_silentErr) { logSilentCatch("server/routes.ts", _silentErr); }
-          }
-        }, STREAM_FIRST_CHUNK_TIMEOUT);
 
         try {
-        for await (const chunk of stream) {
+        for await (const chunk of streamWithProgressDeadline<any>(stream, {
+          timeoutMs: STREAM_FIRST_CHUNK_TIMEOUT,
+          signal: streamAbortController.signal,
+          onTimeout: () => {
+            streamProgressTimedOut = true;
+            console.error(`[sse-round] Round ${round}: model progress deadline exceeded`);
+            streamAborted = true;
+            stream?.controller?.abort();
+          },
+        })) {
           if ((chunk as any)?.model) workerModels.add(String((chunk as any).model));
-          if (!firstChunkReceived) {
-            firstChunkReceived = true;
-            if (streamTimeoutTimer) { clearTimeout(streamTimeoutTimer); streamTimeoutTimer = null; }
-          }
           if (!thinkingCleared) { clearInterval(thinkingTimer); thinkingCleared = true; }
           if (streamAborted) break;
-          const choice = chunk.choices[0];
+          const choice = chunk.choices?.[0];
           if (!choice) continue;
           const delta = choice.delta as any;
 
@@ -5168,9 +5181,8 @@ ${buildFelixProtocol()}`
           }
         }
         clearInterval(thinkingTimer);
-        if (streamTimeoutTimer) { clearTimeout(streamTimeoutTimer); streamTimeoutTimer = null; }
         if (streamAborted && !roundContent && !hasToolCalls) {
-          if (hadSlowTool && round > 0 && executedTools.length > 0) {
+          if (!streamProgressTimedOut && hadSlowTool && round > 0 && executedTools.length > 0) {
             console.log(`[sse-round] Round ${round}: stream timed out after presentation/slow tool — attempting recovery retry`);
             streamAborted = false;
             res.write(`data: ${JSON.stringify({ type: "thinking_progress", message: "Recovering from timeout, retrying response...", round })}\n\n`);
@@ -5192,7 +5204,11 @@ ${buildFelixProtocol()}`
                 currentRegistryModelId,
               );
               const recoveryMarkupFilter = createToolMarkupStreamFilter();
-              for await (const rChunk of recoveryStream) {
+              for await (const rChunk of streamWithProgressDeadline<any>(recoveryStream, {
+                timeoutMs: STREAM_FIRST_CHUNK_TIMEOUT,
+                signal: streamAbortController.signal,
+                onTimeout: () => recoveryStream?.controller?.abort(),
+              })) {
                 if ((rChunk as any)?.model) workerModels.add(String((rChunk as any).model));
                 const rDelta = rChunk.choices?.[0]?.delta?.content || "";
                 if (rDelta) {
@@ -5229,7 +5245,6 @@ ${buildFelixProtocol()}`
         break escalation_retry; // success — no overflow, exit retry loop
         } catch (midStreamErr: unknown) {
           clearInterval(thinkingTimer);
-          if (streamTimeoutTimer) { clearTimeout(streamTimeoutTimer); streamTimeoutTimer = null; }
           const midMsg = String(errorMessage(midStreamErr) || midStreamErr || "");
           const midMsgLower = midMsg.toLowerCase();
           console.error(`[stream] Mid-stream error (round ${round}): ${midMsg.slice(0, 300)}`);
@@ -6078,7 +6093,7 @@ ${buildFelixProtocol()}`
       import("./project-brain").then(({ updateProjectBrain }) => {
         const pId = conv.projectId || conv.projectId;
         if (pId) {
-          updateProjectBrain(pId, conversationId, content, fullResponse, persona?.name).catch(() => {});
+          updateProjectBrain(pId, conversationId, content, fullResponse, persona?.name, tenantId).catch(() => {});
         }
       }).catch(() => {});
 
@@ -7429,6 +7444,7 @@ ${buildFelixProtocol()}`
   // (first slice of routes.ts decomposition — 70 LOC removed from this file).
   registerCodeProposalsRoutes(app, { getTenantFromRequest, requirePlatformAdmin });
   registerRepairHandoffRoute(app);
+  registerWorkspaceVerifierRoutes(app);
   registerEventsRoutes(app, { authMiddleware, getTenantFromRequest, isAdminRequest });
   registerGoalLedgerRoutes(app, { authMiddleware, requirePlatformAdmin });
   registerSandboxRoutes(app, { authMiddleware, getTenantFromRequest, isAdminRequest, ADMIN_TENANT_ID });

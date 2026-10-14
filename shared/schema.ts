@@ -168,6 +168,8 @@ export const apiV1ConversationRuns = pgTable("api_v1_conversation_runs", {
   failureReason: text("failure_reason"),
   failedAt: timestamp("failed_at"),
   completedReply: text("completed_reply"),
+  resolvedModel: text("resolved_model"),
+  observedModel: text("observed_model"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
   tenantIdx: index("idx_api_v1_conversation_runs_tenant").on(t.tenantId, t.conversationId),

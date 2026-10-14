@@ -194,7 +194,7 @@ async function runOneJob(job: AgentJob): Promise<void> {
     const handler = HANDLERS.get(job.kind);
     if (!handler) {
       console.warn(`[job-worker] No handler registered for kind="${job.kind}" (job #${job.id}) — failing`);
-      await failJob(job.id, job.attempts, `No handler registered for kind="${job.kind}"`);
+      await failJob(job.id, job.attempts, `No handler registered for kind="${job.kind}"`, job.tenantId);
       return;
     }
     try {
@@ -229,7 +229,7 @@ async function runOneJob(job: AgentJob): Promise<void> {
       }
       if (err instanceof WeeklyEmailNeedsReview) {
         console.error(`[job-worker] Job #${job.id} requires operator review: ${err.message}`);
-        await failJob(job.id, job.attempts, err.message, { stopRetry: true, failureClass: "unknown" });
+        await failJob(job.id, job.attempts, err.message, job.tenantId, { stopRetry: true, failureClass: "unknown" });
         return;
       }
       if (err instanceof HeavyWorkDeferred) {
@@ -255,7 +255,7 @@ async function runOneJob(job: AgentJob): Promise<void> {
       }
       const msg = normalizeError(err);
       console.error(`[job-worker] Job #${job.id} (${job.kind}) failed attempt ${job.attempts}: ${msg.split("\n")[0]}`);
-      await failJob(job.id, job.attempts, msg);
+      await failJob(job.id, job.attempts, msg, job.tenantId);
     }
   } finally {
     inFlight--;

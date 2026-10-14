@@ -1,9 +1,9 @@
-import { db } from "./db";
 import { sql } from "drizzle-orm";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
 import * as path from "path";
 import { WORKER_SOURCE_MISMATCH } from "./lib/bounded-verifier-worker";
+import { validateWorkspaceSnapshot, WORKSPACE_CONTEXT_PREFIX, type WorkspaceProposalSnapshot } from "./lib/workspace-verifier-contract";
 
 import {
   artifactAuthoritySha256Text,
@@ -37,13 +37,26 @@ const MAX_DIFF_LINES = 800;
 // truth: tsc reads everything else fresh from disk on every run.
 
 export async function verifyProposalById(
-  proposalId: number, tenantId: number, options: { strictSourceBase?: boolean } = {},
+  proposalId: number, tenantId: number,
+  options: { strictSourceBase?: boolean; snapshot?: WorkspaceProposalSnapshot } = {},
 ): Promise<VerifyResult> {
   const t0 = Date.now();
   if (!Number.isInteger(tenantId) || tenantId <= 0) {
     throw new Error("verifyProposalById: tenantId must be a positive integer");
   }
-  const r = await db.execute(sql`
+  const snapshot = options.snapshot ? validateWorkspaceSnapshot(options.snapshot) : undefined;
+  if (snapshot && (snapshot.proposalId !== proposalId || snapshot.tenantId !== tenantId)) {
+    throw new Error("Snapshot proposal identity mismatch");
+  }
+  const db = snapshot ? undefined : (await import("./db")).db;
+  // Snapshot mode is computation-only; its result is persisted by the production
+  // lease owner. Never import remote rows into the development database.
+  const persist = snapshot
+    ? async (_id: number, _tenant: number, _status: string, _details: string) => {}
+    : persistProposalVerification;
+  const r = snapshot ? { rows: [{
+    id: snapshot.proposalId, target_file: snapshot.targetFile, code_diff: snapshot.codeDiff,
+  }] } : await db!.execute(sql`
     SELECT id, target_file, code_diff, validation_result, description, rationale
     FROM code_proposals
     WHERE id = ${proposalId} AND tenant_id = ${tenantId}
@@ -60,7 +73,7 @@ export async function verifyProposalById(
   const parsedDiff = parseProposalDiff(codeDiff);
   if (!parsedDiff) {
     const details = "diff missing OLD_CODE / NEW_CODE markers";
-    await persistProposalVerification(proposalId, tenantId, "skipped", details);
+    await persist(proposalId, tenantId, "skipped", details);
     return { status: "skipped", details, durationMs: Date.now() - t0 };
   }
   let { oldCode, newCode } = parsedDiff;
@@ -68,7 +81,7 @@ export async function verifyProposalById(
   const diffLineCount = (oldCode.split("\n").length + newCode.split("\n").length);
   if (diffLineCount > MAX_DIFF_LINES) {
     const details = `diff too large (${diffLineCount} lines > ${MAX_DIFF_LINES}), refusing to verify`;
-    await persistProposalVerification(proposalId, tenantId, "skipped", details);
+    await persist(proposalId, tenantId, "skipped", details);
     return { status: "skipped", details, durationMs: Date.now() - t0 };
   }
 
@@ -79,7 +92,7 @@ export async function verifyProposalById(
   // Safety: never read anything outside the repo root.
   if (!resolved.startsWith(repoRoot + path.sep) && resolved !== repoRoot) {
     const details = `target path outside repo: ${targetFile}`;
-    await persistProposalVerification(proposalId, tenantId, "skipped", details);
+    await persist(proposalId, tenantId, "skipped", details);
     return { status: "skipped", details, durationMs: Date.now() - t0 };
   }
 
@@ -88,16 +101,22 @@ export async function verifyProposalById(
     liveContent = await fs.readFile(resolved, "utf-8");
   } catch (e) {
     const details = `cannot read target file: ${(e as Error).message}`;
-    await persistProposalVerification(proposalId, tenantId, "skipped", details);
+    await persist(proposalId, tenantId, "skipped", details);
     return { status: "skipped", details, durationMs: Date.now() - t0 };
   }
 
+  if (snapshot && artifactAuthoritySha256Text(liveContent) !== snapshot.sourceSha256) {
+    return { status: "skipped", details: WORKER_SOURCE_MISMATCH, durationMs: Date.now() - t0 };
+  }
   let patchedContent: string;
   if (liveContent.includes(oldCode)) {
     patchedContent = liveContent.replace(oldCode, newCode);
   } else {
     // The external worker must never spend on an LLM rebase against a different
     // checkout or mutate the proposal to conceal deployment/source drift.
+    if (snapshot) {
+      return { status: "skipped", details: "Proposal anchor is stale against authoritative source; regenerate proposal", durationMs: Date.now() - t0 };
+    }
     if (options.strictSourceBase === true) {
       return { status: "skipped", details: WORKER_SOURCE_MISMATCH, durationMs: Date.now() - t0 };
     }
@@ -109,7 +128,7 @@ export async function verifyProposalById(
     );
     if (!rebased) {
       const details = "OLD_CODE no longer matches file content (drift)";
-      await persistProposalVerification(proposalId, tenantId, "skipped", details);
+      await persist(proposalId, tenantId, "skipped", details);
       return { status: "skipped", details, durationMs: Date.now() - t0 };
     }
     oldCode = rebased.oldCode;
@@ -124,7 +143,7 @@ export async function verifyProposalById(
       // proposal in "stuck" state forever even though no successful verify
       // ever ran. Outcome marked 'race_after_rebase' for forensics.
       try {
-        await db.execute(sql`
+        await db!.execute(sql`
           UPDATE code_proposals
           SET validation_result = COALESCE(validation_result, '{}'::jsonb)
             - 'rebased_at'
@@ -135,7 +154,7 @@ export async function verifyProposalById(
         console.error(`[proposal-verifier] failed to clear rebased_at after race: ${(e as Error).message}`);
       }
       const details = "rebased OLD_CODE drifted again before in-memory apply (rebase gate cleared for retry)";
-      await persistProposalVerification(proposalId, tenantId, "skipped", details);
+      await persist(proposalId, tenantId, "skipped", details);
       return { status: "skipped", details, durationMs: Date.now() - t0 };
     }
     patchedContent = liveContent.replace(oldCode, newCode);
@@ -143,10 +162,10 @@ export async function verifyProposalById(
 
   let tscResult: { errors: string[] };
   try {
-    tscResult = await runTscWithOverride(resolved, patchedContent);
+    tscResult = await runTscWithOverride(resolved, patchedContent, !!snapshot);
   } catch (e) {
     const details = `in-memory tsc crashed: ${(e as Error).message}`;
-    await persistProposalVerification(proposalId, tenantId, "failed", details);
+    await persist(proposalId, tenantId, "failed", details);
     return { status: "failed", details, durationMs: Date.now() - t0 };
   }
 
@@ -165,12 +184,12 @@ export async function verifyProposalById(
       heldOut = heldOutEvalGate({ targetFile, oldCode, newCode });
     } catch (e) {
       const details = `artifact authority indeterminate: held-out eval gate unavailable: ${(e as Error).message}`.slice(0, 4000);
-      await persistProposalVerification(proposalId, tenantId, "failed", details);
+      await persist(proposalId, tenantId, "failed", details);
       return { status: "failed", details, durationMs: Date.now() - t0 };
     }
     if (heldOut && !heldOut.passed) {
       const details = `held-out eval gate BLOCKED (SIA Goodhart guard, mode=${heldOut.mode}): ${heldOut.violations.join("; ")}`.slice(0, 4000);
-      await persistProposalVerification(proposalId, tenantId, "failed", details);
+      await persist(proposalId, tenantId, "failed", details);
       return { status: "failed", details, durationMs: Date.now() - t0 };
     }
     const warnNote = heldOut && heldOut.severity === "warn" && heldOut.violations.length
@@ -185,6 +204,7 @@ export async function verifyProposalById(
         targetFile,
         sourceSha256: artifactAuthoritySha256Text(liveContent),
         proposal: { oldCode, newCode },
+        ...(snapshot ? { compilerContextSha256: snapshot.contextSha256 } : {}),
       },
       verdict: "accepted",
       reasonCodes: [
@@ -199,14 +219,15 @@ export async function verifyProposalById(
       },
     });
     const receiptLine = serializeArtifactAuthorityReceipt(receipt);
+    const contextLine = snapshot ? `${WORKSPACE_CONTEXT_PREFIX}${snapshot.contextSha256}\n` : "";
     const summary = `tsc --noEmit OK (in-memory, ${Math.round((Date.now() - t0) / 1000)}s)${warnNote}`;
-    const details = `${summary.slice(0, Math.max(0, 3999 - receiptLine.length))}\n${receiptLine}`;
-    await persistProposalVerification(proposalId, tenantId, "passed", details);
+    const details = `${summary.slice(0, Math.max(0, 3999 - receiptLine.length - contextLine.length))}\n${contextLine}${receiptLine}`;
+    await persist(proposalId, tenantId, "passed", details);
     return { status: "passed", details, durationMs: Date.now() - t0 };
   }
   const errSnippet = tscResult.errors.slice(0, 30).join("\n").slice(0, 3500);
   const details = `tsc --noEmit FAILED (${tscResult.errors.length} errors). First errors:\n${errSnippet}`;
-  await persistProposalVerification(proposalId, tenantId, "failed", details);
+  await persist(proposalId, tenantId, "failed", details);
   return { status: "failed", details, durationMs: Date.now() - t0 };
 }
 
@@ -214,7 +235,7 @@ export async function verifyProposalById(
 // returns `patchedContent` for the single overridden file path, and let
 // ts.getPreEmitDiagnostics walk the program. Everything else (other source
 // files, node_modules, lib.d.ts) is read fresh from disk on every call.
-async function runTscWithOverride(absTargetFile: string, patchedContent: string): Promise<{ errors: string[] }> {
+async function runTscWithOverride(absTargetFile: string, patchedContent: string, snapshotMode = false): Promise<{ errors: string[] }> {
   const ts = await import("typescript");
   const repoRoot = process.cwd();
 
@@ -247,14 +268,26 @@ async function runTscWithOverride(absTargetFile: string, patchedContent: string)
     return host.getCanonicalFileName(resolved);
   };
   const overrideCanonical = canonical(absTargetFile);
+  const dependencyRoot = snapshotMode ? canonical(path.join(repoRoot, "node_modules")) : "";
+  const stageRoot = canonical(repoRoot);
+  const admitted = (fileName: string): boolean => {
+    if (!snapshotMode) return true;
+    const file = canonical(fileName);
+    return file === stageRoot || file.startsWith(stageRoot + path.sep)
+      || file === dependencyRoot || file.startsWith(dependencyRoot + path.sep);
+  };
+  const origFileExists = host.fileExists.bind(host);
+  host.fileExists = fileName => admitted(fileName) && origFileExists(fileName);
 
   const origReadFile = host.readFile.bind(host);
   host.readFile = (fileName: string) => {
+    if (!admitted(fileName)) return undefined;
     if (canonical(fileName) === overrideCanonical) return patchedContent;
     return origReadFile(fileName);
   };
   const origGetSourceFile = host.getSourceFile.bind(host);
   host.getSourceFile = (fileName, languageVersion, onError, shouldCreateNewSourceFile) => {
+    if (!admitted(fileName)) return undefined;
     if (canonical(fileName) === overrideCanonical) {
       return ts.createSourceFile(fileName, patchedContent, languageVersion, true);
     }
@@ -264,9 +297,15 @@ async function runTscWithOverride(absTargetFile: string, patchedContent: string)
   // tsconfig's `include` glob should already cover the target, but if a
   // proposal targets an unusual path (e.g., a script), make sure it's seeded
   // into the program so the override actually takes effect.
-  const fileNames = parsed.fileNames.some(f => canonical(f) === overrideCanonical)
+  let fileNames = parsed.fileNames.some(f => canonical(f) === overrideCanonical)
     ? parsed.fileNames
     : [...parsed.fileNames, absTargetFile];
+  if (snapshotMode) {
+    for (const name of ["scripts/proposal-verifier-child.ts", "scripts/workspace-proposal-verifier-worker.ts"]) {
+      const filename = path.join(repoRoot, name);
+      if (fsSync.existsSync(filename) && !fileNames.includes(filename)) fileNames.push(filename);
+    }
+  }
 
   const program = ts.createProgram(fileNames, options, host);
   const diagnostics = ts.getPreEmitDiagnostics(program);
@@ -291,7 +330,7 @@ export async function persistProposalVerification(
   tenantId: number,
   status: string,
   details: string,
-  executeQuery: (query: unknown) => Promise<unknown> = (query) => db.execute(query as any),
+  executeQuery: (query: unknown) => Promise<unknown> = async (query) => (await import("./db")).db.execute(query as any),
 ): Promise<void> {
   // Do NOT clobber proposal.status; verification is a sidecar signal consumed
   // by safeApplyProposal. A verifier result is not complete until exactly one
@@ -355,6 +394,7 @@ async function attemptRebaseOnDrift(
   staleNewCode: string,
   proposal: any,
 ): Promise<{ oldCode: string; newCode: string } | null> {
+  const { db } = await import("./db");
   try {
     const currentContent = await fs.readFile(resolvedFilePath, "utf-8");
     const fileForPrompt = currentContent.length > 18000

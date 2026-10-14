@@ -1,5 +1,23 @@
 [
   {
+    "version": "R136.2",
+    "date": "October 14, 2026",
+    "title": "Current source features, navigation, reliability and repository documentation",
+    "type": "feature",
+    "highlights": [
+      { "icon": "BarChart3", "text": "Treasury stock/crypto historical paper replay includes frozen presets, fees/slippage and matched benchmark evidence. Owner-only pilot: no real-money orders or automatic strategy promotion." },
+      { "icon": "KeyRound", "text": "Optional AgentID sign-in preserves human login, validates OIDC/state/nonce/PKCE and token expiry, and gives agents non-admin trial scope. Full authenticated production lifecycle verification is not claimed." },
+      { "icon": "Users", "text": "Robert is the personal/emotional-life specialist. Shared seeds exclude private owner history; name-based persona synchronization and clean-install canonical identity checks preserve existing accounts." },
+      { "icon": "Cpu", "text": "Owner Luna/Sol preferences retain authorized fallbacks. API evidence distinguishes requested, resolved and provider-reported models. CheaperInference is an opt-in owner paid lane with shared $20 UTC-day reservation accounting, not a platform-wide daily budget." },
+      { "icon": "RefreshCw", "text": "Native OpenClaw-inspired reliability changes add SSE progress deadlines, correction-aware compaction, recent-context budgeting, renewable fenced approval leases and advisory prepared-history comparison. No new automatic paid retry or opaque-action replay." },
+      { "icon": "ShieldCheck", "text": "Tenant/file boundaries include scoped storage and Drive access, owner-only voice-wake configuration with UI masking, task-owned watchdog records and tenant-bound approval updates. Source-bound verifier snapshots remain distinct from unverified production completion." },
+      { "icon": "MessageSquare", "text": "Muse advisory outbox/poll coordination remains partial; queue receipts do not prove replies. Cue/Felix setup documentation is guidance rather than a new active route or proven reply-ingestion channel." },
+      { "icon": "FileCheck", "text": "Both landing views, their Latest Updates menus, sidebar labels, SEO, dashboard history and private/public READMEs now describe source changes through October 14. Counts retain their October 8 development evidence date; the recorded curated model count is 86." },
+      { "icon": "GitCompare", "text": "Repository portability uses public npm URLs, Node 22.22+ and explicit public-test classification. Sanitized public source remains separate from private files, credentials and runtime data; GitHub synchronization is not website publication." },
+      { "icon": "BookOpen", "text": "HERMES and parallel worktree ideas are retained research, not shipped agent swarms. REA informed native AST import checking; its runtime toolkit was not installed. No new tools, permissions or schema were introduced by this documentation update." }
+    ]
+  },
+  {
     "version": "R136.1",
     "date": "October 8, 2026",
     "title": "Bitcoin and alternative crypto paper strategies",

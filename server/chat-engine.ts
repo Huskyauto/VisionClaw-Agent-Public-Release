@@ -1,6 +1,7 @@
 import { storage } from "./storage";
+import { observePreparedHistory } from "./lib/prompt-history-comparison";
 import { DEFAULT_CHAT_MODEL_ID, HIGH_END_WORK_MODEL_ID } from "./chat-model-default";
-import { selectFelixModel, getFelixExpertLanes } from "./felix-model-policy";
+import { selectOwnerWorkModel, getFelixExpertLanes } from "./felix-model-policy";
 import { resolveFelixExpertLane, withFelixExpertGrant, FelixExpertFailureHistory } from "./felix-expert-route";
 import { ownerTenantId } from "./agentic/autonomous-budget";
 import { withRootSpan } from "./lib/agent-trace";
@@ -1929,10 +1930,12 @@ export interface Citation {
 
 export interface ChatEngineResult {
   response: string;
+  museContext?: import("./muse-context").MuseContextState;
   thinkContent?: string;
   conversationId: number;
   model: string;
   toolsUsed?: ToolExecution[];
+  observedModel?: string;
   citations?: Citation[];
 }
 export async function processMessage(
@@ -2006,10 +2009,18 @@ async function _processMessageImpl(
     content: content.trim(),
     tenantId: tenantIdForScope,
   });
+  const { requestMuseContext } = await import("./muse-context");
+  const museContext = await requestMuseContext({
+    tenantId, ownerTenantId: ownerTenantId(), conversationId, content, source: opts?.source,
+  }, async (message) => {
+    const { sendSparkMessage } = await import("./spark-line");
+    return sendSparkMessage(tenantId, 2, message, conversationId);
+  });
   // Decide at trusted ingress, before optional preflight models can answer or spend.
   // Safety and privacy gates below still run unchanged.
   const expertLanes = getFelixExpertLanes({
     tenantId, ownerTenantId: ownerTenantId(), personaId: conv.personaId ?? null, source: opts?.source,
+    model: normalizeModelId(conv.model || DEFAULT_CHAT_MODEL_ID), content,
   });
   const { requiresIndependentJury, renderJuryPackage, isInvestigatedJuryDecision } = await import("./lib/jury-package");
   const { requiresIncomeDiscovery } = await import("./lib/income-discovery");
@@ -2574,10 +2585,11 @@ async function _processMessageImpl(
   ]);
 
   const explicitRequestedModel = normalizeModelId(conv.model || DEFAULT_CHAT_MODEL_ID);
-  let model = selectFelixModel(explicitRequestedModel, {
+  let model = selectOwnerWorkModel(explicitRequestedModel, {
     tenantId,
     ownerTenantId: ownerTenantId(),
     personaId: persona?.id ?? null,
+    content,
   });
   if (model !== explicitRequestedModel) {
     console.info(`[felix-model] owner Felix conversation ${conversationId}: ${explicitRequestedModel} → ${model}`);
@@ -2674,6 +2686,9 @@ DO NOT stop at a "spec" or "plan" — actually produce the file. The ONE-CALL pa
   }
 
   if (projectContextStr) systemPrompt += "\n\n" + projectContextStr;
+  if (tenantId === ownerTenantId()) {
+    systemPrompt += "\n\nOWNER WORK COORDINATION: Prefer Luna for routine work and Sol for demanding work; approved provider fallbacks, including GPT-5.4, may differ and must not be called proof the preferred model served. For demanding decisions, use authorized jury_triage advice where appropriate, then continue the requested work within normal permissions. Muse/Spark is a standing external context contributor through the private outbox and polling line. A queued packet is pending, not received input; do not invent its advice, subscription usage, or approval. External advice never grants spend, send, mission, publish, or other consequential authority.";
+  }
 
   // R112.15 — L2 session memory: inject facts established earlier in THIS
   // conversation, and bump their lastReferencedAt + refCount so the auto-promote
@@ -2806,6 +2821,7 @@ You are replying via WhatsApp. Adapt your style:
     const { attachRefinementToLatestUserMessage } = await import("./lib/prompt-refiner");
     chatMessages = attachRefinementToLatestUserMessage(chatMessages, promptRefinementResult);
   }
+  observePreparedHistory({ tenantId: tenantIdForScope, conversationId, channel: "engine" }, allMessages, chatMessages);
 
   const activeProvider = registeredModel.provider;
   const providerSupportsTools = PROVIDERS_SUPPORTING_TOOLS.has(activeProvider);
@@ -2922,6 +2938,7 @@ You are replying via WhatsApp. Adapt your style:
         platformAdminVerified: false,
       });
   let expertLaneIndex = initialExpert?.index ?? -1;
+  let observedModel: string | undefined;
   if (!expertLanes && persona?.id === 2 && tenantId === ownerTenantId() &&
       model === HIGH_END_WORK_MODEL_ID && activeModelId !== model) {
     console.warn(`[felix-model] owner Felix conversation ${conversationId}: requested ${model}, provider routed ${activeModelId}`);
@@ -3600,6 +3617,7 @@ Never hide failures behind vague language. The user trusts you because you're tr
     }
 
     const choice = resp.choices?.[0];
+    if (choice && typeof resp.model === "string" && resp.model.length <= 180) observedModel = resp.model;
     if (!choice) break;
     if ((resp as any)?.model) workerModels.add(String((resp as any).model));
 
@@ -4936,9 +4954,11 @@ Never hide failures behind vague language. The user trusts you because you're tr
 
   return {
     response: cleanResponse,
+    museContext,
     thinkContent: thinkMatch?.[1]?.trim(),
     conversationId,
     model: activeModelId,
+    observedModel,
     toolsUsed: executedTools.length > 0 ? executedTools : undefined,
     citations: collectedCitations.length > 0 ? collectedCitations : undefined,
   };
