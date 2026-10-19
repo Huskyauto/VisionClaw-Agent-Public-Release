@@ -57,6 +57,21 @@ export const tenants = pgTable("tenants", {
 }));
 
 export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true, trialConversationsUsed: true, emailVerified: true });
+
+// Private, immutable diagnostic snapshots. No public file/download integration.
+export const ownerAlertLogs = pgTable("owner_alert_logs", {
+  id: text("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  subject: text("subject").notNull(),
+  source: text("source").notNull(),
+  severity: text("severity").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  record: jsonb("record").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => ({ tenantCreated: index("idx_owner_alert_logs_tenant_created").on(t.tenantId, t.createdAt) }));
+export const insertOwnerAlertLogSchema = createInsertSchema(ownerAlertLogs).omit({ createdAt: true });
+export type InsertOwnerAlertLog = z.infer<typeof insertOwnerAlertLogSchema>;
+export type OwnerAlertLog = typeof ownerAlertLogs.$inferSelect;
 export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 

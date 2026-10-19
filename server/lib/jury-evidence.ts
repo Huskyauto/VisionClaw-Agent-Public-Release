@@ -7,6 +7,7 @@ export function responseModelIdentity(response: { model?: unknown }): string | u
 }
 
 export type JuryEvidenceReceipt = {
+  reportInspection?: { jobId: number; tenantId: number; inputDigest: string; reportSha256: string };
   candidateId?: string;
   sources?: Array<{ url: string; text: string }>;
   id: string; runId: string; tool: string; ok: boolean;
@@ -105,7 +106,7 @@ function publicDigest(hex: string): string {
     ? `sha256-base64url:${Buffer.from(hex, "hex").toString("base64url")}` : hex;
 }
 
-export function juryEvidencePrompt(pass: JuryEvidencePass): string {
+export function juryEvidencePrompt(pass: JuryEvidencePass, format: "channels" | "report-json" = "channels"): string {
   return `\nYOUR INDEPENDENT READ-ONLY EVIDENCE RUN (${pass.runId}).
 These calls were executed separately for YOUR seat by the server-owned evidence
 runner, not by another juror or by a shared collection pass. Do not claim that
@@ -116,7 +117,8 @@ primaryInferenceReceipts identify the earlier Felix coordinator completion,
 NOT your juror model. Your identity is recorded from your own completion response
 after your reply; do not infer it from another model's receipts or your seat label.
 ${JSON.stringify(pass)}
-End with CITATIONS: <comma-separated successful receipt ids>
-and UNKNOWNS: <explicit limitations, including untested subsystems>.
+${format === "report-json"
+  ? "Return citations and unknowns inside the JSON report vote. Do not append channel labels or any text after the JSON object."
+  : "End with CITATIONS: <comma-separated successful receipt ids>\nand UNKNOWNS: <explicit limitations, including untested subsystems>."}
 Do not certify the whole platform from these bounded checks.`;
 }

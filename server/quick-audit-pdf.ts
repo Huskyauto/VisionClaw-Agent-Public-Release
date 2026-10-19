@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import type { AgentJourneyResult } from "../shared/agent-journey";
 
 export interface QuickAuditPdfInput {
   websiteUrl: string;
@@ -17,6 +18,7 @@ export interface QuickAuditPdfInput {
     recommendation?: string;
   }>;
   recommendations: string[];
+  agentJourney?: AgentJourneyResult;
 }
 
 const PAGE_WIDTH = 612;
@@ -104,6 +106,27 @@ export async function createQuickAuditPdf(input: QuickAuditPdfInput): Promise<Ui
     ensure(50);
     text("Top improvements", { size: 15, font: bold });
     input.recommendations.forEach((item, index) => text(`${index + 1}. ${item}`, { indent: 8 }));
+  }
+
+  if (input.agentJourney) {
+    ensure(70);
+    text("Agent customer journey - read-only evidence pilot", { size: 15, font: bold });
+    text("Five unscored checks. The existing 100-point technical score is unchanged. This is not a live assistant or booking completion test.", { size: 9 });
+    for (const check of input.agentJourney.checks) {
+      ensure(55);
+      const status = check.status === "observed" ? "FOUND" : check.status === "uncertain" ? "UNCERTAIN" : "NOT FOUND IN SAMPLE";
+      text(`${status}: ${check.label}`, { size: 11, font: bold });
+      text(check.finding, { indent: 8 });
+      for (const evidence of check.evidence) {
+        text(`Evidence: ${evidence.excerpt}`, { indent: 12 });
+        text(`Source: ${evidence.url}`, { size: 8, indent: 12 });
+      }
+      text(`Next step: ${check.nextStep}`, { indent: 8 });
+    }
+    text("Pages assessed", { size: 11, font: bold });
+    input.agentJourney.pages.forEach(url => text(url, { size: 9 }));
+    text("Coverage and safety limits", { size: 11, font: bold });
+    input.agentJourney.limitations.forEach(limit => text(limit, { size: 9 }));
   }
 
   ensure(55);

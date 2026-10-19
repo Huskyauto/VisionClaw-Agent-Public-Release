@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Honeypot, TurnstileWidget } from "@/components/bot-protection";
+import AgentJourneyResults from "@/components/agent-journey-results";
+import type { AgentJourneyResult } from "../../../shared/agent-journey";
 import { ArrowRight, Check, FileText, ShieldCheck, ExternalLink, Loader2, Mail, AlertTriangle, TrendingDown, GitBranch, Send, XCircle, Globe, Gauge, Sparkles, Database, Workflow, Brain, Target, ListChecks, RotateCcw } from "lucide-react";
 
 // R125+13.4: pull UTM + referer from the URL once on mount; share across all
@@ -80,6 +82,7 @@ interface AuditRunResult {
   checks: AuditCheckResult[];
   recommendations: string[];
   fetchedAt: string;
+  agentJourney?: AgentJourneyResult;
 }
 
 function statusIcon(s: AuditCheckResult["status"]) {
@@ -217,6 +220,8 @@ function AuditResultCard({ result }: { result: AuditRunResult }) {
           </ol>
         </div>
       )}
+
+      {result.agentJourney && <AgentJourneyResults result={result.agentJourney} />}
 
       {/* Email capture + upsell */}
       <div className="rounded-lg border p-5 space-y-3">
@@ -759,7 +764,7 @@ export default function AuditPage() {
             </CardTitle>
             <CardDescription>
               Enter your website and get a real, scored report in seconds — how well AI assistants
-              can find, read, and represent your business. Free, no signup required.
+              can find, read, and represent your business. Free, no signup required. The report may also include five read-only website evidence checks—not live assistant or booking verification.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

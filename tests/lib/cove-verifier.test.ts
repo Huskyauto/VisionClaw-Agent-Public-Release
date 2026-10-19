@@ -35,17 +35,19 @@ test("R123 CoVe — empty/whitespace drafts are returned with a warning, never t
 
 test("R123 CoVe — invalid tenantId still returns a fail-safe object (no throw)", async () => {
   const { verifyWithCoVe } = await import("../../server/lib/cove-verifier");
-  // Long enough to pass the short-circuit but tenantId is bogus — providers
-  // will fail; the helper must catch and return a warning, not throw.
+  // Invalid tenant scope must fail before model selection: the provider layer
+  // may otherwise fall back to billing ADMIN, even in a nominal unit test.
   const longDraft = "The Replit Agent platform was founded in 2016 by James Smith. ".repeat(20);
   const result = await verifyWithCoVe({
     draft: longDraft,
-    tenantId: -1 as any,
+    tenantId: -1,
   });
   assert.ok(typeof result.revised === "string");
   assert.equal(result.revised.length > 0, true);
-  // Either the planner failed (warning set) or by some miracle it succeeded
-  // — both are acceptable. The invariant is "never throw".
+  assert.equal(result.unchanged, true);
+  assert.equal(result.modelUsed, "");
+  assert.equal(result.questionsAsked, 0);
+  assert.match(result.warning || "", /Invalid tenantId/);
 });
 
 test("R123 CoVe — research-report intake preserves opt-in `verify` flag through sanitization", async () => {

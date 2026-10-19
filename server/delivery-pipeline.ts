@@ -44,6 +44,7 @@ import {
   validateCompletedArtifactReceipt,
   validateCompletedEmailReceipt,
 } from "./lib/delivery-receipt-policy";
+import { assertBackcheckIdentity, assertCompletedPackageIdentity, parseAcceptanceCriteria, retainedAcceptanceCriteria, type CustomerAcceptanceCriteria } from "./lib/customer-artifact-backcheck";
 export {
   buildRetryDeliveryRequest,
   readRetrySource,
@@ -111,6 +112,8 @@ export interface DeliveryRequest {
   emailSubject?: string;
   emailBody?: string;
   metadata?: Record<string, any>;
+  /** Primary-artifact requirements derived from the customer's request. */
+  acceptanceCriteria?: CustomerAcceptanceCriteria;
   /**
    * Additional files to include in the same delivery (bundle mode). All
    * files land in the same per-customer Drive folder created by the primary
@@ -192,6 +195,25 @@ type DeliveryArtifactIntents = {
   primaryArtifactId: number;
   bundleArtifactIds: number[];
 };
+
+/** Returning a completed receipt is not permission to substitute new bytes. */
+async function assertCompletedReplayIdentity(req: DeliveryRequest, deliveryId: number): Promise<void> {
+  const files = [req, ...(req.additionalFiles || [])];
+  const records = await db.select({
+    sha256: artifactRecords.sha256, logicalName: artifactRecords.logicalName, idempotencyKey: artifactRecords.idempotencyKey,
+  }).from(artifactRecords).where(and(
+    eq(artifactRecords.tenantId, req.tenantId), eq(artifactRecords.deliveryLogId, deliveryId),
+    eq(artifactRecords.sourceRunKey, `delivery:${deliveryId}`),
+  )).limit(100);
+  const requested = files.map(file => ({ fileName: sanitizeDisplayField(file.fileName, 300) }));
+  // Name AND entire package composition are mandatory, even for receipt-only
+  // lookups. Only exact byte comparison may be omitted when no source is sent.
+  assertCompletedPackageIdentity(requested, records, deliveryId);
+  assertCompletedPackageIdentity(files.map((file, index) => ({
+    ...requested[index],
+    bytes: file.fileData || file.filePath ? readDeliveryArtifactBytes(file) : undefined,
+  })), records, deliveryId);
+}
 
 /**
  * Write-ahead artifact records for the primary file and every companion. The
@@ -276,6 +298,7 @@ export interface BundleFileResult {
 
 export interface DeliveryResult {
   success: boolean;
+  /** Zero means validation failed before any delivery identity was claimed. */
   deliveryId: number;
   /** Google Drive ID for the primary delivered file. */
   driveFileId?: string;
@@ -724,15 +747,15 @@ async function scanDeliverablesForSecrets(req: DeliveryRequest, deliveryId: numb
   for (const f of all) {
     try {
       let report: ScanReport | null = null;
-      if (f.filePath && isLikelyTextPath(f.filePath)) {
+      if (f.fileData && isLikelyTextPath(f.fileName)) {
+        report = scanForSecrets(f.fileData.toString("utf8"), { source: f.fileName });
+      } else if (f.filePath && isLikelyTextPath(f.filePath)) {
         let resolved = f.filePath;
         if (resolved.startsWith("/uploads/") || resolved.startsWith("/attached_assets/") || resolved.startsWith("/stress-test-output/")) {
           resolved = resolved.slice(1);
         }
         const abs = path.resolve(process.cwd(), resolved);
         if (fs.existsSync(abs)) report = await scanFileForSecrets(abs, { source: f.fileName });
-      } else if (f.fileData && isLikelyTextPath(f.fileName)) {
-        report = scanForSecrets(f.fileData.toString("utf8"), { source: f.fileName });
       }
       if (!report) continue;
       reports.push({ fileName: f.fileName, report });
@@ -793,14 +816,10 @@ async function attemptUpload(req: DeliveryRequest, deliveryId: number, artifactI
   // while it works, but it is not optional at the irreversible upload/email
   // boundary. Every artifact must pass a known contract and leave an audit row.
   const artifacts: Array<{ fileName: string; filePath?: string; fileData?: Buffer }> = [
-    { fileName: req.fileName, filePath: req.filePath, fileData: req.fileData },
-    ...(req.additionalFiles || []).map((file) => ({
-      fileName: file.fileName,
-      filePath: file.filePath,
-      fileData: file.fileData,
-    })),
+    req,
+    ...(req.additionalFiles || []),
   ];
-  for (const artifact of artifacts) {
+  for (const [index, artifact] of artifacts.entries()) {
     const deliverableType = resolveDeliveryContractType(artifact.fileName);
     if (!deliverableType) {
       return { success: false, error: `Delivery verification blocked uncontracted artifact: ${artifact.fileName}` };
@@ -812,12 +831,26 @@ async function attemptUpload(req: DeliveryRequest, deliveryId: number, artifactI
         filePath: artifact.filePath,
         fileName: artifact.fileName,
         buffer: artifact.fileData,
+        acceptanceCriteria: artifact === req ? req.acceptanceCriteria : undefined,
       });
       if (verification.status !== "passed" || !verification.passed || verification.auditPersisted !== true) {
         return {
           success: false,
           error: `Delivery verification failed for ${artifact.fileName}: ${verification.failures.join("; ") || verification.status}`,
         };
+      }
+      if (verification.backcheck) {
+        const bytes = readDeliveryArtifactBytes(artifact);
+        const artifactId = index === 0 ? artifactIntents.primaryArtifactId : artifactIntents.bundleArtifactIds[index - 1];
+        const [intent] = await db.select({ sha256: artifactRecords.sha256 }).from(artifactRecords).where(and(
+          eq(artifactRecords.id, artifactId), eq(artifactRecords.tenantId, tenantId),
+        )).limit(1);
+        if (!intent) {
+          return { success: false, error: "Artifact changed since the durable delivery intent; reconciliation required" };
+        }
+        assertBackcheckIdentity(bytes, verification.backcheck, intent.sha256);
+        // Upload, scan and publish the verified snapshot, not mutable path bytes.
+        artifact.fileData = bytes;
       }
     } catch (err: any) {
       return { success: false, error: `Delivery verification unavailable for ${artifact.fileName}: ${err?.message || String(err)}` };
@@ -1151,6 +1184,15 @@ async function attemptUpload(req: DeliveryRequest, deliveryId: number, artifactI
 }
 
 export async function deliverDigitalProduct(req: DeliveryRequest): Promise<DeliveryResult> {
+  try {
+    // Validate before an upload, receipt mutation or external email.
+    if (req.acceptanceCriteria !== undefined) req = { ...req, acceptanceCriteria: parseAcceptanceCriteria(req.acceptanceCriteria) };
+    if (req.reservedDeliveryId && req.acceptanceCriteria !== undefined) {
+      return { success: false, deliveryId: 0, error: "Acceptance criteria require a non-reserved delivery identity" };
+    }
+  } catch {
+    return { success: false, deliveryId: 0, error: "Invalid customer acceptance criteria" };
+  }
   if (!Number.isInteger(req.tenantId) || req.tenantId <= 0) {
     throw new Error("deliverDigitalProduct requires a positive tenantId");
   }
@@ -1186,6 +1228,8 @@ async function deliverDigitalProductInner(req: DeliveryRequest): Promise<Deliver
         eq(deliveryLogs.tenantId, tenantId),
       )).limit(1);
       if (current?.status === "completed") {
+        try { await assertCompletedReplayIdentity(req, current.id); }
+        catch { return { success: false, deliveryId: current.id, error: "Completed receipt source requires reconciliation" }; }
         return {
           success: true,
           deliveryId: current.id,
@@ -1210,11 +1254,20 @@ async function deliverDigitalProductInner(req: DeliveryRequest): Promise<Deliver
   }
   if (!deliveryId && req.idempotencyKey) {
     const tenantId = req.tenantId;
+    // Preserve the narrowed identity across acceptance-criteria normalization,
+    // which replaces req without changing this operation's retry key.
+    const idempotencyKey = req.idempotencyKey;
     const [prior] = await db.select().from(deliveryLogs).where(and(
       eq(deliveryLogs.tenantId, tenantId),
-      eq(deliveryLogs.idempotencyKey, req.idempotencyKey),
+      eq(deliveryLogs.idempotencyKey, idempotencyKey),
     )).orderBy(deliveryLogs.id).limit(1);
+    if (prior) {
+      try { req = { ...req, acceptanceCriteria: retainedAcceptanceCriteria(req.acceptanceCriteria, prior.metadata) }; }
+      catch { return { success: false, deliveryId: prior.id, error: "Acceptance criteria changed; use a new delivery identity" }; }
+    }
     if (prior?.status === "completed" && (!req.sendEmail || prior.emailSent)) {
+      try { await assertCompletedReplayIdentity(req, prior.id); }
+      catch { return { success: false, deliveryId: prior.id, error: "Completed receipt source changed or unavailable; use a new delivery identity" }; }
       return {
         success: true,
         deliveryId: prior.id,
@@ -1249,7 +1302,7 @@ async function deliverDigitalProductInner(req: DeliveryRequest): Promise<Deliver
         eq(deliveryLogs.id, prior.id),
         eq(deliveryLogs.tenantId, tenantId),
         eq(deliveryLogs.status, "failed"),
-        eq(deliveryLogs.idempotencyKey, req.idempotencyKey),
+        eq(deliveryLogs.idempotencyKey, idempotencyKey),
       )).returning({ id: deliveryLogs.id });
       if (!released) {
         return {
@@ -1278,7 +1331,13 @@ async function deliverDigitalProductInner(req: DeliveryRequest): Promise<Deliver
       .where(and(eq(deliveryLogs.stripePaymentId, req.stripePaymentId), eq(deliveryLogs.tenantId, reqTenantId)))
       .orderBy(deliveryLogs.id)
       .limit(1);
+    if (prior) {
+      try { req = { ...req, acceptanceCriteria: retainedAcceptanceCriteria(req.acceptanceCriteria, prior.metadata) }; }
+      catch { return { success: false, deliveryId: prior.id, error: "Acceptance criteria changed; use a new delivery identity" }; }
+    }
     if (prior && prior.status === "completed") {
+      try { await assertCompletedReplayIdentity(req, prior.id); }
+      catch { return { success: false, deliveryId: prior.id, error: "Completed receipt source changed or unavailable; use a new delivery identity" }; }
       console.log(`[delivery] IDEMPOTENT-HIT stripe=${req.stripePaymentId} → existing delivery #${prior.id} already completed; returning prior result`);
       return {
         success: true,

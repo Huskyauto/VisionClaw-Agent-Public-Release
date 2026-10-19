@@ -5,12 +5,12 @@
 > human-readable rendering; public metadata and count checks consume the same
 > facts. Do not hand-edit either generated output.
 >
-> **Tool-count semantics:** **427 total registered tools** is the
+> **Tool-count semantics:** **428 total registered tools** is the
 > complete governed registry. **386 public documented tools**
 > is the filtered public index and intentionally excludes trusted-persona-only
 > tools. These are different valid metrics, not competing totals.
 
-**Release evidence date:** 2026-10-08. **Evidence environment: development.**
+**Release evidence date:** 2026-10-19. **Evidence environment: development.**
 This snapshot describes the measured source and evidence database, not proof
 of production publication, production schema parity, or live feature readiness.
 Database-derived values are a
@@ -24,17 +24,17 @@ checkout. Fresh checkouts verify committed facts with `verify-counts.ts`.
 
 | Metric | Value | How it's verified |
 |---|---|---|
-| **Tools (total registered)** | **427** | Static unique-name extraction across `server/tools.ts` + migrated domain definitions |
+| **Tools (total registered)** | **428** | Static unique-name extraction across `server/tools.ts` + migrated domain definitions |
 | **Tools (public documented)** | **386** | Registered tools excluding `trustedPersonasOnly` policy entries |
 | **AI agent personas (active)** | **18** | `SELECT count(*) FROM personas WHERE is_active=true` |
 | **Skills (DB seeded)** | **63** | `SELECT count(*) FROM skills` |
 | **Skills (total incl. .agents/skills/)** | **68** | DB count + 5 platform agent skills not yet seeded |
-| **Capabilities (active)** | **144** | `SELECT count(*) FROM capabilities WHERE is_active=true` |
-| **Database tables (declared)** | **194** | Published core-schema baseline plus explicitly tracked new split-model declarations |
-| **Database tables (live in `public` schema)** | **275** | `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'` |
+| **Capabilities (active)** | **146** | `SELECT count(*) FROM capabilities WHERE is_active=true` |
+| **Database tables (declared)** | **195** | Published core-schema baseline plus explicitly tracked new split-model declarations |
+| **Database tables (live in `public` schema)** | **276** | `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'` |
 | **Governance rules** | **41** | `SELECT count(*) FROM governance_rules` |
-| **Platform indexes (release aggregate)** | **885** | Live `pg_indexes` count minus versioned auth/session infrastructure exclusions |
-| **Non-PK indexes (evidence database)** | **616** | `SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'` |
+| **Platform indexes (release aggregate)** | **887** | Live `pg_indexes` count minus versioned auth/session infrastructure exclusions |
+| **Non-PK indexes (evidence database)** | **617** | `SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'` |
 | **AI providers** | **6** | OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity |
 | **AI models (core registry)** | **86 curated** | `MODEL_REGISTRY.length` in `server/model-registry.ts` |
 

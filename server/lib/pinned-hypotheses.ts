@@ -8,6 +8,7 @@
  */
 import { db } from "../db";
 import { sql } from "drizzle-orm";
+import { evidenceReferenceAuthority } from "./evidence-reference-authority";
 
 export interface PinnedHypothesisRow {
   id: number;
@@ -214,15 +215,20 @@ export async function attachEvidence(opts: {
   const refSan = sanitizeHypothesisText(opts.evidenceRef);
   if (!refSan) throw new Error("evidenceRef is empty after sanitization");
   const noteSan = opts.note ? sanitizeHypothesisText(opts.note) : null;
+  const sourceAuthority = evidenceReferenceAuthority(opts.evidenceKind, opts.evidenceRef, opts.tenantId);
   const conf = typeof opts.confidence === "number"
     ? Math.max(0, Math.min(1, opts.confidence))
     : 0.6;
   const r = await db.execute(sql`
     INSERT INTO hypothesis_evidence_edges (tenant_id, hypothesis_id, evidence_kind, evidence_ref, confidence, note)
-    VALUES (${opts.tenantId}, ${opts.hypothesisId}, ${opts.evidenceKind}, ${refSan}, ${conf}, ${noteSan})
+    SELECT ${opts.tenantId}, ${opts.hypothesisId}, ${opts.evidenceKind}, ${refSan}, ${conf}, ${noteSan}
+    FROM pinned_hypotheses h
+    WHERE h.id = ${opts.hypothesisId} AND h.tenant_id = ${opts.tenantId}
+      AND ${sourceAuthority}
     RETURNING id, created_at
   `);
   const row = ((r as any).rows ?? r)[0];
+  if (!row) throw new Error("Hypothesis or evidence source unavailable in this tenant");
   return { id: Number(row.id), createdAt: row.created_at };
 }
 

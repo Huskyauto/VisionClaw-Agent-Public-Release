@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { usePlatformImport } from "@/hooks/use-platform-import";
 import { useAuth } from "@/lib/auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -2707,18 +2708,7 @@ function ExportImportSection() {
   const [backingUp, setBackingUp] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
 
-  const importMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/import", data);
-      return res.json();
-    },
-    onSuccess: (data) => {
-      setImportResult(data.imported);
-      queryClient.invalidateQueries();
-      toast({ description: "Import completed successfully" });
-    },
-    onError: () => toast({ description: "Import failed", variant: "destructive" }),
-  });
+  const importMutation = usePlatformImport(setImportResult);
 
   const handleExport = async () => {
     setExporting(true);
@@ -2820,12 +2810,15 @@ function ExportImportSection() {
       {importResult && (
         <div className="rounded-lg border bg-muted/50 p-3 text-xs space-y-1">
           <div className="font-medium text-sm mb-1">Import Results</div>
-          {Object.entries(importResult).map(([key, count]) => (
+          {Object.entries(importResult.imported).map(([key, count]) => (
             <div key={key} className="flex justify-between">
               <span className="capitalize">{key}</span>
               <span className="font-mono">{count as number}</span>
             </div>
           ))}
+          {Object.values(importResult.rejected).some(count => Number(count) > 0) && (
+            <div role="alert">Rejected: {Object.entries(importResult.rejected).filter(([, count]) => Number(count) > 0).map(([key, count]) => `${key}: ${count}`).join(", ")}. Review these records before importing again.</div>
+          )}
         </div>
       )}
       <p className="text-[11px] text-muted-foreground/60">

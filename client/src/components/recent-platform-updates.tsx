@@ -4,6 +4,46 @@ import { CURRENT_SOURCE_RELEASE } from "./prepublication-notice";
 
 const updates = [
   {
+    title: "Business health and saved re-scans",
+    business: "The owner-only manual workbench turns supplied operating totals into five indicators, saved baselines and period comparisons. Missing information stays Unknown; it does not invent a business health score.",
+    technical: "Tenant-scoped private history, bounded inputs and dependency-safe deletion. Semantic request IDs prevent duplicate saves and reject conflicting reuse. Felix and Forge use the same guarded owner-invoked business_pilot contract.",
+  },
+  {
+    title: "Release readiness and Governance evidence",
+    business: "Two owner-only pilots organize six release evidence areas and six governance controls, including dates, references and gaps. Human review remains necessary: a report is not certification, legal advice or permission to publish.",
+    technical: "Deterministic manual evidence inventories with freshness policies, explicit limitations and durable report history. Source documents and implementation assertions are not independently verified; background workers receive no owner authority.",
+  },
+  {
+    title: "Cost/routing estimates without automatic changes",
+    business: "The owner can compare supplied token usage, prices and quality evidence. Qualified potential savings require current evidence. The pilot estimates costs; it never changes production routing or proves application-wide budget enforcement.",
+    technical: "Bounded manual pricing/usage inputs, explicit unknowns and a separate quality-evidence gate. Owner provider fallbacks retain their own opt-in, reservations and ceilings; the report grants no spend, retry or routing authority.",
+  },
+  {
+    title: "Website readiness with source evidence",
+    business: "Website audits include five read-only checks for services, area/hours, pricing or quotes, inquiry links and missing next-step information. Finding a booking link does not prove a booking works.",
+    technical: "Reuses homepage evidence and inspects at most two explicitly linked same-origin information pages with pinned retrieval and strict byte/time limits. No scripts, form submission, customer information or live-agent benchmark.",
+  },
+  {
+    title: "Company report packages and narrated audio",
+    business: "Company report workflows combine sourced research, detailed business recommendations, readable deliverables and narrated audio. Full report completion requires its audio; retained artifacts support recovery without calling unfinished delivery a success.",
+    technical: "Bounded report compilation, section-linked evidence and review, retained compiler-response recovery, child-process hard deadlines and narrative-safe audio segmentation. Provider entitlements, cost controls and delivery verification still apply.",
+  },
+  {
+    title: "Alert logs kept private to the owner",
+    business: "The owner's alert archive retains operational notifications for review. It stays separate from ordinary customer files and does not prove an email reached the inbox.",
+    technical: "Owner-only alert routes and a reserved private archive. Company report package PDFs are excluded from generic file lists, reads, deletion, agent recovery and upload/download fallbacks; dedicated owner download authorization remains required.",
+  },
+  {
+    title: "Outcome-first briefings and delivery checks",
+    business: "Briefings emphasize decisions, evidence, unknowns and next steps. Cost audits distinguish receipt-backed deliveries from incomplete work; a receipt is not customer acceptance or proof of inbox delivery.",
+    technical: "Existing-tenant outcome aggregates, artifact postflight validation and customer backchecks preserve authority receipts and exact output identity. Period-wide costs are labeled proxies, not attributed workflow profit or measured savings.",
+  },
+  {
+    title: "Video packaging linked to actual evidence",
+    business: "Video workflows connect titles, descriptions and packaging to the actual narrative and supplied facts. Packaging does not independently authorize rendering, paid retries or public posting.",
+    technical: "Shared Built With Bob packaging and weekly-render evidence preserve source figures and narration constraints. Report, delivery and paid-stream recovery retain bounded attempts and explicit uncertainty.",
+  },
+  {
     title: "Stock and crypto paper simulations",
     business: "Treasury's owner-only pilot compares historical stock, Bitcoin, Ethereum and Solana strategies with explicit fees, slippage and a benchmark. It does not place trades or promise returns.",
     technical: "Historical daily-bar replay with causal next-open fills, frozen trend/reversion/breakout/RSI presets, persisted equity/fill evidence and optional Jev shadow review. No broker connection, real-money orders or automatic strategy promotion.",
@@ -84,7 +124,7 @@ export function RecentPlatformUpdates({ technical = false }: { technical?: boole
         <span className="rounded bg-cyan-600 text-white px-2 py-1 text-xs font-semibold">{CURRENT_SOURCE_RELEASE}</span>
       </div>
       <p className="text-sm text-muted-foreground mb-6">
-        Source updates through October 14. Counts remain the dated development snapshot.
+        Source updates through October 19. Counts remain the dated development snapshot.
         Integration access, account allowances and feature flags still apply.
         These notes describe the source, not a guarantee that every option is enabled on this deployment.
       </p>

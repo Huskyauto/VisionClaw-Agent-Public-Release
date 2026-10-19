@@ -148,6 +148,7 @@ function CostAuditCard() {
             const cache = data.costs?.cache as
               | { hitRatePct?: number; cachedTokensIn?: number; tokensIn?: number; cacheWriteTokens?: number }
               | undefined;
+            const outcomes = data.outcomes;
             const verdictColor =
               verdict === "UNPROFITABLE" ? "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30"
               : verdict === "WARNING" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
@@ -200,6 +201,86 @@ function CostAuditCard() {
                   )}
                 </div>
                 <p className="text-[11px] text-muted-foreground italic">{data.notice}</p>
+                <Separator />
+                <section className="space-y-3" data-testid="section-outcome-evidence">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold">Outcome evidence</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Read-only counts for the selected period. Receipts indicate artifact presence only.
+                      </p>
+                    </div>
+                    {outcomes?.status === "available" && (
+                      <Badge variant="outline" className="border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
+                        Receipt scope only
+                      </Badge>
+                    )}
+                  </div>
+                  {outcomes?.status === "available" ? (
+                    <div className="space-y-3">
+                      {outcomes.total === 0 && (
+                        <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground" data-testid="text-outcomes-empty">
+                          No outcomes recorded in this period.
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                        <div>
+                          <div className="text-xs text-muted-foreground">Recorded total</div>
+                          <div className="text-lg font-semibold" data-testid="text-outcomes-total">{outcomes.total}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Receipt-backed deliveries</div>
+                          <div className="text-lg font-semibold" data-testid="text-outcomes-receipt-backed">{outcomes.receiptBacked}</div>
+                          <div className="text-[11px] text-muted-foreground">Not verified customer outcomes</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Completed without proof</div>
+                          <div className="text-lg font-semibold" data-testid="text-outcomes-unverified">{outcomes.completedUnverified}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Failed</div>
+                          <div className="text-lg font-semibold" data-testid="text-outcomes-failed">{outcomes.failed}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Pending</div>
+                          <div className="text-lg font-semibold" data-testid="text-outcomes-pending">{outcomes.pending}</div>
+                        </div>
+                      </div>
+                      <div className="rounded-md bg-muted/40 p-3 space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-xs text-muted-foreground">Estimated window list-price cost</div>
+                            <div className="text-sm font-semibold" data-testid="text-outcomes-window-cost">
+                              {outcomes.estimatedWindowCostUsd === null ? "Unavailable" : fmt(outcomes.estimatedWindowCostUsd)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground">Cost per receipt-backed delivery</div>
+                            <div className="text-sm font-semibold" data-testid="text-outcomes-cost-per-receipt">
+                              {outcomes.windowCostPerReceiptBackedDeliveryUsd === null
+                                ? "Unavailable"
+                                : fmt(outcomes.windowCostPerReceiptBackedDeliveryUsd)}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          This is a period-wide list-price cost proxy across mixed workloads, not workflow-attributed cost or actual billing.
+                          Receipts do not verify content accuracy, customer acceptance, or inbox delivery.
+                        </p>
+                      </div>
+                      {outcomes.notice && <p className="text-[11px] text-muted-foreground">{outcomes.notice}</p>}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground" data-testid="text-outcomes-unavailable">
+                      Outcome evidence is unavailable{outcomes?.notice ? `: ${outcomes.notice}` : " for this period"}.
+                    </div>
+                  )}
+                  {outcomes?.asOf && (
+                    <p className="text-[11px] text-muted-foreground" data-testid="text-outcomes-as-of">
+                      Measured: {new Date(outcomes.asOf).toLocaleString()}
+                    </p>
+                  )}
+                </section>
               </div>
             );
           })()

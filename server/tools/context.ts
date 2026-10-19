@@ -56,6 +56,7 @@ export function stripTrustSignals(params: Record<string, any>): Record<string, a
 }
 
 export function buildToolContext(args: {
+  invokedVia?: string;
   tenantId?: number;
   personaId?: number;
   conversationId?: number;
@@ -66,6 +67,7 @@ export function buildToolContext(args: {
   abortSignal?: AbortSignal;
 }): ToolContext {
   return {
+    invokedVia: args.invokedVia,
     tenantId: args.tenantId,
     personaId: args.personaId,
     conversationId: args.conversationId,

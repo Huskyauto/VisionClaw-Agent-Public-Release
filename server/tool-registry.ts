@@ -563,6 +563,7 @@ registerTool("revenue_vs_cost", { categories: ["agentic", "finance"], speed: "no
 registerTool("copilot_chat", { categories: ["agentic"], speed: "slow", isProductOutput: false, isNetworkTool: true });
 registerTool("treasury_paper_simulation", { categories: ["finance"], speed: "slow", isProductOutput: false, isNetworkTool: true });
 registerTool("agent_cost_summary", { categories: ["agentic", "finance", "system"], speed: "normal", isProductOutput: false, isNetworkTool: false });
+registerTool("business_pilot", { categories: ["agentic", "finance", "system"], speed: "normal", isProductOutput: false, isNetworkTool: true });
 registerTool("self_heal", { categories: ["agentic", "governance", "ai"], speed: "slow", isProductOutput: false, isNetworkTool: true });
 registerTool("self_heal_log", { categories: ["agentic", "governance", "system"], speed: "normal", isProductOutput: false, isNetworkTool: false });
 registerTool("self_heal_inspect", { categories: ["agentic", "governance", "system"], speed: "normal", isProductOutput: false, isNetworkTool: false });

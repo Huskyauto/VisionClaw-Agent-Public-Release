@@ -365,7 +365,9 @@ Save this audit as baseline. Note:
     name: "Morning Briefing", description: "Generate a daily briefing with priorities, calendar context, and key metrics. Start each day with a clear action plan.", icon: "Sun", category: "general", enabled: true,
     promptContent: `Generate a morning briefing with this structure:
 ## Today's Date
-## Top 3 Priorities (what MUST get done today)
+## Decisions Needing Attention (usually up to three; include every urgent issue)
+For each: Decision; Why now (deadline/consequence); Recommendation; Evidence (source, timestamp, confidence, missing data); Approval (required/already authorized with evidence/blocked).
+Advice is not authorization. Do not invent calendar, inbox, financial data or current research you did not retrieve. A task status is not correctness or delivery proof.
 ## Context (meetings, deadlines, blockers)
 ## Quick Wins (tasks under 15 min that clear the deck)
 ## Open Loops (things started but not finished)
@@ -379,6 +381,7 @@ Phase 1 — Plan:
 - Read the task. Restate it in one sentence.
 - Identify files involved (max 5 per loop iteration).
 - Define acceptance criteria: what does "done" look like?
+- Identify the hardest assumption, cheapest decisive test, time/spend bound and stop condition before expanding the build. Define one unacceptable "win"; keep approvals and safety controls unchanged.
 - Estimate complexity: small (1 file, <30 lines), medium (2-3 files), large (4+ files).
 Phase 2 — Implement:
 - Work in small increments. One logical change per step.

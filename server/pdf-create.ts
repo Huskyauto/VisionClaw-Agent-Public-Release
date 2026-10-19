@@ -788,6 +788,8 @@ export interface StyledPdfOptions {
   tenantId?: number;
   /** Disable all platform promotion for customer-owned attestations. */
   includePlatformBranding?: boolean;
+  /** Larger text and spacing for detailed customer advisory reports. */
+  readableBody?: boolean;
 }
 
 function escHtml(s: string | undefined | null): string {
@@ -923,6 +925,14 @@ export function buildStyledHtml(opts: StyledPdfOptions): string {
   .highlight-box p { font-size: 9px; }
   .signature { font-family: 'Segoe Script', 'Brush Script MT', cursive; font-size: 24px; font-style: italic; color: #16213e; border-bottom: 1px solid #16213e; display: inline-block; min-width: 220px; padding: 6px 24px 2px 4px; margin: 8px 0 2px; }
   .footer { margin-top: 20px; padding-top: 8px; border-top: 2px solid #1a1a2e; font-size: 8px; color: #999; text-align: center; }
+  ${opts.readableBody ? `
+  body { font-size: 14px; line-height: 1.65; }
+  p, li { font-size: 14px; line-height: 1.65; margin-bottom: 9px; overflow-wrap: anywhere; }
+  .highlight-box p { font-size: 14px; }
+  .section-title { font-size: 18px; padding: 12px; margin-top: 28px; break-after: avoid; }
+  .sub-title { font-size: 15px; margin-top: 18px; break-after: avoid; }
+  .data-table, .data-table td, .data-table th { font-size: 12px; padding: 7px; }
+  ` : ""}
 </style>
 </head>
 <body>

@@ -8,6 +8,7 @@ import { StandardComputeCompletionError } from "./standard-compute";
 export const JURY_BACKUPS: readonly ProposerCallSpec[] = [
   { modelId: "claude-opus-5", providerLane: "claude-runner" },
   { modelId: "gemini-3.1-pro-preview", providerLane: "standard-compute" },
+  { modelId: "openference/minimax-m3", providerLane: "openference" },
   { modelId: "openference/deepseek-v4-pro", providerLane: "openference" },
   { modelId: "gpt-5.4", providerLane: "replit" },
   { modelId: "gpt-5.4", providerLane: "openai-api" },

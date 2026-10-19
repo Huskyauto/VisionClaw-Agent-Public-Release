@@ -38,6 +38,7 @@ import {
   normalizeMuseMissionPayload,
 } from "../lib/muse-revenue-orchestrator";
 import wellnessTemplates from "../templates/wellness-video-templates.json";
+import { registerBusinessReportConnector } from "./business-report-connector";
 
 const apiV1ConversationRuns = () => import("../spark-line");
 const apiV1GrokLine = () => import("../grok-line");
@@ -252,6 +253,9 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
         "POST /api/v1/agents/dispatch": "Dispatch a task to an agent (scope: chat)",
         "POST /api/v1/agui/run": "Run an agent turn as an AG-UI protocol SSE stream for third-party frontends (scope: chat)",
         "GET /api/v1/conversations/:id": "Poll a conversation for the latest reply (scope: read or chat)",
+        "GET /api/v1/spark/reports": "Owner-only Muse inbox for pending evidence-backed business-report compilations (scope: read or chat)",
+        "GET /api/v1/spark/reports/:id": "Retrieve a tenant/revision-bound report handoff, excluding contact/payment/credential fields (scope: read or chat)",
+        "POST /api/v1/spark/reports/:id/reply": "Submit an exact-request/digest structured compilation for further jury review, never customer delivery approval (scope: chat)",
         "GET /api/v1/video/templates": "List wellness / [Your Product] video templates (scope: read or chat)",
         "POST /api/v1/agents/produce-video": "Render a video from a template or custom scenes (scope: chat)",
         "POST /api/v1/a2a": "A2A protocol JSON-RPC endpoint — message/send + tasks/get (scope: chat)",
@@ -585,6 +589,8 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
       }
     },
   );
+
+  registerBusinessReportConnector(app, authMiddleware, requireApiKeyOnly, getTenantFromRequest);
 
   // GET /api/v1/spark/outbox?since=<integer-cursor>
   app.get(

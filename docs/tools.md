@@ -2,7 +2,7 @@
 
 > Auto-generated from `server/tools.ts` by `scripts/generate-public-docs.ts`. Do not hand-edit.
 
-**386 public tools** wired into the persona dispatcher. Every call passes through the destructive-tool policy gate (`server/safety/destructive-tool-policy.ts`) and the AHB intent gate before execution. Tools flagged `trustedPersonasOnly:true` (introspection, raw SQL/shell, secret-rotation, undo, mass-comms) are intentionally **excluded** from this index so adversarial agents cannot fingerprint internal-only surface; 41 such tools are filtered.
+**386 public tools** wired into the persona dispatcher. Every call passes through the destructive-tool policy gate (`server/safety/destructive-tool-policy.ts`) and the AHB intent gate before execution. Tools flagged `trustedPersonasOnly:true` (introspection, raw SQL/shell, secret-rotation, undo, mass-comms) are intentionally **excluded** from this index so adversarial agents cannot fingerprint internal-only surface; 42 such tools are filtered.
 
 | Tool | Description |
 |------|-------------|
@@ -85,7 +85,7 @@
 | `deep_research` | Research multiple web sources and return normalized URLs plus a citation audit. Use for comprehensive, source-backed investigation. |
 | `define_icp` | Define an Ideal Customer Profile (ICP) with scoring criteria. Used by score_leads to automatically qualify leads. Describe your target customer characteristics and scoring weights. |
 | `delegate_task` | Delegate a task to another agent (persona). One-shot tasks (schedule='once') execute INLINE — the specialist runs immediately and returns their result in this conversation. Recurring tasks (cron schedule) are queued f... |
-| `deliver_product` | Full automated digital product delivery pipeline. Creates a dated subfolder in Google Drive, uploads the file, makes it publicly shareable, sends a branded delivery email to the customer, and logs the entire transacti... |
+| `deliver_product` | Deliver a customer product only after artifact verification. Pass acceptanceCriteria from the customer's request, identical to verify_deliverable criteria; PDFs are parsed and required text/exact clickable links check... |
 | `delivery_status` | Use AFTER any send_message / scheduled-delivery to confirm receipt, when a recipient says "I never got it", or when auditing recent multi-channel deliveries. Returns delivery rows with channel, status (sent/delivered/... |
 | `derived_api_capture_list` | List the network calls captured from the current browser session. Use after the user has browsed a site, to see what API calls were recorded before calling derived_api_derive. |
 | `derived_api_delete` | Delete a saved API recipe by name. |
@@ -360,7 +360,7 @@
 | `update_invoice_status` | Update an invoice's status (draft → sent → paid) and optionally record payment amount. |
 | `update_memory` | Update an existing memory entry — change the fact text, category, or archive it. Use when information about the user changes or becomes outdated. |
 | `user_model_query` | Query the dialectic user model — a progressively-built profile of the user's communication style, decision patterns, preferences, and personality traits. Built automatically from conversation analysis. Use to understa... |
-| `verify_deliverable` | R76 — Verify a customer-facing artifact against its deliverable contract before claiming success. Returns passed/failed with concrete failure reasons (extension mismatch, MIME mismatch, render-check failure, size out ... |
+| `verify_deliverable` | Verify actual customer-artifact bytes before claiming success. PDFs are parsed and clickable links checked; acceptance_criteria checks requested text, exact clickable URLs and page count. Returns an exact-byte backche... |
 | `verify_delivery_proof` | R98.12 W2 — REFUSE-TO-DECLARE-DONE GATE. Felix MUST call this before saying a deliverable is done. Confirms three independent proofs of delivery exist: (1) artifact passes deliverable-contract verification (extension/... |
 | `verify_felix_proposal_spec` | Read-only sanity check: validates a Felix proposal's expected_post_state spec without executing anything. Tells you whether the proposal is safe to approve+execute (verifier registered, spec well-formed, columns white... |
 | `verify_math_chain` | R77.5 (KisMATH-style Causal CoT graph for arithmetic) — re-executes a sequence of named arithmetic steps (revenue/cost/profit-style) deterministically and reports per-step pass/fail, claimed vs computed value mismatch... |

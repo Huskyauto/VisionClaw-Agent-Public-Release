@@ -23,7 +23,7 @@ import { assertCheaperInferenceAccess, cheaperInferenceReady, cheaperInferenceCo
   guardCheaperInferenceRequest, CHEAPER_INFERENCE_MODEL_ID, CHEAPER_INFERENCE_UPSTREAM_MODEL,
   CHEAPER_INFERENCE_BASE_URL } from "./lib/cheaper-inference";
 import { cheaperAutomaticAllowed, getCheaperCatalog, catalogUsageCost,
-  cheaperRequestMaximum, runCheaperBudgeted } from "./lib/cheaper-inference-automatic";
+  cheaperRequestMaximum, runCheaperBudgeted, cheaperMinimumDiscount } from "./lib/cheaper-inference-automatic";
 
 export const COST_LEDGER_RECORDED = Symbol.for("visionclaw.cost-ledger-recorded");
 import { normalizeRetiredModelId, wrapClientWithParamAdaptation } from "./lib/param-adaptation";
@@ -667,7 +667,7 @@ export function providerLaneLocallyReady(lane: ProviderLane): boolean {
     case "claude-runner": return isClaudeRunnerAvailable();
     case "profundo": return getProfundoKey() !== null;
     case "standard-compute": return standardComputeReady();
-    case "openference": return !!process.env.OPENFERENCE_API_KEY?.trim();
+    case "openference": return hasOpenferenceKey();
     case "replit": return !!process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
     case "openai-api": return !!process.env.OPENAI_API_KEY?.trim();
     case "anthropic-api": return !!process.env.ANTHROPIC_API_TOKEN?.trim();
@@ -799,6 +799,7 @@ const OPENFERENCE_MODEL_MAP: Record<string, string> = {
 };
 
 function getOpenferenceKey(): string | null {
+  if (process.env.OPENFERENCE_ENABLED === "0") return null;
   const raw = process.env.OPENFERENCE_API_KEY;
   if (!raw) return null;
   const key = raw.replace(/\s+/g, "");
@@ -989,8 +990,12 @@ export function wrapOpenferenceFailureMarking(client: OpenAI): OpenAI {
     } catch (err: any) {
       const status = err?.status ?? err?.response?.status;
       if (status === 401 || status === 403 || status === 429 || (status >= 500 && status <= 599)) {
+        // 529 reports upstream model capacity, not account/transport failure.
+        // Quarantining every model here disables working subscription backups.
+        const requestedModel = String((args[0] as any)?.model || "");
+        const modelOverload = status === 529 && Object.values(OPENFERENCE_MODEL_MAP).includes(requestedModel);
         markProviderUnhealthyOnce(
-          "openference",
+          modelOverload ? `openference:model:${requestedModel}` : "openference",
           err,
           `HTTP ${status}: ${String(err?.message || "").slice(0, 60)}`,
         );
@@ -1009,7 +1014,8 @@ function tryOpenferenceLane(
   tenantId: number | undefined,
 ): { client: OpenAI; actualModelId: string } | null {
   const actualModelId = OPENFERENCE_MODEL_MAP[modelId];
-  if (!actualModelId || !isProviderHealthy("openference")) return null;
+  if (!actualModelId || !isProviderHealthy("openference") ||
+      !isProviderHealthy(`openference:model:${actualModelId}`)) return null;
   const client = getOpenferenceClient();
   if (!client) return null;
   const costTenant = typeof tenantId === "number" && tenantId > 0 ? tenantId : ADMIN_TENANT_ID_FALLBACK;
@@ -1429,6 +1435,19 @@ async function getPinnedProviderLane(
   requiresTools: boolean | undefined,
   meteredOverride: boolean | undefined,
 ): Promise<{ client: OpenAI; actualModelId: string }> {
+  if (lane === "openrouter" && modelId === "google/gemini-4-argon") {
+    if (tenantId !== ADMIN_TENANT_ID_FALLBACK || meteredOverride !== true ||
+        !hasOwnerJuryApiGrant(tenantId, "openrouter", modelId)) {
+      throw new Error("[providers] Argon requires a bounded owner report grant");
+    }
+    const key = process.env.OPENROUTER_API_KEY?.trim();
+    if (!key || !isProviderHealthy(lane)) throw new Error("[providers] Argon transport unavailable; no fallback");
+    const { guardReportArgonClient } = await import("./lib/report-argon-route");
+    const client = new OpenAI({ apiKey: key, baseURL: PROVIDER_CONFIG.openrouter.baseUrl,
+      maxRetries: 0, timeout: 120_000 });
+    return { client: guardReportArgonClient(
+      wrapClientWithCostTracking(client, modelId, tenantId, "llm.report-argon"), tenantId), actualModelId: modelId };
+  }
   if (lane === "standard-compute") {
     assertStandardComputeAccess(tenantId, modelId);
     if (!isProviderHealthy(lane)) throw new Error("Standard Compute is temporarily unavailable");
@@ -1685,9 +1704,10 @@ export async function getClientForModel(
       if (!snapshot) throw new Error("CheaperInference catalog no longer authorizes this chat model");
       const automatic = cheaperAutomaticAllowed(tenantId) &&
         !(options?.explicitOwnerSelection === true && options?.platformAdminVerified === true);
-      if (automatic && snapshot.discount < 40) throw new Error("CheaperInference automatic model does not meet the 40% catalog discount floor");
+      if (automatic && snapshot.discount < cheaperMinimumDiscount())
+        throw new Error("CheaperInference automatic model does not meet the operator catalog discount floor");
       const payload = guardCheaperInferenceRequest({
-        ...params, ...(automatic ? { min_discount_percent: 40 } : {}),
+        ...params, ...(automatic ? { min_discount_percent: cheaperMinimumDiscount() } : {}),
       }, upstream);
       delete payload.service_tier;
       const create = buildPatchedCreate(rawCreate, () => upstream, () => tenantId!, "llm.cheaperinference",
@@ -2337,7 +2357,9 @@ export async function getModelForTierAsync(
     if (
       c.provider === "openference" &&
       hasOpenferenceKey() &&
-      isProviderHealthy("openference")
+      isProviderHealthy("openference") &&
+      !!OPENFERENCE_MODEL_MAP[c.model] &&
+      isProviderHealthy(`openference:model:${OPENFERENCE_MODEL_MAP[c.model]}`)
     ) {
       logAutoRoute(tier, c.model, "Openference Auto Agent flat-rate plan");
       return c.model;
@@ -2360,7 +2382,9 @@ export async function getModelForTierAsync(
         logAutoRoute(tier, c.model, "replit modelfarm (free-tier-only mode — no paid lane)");
         return c.model;
       }
-      if (c.provider === "openference" && hasOpenferenceKey() && isProviderHealthy("openference")) {
+      if (c.provider === "openference" && hasOpenferenceKey() && isProviderHealthy("openference") &&
+          !!OPENFERENCE_MODEL_MAP[c.model] &&
+          isProviderHealthy(`openference:model:${OPENFERENCE_MODEL_MAP[c.model]}`)) {
         logAutoRoute(tier, c.model, "Openference Auto Agent flat-rate plan (free-tier-only mode)");
         return c.model;
       }
@@ -2383,7 +2407,7 @@ export async function getModelForTierAsync(
     try {
       const candidate = (await getCheaperCatalog()).find(m =>
         m.id === CHEAPER_INFERENCE_UPSTREAM_MODEL && m.endpoint === "/v1/chat/completions");
-      if (candidate && candidate.discount >= 40) {
+      if (candidate && candidate.discount >= cheaperMinimumDiscount()) {
         logAutoRoute(tier, CHEAPER_INFERENCE_MODEL_ID, "CheaperInference owner wallet ($20 shared UTC-day cap)");
         return CHEAPER_INFERENCE_MODEL_ID;
       }

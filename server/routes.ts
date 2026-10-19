@@ -43,6 +43,7 @@ import { isManagedSkillSecurityError } from "./lib/managed-skill-safety";
 import { registerHumanAiSynergyRoutes } from "./routes/human-ai-synergy";
 import { registerCommercialResearchFrontierRoutes } from "./routes/commercial-research-frontier";
 import { registerInstinctOwnerRecoveryRoutes } from "./routes/instinct-owner-recovery";
+import { registerOwnerAlertRoutes } from "./routes/owner-alert-logs";
 import { streamWithProgressDeadline } from "./lib/stream-progress-deadline";
 import { observePreparedHistory } from "./lib/prompt-history-comparison";
 import {
@@ -121,6 +122,8 @@ import { registerAgenticPolicyRoutes } from "./routes/agentic-policy";
 import { registerTeamAdminRoutes } from "./routes/team-admin";
 import { registerAgentMailWebhookRoutes } from "./routes/agentmail-webhook";
 import { registerActivityRoutes } from "./routes/activity";
+import { registerBusinessPilotRoutes } from "./routes/business-pilots";
+import { denyPrivatePilotUpload, isPrivateOwnerApplicationFile } from "./lib/private-business-pilot-files";
 import { registerVideoJobRoutes } from "./routes/video-jobs";
 import { registerChannelsRoutes } from "./routes/channels";
 import { registerSculptorRoutes } from "./routes/sculptor";
@@ -138,7 +141,9 @@ import { buildAdaptiveHint, getRelevantLessons, saveLessonLearned, shouldEscalat
 import { shouldCompact, compactMessages, splitForCompaction, buildCompactedMessages } from "./compaction";
 import { compactLadder } from "./lib/compaction-ladder";
 import { isRetryableError, findFallbackModel } from "./model-failover";
-import { createCompletionWithTimeout, StreamCreateTimeoutError } from "./lib/stream-create-timeout";
+import { createCompletionWithTimeout, StreamCreateTimeoutError, paidStreamRecoveryPolicy } from "./lib/stream-create-timeout";
+import { isInteractivePilotRequest, pilotToolStillNeeded } from "./lib/business-pilot-routing";
+import { registerPlatformImportRoute } from "./routes/platform-import";
 import { requestWithModelToolRoster } from "./lib/model-tool-authorization";
 import { PreparationDeadlineExceededError, runWithPreparationDeadline } from "./lib/preparation-deadline";
 import { selectTenantValidatedModel } from "./lib/tenant-model-access";
@@ -931,6 +936,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Files without a DB row (legacy / /tmp uploads / dev-only) are still
   // served once authenticated, but the static directory is restricted
   // to the project's uploads/ folder (no path traversal).
+  app.use("/uploads", denyPrivatePilotUpload);
   app.use("/uploads", async (req: Request, res: Response, next: express.NextFunction) => {
     if (!isSafeUploadsHttpPath(req.path)) return res.status(404).json({ error: "File not found" });
     // Authorize/classify the same once-decoded path that express.static serves.
@@ -1118,7 +1124,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // R63.7 gate-before-compress — public read-only stats for the API cost cache.
   // Shows how many expensive API calls have been short-circuited by the cache
   // (image gen, TTS) and the estimated USD savings since process start.
-  app.get("/api/cache/stats", async (req: Request, res: Response) => {
+  app.get("/api/cache/stats", authMiddleware, async (req: Request, res: Response) => {
     // R74 SECURITY: was pre-auth, leaking system internals. Now admin-only
     // — same gate as /api/onedrive-health below it. Code-review HIGH fix.
     // Task 124 — global system internals: platform admin only.
@@ -1652,7 +1658,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.get("/api/drive-health", async (req: Request, res: Response) => {
+  app.get("/api/drive-health", authMiddleware, async (req: Request, res: Response) => {
     // R74 SECURITY: was pre-auth, leaking integration posture. Now admin-only
     // — same gate as /api/onedrive-health below it for symmetry.
     // Code-review HIGH fix.
@@ -1668,7 +1674,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.get("/api/onedrive-health", async (req: Request, res: Response) => {
+  app.get("/api/onedrive-health", authMiddleware, async (req: Request, res: Response) => {
     try {
       if (!isPlatformAdmin(req)) {
         return res.status(403).json({ connected: false, error: "Admin only" });
@@ -1681,7 +1687,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/demo/warmup", async (req: Request, res: Response) => {
+  app.post("/api/demo/warmup", authMiddleware, async (req: Request, res: Response) => {
     try {
       if (!isPlatformAdmin(req)) return res.status(403).json({ error: "Admin only" });
       const { demoWarmup } = await import("./google-drive");
@@ -1692,7 +1698,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/demo/exit", async (req: Request, res: Response) => {
+  app.post("/api/demo/exit", authMiddleware, async (req: Request, res: Response) => {
     try {
       if (!isPlatformAdmin(req)) return res.status(403).json({ error: "Admin only" });
       const { exitDemoMode } = await import("./google-drive");
@@ -1703,7 +1709,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.get("/api/demo/felix-check", async (req: Request, res: Response) => {
+  app.get("/api/demo/felix-check", authMiddleware, async (req: Request, res: Response) => {
     try {
       if (!isPlatformAdmin(req)) return res.status(403).json({ error: "Admin only" });
       const checks: { name: string; status: "pass" | "fail" | "warn"; detail: string }[] = [];
@@ -2546,6 +2552,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.use("/api", authMiddleware);
+  registerOwnerAlertRoutes(app, { authMiddleware, requirePlatformAdmin });
 
   app.use("/api", async (req: Request, _res: Response, next: Function) => {
     if (!getTenantFromRequest(req)) {
@@ -2658,6 +2665,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     //          — produced by signUploadUrl() at upload time. Filename + tenant
     //          + expiry are HMAC'd with SESSION_SECRET; tampering invalidates.
     const filename = path.basename(req.params.filename as string);
+    if (isPrivateOwnerApplicationFile(filename)) {
+      res.status(404).json({ error: "File not found" }); return;
+    }
     let tenantId: number | undefined;
     let diskFallbackAuthorized = false;
 
@@ -3816,6 +3826,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       parentSignal: streamAbortController.signal,
       validate: validateModelForTenant,
       platformAdminVerified: isPlatformAdmin(req),
+      strictSelection: !paidStreamRecoveryPolicy(normalizeModelId(conv.model || DEFAULT_CHAT_MODEL_ID), STREAM_CREATE_TIMEOUT_MS).allowRecovery,
     });
     model = selectOwnerWorkModel(model, {
       tenantId, ownerTenantId: ownerTenantId(), personaId: conv.personaId ?? null, content,
@@ -4474,6 +4485,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         if (streamAbortController.signal.aborted || errorName(primaryErr) === "AbortError") {
           throw primaryErr;
         }
+        // An explicitly selected paid transport must not silently become a
+        // different model, including when client admission fails before dispatch.
+        if (!paidStreamRecoveryPolicy(model, STREAM_CREATE_TIMEOUT_MS).allowRecovery) throw primaryErr;
         const available = await getAvailableModels();
         const excludedProviders = new Set<string>();
         const failedProv = MODEL_REGISTRY.find(m => m.id === model)?.provider;
@@ -4632,7 +4646,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       const isFelix = persona?.id === 2;
-      if (isFelix && useTools) {
+      if (isFelix && useTools && !isInteractivePilotRequest(content, persona?.id, tenantId, ownerTenantId())) {
         try {
           const { isComplexRequest, isCasualChat } = await import("./ceo-orchestrator");
           const casual = isCasualChat(content);
@@ -4660,6 +4674,17 @@ ${buildFelixProtocol()}`
       }
 
       let fullResponse = "";
+      let paidStreamFailure = false;
+      const stopPaidStream = (timer: ReturnType<typeof setInterval>) => {
+        paidStreamFailure = true;
+        clearInterval(timer);
+        const message = "\n\nThe selected paid model did not complete. I did not retry or switch providers. Completion and any charge remain uncertain; its budget reservation is retained. Any completed tool results are preserved.";
+        fullResponse += message;
+        if (!res.writableEnded && !res.destroyed) {
+          res.write(`data: ${JSON.stringify({ content: message })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: "provider_error", error: message.trim(), retryable: false, model: currentRegistryModelId })}\n\n`);
+        }
+      };
       // Tool-budget caps — tenant-aware. The admin/owner tenant (Bob) gets a much
       // larger budget for deep multi-step investigations; customer tenants keep a
       // tighter cost/abuse guardrail. All env-overridable. The ToolLoopDetector
@@ -4771,7 +4796,8 @@ ${buildFelixProtocol()}`
           // original user request as the routing input on retry, not the directive.
           const routed = await routeTools(allToolDefs, (systemAuditRecoveryAttempts > 0 || directExecutionRecoveryAttempts > 0) ? chatMessages : apiMessages, { maxTools: MAX_ROUTED_TOOLS_PER_TURN, personaRole: persona?.role, personaId: persona?.id, tenantId: conv.tenantId });
           createParams.tools = routed.tools;
-          createParams.tool_choice = "auto";
+          createParams.tool_choice = routed.requiredToolName && pilotToolStillNeeded(content, executedTools)
+            ? { type: "function", function: { name: routed.requiredToolName } } : "auto";
           // Contrastive tool-choice note — only on the first round (later
           // rounds already have committed context; re-injecting would nag).
           // Architect finding: keep the leading consecutive-system prefix
@@ -4879,14 +4905,14 @@ ${buildFelixProtocol()}`
               () => activeClient.chat.completions.create(createParams, { signal }),
             ),
             streamAbortController.signal,
-            STREAM_CREATE_TIMEOUT_MS,
+            paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).creationTimeoutMs,
             currentRegistryModelId,
           );
           console.log(`[sse-round] Round ${round}: stream created successfully`);
         } catch (streamErr: unknown) {
           const isCreateTimeout = streamErr instanceof StreamCreateTimeoutError;
           if (isCreateTimeout) {
-            console.error(`[sse-round] Round ${round}: stream CREATION timed out after ${STREAM_CREATE_TIMEOUT_MS / 1000}s on ${currentRegistryModelId} — routing to failover`);
+            console.error(`[sse-round] Round ${round}: stream CREATION timed out after ${streamErr.timeoutMs / 1000}s on ${currentRegistryModelId}`);
           }
           // R125+ — client-disconnect / abort during stream CREATION (before the
           // first token) throws an AbortError here. It is NOT a provider fault and
@@ -4901,6 +4927,8 @@ ${buildFelixProtocol()}`
           if (streamAbortController.signal.aborted || (req as any)._clientDisconnected?.() || streamAborted) {
             console.log(`[sse-round] Round ${round}: client disconnected during stream creation — breaking to persistence (executedTools=${executedTools.length})`);
             streamAborted = true;
+            if (!paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).allowRecovery)
+              stopPaidStream(thinkingTimer);
             try { clearInterval(thinkingTimer); } catch (_silentErr) { logSilentCatch("server/routes.ts", _silentErr); }
             break round_loop;
           }
@@ -4913,6 +4941,11 @@ ${buildFelixProtocol()}`
             if ((errStatus === 401 || errStatus === 403 || errStatus === 429) && conv.tenantId) {
               markSubscriptionFailed(failedProv, conv.tenantId, errStatus);
             }
+          }
+
+          if (!paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).allowRecovery) {
+            stopPaidStream(thinkingTimer);
+            break round_loop;
           }
 
           if (isCreateTimeout || isRetryableError(streamErr)) {
@@ -4956,12 +4989,19 @@ ${buildFelixProtocol()}`
                     () => activeClient.chat.completions.create(createParams, { signal }),
                   ),
                   streamAbortController.signal,
-                  STREAM_CREATE_TIMEOUT_MS,
+                  paidStreamRecoveryPolicy(fallback.id, STREAM_CREATE_TIMEOUT_MS).creationTimeoutMs,
                   fallback.id,
                 );
                 if (fbProvider) resetProviderHealth(fbProvider);
                 streamResolved = true;
               } catch (fbErr: unknown) {
+                if (!paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).allowRecovery) {
+                  if (streamAbortController.signal.aborted || (req as any)._clientDisconnected?.()) {
+                    streamAborted = true;
+                  }
+                  stopPaidStream(thinkingTimer);
+                  break round_loop;
+                }
                 if (streamAbortController.signal.aborted || errorName(fbErr) === "AbortError") {
                   throw fbErr;
                 }
@@ -5181,6 +5221,10 @@ ${buildFelixProtocol()}`
           }
         }
         clearInterval(thinkingTimer);
+        if (streamAborted && !paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).allowRecovery) {
+          stopPaidStream(thinkingTimer);
+          break round_loop;
+        }
         if (streamAborted && !roundContent && !hasToolCalls) {
           if (!streamProgressTimedOut && hadSlowTool && round > 0 && executedTools.length > 0) {
             console.log(`[sse-round] Round ${round}: stream timed out after presentation/slow tool — attempting recovery retry`);
@@ -5200,7 +5244,7 @@ ${buildFelixProtocol()}`
                   () => activeClient.chat.completions.create(recoveryParams, { signal }),
                 ),
                 streamAbortController.signal,
-                STREAM_CREATE_TIMEOUT_MS,
+                paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).creationTimeoutMs,
                 currentRegistryModelId,
               );
               const recoveryMarkupFilter = createToolMarkupStreamFilter();
@@ -5245,6 +5289,10 @@ ${buildFelixProtocol()}`
         break escalation_retry; // success — no overflow, exit retry loop
         } catch (midStreamErr: unknown) {
           clearInterval(thinkingTimer);
+          if (!paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).allowRecovery) {
+            stopPaidStream(thinkingTimer);
+            break round_loop;
+          }
           const midMsg = String(errorMessage(midStreamErr) || midStreamErr || "");
           const midMsgLower = midMsg.toLowerCase();
           console.error(`[stream] Mid-stream error (round ${round}): ${midMsg.slice(0, 300)}`);
@@ -5295,7 +5343,7 @@ ${buildFelixProtocol()}`
                       () => activeClient.chat.completions.create(createParams, { signal }),
                     ),
                     streamAbortController.signal,
-                    STREAM_CREATE_TIMEOUT_MS,
+                    paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).creationTimeoutMs,
                     next.modelId,
                   );
                   continue escalation_retry;
@@ -5349,6 +5397,11 @@ ${buildFelixProtocol()}`
         }
 
         let toolCallCount = Object.keys(toolCallBuffers).length;
+        if ((!hasToolCalls || toolCallCount === 0) && roundContent.trim().length <= 1 &&
+            !paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).allowRecovery) {
+          stopPaidStream(thinkingTimer);
+          break round_loop;
+        }
         // R91 — Hermes-format fallback parser. Try the <tool_call>{json}</tool_call>
         // format BEFORE the XML invoke parser since they're disjoint and
         // open-weight models (Kimi/Qwen via vLLM/OpenRouter) prefer this form.
@@ -5527,6 +5580,10 @@ ${buildFelixProtocol()}`
             console.error(`[sse-round] Round ${round}: model ${currentRegistryModelId} returned a NEAR-EMPTY response (${roundContent.length} char(s), no tool calls) — treating as empty for failover.`);
             fullResponse = fullResponse.slice(0, fullResponse.length - roundContent.length);
             roundContent = "";
+          }
+          if (!roundContent && !paidStreamRecoveryPolicy(currentRegistryModelId, STREAM_CREATE_TIMEOUT_MS).allowRecovery) {
+            stopPaidStream(thinkingTimer);
+            break round_loop;
           }
           if (!roundContent && round > 0 && executedTools.length > 0 && emptyDeliverableReinjects < 1) {
             emptyDeliverableReinjects++;
@@ -5829,6 +5886,7 @@ ${buildFelixProtocol()}`
             result = await executeGuardedTool(tc.name, parsedArgs, {
               tenantId,
               conversationId,
+              personaId: persona?.id,
               personaRole: persona?.role,
               personaName: persona?.name,
               invokedVia: "main_chat",
@@ -5950,7 +6008,7 @@ ${buildFelixProtocol()}`
         console.log(`[sse-round] Round ${round} complete: ${totalToolCalls} total tool calls, ${executedTools.length} executed, starting round ${round + 1}`);
       }
 
-      if (fullResponse.length > 50 && !isThinkingMode && executedTools.length === 0 && !outcomeEnabled) {
+      if (!paidStreamFailure && fullResponse.length > 50 && !isThinkingMode && executedTools.length === 0 && !outcomeEnabled) {
         try {
           res.write(`data: ${JSON.stringify({ type: "reflection", status: "evaluating" })}\n\n`);
           const reflection = await reflectOnResponse(content, fullResponse, persona?.name, tenantId);
@@ -6020,7 +6078,7 @@ ${buildFelixProtocol()}`
       // the DB, and skip the broadcast/title/hooks pipeline below.
       const __wasAborted = (req as any)._clientDisconnected?.() === true || streamAborted;
       const __persistContent = __wasAborted
-        ? `${routeMeta}${toolMeta}${cleanedFullResponse}\n\n[stream-aborted: client disconnected before completion]`
+        ? `${routeMeta}${toolMeta}${cleanedFullResponse}\n\n${paidStreamFailure ? "[paid-stream-aborted: completion and charge uncertain; no retry or substitution]" : "[stream-aborted: client disconnected before completion]"}`
         : `${routeMeta}${toolMeta}${cleanedFullResponse}`;
       const __asstMsg = await storage.createMessage({ conversationId, role: "assistant", content: __persistContent, tenantId });
       // R62 — persist citations BEFORE broadcasting so the client refetch sees them on first read.
@@ -7084,78 +7142,7 @@ ${buildFelixProtocol()}`
     }
   });
 
-  app.post("/api/import", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      const data = req.body;
-      if (!data || !data.version) {
-        return res.status(400).json({ error: "Invalid export file format" });
-      }
-      let imported = { conversations: 0, messages: 0, personas: 0, memories: 0, knowledge: 0, tasks: 0 };
-
-      if (data.personas?.length) {
-        for (const p of data.personas) {
-          try {
-            const { id, isActive, createdAt, ...rest } = p;
-            await storage.createPersona(rest);
-            imported.personas++;
-          } catch (_silentErr) { logSilentCatch("server/routes.ts", _silentErr); }
-        }
-      }
-
-      if (data.memoryEntries?.length) {
-        for (const m of data.memoryEntries) {
-          try {
-            const { id, createdAt, ...rest } = m;
-            await storage.createMemoryEntry({ ...rest, personaId: rest.personaId || null });
-            imported.memories++;
-          } catch (_silentErr) { logSilentCatch("server/routes.ts", _silentErr); }
-        }
-      }
-
-      if (data.knowledge?.length) {
-        for (const k of data.knowledge) {
-          try {
-            const { id, createdAt, updatedAt, ...rest } = k;
-            await storage.createKnowledge({ ...rest, personaId: rest.personaId || null });
-            imported.knowledge++;
-          } catch (_silentErr) { logSilentCatch("server/routes.ts", _silentErr); }
-        }
-      }
-
-      if (data.conversations?.length) {
-        for (const conv of data.conversations) {
-          try {
-            const { id: oldId, createdAt, updatedAt, ...rest } = conv;
-            const newConv = await storage.createConversation(rest);
-            imported.conversations++;
-            const convMessages = (data.messages || []).filter((m: any) => m.conversationId === oldId);
-            for (const msg of convMessages) {
-              try {
-                const { id, createdAt, ...msgRest } = msg;
-                await storage.createMessage({ ...msgRest, conversationId: newConv.id, tenantId: newConv.tenantId });
-                imported.messages++;
-              } catch (_silentErr) { logSilentCatch("server/routes.ts", _silentErr); }
-            }
-          } catch (_silentErr) { logSilentCatch("server/routes.ts", _silentErr); }
-        }
-      }
-
-      if (data.heartbeatTasks?.length) {
-        for (const t of data.heartbeatTasks) {
-          try {
-            const { id, createdAt, lastRunAt, nextRunAt, ...rest } = t;
-            await storage.createHeartbeatTask(rest);
-            imported.tasks++;
-          } catch (_silentErr) { logSilentCatch("server/routes.ts", _silentErr); }
-        }
-      }
-
-      res.json({ success: true, imported });
-    } catch (err: unknown) {
-      res.status(500).json({ error: errorMessage(err) });
-    }
-  });
+  registerPlatformImportRoute(app, { requireAdmin, getTenantFromRequest });
 
   // ─── Email (AgentMail) — tenant-scoped ─────────────────────
   app.get("/api/email/status", async (req, res) => {
@@ -7507,6 +7494,7 @@ ${buildFelixProtocol()}`
   registerTeamAdminRoutes(app, { authMiddleware, getTenantFromRequest, requirePlatformAdmin });
   registerAgentMailWebhookRoutes(app);
   registerActivityRoutes(app, { authMiddleware, getTenantFromRequest });
+  registerBusinessPilotRoutes(app, { authMiddleware, mutateLimiter, getTenantFromRequest, requirePlatformAdmin });
   registerVideoJobRoutes(app, { authMiddleware, getTenantFromRequest });
   registerChannelsRoutes(app, { authMiddleware, getTenantFromRequest });
 

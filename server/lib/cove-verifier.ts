@@ -317,6 +317,9 @@ export async function verifyWithCoVe(opts: CoVeOptions): Promise<CoVeResult> {
         warning: "draft too short to verify (<80 chars)",
       };
     }
+    if (!Number.isSafeInteger(opts.tenantId) || opts.tenantId <= 0) {
+      throw new Error("Invalid tenantId: verification requires a positive tenant scope");
+    }
     modelId = await getModelForTierAsync(tier, opts.tenantId);
     const { client, actualModelId } = await getClientForModel(modelId, opts.tenantId);
 

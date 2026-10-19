@@ -116,10 +116,10 @@ function main() {
     let text = raw;
     if (rel === "README.md") {
       // The primary README interleaves current overview copy with frozen
-      // release narratives. Scan only the sections explicitly labeled as live
+      // release narratives. Scan only the explicitly dated current sections
       // state, including the architecture table that previously drifted.
       const liveSections: Array<[string, string]> = [
-        ["## Platform stats (live)", "## What you actually get"],
+        ["## Platform stats — dated development evidence", "## What you actually get"],
         ["## Architecture at a glance", "## Documentation"],
       ];
       text = liveSections

@@ -17,13 +17,18 @@ import path from "path";
 import fs from "fs";
 import { getClientForModel, getModelForTierAsync } from "./providers";
 import { draftWithEnsemble } from "./lib/deliverable-ensemble";
+import { generateReportSection } from "./lib/report-section-generation";
 import { findFailedSectionIndices, isFailedSectionBody, describeFailedSections, buildErrorPlaceholder, buildNoContentPlaceholder } from "./lib/deliverable-section-gate";
 import { captureIncident } from "./agentic/repair-incident";
 import { createPdf, generateStyledPdf, type PdfSection } from "./pdf-create";
 import { bodyToStyledSection } from "./lib/audit-styled-sections";
+import { PUBLIC_REPORT_GUIDANCE } from "./lib/business-report-quality";
 import { verifyWithCoVe } from "./lib/cove-verifier";
 import { runAudit } from "./audit-engine";
 import type { FulfillmentResult } from "./research-report-fulfillment";
+import { collectBusinessReportEvidence, renderReportEvidence } from "./lib/business-report-evidence";
+import { assertBusinessReportHandoffsAllowed, enqueueBusinessReportReview, type BusinessReportReviewInput } from "./lib/business-report-review";
+import { businessReportArtifactName } from "./lib/business-report-artifact";
 
 export interface ExecReportIntake {
   /**
@@ -64,18 +69,18 @@ function sanitizeCrmName(str: string): string {
 function opportunitiesSectionPlan(intake: ExecReportIntake): { heading: string; brief: string }[] {
   const crm = intake.crm;
   return [
-    { heading: "Executive Summary", brief: "Open with one 'blunt take' sentence about this business's single biggest untapped revenue opportunity (it becomes the highlight box). Then 2-3 paragraphs: what the business credibly is, where money is being left on the table today, and the 2-3 highest-upside moves. Money, leads, margin — no website critique, no tech jargon." },
-    { heading: "Where the Money Is Today", brief: "5-8 '-' bullets: the current offerings and revenue streams as observed from the website and description, each with a clause on its commercial role (volume driver, margin driver, door-opener). End with one bullet naming which existing stream has the most headroom and why." },
-    { heading: "Quick-Win Revenue Moves", brief: "6-8 '-' bullets of moves that can produce revenue within 30 days with the assets the business already has: reactivation campaigns, bundling, pricing tweaks, follow-up sequences, referral asks, upsell scripts. Each bullet: the move, then the revenue logic in one clause. Concrete and immediately actionable — nothing that requires new hires or big builds." },
-    { heading: "Creative & Profitable Growth Ideas", brief: "The signature section: 6-9 creative, specific revenue ideas for THIS business type — each as a short bold-style title line ending with a colon, then 1-2 sentences of mechanics and revenue logic. Think partnerships, packaging, cross-sell paths, waitlists/pre-commitment capture, referral engines, seasonal campaigns, premium tiers, service add-ons — whatever genuinely fits. No generic 'do social media' filler." },
-    { heading: "Ancillary Revenue Opportunities", brief: "5-8 '-' bullets of add-on revenue streams appropriate to this business model. Open with one sentence noting that not every idea fits every operation but modest add-ons compound. Skip anything implausible for this industry." },
+    { heading: "Executive Summary", brief: "Give a highlighted bullet-point overview of the major sections, the supported commercial bottom line, the top priorities and the first move this week. Introduce the detailed opportunity assessment; do not replace it with a short paragraph. No invented lost revenue." },
+    { heading: "Where the Money Is Today", brief: "Two or three observed offerings and their likely commercial role. Separate known offerings from unknown revenue/margin performance; identify one area worth testing rather than claiming it already outperforms." },
+    { heading: "Quick-Win Revenue Moves", brief: "At most two practical improvements to existing sales within 30 days. State the move, how it could earn more, who acts and what pilot result would justify expanding. No new hires or large builds assumed." },
+    { heading: "Creative & Profitable Growth Ideas", brief: "At most three genuinely distinct, business-specific income opportunities. Each: target buyer, offer, payment mechanism, first small test and success measure. Prefer a few credible opportunities over a long speculative list. Do not repeat quick wins." },
+    { heading: "Ancillary Revenue Opportunities", brief: "At most two optional add-ons, only if credible for this operation. Name buyer, offer, how payment works and a cheap demand test. Do not invent additional ideas to fill space; state when none are supported." },
     {
       heading: "Partnerships, Pricing & Channel Levers",
       brief: crm
-        ? `Bigger structural levers: strategic partnerships worth pursuing, pricing/packaging restructures (tiers, minimums, retainers), and new channels. This business runs ${crm} — where relevant, name how ${crm} supports a lever (automations, segmentation, reporting). 6-8 '-' bullets, each with the revenue logic. Never recommend replacing ${crm}.`
-        : "Bigger structural levers: strategic partnerships worth pursuing, pricing/packaging restructures (tiers, minimums, retainers), and new channels appropriate to this business size. 6-8 '-' bullets, each with the revenue logic.",
+        ? `At most two ways partnerships, pricing or channels could support the selected growth bets. The intake reports ${crm}; verify relevant capabilities before suggesting configuration. Prefer its existing workflows; do not recommend replacing it. No repeated opportunity descriptions.`
+        : "At most two partnership, pricing or channel levers supporting the selected opportunities. State a practical first test; do not assume internal systems are absent or repeat opportunity descriptions.",
     },
-    { heading: "Closing Recommendation", brief: "2 short paragraphs: the ONE money-making move to start this week and why it comes first, then the plain-English priority order for the rest. End with a section titled 'Known Unknowns:' followed by 4-6 '-' bullets of internal data that was NOT available and would sharpen the revenue analysis (close rates, margins, repeat rates, lead volume — whatever fits). Honest, confident, no hedging filler." },
+    { heading: "Closing Recommendation", brief: "One sentence naming the first move and why it comes first; then at most three decision-changing unknowns with a practical way to check them. Do not repeat the summary or action plan." },
   ];
 }
 
@@ -83,20 +88,20 @@ function sectionPlan(intake: ExecReportIntake): { heading: string; brief: string
   if (intake.focus === "opportunities") return opportunitiesSectionPlan(intake);
   const crm = intake.crm;
   return [
-    { heading: "Executive Summary", brief: "Open with one 'blunt take' sentence a busy owner will remember (it becomes the highlight box). Then 2-3 paragraphs: what the business credibly is, whether the website works as a sales system or just a brochure, the 2-3 highest-impact issues, and where the strongest upside is. Business outcomes, not tech jargon." },
-    { heading: "What the Company Does", brief: "6-9 '-' bullets restating the company's offerings and positioning as observed from the website and provided description. Each bullet: offering name then a clause on why it matters commercially. End with one bullet naming the trust signals or differentiators that elevate them above commodity competitors (certifications, portfolio scale, tenure — whatever applies)." },
-    { heading: "Current Website Strengths", brief: "5-7 '-' bullets: what the website already does well for credibility and conversion. Be honest and specific to what was actually observed — this is the 'positives' section." },
-    { heading: "Highest-Priority Website Findings", brief: "The 'negatives': the most serious website problems in priority order, framed as executive issues with business impact (lead leakage, wasted traffic, price-comparison framing, missing conversion paths — whatever the evidence supports). For each: what was observed, why it costs money, what to do. If a finding is severe, say so plainly. Never invent problems the evidence doesn't support — frame unverified items as 'likely' or 'worth confirming'." },
-    { heading: "Website & Sales Improvements", brief: "6-8 '-' bullets of concrete improvements in priority order: messaging repositioning, proof/trust content, conversion paths and CTAs, industry/segment pages, lead capture, sales language. Conversion infrastructure before cosmetic polish." },
+    { heading: "Executive Summary", brief: "Give a highlighted bullet-point overview of every major report section, the supported bottom line, top priorities and first move this week. Introduce the detailed report and business opportunities without claiming unmeasured lost sales or failed operations." },
+    { heading: "What the Company Does", brief: "Two or three source-supported offerings or differentiators and why they matter commercially. No brochure rewrite, full company history or assumed revenue mix." },
+    { heading: "Current Website Strengths", brief: "Two or three observed strengths worth retaining and their likely sales benefit. Attribute claims to their sources; no generic praise." },
+    { heading: "Highest-Priority Website Findings", brief: "At most three supported issues in priority order. Each: observation, likely business impact and practical fix. Label untested concerns as checks; never invent failures or quantify lost sales without evidence." },
+    { heading: "Website & Sales Improvements", brief: "Two or three concrete fixes linked to the findings, with the first step and success measure. Prioritize useful enquiries, follow-up and conversion over cosmetic changes; avoid repeating the full findings." },
     {
       heading: crm ? `${crm}-Aligned Operating Opportunities` : "Operating System & Lead-Handling Opportunities",
       brief: crm
-        ? `This business already runs ${crm}. 6-8 '-' bullets on operating harder off that existing stack — name specific ${crm} features, automations, reporting, and integrations. Open with the framing that the opportunity is NOT to replace ${crm}. Never recommend a competing platform.`
-        : "No CRM/system of record was reported. Explain what that costs them (leads, follow-up, repeat business), recommend 2-3 candidate systems by name appropriate to this business size, and 4-5 workflows to run on it from day one.",
+        ? `The intake reports ${crm}. Suggest at most two follow-up or reporting improvements using it, conditional on verifying the relevant features and current setup. State a pilot measure. Do not recommend replacement or pretend configuration was inspected.`
+        : "The CRM and current workflows are unknown, not absent. Recommend checking who handles enquiries, response time and follow-up. Give at most two conditional improvements using existing tools first, with a clear pilot measure. No unsupported lost-revenue claim.",
     },
-    { heading: "Creative & Profitable Growth Ideas", brief: "The signature section: 6-9 creative, specific revenue ideas for THIS business type — each as a short bold-style title line ending with a colon, then 1-2 sentences of mechanics and revenue logic. Think partnerships, packaging, cross-sell paths, waitlists/pre-commitment capture, referral engines, seasonal campaigns, premium tiers, service add-ons — whatever genuinely fits. No generic 'do social media' filler." },
-    { heading: "Ancillary Revenue Opportunities", brief: "5-8 '-' bullets of add-on revenue streams appropriate to this business model. Open with one sentence noting that not every idea fits every operation but modest add-ons compound. Skip anything implausible for this industry." },
-    { heading: "Closing Recommendation", brief: "2 short paragraphs: the single repositioning or fix that matters most, then the plain-English 'do this first, then this' executive priority order. End with a section titled 'Known Unknowns:' followed by 4-6 '-' bullets of internal data that was NOT available and would sharpen the analysis (occupancy, close rates, margins, lead volume — whatever fits). Honest, confident, no hedging filler." },
+    { heading: "Creative & Profitable Growth Ideas", brief: "At most three distinct, business-specific income opportunities. Each: target buyer, offer, how payment works, cheap first test and success measure. Explain the income mechanism, not generic marketing advice or invented returns." },
+    { heading: "Ancillary Revenue Opportunities", brief: "At most two optional, realistic add-ons not already described. Include buyer, offer, payment mechanism and a small demand test; do not force ideas unsupported by the business model." },
+    { heading: "Closing Recommendation", brief: "One sentence naming the first action and why; then at most three decision-changing unknowns and how to check them. Do not restate the full summary or roadmap." },
   ];
 }
 
@@ -152,7 +157,7 @@ function buildSystemPrompt(): string {
     "Write like a sharp operator talking to a peer: direct, specific, business-outcome language. Money, leads, margin, conversion — not technology for its own sake.",
     "Ground every claim in the provided evidence and intake. Where you must generalize, frame it as 'likely' or industry best practice — never fabricate specifics about the business.",
     "Use plain prose with short paragraphs and '-' bullet lists where the section brief asks for them. Short 'Title:' lines may introduce grouped ideas. No markdown headings, no bold markers.",
-    "Aim for ~250-450 words per section unless brevity serves the reader better.",
+    "Begin with highlighted overview bullets, then give detailed analysis and practical implementation guidance. Explain what to improve, why it helps the business and its customers, how to test product or revenue ideas, and what dependencies, costs, risks and measures matter. Do not impose an arbitrary short-section word limit or replace detail with bullets. Preserve useful evidence and material uncertainty, not filler.",
   ].join("\n");
 }
 
@@ -162,8 +167,8 @@ function intakeBlock(intake: ExecReportIntake): string {
     intake.website ? `WEBSITE: ${intake.website}` : "",
     intake.principalName ? `PREPARED FOR (PRINCIPAL): ${intake.principalName}` : "",
     intake.industry ? `INDUSTRY: ${intake.industry}` : "",
-    intake.description ? `WHAT THE COMPANY DOES (owner's words): ${intake.description}` : "",
-    intake.crm ? `EXISTING CRM / CORE PLATFORM: ${intake.crm}` : "EXISTING CRM / CORE PLATFORM: none reported",
+    intake.description ? `SUPPLIED BUSINESS DESCRIPTION (not independently verified): ${intake.description}` : "",
+    intake.crm ? `REPORTED CRM / CORE PLATFORM (unverified context): ${intake.crm}` : "CRM / CORE PLATFORM: unknown; do not infer absence",
     intake.notes ? `OPERATOR NOTES: ${intake.notes}` : "",
   ].filter(Boolean).join("\n");
 }
@@ -176,16 +181,17 @@ function buildSectionPrompt(intake: ExecReportIntake, evidence: string, section:
     "",
     `SECTION TO WRITE: "${section.heading}"`,
     `WHAT THIS SECTION MUST COVER: ${section.brief}`,
+    PUBLIC_REPORT_GUIDANCE,
     "",
     "Write the section now.",
   ].join("\n");
 }
 
-async function generateSection(modelId: string, tenantId: number, intake: ExecReportIntake, evidence: string, section: { heading: string; brief: string }): Promise<string> {
+async function generateSection(modelId: string, tenantId: number, intake: ExecReportIntake, evidence: string, section: { heading: string; brief: string }, freeResearch = false): Promise<string> {
   try {
     // Premium ensemble lane: 3 cheap-frontier drafts in parallel + a 4th
     // model's final redraft. Fail-open — null means use the single-model path.
-    const ensemble = await draftWithEnsemble({
+    const ensemble = freeResearch ? null : await draftWithEnsemble({
       tenantId,
       system: buildSystemPrompt(),
       user: buildSectionPrompt(intake, evidence, section),
@@ -198,7 +204,11 @@ async function generateSection(modelId: string, tenantId: number, intake: ExecRe
       }] : [],
     });
     if (ensemble?.text) return ensemble.text;
-    const { client, actualModelId } = await getClientForModel(modelId, tenantId);
+    if (freeResearch) return await generateReportSection({ modelId, tenantId, messages: [
+      { role: "system", content: buildSystemPrompt() },
+      { role: "user", content: buildSectionPrompt(intake, evidence, section) },
+    ] });
+    const { client, actualModelId } = await getClientForModel(modelId, tenantId, { forbidMeteredFallback: freeResearch });
     const result = await client.chat.completions.create({
       model: actualModelId,
       messages: [
@@ -282,12 +292,19 @@ export async function fulfillExecutiveReport(params: {
   customerEmail: string;
   orderId: string;
   tenantId?: number;
+  deliveryContext?: import("./research-report-fulfillment").DelayedReportDeliveryContext;
+  operatorJobId?: string;
+  paidJuryBatch?: string;
+  reportOnly?: boolean;
+  /** Server-owned immutable research, never populated from a request body. */
+  sharedEvidence?: import("./lib/business-report-evidence").ReportEvidence;
 }): Promise<FulfillmentResult> {
   // Fail-closed tenant resolution — same contract as fulfillReadinessAudit.
   if (!Number.isInteger(params.tenantId) || (params.tenantId as number) <= 0) {
     throw new Error("fulfillExecutiveReport: a valid positive tenantId is required (no default)");
   }
   const tenantId: number = params.tenantId as number;
+  await assertBusinessReportHandoffsAllowed(tenantId);
   const intake: ExecReportIntake = {
     company: params.intake.company ? sanitize(params.intake.company, 200) : undefined,
     website: params.intake.website ? sanitize(params.intake.website, 300) : undefined,
@@ -308,7 +325,18 @@ export async function fulfillExecutiveReport(params: {
   console.log(`[exec-report] Order ${params.orderId} — using model ${modelId} for ${plan.length} sections`);
 
   // Live-site grounding first (one fetch, shared by every section prompt).
-  const evidence = await buildSiteEvidence(intake.website);
+  if (params.paidJuryBatch) {
+    const { assertReportJuryApproval } = await import("./lib/business-report-paid-budget");
+    assertReportJuryApproval({ tenantId, kind: "executive", intake: intake as Record<string, unknown>,
+      paidJuryBatch: params.paidJuryBatch, operatorJobId: params.operatorJobId });
+  }
+  let sourceSnapshot = params.sharedEvidence ?? await collectBusinessReportEvidence(intake as Record<string, unknown>,
+    { allowPaidExtraction: !params.paidJuryBatch });
+  if (params.paidJuryBatch) {
+    const { classifyReportResearch } = await import("./lib/report-research-preparation");
+    sourceSnapshot = await classifyReportResearch(sourceSnapshot);
+  }
+  const evidence = renderReportEvidence(sourceSnapshot);
 
   const SECTION_CONCURRENCY = 3;
   const sections: { heading: string; body: string }[] = new Array(plan.length);
@@ -318,9 +346,9 @@ export async function fulfillExecutiveReport(params: {
       const i = nextIdx++;
       if (i >= plan.length) return;
       const s = plan[i];
-      const body = await generateSection(modelId, tenantId, intake, evidence, s);
+      const body = await generateSection(modelId, tenantId, intake, evidence, s, !!params.paidJuryBatch || !!params.sharedEvidence);
       let finalBody = body;
-      if (body && body.length >= 200 && !body.startsWith("(")) {
+      if (!params.paidJuryBatch && !params.sharedEvidence && body && body.length >= 200 && !body.startsWith("(")) {
         try {
           const cove = await verifyWithCoVe({
             draft: body,
@@ -344,7 +372,7 @@ export async function fulfillExecutiveReport(params: {
   if (failed.length > 0) {
     console.warn(`[exec-report] Order ${params.orderId} — retrying ${failed.length} failed section(s): ${failed.map((i) => plan[i].heading).join(", ")}`);
     for (const i of failed) {
-      const body = await generateSection(modelId, tenantId, intake, evidence, plan[i]);
+      const body = await generateSection(modelId, tenantId, intake, evidence, plan[i], !!params.paidJuryBatch || !!params.sharedEvidence);
       if (!isFailedSectionBody(body)) sections[i] = { heading: plan[i].heading, body };
     }
     failed = findFailedSectionIndices(sections.map((s) => s?.body));
@@ -373,39 +401,19 @@ export async function fulfillExecutiveReport(params: {
     };
   }
 
-  const generatedAt = new Date().toISOString().slice(0, 10);
-  const digest = sections.map((s) => `## ${s.heading}\n${s.body.slice(0, 900)}`).join("\n\n").slice(0, 9000);
+  return enqueueBusinessReportReview({ tenantId, kind: "executive", intake, modelId, evidence: sourceSnapshot,
+    sections, orderId: params.orderId, customerEmail: params.customerEmail, deliveryContext: params.deliveryContext,
+    operatorJobId: params.operatorJobId, paidJuryBatch: params.paidJuryBatch, reportOnly: params.reportOnly });
+}
 
-  // Boardroom tables (all fail-soft — omitted on any parse/LLM failure).
-  // The opportunities variant skips the gaps/margin-leakage table — it's a
-  // pure revenue-ideas report, not a critique.
-  const [gapsTable, growthTable, planTable] = await Promise.all([
-    isOpportunities ? Promise.resolve(null) : generateTable({
-      modelId, tenantId, intake, digest,
-      title: "Profitability Gaps & Margin Leakage",
-      instruction: "gap = the weakness (under 6 words); why = why it costs money (under 18 words); fix = the recommended fix (under 18 words); impact is exactly one of: High, Medium, Low.",
-      keys: ["gap", "why", "fix", "impact"],
-      headers: ["Gap", "Why It Hurts", "Recommended Fix", "Impact"],
-      minRows: 5, maxRows: 7, lastColEnum: ["High", "Medium", "Low"],
-    }),
-    generateTable({
-      modelId, tenantId, intake, digest,
-      title: "Revenue Growth Opportunities",
-      instruction: "opportunity = short name (under 5 words); description = what to do (under 18 words); logic = the revenue logic (under 16 words); priority is exactly one of: High, Medium, Low.",
-      keys: ["opportunity", "description", "logic", "priority"],
-      headers: ["Opportunity", "Description", "Revenue Logic", "Priority"],
-      minRows: 5, maxRows: 7, lastColEnum: ["High", "Medium", "Low"],
-    }),
-    generateTable({
-      modelId, tenantId, intake, digest,
-      title: "30 / 60 / 90 Day Action Plan",
-      instruction: 'window is exactly one of: "First 30 Days", "Days 31-60", "Days 61-90" (one row each, in that order); actions = the priority actions for that window (under 30 words); outcome = the business outcome (under 12 words).',
-      keys: ["window", "actions", "outcome"],
-      headers: ["Window", "Priority Actions", "Outcome"],
-      minRows: 3, maxRows: 3,
-      firstColSequence: ["First 30 Days", "Days 31-60", "Days 61-90"],
-    }),
-  ]);
+export async function finalizePreparedExecutiveReport(params: BusinessReportReviewInput): Promise<FulfillmentResult> {
+  const { tenantId, intake, modelId, sections } = params;
+  const isOpportunities = intake.focus === "opportunities";
+  const reportLabel = isOpportunities ? "Money-Making Opportunities Report" : "Executive Opportunity Report";
+  const generatedAt = params.evidence.capturedAt.slice(0, 10);
+  const gapsTable: PdfSection | null = null;
+  const growthTable: PdfSection | null = null;
+  const planTable: PdfSection | null = null;
 
   const introBody = [
     `Prepared for ${intake.principalName || intake.company || params.customerEmail}`,
@@ -427,8 +435,7 @@ export async function fulfillExecutiveReport(params: {
     { heading: "Disclaimer", body: disclaimerBody },
   ];
 
-  const safeName = (intake.company || "business").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40).replace(/^-+|-+$/g, "") || "business";
-  const fileName = `${isOpportunities ? "money-making-opportunities-report" : "executive-opportunity-report"}-${safeName}-${Date.now()}.pdf`;
+  const fileName = businessReportArtifactName(params, sections);
   const outputPath = path.join("uploads", fileName);
 
   let finalRelPath: string | undefined;
@@ -458,6 +465,7 @@ export async function fulfillExecutiveReport(params: {
         : { label: "Action Roadmap", value: "30/60/90 Days" },
       { label: "Profit Focus", value: "Leads · Conversion · Margin" },
     ];
+    const { readableBusinessReportSections } = await import("./lib/business-report-readable");
     const styled = await generateStyledPdf({
       title: isOpportunities
         ? `${intake.company ? `${intake.company} — ` : ""}Money-Making Opportunities`
@@ -473,7 +481,8 @@ export async function fulfillExecutiveReport(params: {
         intake.phone ? `Ph. ${intake.phone}` : "",
       ].filter(Boolean),
       coverStats,
-      sections: styledSections,
+      sections: readableBusinessReportSections(finalSections, isOpportunities ? "opportunities" : "executive"),
+      readableBody: true,
       footerLines: [`${reportLabel} — prepared by the VisionClaw Agent platform`],
       fileName: fileName.replace(/\.pdf$/, ""),
       uploadToDrive: false, // the delivery pipeline owns Drive upload + customer links
@@ -493,9 +502,10 @@ export async function fulfillExecutiveReport(params: {
   }
 
   if (!finalRelPath) {
+    const { plainReadableBusinessReportSections } = await import("./lib/business-report-readable");
     const pdfResult = await createPdf({
       title: `${reportLabel}${intake.company ? `: ${intake.company.slice(0, 60)}` : ""}`,
-      sections: finalSections,
+      sections: plainReadableBusinessReportSections(finalSections, isOpportunities ? "opportunities" : "executive"),
       fontSize: 11,
       pageSize: "letter",
       outputPath,
@@ -515,6 +525,12 @@ export async function fulfillExecutiveReport(params: {
   }
 
   const deliveredFileName = path.basename(finalRelPath);
+  const { completeBusinessReportAudio } = await import("./lib/business-report-audio-delivery");
+  const audio = await completeBusinessReportAudio(params,
+    `${reportLabel} for ${intake.company || "your company"}`, finalSections, finalRelPath);
+  pages = audio.pages;
+  finalSections.unshift({ heading: "Listen to this report", body: "One American-English MP3 covers this complete report. Use the listening link in the PDF; source quotations and citation codes are written-only." });
   console.log(`[exec-report] Order ${params.orderId} — PDF ready at ${finalRelPath}${pages ? ` (${pages} pages)` : ""}`);
-  return { success: true, filePath: finalRelPath, fileName: deliveredFileName, pages, modelUsed: modelId, sections: finalSections };
+  return { success: true, filePath: finalRelPath, fileName: deliveredFileName, pages, modelUsed: modelId,
+    audio: { viewUrl: audio.viewUrl, tracks: audio.tracks }, sections: finalSections };
 }

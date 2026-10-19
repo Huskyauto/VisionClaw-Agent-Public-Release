@@ -5,6 +5,7 @@ public-mirror/
 # Development-session transcripts/state belong in the workspace, not the app.
 # Preserve them locally; none are application runtime dependencies.
 .local/state/replit/
+.local/aldon-assessment/
 
 # Regenerable package download caches; installed tools/dependencies stay intact.
 .cache/uv/
@@ -19,3 +20,5 @@ attached_assets/*
 !attached_assets/audit-pitch-bob.mp3
 !attached_assets/Bob_on_Mounjaro_—_Channel_Avatar_1777847875921.png
 !attached_assets/Vision_Claw_Logo_Final-01_1776037691274.png
+data/private-alert-logs/
+/generated-artifacts/

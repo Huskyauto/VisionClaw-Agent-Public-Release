@@ -2,6 +2,23 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { recoverSubscriptionSeats, runSubscriptionSynthesis, subscriptionRecoveryAllowed } from "../../server/lib/subscription-jury-recovery";
 
+test("a working MiniMax subscription seat can complete a jury without lowering its three-seat requirement", async () => {
+  const specs = ["gpt-5.6-sol", "claude-sonnet-5", "moonshotai/kimi-k3"]
+    .map(modelId => ({ modelId, providerLane: "profundo" as const }));
+  const results = specs.map((spec, i) => ({ ...spec, provider: "profundo", ok: i === 0,
+    answer: i === 0 ? "retained GPT response" : undefined, latencyMs: 1 }));
+  const calls: string[] = [];
+  const recovered = await recoverSubscriptionSeats({ specs, results, allowPaid: false,
+    eligible: spec => spec.providerLane === "standard-compute" || spec.modelId === "openference/minimax-m3",
+    call: async spec => {
+      calls.push(spec.modelId);
+      return { ...spec, provider: spec.providerLane!, ok: true, answer: "new owned evidence response", latencyMs: 1 };
+    } });
+  assert.equal(recovered.filter(r => r.ok).length, 3);
+  assert.ok(calls.includes("openference/minimax-m3"));
+  assert.equal(new Set(recovered.filter(r => r.ok).map(r => r.providerLane)).size, 3);
+});
+
 test("alternate-model recovery is confined to owner defaults, never explicit pins", () => {
   assert.equal(subscriptionRecoveryAllowed(true, false, "profundo"), true);
   assert.equal(subscriptionRecoveryAllowed(true, true, "profundo"), false);
@@ -77,7 +94,7 @@ test("partial outages keep good answers and never call a backup twice", async ()
       return { ...spec, provider: spec.providerLane!, ok: false, error: "Unavailable", latencyMs: 1 };
     } });
   assert.equal(recovered[0].answer, "Keep this original answer");
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   assert.equal(new Set(calls).size, calls.length);
   assert.ok(calls.every(c => !/openai-api|anthropic-api/.test(c)));
 });
@@ -94,7 +111,7 @@ test("paid backups only fire when permitted, after free routes fail", async () =
         answer: s.providerLane === "openai-api" ? "Native recovery" : undefined, latencyMs: 1 };
     },
   });
-  assert.deepEqual(calls, ["claude-runner", "standard-compute", "openference", "replit", "openai-api"]);
+  assert.deepEqual(calls, ["claude-runner", "standard-compute", "openference", "openference", "replit", "openai-api"]);
   assert.equal(results.at(-1)?.answer, "Native recovery");
 });
 
@@ -112,7 +129,7 @@ test("total synthesis failure terminates after all permitted routes", async () =
     primary: { modelId: "claude-opus-5", providerLane: "profundo" },
     allowPaid: false, eligible: () => true, call: async () => { calls++; throw new Error("503"); },
   }), /503/);
-  assert.equal(calls, 5);
+  assert.equal(calls, 6);
 });
 
 test("telemetry and one readiness failure cannot destroy a completed synthesis", async () => {

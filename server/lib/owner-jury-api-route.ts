@@ -2,13 +2,14 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { IncomeClaudeBudget } from "./income-claude-route";
 import { reserveIncomeApiBudget } from "./income-claude-route";
 
-type PaidJuryLane = "openai-api" | "anthropic-api";
+type PaidJuryLane = "openai-api" | "anthropic-api" | "openrouter";
 const grants = new AsyncLocalStorage<{ tenantId: number; lane: PaidJuryLane; model: string }>();
 export function ownerJuryDirectApiEnabled(): boolean {
   return process.env.OWNER_JURY_DIRECT_API_ENABLED === "1";
 }
 function approved(lane: PaidJuryLane, model: string): boolean {
   return lane === "openai-api" ? model === "gpt-5.4" :
+    lane === "openrouter" ? model === "google/gemini-4-argon" :
     lane === "anthropic-api" && ["claude-sonnet-5-5", "claude-opus-5-5"].includes(model);
 }
 export function hasOwnerJuryApiGrant(tenantId: number | undefined, lane: PaidJuryLane, model: string): boolean {
@@ -20,10 +21,12 @@ export function hasOwnerJuryApiGrant(tenantId: number | undefined, lane: PaidJur
 export async function executeOwnerJuryApiCall<T>(
   tenantId: number, lane: PaidJuryLane, model: string, prompt: string,
   budget: IncomeClaudeBudget, call: () => Promise<T>,
+  scope?: "bounded-report",
 ): Promise<T> {
-  if (!ownerJuryDirectApiEnabled() || tenantId !== 1 || !approved(lane, model)) {
+  if (!ownerJuryDirectApiEnabled() || tenantId !== 1 || !approved(lane, model) ||
+      (lane === "openrouter" && scope !== "bounded-report")) {
     throw new Error("Owner jury direct API grant denied");
   }
-  reserveIncomeApiBudget(model as "gpt-5.4" | "claude-sonnet-5-5" | "claude-opus-5-5", prompt, budget);
+  reserveIncomeApiBudget(model as "gpt-5.4", prompt, budget);
   return grants.run({ tenantId, lane, model }, call);
 }

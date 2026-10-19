@@ -10,6 +10,7 @@ import {
 import { enforceToolCap, estimateSchemaTokens } from "./lib/tool-cap";
 import { ownerTenantId } from "./agentic/autonomous-budget";
 import { isInstinctReadDraft, instinctToolBlocked } from "./lib/instinct-read-draft";
+import { isInteractivePilotRequest, requiresPilotTool } from "./lib/business-pilot-routing";
 import {
   buildRecentUserRoutingContext,
   getActiveUserRoutingMessage,
@@ -363,8 +364,10 @@ export async function routeTools(
   allTools: ToolDefinition[],
   messages: any[],
   opts?: { maxTools?: number; forceCategories?: string[]; personaRole?: string; personaId?: number; tenantId?: number }
-): Promise<{ tools: ToolDefinition[]; matchedCategories: string[]; totalAvailable: number; contrastiveNote?: string; curatorSignals?: { hintBoosts: number; semanticPicks: number; perfReranked: boolean; deprecatedDropped: number } }> {
+): Promise<{ tools: ToolDefinition[]; matchedCategories: string[]; totalAvailable: number; requiredToolName?: string; contrastiveNote?: string; curatorSignals?: { hintBoosts: number; semanticPicks: number; perfReranked: boolean; deprecatedDropped: number } }> {
   allTools = filterSparkLineTools(allTools, opts?.personaId, opts?.tenantId);
+  const ownerPilotPersona = [2, 3].includes(opts?.personaId ?? 0) && opts?.tenantId === ownerTenantId();
+  if (!ownerPilotPersona) allTools = allTools.filter(tool => tool.function.name !== "business_pilot");
   // Instinct cannot use the ordinary Felix menu. Keep the advertised read +
   // private reply tools aligned with the independent executeTool boundary.
   if (isInstinctReadDraft()) {
@@ -378,12 +381,19 @@ export async function routeTools(
     };
   }
   const ownerFelix = opts?.personaId === 2 && opts.tenantId === ownerTenantId();
+  const userMsg = getActiveUserRoutingMessage(messages);
+  const pilotRequested = isInteractivePilotRequest(userMsg, opts?.personaId, opts?.tenantId, ownerTenantId());
+  // These capabilities cannot travel to an orchestrated/background worker.
+  // Preserve ordinary coordination tools, but do not offer impossible handoffs.
+  if (pilotRequested)
+    allTools = allTools.filter(tool => !["orchestrate", "delegate_task", "spawn_agent"].includes(tool.function.name));
   // Keep the established extra handoff slots, so none displaces cash_flow_summary.
   const maxTools = effectiveRoutedToolCap(opts?.maxTools ?? 25, opts?.personaId, opts?.tenantId)
-    + (ownerFelix ? 2 : 0);
-  const userMsg = getActiveUserRoutingMessage(messages);
+    + (ownerFelix ? 2 : 0) + (pilotRequested ? 1 : 0);
   const routingContext = buildRecentUserRoutingContext(messages);
   const mandatoryContextTools = getMandatoryContextTools(routingContext);
+  if (pilotRequested)
+    mandatoryContextTools.push("business_pilot");
   // Private owner-tenant handoff queues are coordination tools, not external sends.
   // Pin it only for the owner-tenant Felix turn: keyword routing and the tool
   // cap otherwise discard it even when the prompt asks specifically for it.
@@ -653,7 +663,12 @@ export async function routeTools(
     tools: filtered,
     matchedCategories,
     totalAvailable,
-    contrastiveNote: contrastiveNote || undefined,
+    requiredToolName: pilotRequested && requiresPilotTool(userMsg) && filtered.some(tool => tool.function.name === "business_pilot")
+      ? "business_pilot" : undefined,
+    contrastiveNote: [
+      pilotRequested ? "OWNER INTERACTIVE PILOTS: When the owner requests an action, invoke business_pilot directly in this interactive chat. Run every requested pilot, using describe for missing schemas. Never orchestrate or delegate these owner-only actions; workers cannot execute them. A mention or opt-out does not authorize execution. Do not claim completion without successful tool results for each requested action; report missing input or failed calls instead of retrying." : "",
+      contrastiveNote,
+    ].filter(Boolean).join("\n\n") || undefined,
     curatorSignals: { hintBoosts, semanticPicks, perfReranked, deprecatedDropped },
   };
 }

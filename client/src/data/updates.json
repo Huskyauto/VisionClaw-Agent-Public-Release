@@ -1,5 +1,22 @@
 [
   {
+    "version": "R137+sec",
+    "date": "October 19, 2026",
+    "title": "Business pilots, company report packages and evidence-first operations",
+    "type": "feature",
+    "highlights": [
+      { "icon": "BarChart3", "text": "Owner-only Business Pilot Tools: health baselines/re-scans, six-area release readiness, governance evidence and manual AI cost/routing estimates. Missing values stay Unknown; reports are not certification, release approval or automatic routing changes." },
+      { "icon": "Globe", "text": "Website readiness adds five read-only evidence checks with source excerpts and bounded same-origin retrieval. Link discovery is not proof of booking, checkout, legal compliance or an autonomous-agent benchmark." },
+      { "icon": "FileText", "text": "Company report packages combine deeper sourced research, readable section-linked recommendations, review and narrated audio. Full report completion requires its audio. Bounded compiler processes, exact retained artifacts and audio segment validation support recovery without claiming unfinished delivery succeeded." },
+      { "icon": "FileCheck", "text": "Delivery artifact postflight and customer backchecks bind results to actual outputs and evidence. Outcome-first briefings and cost summaries distinguish receipt-backed delivery from customer acceptance, unknown outcomes and period-wide cost proxies." },
+      { "icon": "ShieldCheck", "text": "HIGH: private company report package PDFs are now excluded from generic tenant file lists, reads, deletion, agent recovery and upload/download fallbacks; dedicated owner authorization remains required. Private owner alert logs and pilot histories retain their reserved boundaries. Owner pilot execution stays guarded; unattended workers cannot inherit interactive owner authority." },
+      { "icon": "Lock", "text": "Post-publication hardening preserves queue/evidence/backfill workload boundaries, scoped restore/import authority, typed crew-array bindings and paid model-pin transport identity. Ambiguous paid failures must not trigger automatic retry or substitute providers." },
+      { "icon": "Film", "text": "Evidence-linked Built With Bob video packaging retains actual narrative and supplied figures. Owner CheaperInference automatic fallback stays behind its existing opt-in, shared reservation cap and model/tenant restrictions." },
+      { "icon": "CheckCircle2", "text": "October 19 live production verification: Forge description and Felix's five guarded pilots succeeded; four saved kinds retained reports and idempotent retries; browser health create/reload/report/delete passed. Synthetic records and test conversations were removed. This is focused evidence, not whole-platform security certification." },
+      { "icon": "GitCompare", "text": "Both landing views, dashboard release history, sidebar discovery, SEO and repository documentation now cover the recent work. Public source is sanitized separately; source/GitHub updates do not authorize another website publication." }
+    ]
+  },
+  {
     "version": "R136.2",
     "date": "October 14, 2026",
     "title": "Current source features, navigation, reliability and repository documentation",

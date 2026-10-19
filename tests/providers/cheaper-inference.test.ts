@@ -11,6 +11,7 @@ import {
   guardCheaperInferenceRequest,
   cheaperInferenceCostFields,
 } from "../../server/lib/cheaper-inference";
+import { cheaperRequestMaximum, catalogUsageCost } from "../../server/lib/cheaper-inference-automatic";
 
 test("CheaperInference requires explicit verified owner selection and an enabled secret", () => {
   const env = { CHEAPER_INFERENCE_API_KEY: "fixture-not-a-real-key" };
@@ -115,14 +116,24 @@ test("CheaperInference catalog is owner-only and excluded from unscoped automati
 test("tier routing keeps free first, then owner CheaperInference; free-only and foreign scopes fail closed", async () => {
   let freeHealthy = true;
   let discount = 60;
+  let minimumDiscount = 40;
+  let openferenceAvailable = false;
+  let healthyOpenferenceModel = "";
   const tier = providerFunction("getModelForTierAsync", {
     process: { env: { AI_INTEGRATIONS_OPENAI_API_KEY: "fixture", AI_INTEGRATIONS_OPENAI_BASE_URL: "fixture" } },
     getProfundoKey: () => null, providerLaneCanServeModel: () => false,
-    storage: { getProviderKeys: async () => [] }, hasOpenferenceKey: () => false,
+    storage: { getProviderKeys: async () => [] }, hasOpenferenceKey: () => openferenceAvailable,
+    OPENFERENCE_MODEL_MAP: {
+      "openference/deepseek-v4-pro": "DeepSeek-V4-Pro", "openference/kimi-k3": "Kimi K3",
+      "openference/glm-5.3": "GLM-5.3", "openference/qwen3.8-27b": "Qwen3.8 27b",
+    },
     SUBSCRIPTION_BASE_URLS: {}, logAutoRoute() {}, isClaudeRunnerAvailable: () => false,
-    isProviderHealthy: (p: string) => p === "cheaperinference" || (p === "replit" && freeHealthy),
+    isProviderHealthy: (p: string) => p === "cheaperinference" || (p === "replit" && freeHealthy) ||
+      (p === "openference" && openferenceAvailable) ||
+      (!!healthyOpenferenceModel && p === `openference:model:${healthyOpenferenceModel}`),
     mapReplitToOpenAI: (id: string) => id, hasIntegrationFallback: () => false,
     cheaperAutomaticAllowed: (tenant: number) => tenant === 1,
+    cheaperMinimumDiscount: () => minimumDiscount,
     CHEAPER_INFERENCE_MODEL_ID, CHEAPER_INFERENCE_UPSTREAM_MODEL: "gpt-5.6-luna",
     getCheaperCatalog: async () => [{ id: "gpt-5.6-luna", endpoint: "/v1/chat/completions", discount }],
     meteredLlmEnabled: () => false,
@@ -135,6 +146,69 @@ test("tier routing keeps free first, then owner CheaperInference; free-only and 
   await assert.rejects(tier("balanced", 1, { allowMeteredFallback: false }));
   discount = 39;
   await assert.rejects(tier("balanced", 1));
+  minimumDiscount = 15;
+  discount = 15;
+  assert.equal(await tier("balanced", 1), CHEAPER_INFERENCE_MODEL_ID);
+  discount = 14;
+  await assert.rejects(tier("balanced", 1));
+  discount = 15;
+  openferenceAvailable = true;
+  assert.equal(await tier("powerful", 1), CHEAPER_INFERENCE_MODEL_ID,
+    "provider health alone cannot reselect quarantined model transports");
+  await assert.rejects(tier("powerful", 1, { freeTierOnly: true }));
+  healthyOpenferenceModel = "Kimi K3";
+  assert.equal(await tier("powerful", 1), "openference/kimi-k3",
+    "a genuinely healthy model still precedes paid fallback");
+});
+
+test("Openference has an operator stop without removing its credential", () => {
+  const env: Record<string, string> = { OPENFERENCE_API_KEY: "synthetic-credential-length-only" };
+  const key = providerFunction("getOpenferenceKey", { process: { env } });
+  const ready = providerFunction("providerLaneLocallyReady", {
+    isProviderHealthy: () => true, hasOpenferenceKey: () => key() !== null,
+  });
+  assert.equal(key(), env.OPENFERENCE_API_KEY);
+  assert.equal(ready("openference"), true);
+  env.OPENFERENCE_ENABLED = "0";
+  assert.equal(key(), null);
+  assert.equal(ready("openference"), false);
+});
+
+test("actual closed create enforces the configured floor before reserving and dispatching", async () => {
+  let discount = 15;
+  const events: string[] = [];
+  const entry = () => ({ id: "gpt-5.6-luna", type: "text", endpoint: "/v1/chat/completions",
+    context: 8192, vision: false, input: 0.17, output: 1.02,
+    maximumInput: 0.8, maximumOutput: 3.6, discount });
+  const resolve = providerFunction("getClientForModel", {
+    process: { env: { CHEAPER_INFERENCE_API_KEY: "synthetic-fixture" } },
+    normalizeRetiredModelId: (id: string) => id, normalizeModelId: (id: string) => id, MODEL_REGISTRY: [],
+    isSyntheticEvaluationModel: () => false, isOwnerOnlyFinalDecisionModel: () => false,
+    currentTenantId: () => 1, assertCheaperInferenceAccess() {}, isProviderHealthy: () => true,
+    getCheaperCatalog: async () => [entry()], CHEAPER_INFERENCE_BASE_URL: "https://fixture.invalid/v1",
+    OpenAI: class {
+      chat = { completions: { create: async (payload: any, options: any) => {
+        events.push("dispatch");
+        assert.equal(payload.min_discount_percent, 15);
+        assert.equal(options.maxRetries, 0);
+        return { choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, cost: 0.01 } };
+      } } };
+    },
+    cheaperAutomaticAllowed: () => true, cheaperMinimumDiscount: () => 15,
+    guardCheaperInferenceRequest, cheaperRequestMaximum, catalogUsageCost,
+    buildPatchedCreate: (create: any) => create,
+    runCheaperBudgeted: async (tenant: number, maximum: number, call: () => Promise<unknown>) => {
+      assert.equal(tenant, 1); assert.ok(maximum > 0 && maximum < 0.1);
+      events.push("reserve"); return call();
+    },
+  });
+  const { client } = await resolve(CHEAPER_INFERENCE_MODEL_ID, 1);
+  const payload = { model: "gpt-5.6-luna", messages: [{ role: "user", content: "fixture" }], max_completion_tokens: 128 };
+  await client.chat.completions.create(payload);
+  assert.deepEqual(events, ["reserve", "dispatch"]);
+  events.length = 0; discount = 14;
+  await assert.rejects(client.chat.completions.create(payload), /discount floor/);
+  assert.deepEqual(events, []);
 });
 
 test("requests pin the upstream model and reject malformed or excessive output budgets", () => {

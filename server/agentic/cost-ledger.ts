@@ -6,6 +6,9 @@ import { logSilentCatch } from "../lib/silent-catch";
 import { INCOME_CLAUDE_COST_PER_1K } from "../lib/income-claude-route";
 import { MODEL_REGISTRY, getCatalogModelPricing } from "../model-registry";
 const MODEL_COST_PER_1K: Record<string, { in: number; out: number }> = {
+  // OpenRouter live catalog, 2026-10-15. Report reservations use the higher
+  // post-intro $4/$20/M ceiling, NOT this $2/$10/M usage estimate.
+  "google/gemini-4-argon": { in: 0.002, out: 0.010 },
   "gpt-5.1": { in: 0.00125, out: 0.010 },
   "gpt-5.4": { in: 0.0025, out: 0.015 },
   // Platform default since the Sol migration. Keep this verified OpenRouter rate

@@ -1,6 +1,6 @@
 {
   "name": "visionclaw-agent",
-  "version": "136.2.0",
+  "version": "137.0.0-sec",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -106,6 +106,7 @@
     "undici": "^6.29.0",
     "ws": "^8.18.0",
     "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.1",
     "zod-validation-error": "^3.5.4"
   },
   "devDependencies": {

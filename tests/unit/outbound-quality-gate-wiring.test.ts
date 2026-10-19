@@ -47,7 +47,7 @@ const SIGNATURE = `"outbound_quality_gate_degraded"`;
  */
 function degradedIncidentWindows(src: string): string[] {
   const windows: string[] = [];
-  const re = /if\s*\(\s*\w+\.degraded\s*\)/g;
+  const re = /if\s*\(\s*\w+\.degraded(?:\s*&&\s*hasIncidentScope)?\s*\)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
     const window = src.slice(m.index, m.index + 1200);

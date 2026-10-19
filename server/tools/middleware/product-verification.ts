@@ -20,6 +20,19 @@
 import fs from "node:fs";
 
 export function attachProductVerification(toolName: string, result: any): any {
+  // Legacy presence checks must not throw after a producer already performed
+  // its action, mutate its return object, or evaluate returned accessors.
+  try {
+    if (!result || typeof result !== "object" || Array.isArray(result)) return result;
+    const descriptors = Object.getOwnPropertyDescriptors(result);
+    if (Object.values(descriptors).some(d => !("value" in d))) return result;
+    return buildProductVerification(toolName, { ...result });
+  } catch {
+    console.warn("[product-qa] legacy presence inspection unavailable");
+    return result;
+  }
+}
+function buildProductVerification(toolName: string, result: any): any {
   if (!result || result.error) return result;
   const verification: any = { tool: toolName, timestamp: new Date().toISOString(), checks: [] };
 
@@ -118,8 +131,8 @@ export function attachProductVerification(toolName: string, result: any): any {
     verification.instruction = "IMPORTANT: Review the warnings above before delivering this to the user. Be transparent about any issues found.";
     console.warn(`[product-qa] ${toolName}: verification found issues — ${verification.checks.filter((c: any) => c.status !== "OK").map((c: any) => c.message).join("; ")}`);
   } else {
-    verification.overallStatus = "PASSED";
-    console.log(`[product-qa] ${toolName}: all ${verification.checks.length} verification checks passed`);
+    verification.overallStatus = "BASIC_CHECKS_ONLY";
+    verification.instruction = "Basic presence/metadata checks only, NOT independent product or delivery verification. Inspect _outputVerification and the mandatory delivery contract before claiming completion.";
   }
 
   result._productVerification = verification;

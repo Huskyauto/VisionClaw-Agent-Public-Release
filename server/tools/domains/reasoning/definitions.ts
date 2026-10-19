@@ -123,7 +123,7 @@ export const hypothesisAttachEvidenceDefinition: ToolDefinition = {
       properties: {
         hypothesis_id: { type: "number", description: "id of the pinned hypothesis to attach evidence to (returned by hypothesis_pin)." },
         evidence_kind: { type: "string", enum: ["memory_entry", "finding", "tool_result", "free_text"], description: "What kind of artifact backs this hypothesis." },
-        evidence_ref: { type: "string", description: "The reference: memory entry id (as string), finding id, a sanitized snippet of the tool result, or a one-sentence free-text observation. ≤240 chars after sanitization." },
+        evidence_ref: { type: "string", description: "memory_entry/finding require an exact positive numeric ID for an existing record in this tenant; never guess another tenant's ID. tool_result/free_text accept a sanitized snippet or observation. ≤240 chars after sanitization." },
         confidence: { type: "number", description: "0–1. Default 0.6. Per-edge confidence — independent from the hypothesis's own confidence." },
         note: { type: "string", description: "Optional one-sentence note explaining why this evidence supports the hypothesis." },
       },

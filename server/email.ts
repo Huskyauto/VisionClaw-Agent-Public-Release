@@ -151,6 +151,8 @@ export async function getMessage(inboxId: string, messageId: string) {
 export async function sendEmailDirect(params: {
   to: string;
   subject: string;
+  source?: string;
+  alertReports?: Array<{ name: string; content: string }>;
   text?: string;
   body?: string;
   html?: string;
@@ -165,6 +167,8 @@ export async function sendEmail(params: {
   inboxId: string;
   to: string;
   subject: string;
+  source?: string;
+  alertReports?: Array<{ name: string; content: string }>;
   text?: string;
   body?: string;
   html?: string;
@@ -181,6 +185,8 @@ async function sendEmailInternal(params: {
   inboxId: string;
   to: string;
   subject: string;
+  source?: string;
+  alertReports?: Array<{ name: string; content: string }>;
   text?: string;
   body?: string;
   html?: string;
@@ -190,6 +196,31 @@ async function sendEmailInternal(params: {
   _bypassOwnerDigest?: boolean;
   retryAmbiguous?: boolean;
 }) {
+  // Preserve full diagnostic evidence BEFORE digest preview truncation. This is
+  // independent of delivery success and never claims an error was resolved.
+  let alertArchive: { id: string | null; durability: string; warnings: string[] } | undefined;
+  try {
+    const { isOwnerOnlyRecipients } = await import("./owner-email-digest");
+    if (isOwnerOnlyRecipients(params)) {
+    try {
+      const { saveOwnerAlert } = await import("./lib/owner-alert-archive");
+      alertArchive = await saveOwnerAlert({
+        subject: params.subject, source: params.source, text: params.text || params.body,
+        html: params.html, reports: params.alertReports,
+      });
+    } catch {
+      console.error("[owner-alert-archive] FAILED before owner notification; durable details not confirmed");
+      alertArchive = { id: null, durability: "failed", warnings: ["Full diagnostic archive unavailable."] };
+    }
+    if (alertArchive.durability !== "durable") {
+      const warning = "ALERT LOG WARNING: full details are NOT confirmed durable. Inspect the private recovery spool before republishing.";
+      params = { ...params, text: `${warning}\n\n${params.text || params.body || ""}` };
+      if (params.html) params.html = `<p>${warning}</p>${params.html}`;
+    }
+    }
+  } catch {
+    console.error("[owner-alert-archive] classification unavailable; normal delivery continues without an archive claim");
+  }
   // R103 — Owner email digest gate. Bob asked: "300 emails in a week is
   // too much, once a day give me your report that's it shut everything
   // else down". Every script and route flows through sendEmail, so the
@@ -201,6 +232,8 @@ async function sendEmailInternal(params: {
       const gate = maybeQueueOwnerEmail({
         to: params.to, cc: params.cc, bcc: params.bcc,
         subject: params.subject, text: params.text || params.body, html: params.html,
+        source: params.source, archiveId: alertArchive?.id || undefined,
+        archiveDurability: alertArchive?.durability,
       });
       // Opportunistic flush — if 24h have rolled over, this call will send
       // the digest now. Fire-and-forget so we don't block the hot path.

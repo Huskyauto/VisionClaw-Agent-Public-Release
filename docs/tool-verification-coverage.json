@@ -1,0 +1,6325 @@
+{
+  "version": 1,
+  "registeredTools": 427,
+  "baselineCovered": 427,
+  "artifactAdapters": 25,
+  "exactWriteReadbacks": 1,
+  "scope": "Baseline coverage is not bespoke or live-provider correctness certification.",
+  "knownLimits": [
+    "Arrays/primitives preserve their shapes; receipts use diagnostics rather than a JSON wrapper.",
+    "Generic local-artifact adapter is owner-only; customer deliveries retain their mandatory tenant-scoped gate.",
+    "External acknowledgments, IDs, URLs and success flags are not independent completion proof.",
+    "Additional tool-specific provider/state readbacks are required; this catalog does not pretend they exist."
+  ],
+  "tools": [
+    {
+      "name": "academic_search",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web",
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "add_competitor",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "competitorIntel"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "add_customer",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "crm"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "advance_sequence",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "outreachSequencing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "aeo_score",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing",
+        "content",
+        "research"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "agent_cost_summary",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "finance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "agent_security_scan",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "agent_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "agentic_cache_stats",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "analyze_pdf",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "pdf"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "analyze_portfolio",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "finance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "apply_procedure_edit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "approve_felix_proposal",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "felix",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "approve_procedure_edit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "arxiv_search",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "attribute_failure",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "reasoning",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "audit_reasoning_step",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reasoning",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "auto_memorize_now",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "autonomous_task",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "browser",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "browser_workflow",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "build_html_app",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "product_output",
+        "code"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "build_presentation_distributed",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "presentations"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "build_video_from_brief",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "product_output",
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "build_voice_profile",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "content",
+        "branding"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "business_health_score",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reporting"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "bwb_weekly_build",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media",
+        "video",
+        "social"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "calendar_sync",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "workspace"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "cancel_scheduled_message",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "cancel_scheduled_post",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging",
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "cancel_wake",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "planning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "cash_flow_summary",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reporting"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "charge_task_force",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance",
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "check_background_task",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "check_department_budget",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance",
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "check_inbox",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "email"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "check_system_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "check_video_job",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "media"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "chunk_code",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "code",
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "classify_reply",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "outreachSequencing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "code_slice",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "files",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "codebase_diff_impact",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "code",
+        "validation"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "codebase_graph_query",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "code"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "commit_decision",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "ai",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "commitment_cancel",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "planning",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "commitment_complete",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "planning",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "commitment_create",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "planning",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "commitment_heartbeat",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "planning",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "commitment_list",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "planning",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "competitor_briefing",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "competitorIntel"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "compliance_audit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "legal"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "compose_social_post",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "compress_context",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "context_budget_audit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "copilot_chat",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "create_ab_experiment",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_adr",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "planning",
+        "reasoning",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_contract",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "contracts"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_crew",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "crews"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_document",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "docs"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "create_flow",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "crews"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_invoice",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "invoicing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_knowledge",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_memory",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_mind",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "crews"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_payment_link",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "create_pdf",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "pdf",
+        "presentations"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "create_plan",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "minerva"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_sequence",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "outreachSequencing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_slides",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "presentations"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "create_slideshow_video",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "create_spreadsheet",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "docs"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "create_styled_report",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "pdf",
+        "docs"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "create_task_force",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_tension",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "reasoning",
+        "experiments",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "create_tool",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "tools"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "critique_response",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "cross_critique",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reasoning",
+        "experiments",
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "crossref_lookup",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "customer_pipeline",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "crm"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "debate",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "decide_approval",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "deep_research",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web",
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "define_icp",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "leadEnrichment"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "delegate_task",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "delete_custom_tool",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "tools"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "deliver_product",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "delivery"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "delivery_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "delivery"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "derived_api_capture_list",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web",
+        "data"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "derived_api_delete",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web",
+        "data"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "derived_api_derive",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web",
+        "data"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "derived_api_list",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web",
+        "data"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "derived_api_replay",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web",
+        "data"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "detect_competitor_changes",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "competitorIntel"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "detect_emotional_state",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "wellness",
+        "safety",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "detect_fatigue",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "wellness",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "discover_cmmc_prospects",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "leadEnrichment"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "doc_search",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "draft_social_post",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "edit_pdf",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "pdf"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "emit_event",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "enrich_lead",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "leadEnrichment"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "enroll_in_sequence",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "outreachSequencing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "ensemble_query",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reasoning",
+        "research",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "estimate_cost",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "evaluate_against_contract",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "exec",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "code"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "execute_code",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "code"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "execute_felix_proposal",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "felix",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "expense_report",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "expenses"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "expire_triple",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "export_persona",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "personas"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "felix_loop_run_now",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "felix",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "felix_loop_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "felix",
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "fetch_crypto_price",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "fetch_exchange_rate",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "fetch_hacker_news",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "fetch_weather",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "fetch_wikipedia",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web",
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "figma",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "design",
+        "research"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "fill_pdf",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "pdf"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "finalize_video",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "product_output",
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "finance_market_overview",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "finance_news",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "finance_stock_price",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "finance_stock_search",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "financial_snapshot",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "finance",
+        "reporting"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "findings_publish",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "findings_read",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "firecrawl_crawl",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "scraping"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "firecrawl_map",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "scraping"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "firecrawl_scrape",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "scraping"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "firecrawl_search",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "scraping"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "forecast_ticker",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "finance",
+        "research",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "fork_conversation",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "format_post",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "content",
+        "social"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "generate_audio",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "generate_audit_fix_kit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "generate_chart",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "charts"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "generate_content_matrix",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "content",
+        "social",
+        "planning"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "generate_dashboard",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "charts"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "generate_design_doc",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "generate_evidence_docket",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "delivery",
+        "validation"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "generate_hooks",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "content",
+        "social"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "generate_legal_document",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "legal"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "generate_schema_markup",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "legal"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "generate_social_image",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing",
+        "media"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "get_agent_run",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_daily_notes",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "notes"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_done_condition",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_eval_report",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_experiments",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_minerva_roster",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "minerva",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_plan",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "minerva"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_unified_memory_context",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory",
+        "conversations",
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_usage_analytics",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_user_info",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "get_voice_profile",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "content",
+        "branding"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "google_drive",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "files"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "google_workspace",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "workspace"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "grade_deliverable",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "validation",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "graph_memory",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "grok_send_message",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "grounding_intervention",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "wellness",
+        "safety",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "hypothesis_attach_evidence",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory",
+        "reasoning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "hypothesis_evidence_chain",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory",
+        "reasoning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "hypothesis_list_pinned",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory",
+        "reasoning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "hypothesis_pin",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory",
+        "reasoning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "ideation_session",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ideation"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "inbox_allowlist_list",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "communication"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "inbox_quarantine_list",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "communication"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "inbox_sender_approve",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "communication",
+        "security"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "inbox_sender_block",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "communication",
+        "security"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "ingest_paper",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "init_character_portraits",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media",
+        "product_output"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "instinct_send_message",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "introspect_tools",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "tools",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "invoice_aging_report",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "invoicing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "jury_triage",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reasoning",
+        "system",
+        "safety"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "knowledge_navigate",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "knowledge",
+        "research"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "knowledge_nudge_stats",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "skillEvolution"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "kpi_dashboard",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "kpi"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "kpi_trend",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "kpi"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "learn_from_reference",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "self_improvement",
+        "research"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "legal_review",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "legal"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_adrs",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "planning",
+        "reasoning",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_agent_runs",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_background_tasks",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_character_portraits",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_competitors",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "competitorIntel"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_contracts",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "contracts"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_conversations",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "conversations"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_critiques",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reasoning",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_custom_tools",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "tools"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_customers",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "crm"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_expenses",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "expenses"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_felix_loop_runs",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "felix",
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_felix_proposals",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "felix",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_invoices",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "invoicing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_models",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_open_tensions",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "reasoning",
+        "experiments",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_pdf_fields",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "pdf"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_pending_approvals",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_plans",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "minerva"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_procedure_edits",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_scheduled_messages",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_scheduled_posts",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging",
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_sequences",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "outreachSequencing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_skill_candidates",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "skillEvolution",
+        "tools"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_task_forces",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_uploads",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "files"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "list_wakes",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "planning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "llm_task",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "lobster",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "log_expense",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "expenses"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "log_experiment",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "log_interaction",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "crm"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "lookup_ip_geo",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "lookup_output_skill",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "system",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "lookup_sam_company_cage",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "leadEnrichment"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "lookup_sam_exact_company",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "leadEnrichment"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "manage_content_calendar",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "manage_desk",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "sessions"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "manage_skills",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "tools"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "manage_social_accounts",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "manage_watchlist",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "competitorIntel"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "marketing_analytics",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "marketing_experiment",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "memory_geometry_scan",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "messaging_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "micro_sabbatical",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "wellness",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "mind_ticket",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "crews"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "mission_portfolio_review",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "monid_catalog_browse",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "discovery",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "monid_discover",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "discovery",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "monid_inspect",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "discovery",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "monid_run",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "discovery",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "mpeg_add_audio",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "mpeg_concat",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "mpeg_produce",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "mpeg_produce_parallel",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "multi_source_collect",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "nudge_self",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "skillEvolution",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "openalex_search",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "opportunity_bank_file",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "orchestrate",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "outlook_list_inbox",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "communication",
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "outlook_read_message",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "communication",
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "outlook_search_inbox",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "communication",
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "owner_business_overview",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "parallel_research",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web",
+        "ai",
+        "agentic"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "pin_done_condition",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "plan_and_execute",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "plan_deliverable",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "validation"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "plan_graph_edit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "planning",
+        "reasoning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "plan_graph_query",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "planning",
+        "reasoning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "plan_video_production",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media",
+        "video",
+        "reasoning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "post_to_channel",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "sessions"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "produce_video",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "product_listing_create",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "product_listing_list",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "profit_and_loss",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reporting"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "project",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "code"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "promote_skill_candidate",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "skillEvolution",
+        "tools"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "propose_procedure_edit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "propose_skill",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "self_improvement",
+        "memory",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "publish_social_post",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "pubmed_search",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "qualify_leads",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "leadEnrichment"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "quality_baseline_check",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "code",
+        "system",
+        "self_improvement"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "quality_baseline_save",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "code",
+        "system",
+        "self_improvement"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "query_causal",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "knowledge",
+        "reasoning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "query_communities",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "query_evidence",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "evidence"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "query_project_relationships",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "query_trace",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "query_triples",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "read_channels",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "sessions"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "read_file",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "files"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "read_output_blob",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "files",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "read_scratchpad",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "notes"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "readability_extract",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "recall_capabilities",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "knowledge",
+        "system",
+        "reasoning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "recall_context",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "recall_failure_patterns",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "self_improvement"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "recall_references",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "self_improvement"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "recall_strategic_wins",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "self_improvement"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "recommend_best_tool",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "record_ab_event",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "record_bwb_weight",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "data"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "record_failure_pattern",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "self_improvement"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "record_kpi",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "kpi"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "record_strategic_win",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "self_improvement"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "recursive_synthesize",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reasoning",
+        "research"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "register_character_portrait",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "reject_felix_proposal",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "felix",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "reject_procedure_edit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "reject_skill_candidate",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "skillEvolution",
+        "tools"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "remember_for_this_session",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "render_diagram",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "docs"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "repurpose_content",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "content",
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "request_approval",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "research_digest",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "experiments",
+        "research"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "resolve_tension",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "reasoning",
+        "experiments",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "revenue_mission_create",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business",
+        "planning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "revenue_mission_draft_experiment",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business",
+        "planning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "revenue_mission_list",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "revenue_mission_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "business"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "revenue_report",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reporting"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "revenue_vs_cost",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "rollback_procedure_edit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "run_ab_eval",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "evaluation",
+        "self_improvement",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "run_agent_eval",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "run_background_task",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "run_command",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "code"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "run_okr_review",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "run_self_improvement",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "run_supervisor",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai",
+        "agentic"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "sandbox_promote",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "evaluation",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "sandbox_report",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "evaluation",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "sandbox_run",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "evaluation",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "save_evidence",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "evidence"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "scan_file",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "security",
+        "files"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "scan_for_prompt_injection",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "security",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "scan_for_secrets",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "safety",
+        "security"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "schedule_cross_platform_post",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging",
+        "delivery",
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "schedule_message",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging",
+        "delivery"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "schedule_wake",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "planning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "score_leads",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "leadEnrichment"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "score_post",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "content",
+        "social",
+        "evaluation"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "scraped_page_read",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "scraping"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "scraped_pages_delete",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "scraping"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "scraped_pages_query",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "scraping"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "scrapling_scrape",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "sculptor_review",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "sculptor_session",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "search_knowledge",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "search_memory",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "search_stock_media",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing",
+        "media"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "second_opinion",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reasoning",
+        "research",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "select_best_image",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "select_references_for_frame",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "self_diagnose",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "self_heal",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance",
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "self_heal_inspect",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "self_heal_log",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "send_email",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "email"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "send_message",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging",
+        "delivery"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "seo_content_audit",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "legal"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "sessions_history",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "sessions"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "sessions_list",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "sessions"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "sessions_send",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "sessions"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "sessions_spawn",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "sessions"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "set_department_budget",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance",
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "set_my_profile_photo",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "media"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "set_policy",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "show_diff",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "diff"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "simulate_plan",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "planning",
+        "felix",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "site_login",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "skill_seeker",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "tools"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "skillify",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "tools"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "slash_command",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "code"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "spark_send_message",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "messaging",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "start_video_job",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "product_output",
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "stealth_browse",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "stealth_browse_camofox",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "store_triple",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "knowledge"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "strategic_interview",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "personas"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "stress_intervention",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "wellness",
+        "felix"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "subagents",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "sessions"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "sunset_task_force",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "governance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "supersede_adr",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory",
+        "planning",
+        "reasoning",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "sync_personas",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "personas"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "synthesize_research",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "evidence"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "synthesize_skill",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "skillEvolution",
+        "tools",
+        "experiments"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "system_load_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "take_competitor_snapshot",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "competitorIntel"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "template_scrape",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "template_scraper_stats",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "test_api_keys",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "tool_performance_report",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "skillEvolution"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "track_intervention",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "wellness",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "track_outcome",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "treasury_paper_simulation",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "finance"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "tree_of_thought",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "trend_research",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "typesafe_jev_advisory",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reasoning",
+        "ai"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "undo_last_action",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "update_contract_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "contracts"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "update_customer",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "crm"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "update_invoice_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "invoicing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "update_memory",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "user_model_query",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "userModeling"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "venture_discovery",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "research",
+        "planning"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "verify_deliverable",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "verify_delivery_proof",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "validation",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "verify_felix_proposal_spec",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "agentic",
+        "felix",
+        "governance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "verify_math_chain",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "reasoning",
+        "finance",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "verify_outbound_safety",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "security",
+        "system"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "verify_with_cove",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "quality",
+        "research"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "vibevoice_transcribe",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "video_burn_captions",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "video_cut_fillers",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "video_transcribe_words",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "vision_browse",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "web_fetch",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "web_search",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "web"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "whatsapp",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "whatsapp"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "workspace_finalize",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "workspace_init",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "workspace_list",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "workspace_log_artifact",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "workspace_read",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "workspace_update_status",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "system",
+        "memory"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "write_daily_note",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "notes"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "write_file",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "files"
+      ],
+      "artifactContractAdapter": true,
+      "exactWriteReadback": true,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "request_acceptance",
+        "source_visual_media_qa",
+        "final_delivery_proof"
+      ]
+    },
+    {
+      "name": "write_scratchpad",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "notes"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "tenant_scoped_state_readback_when_mutating"
+      ]
+    },
+    {
+      "name": "x_delete_tweet",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "x_get_me",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "x_get_mentions",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "x_get_timeline",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "x_get_tweet",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "x_like_tweet",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "x_post_tweet",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "x_retweet",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "x_search",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "marketing"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    },
+    {
+      "name": "youtube",
+      "baseline": "bounded_result_postflight",
+      "categories": [
+        "media"
+      ],
+      "artifactContractAdapter": false,
+      "exactWriteReadback": false,
+      "independentCustomerOutcomeCertified": false,
+      "additionalEvidenceRequired": [
+        "tool_action_contract",
+        "authoritative_provider_readback_when_consequential"
+      ]
+    }
+  ]
+}

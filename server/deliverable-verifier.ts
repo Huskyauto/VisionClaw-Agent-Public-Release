@@ -7,6 +7,7 @@ import { logSilentCatch } from "./lib/silent-catch";
 import { scanFailureModes, isTextLike } from "./lib/deliverable-failure-modes";
 import AdmZip from "adm-zip";
 import { DOMParser } from "@xmldom/xmldom";
+import { backcheckCustomerArtifact, BACKCHECK_LIMITS, type ArtifactBackcheck } from "./lib/customer-artifact-backcheck";
 
 type ZipEntry = {
   entryName: string;
@@ -35,7 +36,7 @@ const ALLOWED_FILE_ROOTS: string[] = [
 // allowed dir (`attached_assets/escape -> /etc/passwd`) passed the direct
 // check and never got escape-validated. Now strict for every callsite. Falls
 // CLOSED on realpath failure.
-function isPathAllowed(absPath: string): boolean {
+export function isPathAllowed(absPath: string): boolean {
   const abs = path.resolve(absPath);
   // R110.21.2 architect FAIL fix: ENOENT/EACCES must NOT collapse
   // "missing file" into "path-jail rejected" (downstream stat surfaces
@@ -77,6 +78,7 @@ export interface VerifyInput {
   personaId?: number;
   conversationId?: number;
   buffer?: Buffer; // for in-memory check
+  acceptanceCriteria?: unknown;
 }
 
 export interface VerifyResult {
@@ -91,6 +93,7 @@ export interface VerifyResult {
    *  but the durable audit trail is degraded — ops/callers should surface it). */
   auditPersisted?: boolean;
   detected: { extension?: string; mime?: string; size?: number };
+  backcheck?: ArtifactBackcheck;
 }
 
 let contractCache: { rows: DeliverableContract[]; loadedAt: number } | null = null;
@@ -393,9 +396,10 @@ export async function verifyDeliverable(input: VerifyInput): Promise<VerifyResul
             failures.push(`path is not a regular file (mode=${stat.mode.toString(8)})`);
           } else {
             detected.size = stat.size;
-            if (contract.renderCheck === "office_document") {
-              if (stat.size > MAX_OFFICE_DOCUMENT_VALIDATION_BYTES) {
-                failures.push(`office document exceeds ${MAX_OFFICE_DOCUMENT_VALIDATION_BYTES} byte validation limit`);
+            if (contract.renderCheck === "office_document" || ext === ".pdf" || /\.(txt|md|markdown|html?|csv|json)$/i.test(ext)) {
+              const limit = contract.renderCheck === "office_document" ? MAX_OFFICE_DOCUMENT_VALIDATION_BYTES : BACKCHECK_LIMITS.bytes;
+              if (stat.size > limit) {
+                failures.push(`artifact exceeds ${limit} byte validation limit`);
               } else {
                 // ZIP central directories live at the end of a DOCX. Unlike
                 // header-only checks, OOXML validation must inspect the whole
@@ -455,6 +459,14 @@ export async function verifyDeliverable(input: VerifyInput): Promise<VerifyResul
 
   const renderErr = checkRender(contract.renderCheck, buf, ext);
   if (renderErr) failures.push(renderErr);
+  let backcheck: ArtifactBackcheck | undefined;
+  if (buf && (ext === ".pdf" || /\.(txt|md|markdown|html?|csv|json)$/i.test(ext) || input.acceptanceCriteria !== undefined)) {
+    const checked = await backcheckCustomerArtifact({ bytes: buf, fileName: input.fileName || input.filePath || `artifact${ext}`, criteria: input.acceptanceCriteria });
+    // Other formats may only have a header sample here. Never issue an
+    // exact-byte receipt for that partial buffer.
+    if (checked.coverage !== "identity_only") backcheck = checked;
+    if (!checked.passed) failures.push(...checked.failures.map(f => `artifact-backcheck: ${f}`));
+  }
 
   // Enumerated failure-mode checklist (no-LLM, $0). Runs only on text-like
   // deliverables where we actually hold bytes. HARD findings block; advisory
@@ -475,6 +487,7 @@ export async function verifyDeliverable(input: VerifyInput): Promise<VerifyResul
     advisories: advisories.length ? advisories : undefined,
     contractId: contract.id,
     detected,
+    backcheck,
   };
   await persistVerification(input, contract, result);
   return result;
@@ -488,7 +501,8 @@ async function persistVerification(input: VerifyInput, contract: DeliverableCont
       VALUES
         (${input.tenantId}, ${input.personaId ?? null}, ${input.conversationId ?? null}, ${input.deliverableType},
          ${input.filePath ?? null}, ${input.fileUrl ?? null}, ${contract?.id ?? null}, ${result.status},
-         ${JSON.stringify([...result.failures, ...(result.advisories ?? []).map((a) => `ADVISORY: ${a}`)])}::jsonb, ${result.detected.extension ?? null}, ${result.detected.mime ?? null}, ${result.detected.size ?? null})
+         ${JSON.stringify([...result.failures, ...(result.advisories ?? []).map((a) => `ADVISORY: ${a}`),
+           ...(result.backcheck ? [`ADVISORY: BACKCHECK_RECEIPT ${JSON.stringify(result.backcheck)}`] : [])])}::jsonb, ${result.detected.extension ?? null}, ${result.detected.mime ?? null}, ${result.detected.size ?? null})
       RETURNING id
     `);
     result.verificationId = ((inserted as any).rows?.[0]?.id ?? (inserted as any)[0]?.id) as number;

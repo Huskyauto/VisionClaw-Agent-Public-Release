@@ -22,12 +22,12 @@ test("release facts distinguish complete registered tools from the public index"
   assert.equal(facts.schemaVersion, 1);
   const input = JSON.parse(fs.readFileSync("docs/release-facts-input.json", "utf8"));
   assert.equal(facts.releaseDate, input.releaseDate);
-  assert.equal(facts.metrics.registeredTools, 427);
+  assert.equal(facts.metrics.registeredTools, 428);
   assert.equal(facts.metrics.publicDocumentedTools, 386);
   assert.ok(facts.metrics.registeredTools > facts.metrics.publicDocumentedTools);
 
   for (const text of [totals, readme, roadmap, indexHtml]) {
-    assert.match(text, /427 (?:total )?registered tools/i);
+    assert.match(text, new RegExp(`${facts.metrics.registeredTools} (?:total )?registered tools`, "i"));
     assert.match(text, /386 public(?:ly)? documented tools/i);
   }
 });

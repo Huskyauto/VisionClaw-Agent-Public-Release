@@ -6,6 +6,7 @@ import { logSilentCatch } from "./lib/silent-catch";
 import { shouldSkipApprovalGate, trustedExecFlags } from "./safety/trusted-exec-stamp";
 import type { CmmcAuthoritativeSourceLock } from "./lib/tool-routing-context";
 import { isToolAllowedInModelRound, snapshotAllowedToolNames, trustedConversationScope } from "./lib/model-tool-authorization";
+import { authorizePilotInvocation } from "./lib/business-pilot-invocation";
 export type InvokedVia =
   | "main_chat"
   | "public_chat"
@@ -30,6 +31,8 @@ export interface GuardedExecContext {
    * wrongly blocks trusted personas (Forge/Felix) from their own tools.
    */
   personaName?: string;
+  /** Authenticated conversation persona identity, never model arguments. */
+  personaId?: number;
   invokedVia: InvokedVia;
   /** When true, allows tenantId fallback to admin tenant (1). Required for "system" / "self_heal". */
   allowSystemFallback?: boolean;
@@ -304,6 +307,14 @@ export async function executeGuardedTool(
       // calls without a roster retain their established direct-call arguments.
       ...trustedConversationScope(ctx.conversationId, hasModelToolRoster),
     };
+    if (toolName === "business_pilot") {
+      // No model-authored channel, identity or boolean can authorize pilot access.
+      Object.assign(execArgs, { _personaId: ctx.personaId, _conversationId: ctx.conversationId });
+      authorizePilotInvocation(execArgs, {
+        tenantId: ctx.tenantId, personaId: ctx.personaId,
+        conversationId: ctx.conversationId, invokedVia: ctx.invokedVia,
+      });
+    }
     if (ctx.signal?.aborted) throw new Error("Trusted execution cancelled before dispatch");
     ctx.onDispatch?.();
     result = await executeToolWithTimeout(toolName, execArgs);

@@ -179,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     const bootstrapGeneration = currentAuthIdentityGeneration();
+    let bootstrapPhase = "/api/auth/user";
     try {
       const hasReplitAuth = await checkReplitAuth();
       if (hasReplitAuth) {
@@ -187,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (!isCurrentAuthIdentityGeneration(bootstrapGeneration)) return;
 
+      bootstrapPhase = "/api/auth/status";
       const statusRequest = beginAuthIdentityRequest();
       let data: { authRequired: boolean };
       try {
@@ -203,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!isCurrentAuthIdentityGeneration(bootstrapGeneration)) return;
         const request = beginAuthIdentityRequest();
         try {
+          bootstrapPhase = "/api/settings";
           const verify = await fetch("/api/settings", {
             headers: { Authorization: `Bearer ${token}` },
             signal: request.signal,
@@ -223,7 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       if (isCurrentAuthIdentityGeneration(bootstrapGeneration)) {
-        console.error("[auth] bootstrap failed; retaining the authentication gate", error);
+        console.error("[auth] bootstrap failed; retaining the authentication gate", { endpoint: bootstrapPhase, error });
         setAuthRequired(true);
       }
     } finally {

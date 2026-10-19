@@ -1,5 +1,130 @@
 # REA assessment — October 5, 2026
 
+## October 17 trading-paper recheck
+
+Bob re-shared the trading-oriented REA post and the paper:
+https://drive.google.com/file/d/REDACTED_DRIVE_FILE_ID/view
+
+The linked paper was retrieved in full as extracted text, and its first-page
+image was supplied directly by Bob. Extraction contains garbled words/equations;
+no mathematical validation or figure-complete review is claimed.
+
+### Claim checks
+
+| Promotional claim | Finding | Evidence and limit |
+| --- | --- | --- |
+| "crack apart any trading system" | Overbroad | The paper itself restricts investigation to authorized, supported artifacts and says public observations rarely identify unique internal logic. |
+| Inspect source and binaries "completely FREE" | Imprecise | REA is MIT-licensed; the README describes provider-dependent analysis. Model inference, compute, market data and some analysis-provider licenses are separate costs. No end-to-end free-cost measurement was performed. |
+| "Hedge funds wrote a 6-page research paper" | Unverifiable attribution | No named hedge-fund author or institutional affiliation was found in the retrieved opening/reference text or supplied first-page image. Exact-title/hedge-fund searches did not establish attribution. This is not proof that no institution was involved. |
+| "REA + Opus 5.5" and trading agents "in RUST" | Unsupported by retrieved paper | Neither Opus nor Rust appears in the extracted paper text. This does not rule out external examples not supplied or embedded image-only material. |
+| Trading profitability demonstrated | Not established | The paper presents a framework and literature references, not a reported REA strategy dataset, reproduced backtest, measured edge or live track record. It explicitly disclaims guaranteed strategy recovery and profits. |
+
+### What is useful
+
+1. **Feature-scoped software investigation:** map one owned/authorized capability
+   from input through transformations, boundaries and output, preserving observed,
+   inferred and unknown facts. This is more useful here than broad binary access.
+2. **Independent reconstruction checks:** compare an implementation against
+   retained behavior on cases excluded from construction. Define intended changes
+   separately so the old application's bugs do not become correctness rules.
+3. **Source/build mismatch investigation:** compare source, built artifacts and
+   versions without treating filenames, source maps or reachability as proof that
+   the code actually ran. Production provenance remains a separate check.
+4. **Authorized migration/audit work:** supported Electron/JavaScript or other
+   packaged applications without source may justify specialist REA inspection.
+   Availability, access rights and target licensing must be established first.
+
+The current upstream JavaScript workflow specifically documents
+`trace_application_feature`, `trace_javascript_semantics`,
+`compare_application_versions` and `compare_source_to_bundle`. Its static
+semantic relationships do not establish execution or causality; partial coverage
+keeps absence unknown. SECURITY still explicitly says REA is not a sandbox.
+
+### Native baseline and evaluation limits
+
+Inspected existing native evidence review, per-turn trace telemetry and research
+experiment persistence. These already cover parts of the paper's evidence-ledger,
+experiment and control recommendations; another autonomous research loop is not
+justified by this paper.
+
+A bounded run of the existing evidence-runtime and trace test files reported
+17 passes. The 11 evidence-runtime cases exercised absent sources, injected
+review/audit failures, bounded deadlines, sensitive-source handling, admission
+limits, deterministic arithmetic and explicit disablement.
+
+**Do not report all 17 as proof of durable tracing.** The six trace tests logged
+failed INSERTs for their synthetic tenant while reporting passes; this run does
+not establish successful span persistence, real cross-tenant trace isolation or
+an end-to-end operational trace. No application code was changed to conceal or
+resolve this limitation during the REA assessment.
+
+This is native baseline checking, **not** a candidate-versus-incumbent REA trial
+or independent held-out evaluation. REA was not installed or executed. A useful
+matched trial requires an authorized sanitized target, a credential-free
+supported worker, and independent behavioral oracles. Static source inspection
+cannot supply a measured REA improvement.
+
+**Recommendation:** retain the workflow as a concrete specialist research
+candidate. The first useful trial would investigate a bounded owned report
+delivery path or an authorized packaged JavaScript application, comparing
+ordinary source/browser/compiler investigation against REA on the same questions.
+Measure correctly recovered relationships, explicitly unresolved paths,
+investigation time and total cost; require no regression in tenant/authorization
+boundaries. Include dynamic-dispatch and missing-artifact counterexamples. Adopt
+only a demonstrated gain. Do not globally register REA, install native engines
+on the credential-bearing app host, add trading execution, or claim alpha.
+
+Current upstream sources checked:
+
+- https://raw.githubusercontent.com/morluto/rea/main/README.md
+- https://raw.githubusercontent.com/morluto/rea/main/SECURITY.md
+- https://raw.githubusercontent.com/morluto/rea/main/docs/javascript-application-workflows.md
+
+These are current-document observations, not a pinned release compatibility
+certification or permission to run targets.
+
+## October 14 recheck
+
+The original assessment below is a dated snapshot, not a claim that its provider
+requirements still describe upstream main. The recheck inspected commit
+`9a44fea3479a2ad463fdad2b14e86b412717f771`; its package declares REA 6.5.0.
+README, SECURITY, JavaScript workflow documentation, semantic trace service and
+Evidence input resolver were inspected at that exact revision. These are
+source/documentation observations, not execution of the REA toolkit.
+
+- The strongest project-specific candidate remains own-source JavaScript feature
+  and semantic tracing, source-to-bundle comparison and cross-version inspection.
+  Static JavaScript inspection does not require Hopper/Ghidra. Dynamic calls and
+  inferred relationships still do not establish actual execution or equivalence.
+- The inspected semantic service explicitly refuses a missing companion graph.
+  Its retained-Evidence resolver refuses missing references and mismatched IDs
+  rather than substituting another record. These narrow source observations are
+  not certification of the complete evidence/authentication pipeline.
+- Current upstream describes experimental Windows Ghidra support and additional
+  providers; the October 5 statement that Windows operations are unavailable is
+  historical. Current platform/provider compatibility was not exercised here.
+- Upstream's current security policy still explicitly states that REA is not a
+  sandbox. Native/runtime investigations need a restricted supported worker
+  without application credentials and only owned or authorized targets.
+- Four current native domain-boundary regression groups passed, covering import
+  syntax, permitted imports/comments, unresolved dynamic targets and malformed
+  source. This confirms the previously adapted native check remains functional;
+  it is not a REA-versus-VisionClaw benchmark.
+
+**Decision:** retain the specialist candidate, prioritize own-project tracing
+over broad binary tooling, and do not install/register REA globally. No new
+package, application behavior, tool permission or agent configuration changed.
+A matched REA runtime comparison remains unperformed. Revisit when a concrete
+owned investigation exceeds existing compiler, source and behavior checks.
+
+Pinned primary sources:
+
+- https://github.com/morluto/rea/tree/9a44fea3479a2ad463fdad2b14e86b412717f771
+- https://github.com/morluto/rea/blob/9a44fea3479a2ad463fdad2b14e86b412717f771/docs/javascript-application-workflows.md
+- https://github.com/morluto/rea/blob/9a44fea3479a2ad463fdad2b14e86b412717f771/SECURITY.md
+- https://github.com/morluto/rea/blob/9a44fea3479a2ad463fdad2b14e86b412717f771/src/application/javascript/JavaScriptSemanticTraceService.ts
+- https://github.com/morluto/rea/blob/9a44fea3479a2ad463fdad2b14e86b412717f771/src/application/EvidenceInputResolver.ts
+
 ## Verdict
 
 Useful specialist capability; do not install or expose globally in VisionClaw.

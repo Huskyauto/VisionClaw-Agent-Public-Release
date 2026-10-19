@@ -24,6 +24,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { validateBwbScript, assertRenderableFormat, assertBobVoice, resolveBwbVoice } from "./lib/bwb-validate";
+import { reviewBwbPackaging } from "./lib/bwb-packaging";
 import { renderOnGithubFarm, type FarmScene } from "./lib/github-render-farm";
 import { readFileSyncEIO, existsSyncEIO, writeFileSyncEIO } from "./lib/eio-read";
 import { createStableVideoSnapshot, validateRenderedVideo } from "./lib/video-output-validation";
@@ -41,6 +42,7 @@ interface VideoScript {
   youtubeDescription?: string;
   youtubeTags?: string[];
   thumbnailPrompt?: string;
+  packagingReview?: unknown;
 }
 
 function die(msg: string): never { console.error(`\n[gh-render] FAIL: ${msg}\n`); process.exit(1); }
@@ -51,6 +53,8 @@ async function main(): Promise<number> {
   const script: VideoScript = JSON.parse(readFileSyncEIO(scriptPath, "utf8"));
   // Same brand rules as the local builder — neither backend renders an unvalidated script.
   validateBwbScript(script, die);
+  const packaging = reviewBwbPackaging(script);
+  console.log(`[gh-render] ${packaging.summary}`);
   assertRenderableFormat(script, die);
   assertBobVoice(VOICE, die);
 
@@ -134,7 +138,8 @@ async function main(): Promise<number> {
         // retain their normal delivery email.
         mimeType: "video/mp4", sendEmail: !process.env.BWB_ORCHESTRATOR_RUN_ID,
         emailSubject: `${script.videoId} ready (GitHub render) — ${script.title}`,
-        emailBody: `Rendered via the GitHub Actions farm (${chapters} parallel containers).\nPlay/Download links below.`,
+        metadata: { packagingReview: packaging },
+        emailBody: `Rendered via the GitHub Actions farm (${chapters} parallel containers).\n\n${packaging.summary}\n\nPlay/Download links below.`,
         idempotencyKey: `bwb-weekly:${process.env.BWB_JOB_KEY || script.videoId}:delivery`,
       });
     } finally {
@@ -150,6 +155,7 @@ async function main(): Promise<number> {
       const sidecar = {
         videoId: script.videoId,
         title: script.title,
+        packagingReview: packaging,
         playlist: script.playlist,
         description: script.youtubeDescription || `Built With Bob — ${script.title}.`,
         tags: Array.isArray(script.youtubeTags) ? script.youtubeTags : [],

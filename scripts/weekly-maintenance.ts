@@ -1395,17 +1395,16 @@ async function pass24_InternalCapabilityDrift(): Promise<PassResult> {
   try {
     const { existsSync } = await import("node:fs");
     const { STATIC_CAPABILITIES } = await import("../server/capability-registry");
-    const entry = STATIC_CAPABILITIES.find((candidate) =>
-      candidate.name === "portable_skill_behavior_bundle"
-    );
-    if (!entry) {
-      findings.push({ severity: "HIGH", message: "portable_skill_behavior_bundle is missing from the capability registry" });
-    } else if (entry.kind !== "fulfillment" || entry.codePath !== "server/lib/skill-behavior-bundle.ts") {
-      findings.push({ severity: "HIGH", message: "portable_skill_behavior_bundle registry entry has drifted", detail: entry });
-    } else if (!existsSync(entry.codePath)) {
-      findings.push({ severity: "HIGH", message: `Registered internal capability source is missing: ${entry.codePath}` });
-    } else {
-      findings.push({ severity: "INFO", message: "Portable learned-behavior registry entry and source are present" });
+    for (const [name, codePath] of [
+      ["portable_skill_behavior_bundle", "server/lib/skill-behavior-bundle.ts"],
+      ["reflection_owner_source_work", "server/lib/reflection-owner-work.ts"],
+    ]) {
+      const entry = STATIC_CAPABILITIES.find(candidate => candidate.name === name);
+      if (!entry || entry.kind !== "fulfillment" || entry.codePath !== codePath || !existsSync(codePath)) {
+        findings.push({ severity: "HIGH", message: `${name} registry entry or source is missing/drifted` });
+      } else {
+        findings.push({ severity: "INFO", message: `${name} registry entry and source are present` });
+      }
     }
   } catch (error: any) {
     findings.push({ severity: "HIGH", message: `Internal capability drift check failed: ${error?.message ?? error}` });

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { authFetch } from "@/lib/queryClient";
+import { ReportDeliveryOption } from "@/components/report-delivery-option";
+import CompanyReportPackage from "@/components/company-report-package";
 import { Loader2, Briefcase, TrendingUp, Download, CheckCircle2, XCircle } from "lucide-react";
 
 interface ExecJob {
@@ -17,6 +19,8 @@ interface ExecJob {
   error?: string | null;
   customerEmail?: string | null;
   queuedReviewId?: string | null;
+  reviewPhase?: string | null;
+  reportOnly?: boolean;
 }
 
 type ReportFocus = "full" | "opportunities";
@@ -55,6 +59,7 @@ function ReportForm({ focus }: { focus: ReportFocus }) {
   const [website, setWebsite] = useState("");
   const [principalName, setPrincipalName] = useState("");
   const [principalEmail, setPrincipalEmail] = useState("");
+  const [reportOnly, setReportOnly] = useState(true);
   const [description, setDescription] = useState("");
   const [industry, setIndustry] = useState("");
   const [crm, setCrm] = useState("");
@@ -126,7 +131,7 @@ function ReportForm({ focus }: { focus: ReportFocus }) {
       setError("Company name and website are both required.");
       return;
     }
-    const email = principalEmail.trim();
+    const email = reportOnly ? "" : principalEmail.trim();
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError("That email doesn't look valid — fix it or leave it blank.");
       return;
@@ -139,6 +144,7 @@ function ReportForm({ focus }: { focus: ReportFocus }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           focus,
+          reportOnly,
           company: company.trim(),
           website: website.trim(),
           principalName: principalName.trim() || null,
@@ -157,7 +163,7 @@ function ReportForm({ focus }: { focus: ReportFocus }) {
       }
       if (!res.ok) throw new Error(data?.error || "Could not start the report");
       localStorage.setItem(storageKey, data.jobId);
-      setJob({ jobId: data.jobId, status: "running", company, website });
+      setJob({ jobId: data.jobId, status: "running", company, website, reportOnly });
       startPolling(data.jobId);
     } catch (e: any) {
       setError(e?.message || "Could not start the report");
@@ -178,8 +184,10 @@ function ReportForm({ focus }: { focus: ReportFocus }) {
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Input placeholder="Principal in charge (e.g. Mike Lannan)" value={principalName} onChange={(e) => setPrincipalName(e.target.value)} data-testid={`input-${t}-principal`} />
-          <Input type="email" placeholder="Principal's email (optional — routes to review queue for Approve & ship)" value={principalEmail} onChange={(e) => setPrincipalEmail(e.target.value)} data-testid={`input-${t}-email`} />
+          {!reportOnly && <Input type="email" placeholder="Customer email — example: alex@company.com" value={principalEmail} onChange={(e) => setPrincipalEmail(e.target.value)} data-testid={`input-${t}-email`} />}
         </div>
+        <ReportDeliveryOption id={`checkbox-${t}-report-only`} checked={reportOnly} onChange={setReportOnly}
+          disabled={job?.status === "running"} />
         <Textarea placeholder="What the company does (in your words — e.g. 'multifamily apartment owner-operator across IL and WI')" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} data-testid={`input-${t}-description`} />
         <div className="grid gap-3 sm:grid-cols-3">
           <Input placeholder="Industry (optional)" value={industry} onChange={(e) => setIndustry(e.target.value)} data-testid={`input-${t}-industry`} />
@@ -190,6 +198,8 @@ function ReportForm({ focus }: { focus: ReportFocus }) {
         <Button onClick={runReport} disabled={job?.status === "running" || !company.trim() || !website.trim()} data-testid={`button-run-${t}-report`}>
           {job?.status === "running" ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generating report…</> : copy.buttonLabel}
         </Button>
+        <p className="text-xs text-muted-foreground">Compilation uses the paid Google Gemini API, with at most $3 reserved for this single report. An approved shared report budget, when present, also limits this cost. This does not charge the customer.</p>
+        <p className="text-xs text-muted-foreground">For a single run that creates all three full reports and their derived one-page teasers, use the separate package checkbox below.</p>
         {error && <p className="text-sm text-destructive" data-testid={`text-${t}-error`}>{error}</p>}
 
         {job && (
@@ -197,7 +207,16 @@ function ReportForm({ focus }: { focus: ReportFocus }) {
             {job.status === "running" && (
               <p className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {copy.runningLabel} for {job.company || company}… this usually takes 3–8 minutes. You can leave this page and come back.
+                {job.reviewPhase === "compiler_setup"
+                  ? "Waiting for a valid direct Google Gemini API credential. No compiler call has been made."
+                  : job.reviewPhase === "compiling" || job.reviewPhase === "wait_muse"
+                  ? "Gemini Argon is compiling the evidence-backed report directly. Final three-model approval is still required."
+                  : job.reviewPhase === "initial_jury" || job.reviewPhase === "final_jury" || job.reviewPhase === "jury_started"
+                    ? "Jury triage is reviewing the report and its retained sources."
+                    : job.reviewPhase === "finalizing"
+                      ? "The reviewed report is being assembled with its citations and evidence appendix."
+                      : `${copy.runningLabel} for ${job.company || company}…`}
+                {" "}You can leave this page and come back. Progress is saved; the review expires after 24 hours.
               </p>
             )}
             {job.status === "done" && (
@@ -205,6 +224,9 @@ function ReportForm({ focus }: { focus: ReportFocus }) {
                 <p className="flex items-center gap-2 text-green-600 font-medium">
                   <CheckCircle2 className="h-4 w-4" /> Report ready{job.pages ? ` — ${job.pages} pages` : ""}.
                 </p>
+                {job.reportOnly && <p className="text-sm" data-testid={`text-${t}-report-only-ready`}>
+                  Report only: download the PDF and send it yourself. No customer email or payment record was created.
+                </p>}
                 {job.queuedReviewId && (
                   <p className="text-sm" data-testid={`text-${t}-queued-review`}>
                     It's waiting in your{" "}
@@ -245,6 +267,7 @@ function ReportForm({ focus }: { focus: ReportFocus }) {
 }
 
 export default function ExecutiveReportPage() {
+  const [packageMode, setPackageMode] = useState(false);
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -256,10 +279,13 @@ export default function ExecutiveReportPage() {
             Two boardroom-grade PDFs from one form each: the full Executive Opportunity Report
             (website strengths &amp; problems, profitability gaps, growth ideas, 30/60/90 plan)
             or the Money-Making Opportunities report (pure revenue ideas and quick wins).
+            {" "}Each full report includes one American-English MP3 narrated by Eric, covering
+            the report body without source excerpts, citation codes, or supporting appendices.
           </p>
         </div>
 
-        <Tabs defaultValue="full">
+        <CompanyReportPackage onModeChange={setPackageMode} />
+        <Tabs defaultValue="full" className={packageMode ? "hidden" : undefined}>
           <TabsList className="grid w-full grid-cols-2" data-testid="tabs-company-reports">
             <TabsTrigger value="full" data-testid="tab-exec-report">
               <Briefcase className="h-4 w-4 mr-2" /> Executive Report

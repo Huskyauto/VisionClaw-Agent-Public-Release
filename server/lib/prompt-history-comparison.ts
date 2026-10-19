@@ -1,4 +1,5 @@
 import { createHmac, randomBytes } from "node:crypto";
+import { logSilentCatch } from "./silent-catch";
 
 interface Scope { tenantId: number; conversationId: number; channel: string }
 interface Observation { compared: number; changed: number; skipped: number }
@@ -92,5 +93,5 @@ export function observePreparedHistory(
     if (result.compared || result.skipped) {
       console.info(`[prompt-history-comparison] channel=${scope.channel} compared=${result.compared} changed=${result.changed} skipped=${result.skipped}`);
     }
-  } catch { /* advisory only; no inference or privacy behavior changes */ }
+  } catch { logSilentCatch("prompt-history-comparison:advisory", "Advisory comparison failed"); }
 }

@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { boundPostgresArray } from "./lib/bound-postgres-array";
 
 export interface Crew {
   id: number;
@@ -323,7 +324,7 @@ export async function addCrewAgent(params: {
   if (!params.goal?.trim()) return { success: false, error: "goal required" };
 
   try {
-    const toolsArr = params.tools && params.tools.length > 0 ? `{${params.tools.map(t => `"${t}"`).join(",")}}` : null;
+    const toolsArr = boundPostgresArray(params.tools, "text");
     const res = await db.execute(sql`
       INSERT INTO crew_agents (crew_id, tenant_id, name, role, goal, backstory, persona_id, tools, allow_delegation, max_iterations, config, sort_order)
       VALUES (
@@ -388,8 +389,8 @@ export async function addCrewTask(params: {
   if (!params.expectedOutput?.trim()) return { success: false, error: "expectedOutput required" };
 
   try {
-    const toolsArr = params.tools && params.tools.length > 0 ? `{${params.tools.map(t => `"${t}"`).join(",")}}` : null;
-    const ctxArr = params.contextTaskIds && params.contextTaskIds.length > 0 ? `{${params.contextTaskIds.join(",")}}` : null;
+    const toolsArr = boundPostgresArray(params.tools, "text");
+    const ctxArr = boundPostgresArray(params.contextTaskIds, "integer");
     const res = await db.execute(sql`
       INSERT INTO crew_tasks (crew_id, tenant_id, name, description, expected_output, agent_id, context_task_ids, async_execution, output_json_schema, tools, guardrail, sort_order, config)
       VALUES (

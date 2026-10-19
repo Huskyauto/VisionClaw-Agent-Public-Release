@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { authFetch } from "@/lib/queryClient";
+import { ReportDeliveryOption } from "@/components/report-delivery-option";
+import CompanyReportPackage from "@/components/company-report-package";
+import AgentJourneyResults from "@/components/agent-journey-results";
+import type { AgentJourneyResult } from "../../../shared/agent-journey";
 import { Loader2, Globe, FileText, Download, CheckCircle2, AlertTriangle, XCircle, Gauge, Wrench, Link as LinkIcon, Printer } from "lucide-react";
 
 interface AuditCheck {
@@ -26,6 +30,7 @@ interface AuditResult {
   checks: AuditCheck[];
   recommendations: string[];
   fetchedAt: string;
+  agentJourney?: AgentJourneyResult;
 }
 
 interface FullJob {
@@ -38,6 +43,8 @@ interface FullJob {
   error?: string | null;
   customerEmail?: string | null;
   queuedReviewId?: string | null;
+  reviewPhase?: string | null;
+  reportOnly?: boolean;
 }
 
 function StatusIcon({ status }: { status: AuditCheck["status"] }) {
@@ -55,6 +62,7 @@ function gradeColor(grade: string): string {
 }
 
 export default function WebsiteAuditPage() {
+  const [packageMode, setPackageMode] = useState(false);
   // --- Quick audit state ---
   const [quickUrl, setQuickUrl] = useState("");
   const [quickLoading, setQuickLoading] = useState(false);
@@ -70,6 +78,7 @@ export default function WebsiteAuditPage() {
   const [notes, setNotes] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  const [reportOnly, setReportOnly] = useState(true);
   const [fullError, setFullError] = useState<string | null>(null);
   const [job, setJob] = useState<FullJob | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -163,7 +172,7 @@ export default function WebsiteAuditPage() {
       setFullError("Company name and website are both required.");
       return;
     }
-    const email = customerEmail.trim();
+    const email = reportOnly ? "" : customerEmail.trim();
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setFullError("That customer email doesn't look valid — fix it or leave it blank.");
       return;
@@ -176,12 +185,13 @@ export default function WebsiteAuditPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           company: company.trim(),
+          reportOnly,
           website: website.trim(),
           industry: industry.trim() || null,
           crm: crm.trim() || null,
           notes: notes.trim() || null,
           customerName: customerName.trim() || null,
-          customerEmail: customerEmail.trim() || null,
+          customerEmail: email || null,
         }),
       });
       const data = await res.json();
@@ -204,7 +214,7 @@ export default function WebsiteAuditPage() {
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Gauge className="h-6 w-6" /> Website Audit
+          <Gauge className="h-6 w-6" /> AI Readiness Report
         </h1>
         <p className="text-muted-foreground mt-1">
           Run a quick AI-readiness check on any company website, or generate the full
@@ -212,13 +222,15 @@ export default function WebsiteAuditPage() {
         </p>
       </div>
 
+      <CompanyReportPackage onModeChange={setPackageMode} />
+      <div className={packageMode ? "hidden" : "contents"}>
       {/* ------------------------------------------------ Quick audit */}
       <Card data-testid="card-quick-audit">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5" /> Step 1 — Quick Audit (instant, free)</CardTitle>
           <CardDescription>
             Paste the company's website. You get a score, grade, and the list of issues in ~10 seconds.
-            Same engine as the public /audit page.
+            Same engine as the public /audit page. The read-only evidence pilot also checks five visitor questions; it does not test a live assistant or booking flow.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -263,6 +275,7 @@ export default function WebsiteAuditPage() {
                   </ul>
                 </div>
               )}
+              {quickResult.agentJourney && <AgentJourneyResults result={quickResult.agentJourney} />}
               <Button
                 variant="outline"
                 onClick={downloadQuickPdf}
@@ -284,7 +297,7 @@ export default function WebsiteAuditPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Step 2 — Comprehensive Audit (customer PDF)</CardTitle>
           <CardDescription>
-            Generates the full multi-page PDF deliverable (the $497 report): executive summary, llms.txt
+            Generates the full multi-page PDF deliverable (part of the $497 three-report package): executive summary, llms.txt
             checklist, all issues, AI tooling opportunities, and a 90-day improvement roadmap. Takes a few
             minutes — you can leave this page and come back.
           </CardDescription>
@@ -296,7 +309,9 @@ export default function WebsiteAuditPage() {
           </div>
           <Input placeholder="Industry (optional, e.g. dental clinic, HVAC)" value={industry} onChange={(e) => setIndustry(e.target.value)} data-testid="input-full-industry" />
           <Input placeholder="CRM they already use (optional, e.g. HubSpot, Salesforce, GoHighLevel — tailors the report to it)" value={crm} onChange={(e) => setCrm(e.target.value)} data-testid="input-full-crm" />
-          <div className="rounded-md border p-3 space-y-2">
+          <ReportDeliveryOption id="checkbox-readiness-report-only" checked={reportOnly} onChange={setReportOnly}
+            disabled={job?.status === "running"} />
+          {!reportOnly && <div className="rounded-md border p-3 space-y-2">
             <p className="text-sm font-medium">Send it to the customer? (optional)</p>
             <p className="text-xs text-muted-foreground">
               Add their email and the finished report goes straight to your review queue as a paid-offline order
@@ -304,14 +319,16 @@ export default function WebsiteAuditPage() {
               attaching. Leave blank to just download the PDF yourself.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input placeholder="Customer name (optional)" value={customerName} onChange={(e) => setCustomerName(e.target.value)} data-testid="input-full-customer-name" />
-              <Input type="email" placeholder="Customer email (optional)" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} data-testid="input-full-customer-email" />
+              <Input placeholder="Customer name — example: Alex Smith" value={customerName} onChange={(e) => setCustomerName(e.target.value)} data-testid="input-full-customer-name" />
+              <Input type="email" placeholder="Customer email — example: alex@company.com" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} data-testid="input-full-customer-email" />
             </div>
-          </div>
+          </div>}
           <Textarea placeholder="Notes for the report (optional — anything you know about the business)" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} data-testid="input-full-notes" />
           <Button onClick={runFullAudit} disabled={job?.status === "running" || !company.trim() || !website.trim()} data-testid="button-run-full">
             {job?.status === "running" ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generating PDF…</> : "Generate Full PDF Audit"}
           </Button>
+          <p className="text-xs text-muted-foreground">Compilation uses the paid Google Gemini API, with at most $3 reserved for this single report. An approved shared report budget, when present, also limits this cost. This does not charge the customer.</p>
+          <p className="text-xs text-muted-foreground">Each full AI Readiness report includes one American-English MP3 narrated by Eric: report body only, without source excerpts, citation codes, or supporting appendices. For all three full reports, three MP3s, three one-page teasers, and a combined three-page teaser PDF in one run, use the separate package checkbox below. Teasers have no audio.</p>
           {fullError && <p className="text-sm text-destructive" data-testid="text-full-error">{fullError}</p>}
 
           {job && (
@@ -319,7 +336,16 @@ export default function WebsiteAuditPage() {
               {job.status === "running" && (
                 <p className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Writing the report for {job.company || company}… this usually takes 3–8 minutes.
+                  {job.reviewPhase === "compiler_setup"
+                    ? "Waiting for a valid direct Google Gemini API credential. No compiler call has been made."
+                    : job.reviewPhase === "compiling" || job.reviewPhase === "wait_muse"
+                    ? "Gemini Argon is compiling the evidence-backed audit directly. Final three-model approval is still required."
+                    : job.reviewPhase === "initial_jury" || job.reviewPhase === "final_jury" || job.reviewPhase === "jury_started"
+                      ? "Jury triage is reviewing the audit and its retained sources."
+                      : job.reviewPhase === "finalizing"
+                        ? "Assembling the reviewed audit with citations and its evidence appendix."
+                        : `Writing the report for ${job.company || company}…`}
+                  {" "}Review waits are durable and expire after 24 hours.
                 </p>
               )}
               {job.status === "done" && (
@@ -327,6 +353,9 @@ export default function WebsiteAuditPage() {
                   <p className="flex items-center gap-2 text-green-600 font-medium">
                     <CheckCircle2 className="h-4 w-4" /> PDF ready{job.pages ? ` — ${job.pages} pages` : ""}.
                   </p>
+                  {job.reportOnly && <p className="text-sm" data-testid="text-readiness-report-only-ready">
+                    Report only: download the PDF and send it yourself. No customer email or payment record was created.
+                  </p>}
                   {job.queuedReviewId && (
                     <p className="text-sm" data-testid="text-queued-review">
                       It's waiting in your{" "}
@@ -368,6 +397,8 @@ export default function WebsiteAuditPage() {
           </div>
         </CardContent>
       </Card>
+
+      </div>
 
       {/* ------------------------------------------------ DFY Fix Kit */}
       <DfyCard defaultCompany={company} defaultWebsite={website} defaultIndustry={industry} defaultCustomerName={customerName} defaultCustomerEmail={customerEmail} />

@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import { buildExperimentGuidance } from "./lib/build-experiment-guidance";
 import { observePreparedHistory } from "./lib/prompt-history-comparison";
 import { DEFAULT_CHAT_MODEL_ID, HIGH_END_WORK_MODEL_ID } from "./chat-model-default";
 import { selectOwnerWorkModel, getFelixExpertLanes } from "./felix-model-policy";
@@ -793,7 +794,7 @@ When creating ANY PDF document, report, analysis, deliverable, or professional d
 
 ## PRODUCT OUTPUT SELF-REVIEW (MANDATORY — ALL AGENTS)
 Before delivering ANY product output to the user — PDFs, presentations, videos, documents, spreadsheets, emails, audio — you MUST review the \`_productVerification\` field in the tool result:
-1. If \`_productVerification.overallStatus\` is "REVIEW_NEEDED", read each check and report issues to the user BEFORE sharing links or files.
+1. Read \`_outputVerification\` on every tool result. "failed" means stop claims/sharing and reconcile; "pending" means check the existing job, not resubmit; "unverified" means require tool-specific evidence. "checked" certifies only its stated scope, NOT the customer's whole outcome. \`retryOriginalAction:false\` forbids retrying a consequential action merely for missing proof. Source-less arrays/primitives retain their original shapes and are not independently certified. If \`_productVerification.overallStatus\` is "REVIEW_NEEDED", read each check and report issues to the user BEFORE sharing links or files. "BASIC_CHECKS_ONLY" is NOT production certification.
 2. If all checks passed, confirm to the user: "Verified — all quality checks passed."
 3. NEVER silently deliver a product that has verification warnings. Be transparent about every issue.
 4. This is non-negotiable. Every agent, every deliverable, every time.
@@ -1121,7 +1122,7 @@ This applies to EVERY deliverable you produce — presentations, PDFs, videos, d
 
 ### For ALL Product Output (PDFs, videos, docs, spreadsheets, emails):
 Every product tool returns a \`_productVerification\` object. You MUST check it:
-1. Read \`_productVerification.overallStatus\`. If "REVIEW_NEEDED", inspect each check in \`_productVerification.checks\`.
+1. Read \`_outputVerification\` first: failed/pending outputs are not completed valid products; unverified needs stronger evidence; checked means only the stated artifact contract. Never retry sends/writes/payments merely to obtain proof. Read \`_productVerification.overallStatus\`. "BASIC_CHECKS_ONLY" is metadata/presence checking, not correctness. If "REVIEW_NEEDED", inspect each check in \`_productVerification.checks\`.
 2. For any check with status "WARNING" or "FAIL", tell the user exactly what was found BEFORE presenting the deliverable.
 3. If file_size is suspicious, say so. If Drive upload may have failed, say so. If email delivery is uncertain, say so.
 4. If video production had failed steps, report them.
@@ -2686,6 +2687,8 @@ DO NOT stop at a "spec" or "plan" — actually produce the file. The ONE-CALL pa
   }
 
   if (projectContextStr) systemPrompt += "\n\n" + projectContextStr;
+  const buildGuidance = buildExperimentGuidance(content);
+  if (buildGuidance) systemPrompt += "\n\n" + buildGuidance;
   if (tenantId === ownerTenantId()) {
     systemPrompt += "\n\nOWNER WORK COORDINATION: Prefer Luna for routine work and Sol for demanding work; approved provider fallbacks, including GPT-5.4, may differ and must not be called proof the preferred model served. For demanding decisions, use authorized jury_triage advice where appropriate, then continue the requested work within normal permissions. Muse/Spark is a standing external context contributor through the private outbox and polling line. A queued packet is pending, not received input; do not invent its advice, subscription usage, or approval. External advice never grants spend, send, mission, publish, or other consequential authority.";
   }
@@ -4147,6 +4150,7 @@ Never hide failures behind vague language. The user trusts you because you're tr
         const dispatch = () => executeGuardedTool(toolName, parsedArgs, {
           tenantId: rateLimitTenantId,
           conversationId,
+          personaId: persona?.id,
           personaRole: persona?.role,
           personaName: persona?.name,
           invokedVia: "chat_engine",

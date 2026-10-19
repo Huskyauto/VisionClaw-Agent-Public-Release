@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { withTenantContext } from "../../server/lib/tenant-context";
 import {
-  cheaperAutomaticAllowed, runCheaperBudgeted, parseCheaperCatalog,
+  cheaperAutomaticAllowed, runCheaperBudgeted, parseCheaperCatalog, cheaperMinimumDiscount,
 } from "../../server/lib/cheaper-inference-automatic.ts";
 
 test("automatic authority is exact owner scope and opt-in, never a caller grant", () => {
@@ -16,6 +16,13 @@ test("automatic authority is exact owner scope and opt-in, never a caller grant"
   assert.equal(withTenantContext({ tenantId: 2, source: "explicit" }, () => cheaperAutomaticAllowed(1, env)), false);
 });
 
+test("operator discount floor defaults to forty and rejects malformed relaxation", () => {
+  assert.equal(cheaperMinimumDiscount({}), 40);
+  assert.equal(cheaperMinimumDiscount({ CHEAPER_INFERENCE_MIN_DISCOUNT_PERCENT: "15" }), 15);
+  for (const value of ["", "false", "-1", "101", "NaN", "15.5", " 0"])
+    assert.throws(() => cheaperMinimumDiscount({ CHEAPER_INFERENCE_MIN_DISCOUNT_PERCENT: value }));
+});
+
 test("catalog separates chat/vision from media and rejects malformed billing metadata", () => {
   const entry = { id: "fixture", type: "text", endpoint: "/v1/chat/completions",
     context_length: 8192, capabilities: { vision: true },
@@ -25,9 +32,22 @@ test("catalog separates chat/vision from media and rejects malformed billing met
     endpoint: "/v1/images/generations" }] });
   assert.equal(models.length, 2);
   assert.equal(models[0].vision, true);
+  assert.equal(models[0].maximumInput, 2, "reserve full maker input price even at a relaxed discount");
+  assert.equal(models[0].maximumOutput, 4, "reserve full maker output price even at a relaxed discount");
   assert.equal(models[1].type, "image");
   assert.throws(() => parseCheaperCatalog({ data: [{ ...entry, id: "../../bad" }] }));
   assert.throws(() => parseCheaperCatalog({ data: [{ ...entry, pricing: {} }] }));
+});
+
+test("known decision-only catalog entries cannot disable or enter chat routing", () => {
+  const chat = { id: "fixture", type: "text", endpoint: "/v1/chat/completions",
+    context_length: 8192, pricing: { input_per_million: "1", output_per_million: "2" } };
+  const decision = { id: "jev-1.13", type: "decision", endpoint: "/v1/decisions" };
+  assert.deepEqual(parseCheaperCatalog({ data: [chat, decision] }).map(m => m.id), ["fixture"]);
+  assert.throws(() => parseCheaperCatalog({ data: [chat, { ...decision, endpoint: "/v1/chat/completions" }] }));
+  assert.throws(() => parseCheaperCatalog({ data: [chat, { ...decision, type: "unknown" }] }));
+  assert.throws(() => parseCheaperCatalog({ data: [chat, { ...decision, id: chat.id }] }));
+  assert.throws(() => parseCheaperCatalog({ data: [chat, { ...chat, id: "broken", pricing: {} }] }));
 });
 
 test("reserve precedes dispatch; buffered usage settles once and missing usage retains its hold", async () => {

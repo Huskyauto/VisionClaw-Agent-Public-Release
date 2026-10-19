@@ -1,3 +1,4 @@
+import { logSilentCatch } from "./silent-catch";
 /** Connection keepalives are not inference progress. No retries or spend here. */
 export function hasModelProgress(chunk: unknown): boolean {
   if (!chunk || typeof chunk !== "object") return false;
@@ -40,7 +41,7 @@ export async function* streamWithProgressDeadline<T>(
           // Settle the deadline before aborting: some SDKs synchronously finish
           // next() during abort, which must not turn a timeout into success.
           reject(new Error("Timed out waiting for model progress"));
-          try { options.onTimeout?.(); } catch { /* timeout must still terminate */ }
+          try { options.onTimeout?.(); } catch { logSilentCatch("stream-progress-deadline:on-timeout", "Timeout callback failed"); }
         }, Math.max(1, deadline - performance.now()));
       });
       let next: IteratorResult<T>;
@@ -54,7 +55,7 @@ export async function* streamWithProgressDeadline<T>(
       // Check the clock too: synchronously resolved empty chunks must not starve
       // the timer/event loop indefinitely.
       if (performance.now() >= deadline) {
-        try { options.onTimeout?.(); } catch { /* preserve deadline error */ }
+        try { options.onTimeout?.(); } catch { logSilentCatch("stream-progress-deadline:on-timeout", "Timeout callback failed"); }
         throw new Error("Timed out waiting for model progress");
       }
       if (hasModelProgress(next.value)) deadline = performance.now() + options.timeoutMs;
@@ -67,7 +68,9 @@ export async function* streamWithProgressDeadline<T>(
     // Some SDKs ignore abort or return() hangs. Do not await cleanup; attach a
     // rejection handler so late iterator failures never escape unhandled.
     if (!finished) {
-      try { void Promise.resolve(iterator.return?.()).catch(() => {}); } catch { /* bounded cleanup */ }
+      try {
+        void Promise.resolve(iterator.return?.()).catch(error => logSilentCatch("stream-progress-deadline:cleanup", error, "expected"));
+      } catch (error) { logSilentCatch("stream-progress-deadline:cleanup", error, "expected"); }
     }
   }
 }

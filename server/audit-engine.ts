@@ -13,6 +13,8 @@
 import { ssrfSafeUrl } from "./lib/ssrf-jail";
 import { logSilentCatch } from "./lib/silent-catch";
 import { Agent } from "undici";
+import { collectAgentJourney } from "./lib/agent-journey";
+import type { AgentJourneyResult } from "../shared/agent-journey";
 
 // Closes the DNS-rebinding TOCTOU: ssrfSafeUrl() validates the IPs the hostname
 // currently resolves to, but a normal fetch() re-resolves at connect time, so a
@@ -58,6 +60,7 @@ export interface AuditResult {
   checks: AuditCheck[];
   recommendations: string[];
   fetchedAt: string;
+  agentJourney?: AgentJourneyResult;
 }
 
 export class AuditFetchError extends Error {
@@ -68,7 +71,7 @@ export class AuditFetchError extends Error {
   }
 }
 
-type FetchOk = { ok: true; status: number; text: string; finalUrl: string; contentType: string };
+type FetchOk = { ok: true; status: number; text: string; finalUrl: string; contentType: string; truncated?: boolean };
 type FetchErr = { ok: false; reason: string };
 
 const UA = "VisionClaw-Audit/1.0 (+https://agenticcorporation.net)";
@@ -109,19 +112,21 @@ export async function safeFetchText(
       const reader = res.body?.getReader();
       if (!reader) return { ok: false, reason: "no body stream" };
       let total = 0;
+      let truncated = false;
       const chunks: Uint8Array[] = [];
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         total += value.byteLength;
         if (total > opts.maxBytes) {
+          truncated = true;
           try { await reader.cancel(); } catch (_silentErr) { logSilentCatch("server/audit-engine.ts", _silentErr); }
           break; // cap reached — keep what we have, enough to analyze <head>
         }
         chunks.push(value);
       }
       const buf = Buffer.concat(chunks.map((c) => Buffer.from(c)));
-      return { ok: true, status: res.status, text: buf.toString("utf-8"), finalUrl: safe.url.toString(), contentType: ct };
+      return { ok: true, status: res.status, text: buf.toString("utf-8"), finalUrl: safe.url.toString(), contentType: ct, truncated };
     } catch (e: any) {
       const msg = e?.name === "AbortError" ? "timed out" : e?.message || String(e);
       return { ok: false, reason: `fetch failed: ${msg}` };
@@ -470,6 +475,7 @@ export async function runAudit(rawInput: string): Promise<AuditResult> {
     .slice(0, 6)
     .map((c) => c.recommendation!) as string[];
 
+  const agentJourney = await collectAgentJourney({ url: home.finalUrl, html }, safeFetchText);
   return {
     websiteUrl,
     finalUrl: home.finalUrl,
@@ -478,5 +484,6 @@ export async function runAudit(rawInput: string): Promise<AuditResult> {
     checks,
     recommendations,
     fetchedAt: new Date().toISOString(),
+    agentJourney,
   };
 }

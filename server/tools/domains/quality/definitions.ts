@@ -127,13 +127,22 @@ export const verifyDeliverableDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "verify_deliverable",
-    description: "R76 — Verify a customer-facing artifact against its deliverable contract before claiming success. Returns passed/failed with concrete failure reasons (extension mismatch, MIME mismatch, render-check failure, size out of bounds). MUST be called by personas before claiming an HTML page, PDF, slide deck, video, audio, image, csv, or json is delivered.",
+    description: "Verify actual customer-artifact bytes before claiming success. PDFs are parsed and clickable links checked; acceptance_criteria checks requested text, exact clickable URLs and page count. Returns an exact-byte backcheck receipt, failures and coverage. Not factual/visual/media certification. Preserve the same criteria in deliver_product. URL-only input cannot pass content checks.",
     parameters: {
       type: "object",
       properties: {
         deliverable_type: { type: "string", description: "One of: html_page, pdf_document, slide_deck, image, video, audio, csv_data, json_data." },
         file_path: { type: "string", description: "Local file path. Provide either this or file_url." },
         file_url: { type: "string", description: "Public file URL (e.g. Drive viewUrl). Provide either this or file_path." },
+        acceptance_criteria: {
+          type: "object", additionalProperties: false,
+          description: "Work backward from the customer's actual request. Declare requirements BEFORE checking the artifact; do not invent criteria from whatever the artifact happens to contain.",
+          properties: {
+            requiredText: { type: "array", maxItems: 20, items: { type: "string", maxLength: 250 }, description: "Required customer name, headings or exact requested phrases. PDF extracted text or text-source checks, not factual verification." },
+            expectedLinks: { type: "array", maxItems: 20, items: { type: "string", maxLength: 2048 }, description: "Exact HTTP(S) PDF hyperlink targets, e.g. the verified matching MP3 Drive URL. Printed URL text alone does not count." },
+            minimumPages: { type: "integer", minimum: 1, maximum: 80 },
+          },
+        },
       },
       required: ["deliverable_type"],
     },

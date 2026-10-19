@@ -7,7 +7,45 @@ import {
   getClientForModel,
   getTestModelForProvider,
   wrapOpenferenceRateLimitRetry,
+  wrapOpenferenceFailureMarking,
+  isProviderHealthy,
+  resetProviderHealth,
 } from "../../server/providers";
+
+test("an overloaded Openference model does not quarantine another working model", async () => {
+  resetProviderHealth("openference");
+  resetProviderHealth("openference:model:DeepSeek-V4-Pro");
+  const client = { chat: { completions: { create: async () => {
+    throw Object.assign(new Error("model overloaded"), { status: 529 });
+  } } } };
+  try {
+    for (let i = 0; i < 3; i++) await assert.rejects(
+      wrapOpenferenceFailureMarking(client as any).chat.completions.create({
+        model: "DeepSeek-V4-Pro", messages: [],
+      }));
+    assert.equal(isProviderHealthy("openference"), true);
+    assert.equal(isProviderHealthy("openference:model:DeepSeek-V4-Pro"), false);
+  } finally {
+    resetProviderHealth("openference");
+    resetProviderHealth("openference:model:DeepSeek-V4-Pro");
+  }
+});
+
+test("Openference credential and account-rate failures still quarantine the whole transport", async () => {
+  for (const status of [401, 403, 429, 503]) {
+    resetProviderHealth("openference");
+    const client = { chat: { completions: { create: async () => {
+      throw Object.assign(new Error("provider failure"), { status });
+    } } } };
+    try {
+      for (let i = 0; i < 3; i++) await assert.rejects(
+        wrapOpenferenceFailureMarking(client as any).chat.completions.create({
+          model: "MiniMax M3", messages: [],
+        }));
+      assert.equal(isProviderHealthy("openference"), false);
+    } finally { resetProviderHealth("openference"); }
+  }
+});
 
 test("Openference DeepSeek V4 Pro is registered as a zero-marginal-cost model", () => {
   const model = MODEL_REGISTRY.find((entry) => entry.id === "openference/deepseek-v4-pro");

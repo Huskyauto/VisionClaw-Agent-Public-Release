@@ -50,6 +50,8 @@ export type QueuedEmail = {
   preview: string;
   dedupeKey?: string;
   repeatCount?: number;
+  archiveId?: string;
+  archiveDurability?: string;
 };
 
 const WEEKLY_SUBJECT = /^(?:🔴 \[URGENT\]|🟡|🟢) Weekly Maintenance — (?:GREEN|YELLOW|RED) — Week of \d{4}-\d{2}-\d{2}$/;
@@ -226,6 +228,7 @@ export function maybeQueueOwnerEmail(params: {
   to: unknown; cc?: unknown; bcc?: unknown;
   subject?: string; text?: string; html?: string;
   source?: string;
+  archiveId?: string; archiveDurability?: string;
 }): GateResult {
   if (MODE === "immediate") return { action: "pass-through" };
   if (!isOwnerOnlyRecipients(params)) return { action: "pass-through" };
@@ -241,6 +244,7 @@ export function maybeQueueOwnerEmail(params: {
     to: normalizeAddresses(params.to).join(", "),
     cc: normalizeAddresses(params.cc).join(", ") || undefined,
     source: params.source,
+    archiveId: params.archiveId, archiveDurability: params.archiveDurability,
     preview: String(params.text || params.html || "").replace(/\s+/g, " ").trim().slice(0, 280),
   }, params.text);
   writeQueue(queue);
@@ -339,10 +343,17 @@ const SCHEDULER_TICK_MS = 10 * 60 * 1000;
 export function startOwnerDigestScheduler(): void {
   if (schedulerHandle) return;
   if (MODE === "immediate") {
-    console.log(`[owner-digest] scheduler not started (OWNER_EMAIL_MODE=immediate)`);
+    schedulerHandle = setInterval(() => {
+      import("./lib/owner-alert-archive").then(m => m.retryPendingOwnerAlerts())
+        .catch(() => console.error("[owner-alert-archive] immediate-mode pending recovery failed; spool retained"));
+    }, SCHEDULER_TICK_MS);
+    (schedulerHandle as any).unref?.();
+    console.log(`[owner-digest] only private alert recovery scheduled (OWNER_EMAIL_MODE=immediate)`);
     return;
   }
   schedulerHandle = setInterval(() => {
+    import("./lib/owner-alert-archive").then(m => m.retryPendingOwnerAlerts())
+      .catch(() => console.error("[owner-alert-archive] pending recovery failed; private spool retained"));
     flushIfDue().catch((e) => console.warn(`[owner-digest] scheduled flush error: ${e?.message}`));
   }, SCHEDULER_TICK_MS);
   // Don't keep the event loop alive solely on this timer.
@@ -372,6 +383,8 @@ function renderDigest(items: QueuedEmail[]): string {
   out.push(`============================`);
   out.push(`Window: last ~24h. Total queued: ${items.length}`);
   out.push(`Mode: OWNER_EMAIL_MODE=${MODE} (set to "immediate" to revert, "silent" to mute entirely)`);
+  out.push(`Full details: sign in to your main site → Admin → Alert Logs (/admin/alert-logs).`);
+  out.push(`Legacy preview-only alerts cannot reconstruct missing diagnostic details.`);
   out.push(``);
   for (const src of sortedSources) {
     const list = bySource.get(src)!;
@@ -380,6 +393,9 @@ function renderDigest(items: QueuedEmail[]): string {
       const ts = it.ts.replace("T", " ").slice(5, 16);
       out.push(`  ${ts}  ${it.subject}${(it.repeatCount || 1) > 1 ? ` (identical report repeated ${it.repeatCount} times)` : ""}`);
       if (it.preview) out.push(`              ${it.preview.slice(0, 200)}`);
+      out.push(it.archiveId && it.archiveDurability === "durable"
+        ? `              Full private log: /admin/alert-logs?alert=${it.archiveId}`
+        : `              Full private log: ${it.archiveDurability || "legacy preview only"} — durable details not confirmed.`);
     }
     if (list.length > 50) out.push(`  …and ${list.length - 50} more from this source`);
     out.push(``);

@@ -12,6 +12,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { PDFDocument } from "pdf-lib";
 import { db } from "../../server/db";
 import { verifyDeliverable, invalidateContractCache } from "../../server/deliverable-verifier";
 
@@ -24,6 +25,11 @@ const FAKE_CONTRACT = {
   minSizeBytes: null,
   maxSizeBytes: null,
 } as any;
+async function realPdf() {
+  const doc = await PDFDocument.create();
+  doc.addPage().drawText("A real PDF fixture for MIME and audit branch checks");
+  return Buffer.from(await doc.save());
+}
 
 function stubDb(opts: { persistThrows?: boolean }) {
   (db as any).select = () => ({ from: async () => [FAKE_CONTRACT] });
@@ -56,7 +62,7 @@ test("MIME-gated contract PASSES on a matching extension-derived MIME (happy pat
     tenantId: 1,
     deliverableType: "mime-gated-test",
     fileUrl: "https://example.com/report.pdf",
-    buffer: Buffer.from("%PDF-1.4 fake body"),
+    buffer: await realPdf(),
   });
   assert.equal(r.status, "passed", `expected passed, got ${r.status}: ${r.failures.join("; ")}`);
   assert.equal(r.auditPersisted, true, "successful audit insert must set auditPersisted=true");
@@ -69,7 +75,7 @@ test("audit-insert failure sets auditPersisted=false without throwing (repudiati
     tenantId: 1,
     deliverableType: "mime-gated-test",
     fileUrl: "https://example.com/report.pdf",
-    buffer: Buffer.from("%PDF-1.4 fake body"),
+    buffer: await realPdf(),
   });
   assert.equal(r.status, "passed", "verification itself still completes (quality fails OPEN)");
   assert.equal(r.auditPersisted, false, "failed audit insert must set auditPersisted=false");
@@ -124,7 +130,7 @@ test("buffer-only artifacts use their supplied filename for contract extension a
     tenantId: 1,
     deliverableType: "mime-gated-test",
     fileName: "in-memory-report.pdf",
-    buffer: Buffer.from("%PDF-1.4 in-memory content"),
+    buffer: await realPdf(),
   });
   assert.equal(result.status, "passed", result.failures.join("; "));
   assert.equal(result.detected.extension, ".pdf");

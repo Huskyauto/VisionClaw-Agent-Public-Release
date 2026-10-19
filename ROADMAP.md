@@ -12,6 +12,17 @@ where we're going (so you can decide whether to fork, contribute, or wait).
 
 ---
 
+## R137+sec — October 19, 2026
+
+Dated development snapshot: 428 total registered tools, 386 publicly documented
+tools. Production telemetry is separate from these source-release facts.
+
+Recent source work adds owner-only manual business pilots, read-only website
+readiness evidence, company report packages with required audio, private alert
+logs, outcome-first briefings, delivery artifact checks and video packaging.
+See the [feature/access matrix](docs/platform-update-2026-10-19.md) for limits.
+GitHub synchronization does not publish a website or enable optional integrations.
+
 ## ✅ Selected Shipped Highlights
 
 A curated sample of rounds that shaped the platform. This is **not** the full
@@ -90,7 +101,7 @@ evidence required before deferred ideas become active work.
 
 ## Current platform totals
 
-**427 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 144 active capabilities · 194 declared / 275 live development tables · 885 platform indexes · 41 governance rules · 86 curated AI models in the core registry plus daily OpenRouter catalog discovery · ~320k LOC across 1,100+ TypeScript files.** ([authoritative release facts](docs/release-facts.json), October 8 development snapshot). R136.2 reconciles source and documentation through October 14; app publication and production readiness remain separate.
+**428 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 146 active capabilities · 195 declared / 276 live development tables · 887 platform indexes · 41 governance rules · 86 curated AI models in the core registry plus daily OpenRouter catalog discovery.** ([authoritative release facts](docs/release-facts.json), October 19 development snapshot). R137+sec reconciles source and documentation through October 19; app publication and production readiness remain separate.
 
 Machine-readable source: [docs/release-facts.json](docs/release-facts.json).
 

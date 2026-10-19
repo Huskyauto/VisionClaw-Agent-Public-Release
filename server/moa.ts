@@ -218,6 +218,7 @@ const POLARITY_PROPOSERS: PolarityProposer[] = [
 ];
 
 export interface ProposerResult {
+  finishReason?: string;
   /** Stored once on the first result for durable synthesis recovery evidence; not a ballot. */
   synthesisAttempts?: SynthesisAttempt[];
   evidence?: import("./lib/jury-evidence").JuryEvidencePass;
@@ -441,7 +442,8 @@ export interface ProposerCallSpec {
   noRetry?: boolean;
   /** Only the flat-rate Profundo transport may recover one explicit 429/502/503. */
   profundoRetry?: boolean;
-  beforeDispatch?: () => void;
+  beforeDispatch?: () => void | Promise<void>;
+  signal?: AbortSignal;
 }
 
 export function proposerTokenBudget(spec: ProposerCallSpec): number {
@@ -457,6 +459,8 @@ export function ownerJuryMeteredOverrideAllowed(
   if (tenantId !== ADMIN_TENANT_ID || requested !== true) return false;
   return ownerJuryMeteredEnabled() || ownerJuryDirectApiEnabled() &&
     (spec.providerLane === "openai-api" && spec.modelId === "gpt-5.4" ||
+      spec.providerLane === "openrouter" && spec.modelId === "google/gemini-4-argon" &&
+        hasOwnerJuryApiGrant(tenantId, "openrouter", spec.modelId) ||
       spec.providerLane === "anthropic-api" && ["claude-sonnet-5-5", "claude-opus-5-5"].includes(spec.modelId));
 }
 
@@ -619,7 +623,43 @@ export function _selectJuryLaneReplacement(args: {
   return null;
 }
 
-async function callProposer(specOrId: string | ProposerCallSpec, question: string, tenantId: number, meteredOverride = false): Promise<ProposerResult> {
+/** Paid report callers reserve durably BEFORE entering this one-call grant.
+ * No aggregation, auto-hooks, recovery, SDK retries or parameter retries. */
+export async function executeBoundedReportSeat(
+  spec: ProposerCallSpec, question: string, tenantId: number, reserve: (usd: number) => Promise<void>,
+  dependencies?: { dispatch: typeof callProposer },
+): Promise<ProposerResult> {
+  const { reserveIncomeApiBudget } = await import("./lib/income-claude-route");
+  if (tenantId !== ADMIN_TENANT_ID || !ownerJuryDirectApiEnabled() ||
+       !(spec.providerLane === "openai-api" && spec.modelId === "gpt-5.4" ||
+         spec.providerLane === "openrouter" && spec.modelId === "google/gemini-4-argon" ||
+         spec.providerLane === "anthropic-api" && spec.modelId === "claude-opus-5-5")) {
+    throw new Error("Paid report model/owner permission denied");
+  }
+  let amount = 0;
+  const budget = {
+    ceiling: () => ({ spent: 0, ceiling: 2 }),
+    // Google lists $4/$20 per million after the introductory $2/$10 rate.
+    // Reserve at the higher rate; ordinary usage accounting remains separate.
+    estimate: (model: string, input: number) => model === "google/gemini-4-argon"
+      ? (input * 4 + 4096 * 20) / 1_000_000 : estimateCostUsd(model, input, 4096),
+    reserve: (usd: number) => { amount = usd; },
+  };
+  const prompt = DEFAULT_PROPOSER_SYSTEM_PROMPT + question;
+  reserveIncomeApiBudget(spec.modelId as "gpt-5.4", prompt, budget);
+  await reserve(amount);
+  return executeOwnerJuryApiCall(tenantId, spec.providerLane, spec.modelId, prompt,
+    { ...budget, ceiling: () => ({ spent: 0, ceiling: amount }), reserve: () => {} },
+    () => (dependencies?.dispatch ?? callProposer)({ ...spec, maxTokens: 4096, timeoutMs: 120_000,
+      clientTimeoutMs: 6000, noRetry: true, beforeDispatch: () => {
+        if (process.env.REPORT_EVIDENCE_HANDOFFS_DISABLED === "1" ||
+            !hasOwnerJuryApiGrant(tenantId, spec.providerLane as "openai-api" | "anthropic-api" | "openrouter", spec.modelId)) {
+          throw new Error("Paid report jury stopped before dispatch");
+        }
+      } }, question, tenantId, true), "bounded-report");
+}
+
+export async function callProposer(specOrId: string | ProposerCallSpec, question: string, tenantId: number, meteredOverride = false): Promise<ProposerResult> {
   const spec: ProposerCallSpec = typeof specOrId === "string" ? { modelId: specOrId } : specOrId;
   meteredOverride = ownerJuryMeteredOverrideAllowed(tenantId, meteredOverride, spec) ||
     meteredOverride && tenantId === ADMIN_TENANT_ID &&
@@ -657,7 +697,9 @@ async function callProposer(specOrId: string | ProposerCallSpec, question: strin
       ? withTimeout(resolvingClient, spec.clientTimeoutMs, `client resolution ${modelId}`)
       : resolvingClient);
     const abort = new AbortController();
-    spec.beforeDispatch?.();
+    spec.signal?.throwIfAborted();
+    await spec.beforeDispatch?.();
+    spec.signal?.throwIfAborted();
     const resp = await withTimeout(
       client.chat.completions.create({
         model: actualModelId,
@@ -668,7 +710,7 @@ async function callProposer(specOrId: string | ProposerCallSpec, question: strin
           { role: "system", content: spec.systemPrompt || DEFAULT_PROPOSER_SYSTEM_PROMPT },
           { role: "user", content: question },
         ],
-      }, { signal: abort.signal, ...(spec.noRetry ? { maxRetries: 0 } : {}),
+      }, { signal: spec.signal ? AbortSignal.any([abort.signal, spec.signal]) : abort.signal, ...(spec.noRetry ? { maxRetries: 0 } : {}),
         ...(spec.providerLane === "profundo" && spec.profundoRetry === true ? { profundoRetry: true } : {}),
       }) as Promise<any>,
       spec.timeoutMs ?? proposerTimeoutForLane(spec.providerLane),
@@ -691,6 +733,7 @@ async function callProposer(specOrId: string | ProposerCallSpec, question: strin
       modelId, provider, providerLane: spec.providerLane,
       reportedModel,
       requestedModel: modelId, actualModel: actualModelId,
+      finishReason: resp?.choices?.[0]?.finish_reason,
       routeReason: spec.providerLane ? "pinned-jury-lane" : "provider-router",
       ok: !!answer, answer,
       latencyMs: Date.now() - t0,
@@ -1042,6 +1085,8 @@ function pinJuryModel(spec: ProposerCallSpec): ProposerCallSpec {
 }
 
 export interface MoAOptions {
+  /** Report votes are strict JSON; evidence instructions must not append channels. */
+  evidenceFormat?: "channels" | "report-json";
   /** Server-owned independent read-only pass, executed separately before each vote. */
   collectProposerEvidence?: (spec: ProposerCallSpec) => Promise<import("./lib/jury-evidence").JuryEvidencePass>;
   /** Actual source snapshots, never proposer drafts. Advisory observation only. */
@@ -1453,7 +1498,7 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
     // a verdict. Investigated seats have one bounded call, never a paid retry.
     const callSpec = evidence ? { ...spec, maxTokens: spec.maxTokens ?? 8192,
       timeoutMs: spec.timeoutMs ?? 90_000 } : spec;
-    const result = await callProposer(callSpec, question + (evidence ? juryEvidencePrompt(evidence) : ""), opts.tenantId, useMetered);
+    const result = await callProposer(callSpec, question + (evidence ? juryEvidencePrompt(evidence, opts.evidenceFormat) : ""), opts.tenantId, useMetered);
     return { ...result, evidence };
   }));
   let proposers: ProposerResult[] = settled.map((s, i) =>
@@ -1491,7 +1536,7 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
           ? await opts.collectProposerEvidence(spec) : undefined;
         const { juryEvidencePrompt } = await import("./lib/jury-evidence");
         if (isPaidJuryBackup(spec)) meteredRecoveryActive = true;
-        const p = await callProposer(spec, question + (evidence ? juryEvidencePrompt(evidence) : ""),
+        const p = await callProposer(spec, question + (evidence ? juryEvidencePrompt(evidence, opts.evidenceFormat) : ""),
           opts.tenantId, isPaidJuryBackup(spec) && allowPaidSubscriptionBackup);
         return { ...p, evidence };
       },

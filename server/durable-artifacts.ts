@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { recordCommittedToolArtifact } from "./lib/tool-output-authority";
 import { and, desc, eq, ilike, sql } from "drizzle-orm";
 import { db } from "./db";
 import {
@@ -136,7 +137,7 @@ async function appendArtifactEvent(
  */
 export async function createArtifactIntent(input: ArtifactIntentInput): Promise<ArtifactRecord> {
   const intent = buildArtifactIntent(input);
-  return db.transaction(async (tx) => {
+  const committed = await db.transaction(async (tx) => {
     // Serialize retries by their tenant-scoped operation key BEFORE lookup; a
     // same-key concurrent caller must receive the existing manifest, not lose
     // an INSERT race to the unique constraint.
@@ -205,6 +206,8 @@ export async function createArtifactIntent(input: ArtifactIntentInput): Promise<
     });
     return created;
   });
+  recordCommittedToolArtifact(committed);
+  return committed;
 }
 
 export async function markArtifactDegraded(params: {

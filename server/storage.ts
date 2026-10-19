@@ -155,8 +155,8 @@ export interface IStorage {
   updateKnowledge(id: number, data: Partial<InsertKnowledge>, tenantId: number, opts?: { allowReservedCategory?: boolean; allowPlatformManagedKnowledge?: boolean }): Promise<AgentKnowledge | undefined>;
   deleteKnowledge(id: number, tenantId: number, opts?: { allowPlatformManagedKnowledge?: boolean }): Promise<void>;
   updateMemoryEmbedding(id: number, embedding: number[], tenantId: number): Promise<void>;
-  getMemoriesWithoutEmbeddings(limit?: number): Promise<MemoryEntry[]>;
-  getKnowledgeWithoutEmbeddings(limit?: number): Promise<AgentKnowledge[]>;
+  getMemoriesWithoutEmbeddings(limit: number | undefined, tenantId: TenantScope): Promise<MemoryEntry[]>;
+  getKnowledgeWithoutEmbeddings(limit: number | undefined, tenantId: TenantScope): Promise<AgentKnowledge[]>;
   archiveExpiredMemories(): Promise<number>;
   archiveStaleMemories(olderThanDays: number): Promise<number>;
   pruneHeartbeatLogs(keepCount: number): Promise<number>;
@@ -957,9 +957,11 @@ export class DatabaseStorage implements IStorage {
       console.warn(`[storage] storeEmbeddingVec failed for knowledge #${id}:`, (err as Error)?.message);
     }
   }
-  async getMemoriesWithoutEmbeddings(limit = 50): Promise<any[]> {
+  async getMemoriesWithoutEmbeddings(limit = 50, tenantId: TenantScope): Promise<any[]> {
+    const scope = requiredTenantScope(memoryEntries.tenantId, tenantId);
     return db.select(memoryEntrySafeCols).from(memoryEntries)
       .where(and(
+        scope,
         eq(memoryEntries.status, "active"),
         isNull(memoryEntries.deletedAt),
         or(isNull(memoryEntries.expiresAt), gt(memoryEntries.expiresAt, new Date())),
@@ -967,10 +969,11 @@ export class DatabaseStorage implements IStorage {
       ))
       .limit(limit) as any;
   }
-  async getKnowledgeWithoutEmbeddings(limit = 50): Promise<any[]> {
+  async getKnowledgeWithoutEmbeddings(limit = 50, tenantId: TenantScope): Promise<any[]> {
+    const scope = requiredTenantScope(agentKnowledge.tenantId, tenantId);
     const notExpired = or(isNull(agentKnowledge.expiresAt), gt(agentKnowledge.expiresAt, new Date()));
     return db.select(knowledgeSafeCols).from(agentKnowledge)
-      .where(and(notExpired!, isNull(agentKnowledge.embedding)))
+      .where(and(scope, notExpired!, isNull(agentKnowledge.embedding)))
       .limit(limit) as any;
   }
 

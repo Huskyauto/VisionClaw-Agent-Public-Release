@@ -159,6 +159,7 @@ import {
 } from "../../server/tools/domains/content-ops/definitions";
 import { copilotChatDefinition } from "../../server/tools/domains/copilot/definitions";
 import { treasuryPaperSimulationDefinition } from "../../server/tools/domains/treasury-paper/definitions";
+import { businessPilotDefinition } from "../../server/tools/domains/business-pilots/definitions";
 import {
   sculptorReviewDefinition,
   verifyFelixProposalSpecDefinition,
@@ -1232,6 +1233,7 @@ const EXPECTED_MIGRATED = new Map([
   ["typesafe_jev_advisory", typesafeJevDefinition],
   ["copilot_chat", copilotChatDefinition],
   ["treasury_paper_simulation", treasuryPaperSimulationDefinition],
+  ["business_pilot", businessPilotDefinition],
 ]);
 
 test("registered migrated definitions are the IDENTICAL objects the facade splices in", () => {

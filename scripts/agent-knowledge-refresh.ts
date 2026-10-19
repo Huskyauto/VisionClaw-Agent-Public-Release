@@ -276,6 +276,7 @@ interface Indexable {
   category: string;
   priority: number;
   content: string;
+  reflectionSourcePath?: string; // set only by the engineering-runbook walker, never DB/user content
 }
 
 function parseReleaseLog(): Indexable[] {
@@ -347,6 +348,8 @@ function walkAgentSkills(): Indexable[] {
         category: "agent_skill",
         priority: 1,
         content: cleaned.slice(0, 12000),
+        ...(["tdd", "zoom-out", "module-girth-guard"].includes(entry)
+          ? { reflectionSourcePath: `.agents/skills/${entry}/SKILL.md` } : {}),
       });
     } catch (_e) { /* unreadable — skip */ }
   }
@@ -414,6 +417,19 @@ function walkLoopContracts(): Indexable[] {
 
 function walkInternalCapabilities(): Indexable[] {
   return [{
+    title: "capability:reflection_owner_source_work",
+    category: "internal_capability",
+    priority: 1,
+    content: [
+      "Owner-only internal Reflection Beam source-work lane, not a customer model or persona tool.",
+      "Use existing authorized owner exec with: npx tsx scripts/reflection-owner-work.ts --task=review-source|draft-tests|compile-runbook --source=<allowlisted path>.",
+      "Tasks are advisory; no code applies itself. Engineering-runbook compilation selects numbered lines and the server extracts exact text.",
+      "No customer DB records, files, arbitrary prompts or chat history. Sources are closed and screened. See docs/providers/reflection.md.",
+      "REFLECTION_OWNER_WORK_ENABLED must be exactly 1 and REFLECTION_FREE_APPROVED_UNTIL future UTC; no auto renewal, retry or paid fallback.",
+      "Free pricing is an owner-reported temporary offer, not an independently verified billing guarantee; standard retention is owner-approved.",
+      "Code suggestions can be redundant or wrong. Verify with source and tests; never call this a final approval or replace Aldon jury seats.",
+    ].join("\n"),
+  }, {
     title: "capability:portable_skill_behavior_bundle",
     category: "internal_capability",
     priority: 1,
@@ -649,6 +665,27 @@ async function main() {
       let compiledRows = 0, degraded = 0;
       for (const src of batch) {
         try {
+          if (src.reflectionSourcePath && process.env.REFLECTION_OWNER_WORK_ENABLED === "1") {
+            // The helper reads its own allowlisted source: no existing DB concepts,
+            // caller prompts, customer data or arbitrary content enter Reflection.
+            // Enabled-but-expired/unavailable = degraded, never paid fallback.
+            const { runReflectionOwnerWork } = await import("../server/lib/reflection-owner-work");
+            const reflected = await runReflectionOwnerWork({
+              tenantId: 1, task: "compile-runbook",
+              sourcePath: src.reflectionSourcePath as Parameters<typeof runReflectionOwnerWork>[0]["sourcePath"],
+            });
+            if (!("concepts" in reflected.result)) throw new Error("Reflection returned the wrong task result");
+            const concepts = reflected.result.concepts;
+            if (concepts.length) {
+              const result = await upsertIndexables(concepts.map(c => ({
+                title: conceptTitle(c.key), category: COMPILE_CATEGORY, priority: 2,
+                content: `${c.title}\n\nSource quotations (not independent verification):\n${c.quotes.join("\n\n")}\n\n(last compiled from: ${src.title})`,
+              })), COMPILE_SOURCE, activeTenantIds);
+              compiledRows += result.inserted + result.updated;
+            }
+            console.log(`[agent-knowledge-refresh] Reflection compile validated: ${src.title}; ${concepts.length} extractive concepts`);
+            continue;
+          }
           // Existing-concept context: recent compiled rows + token-overlap with the source title.
           const existingRes = await db.execute(sql`
             SELECT title, content FROM agent_knowledge

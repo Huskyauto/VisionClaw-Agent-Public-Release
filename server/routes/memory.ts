@@ -220,8 +220,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
     // requirePlatformAdmin (platform tenant + admin claim).
     if (!requirePlatformAdmin(req, res)) return;
     try {
-      const memoriesWithout = await storage.getMemoriesWithoutEmbeddings(100);
-      const knowledgeWithout = await storage.getKnowledgeWithoutEmbeddings(100);
+      const memoriesWithout = await storage.getMemoriesWithoutEmbeddings(100, ALL_TENANTS);
+      const knowledgeWithout = await storage.getKnowledgeWithoutEmbeddings(100, ALL_TENANTS);
 
       const memoryTenantById = new Map(
         memoriesWithout.map((m) => [m.id, Number(m.tenantId)]),

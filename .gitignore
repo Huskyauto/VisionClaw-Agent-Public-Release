@@ -102,3 +102,5 @@ data/youtube/scenes/
 data/service-review-queue.json
 data/jury-decisions/queue.json
 data/threat-intel-state.json
+data/private-alert-logs/
+/generated-artifacts/

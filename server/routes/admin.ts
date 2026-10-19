@@ -663,18 +663,29 @@ export function registerAdminRoutes(app: Express, helpers: AdminHelpers) {
     try {
       const tenantId = getTenantFromRequest(req);
       if (tenantId !== ADMIN_TENANT_ID || !isAdminRequest(req)) return res.status(403).json({ error: "Admin access required" });
-      const days = Math.min(90, Math.max(1, parseInt((req.query.days as string) || "7", 10)));
+      const rawDays = Number(req.query.days ?? 7);
+      const days = Number.isFinite(rawDays) ? Math.min(90, Math.max(1, Math.trunc(rawDays))) : 7;
       const { getCostSummary, getRevenueVsCost } = await import("../agentic/cost-ledger");
       const [costs, revenue] = await Promise.all([
         getCostSummary(tenantId, days),
         getRevenueVsCost(tenantId, days),
       ]);
+      let outcomes: unknown;
+      try {
+        const { getDeliveryOutcomeCounts } = await import("../agentic/outcome-audit");
+        const { summarizeOutcomeEconomics } = await import("../lib/outcome-economics");
+        outcomes = { status: "available", asOf: new Date().toISOString(), ...summarizeOutcomeEconomics(await getDeliveryOutcomeCounts(tenantId, days), costs.totalCostUsd) };
+      } catch (error) {
+        console.error("[cost-audit] outcome evidence unavailable", error);
+        outcomes = { status: "unavailable", asOf: new Date().toISOString(), notice: "Outcome evidence could not be read. No verified-outcome cost is available." };
+      }
       res.json({
         backgroundFreeTierOnly: process.env.BACKGROUND_FREE_TIER_ONLY === "true",
         claudeRunner: (await import("../claude-runner")).isClaudeRunnerAvailable(),
         notice: "costUsd is an ESTIMATE based on per-token list pricing. OAuth/Runner lanes consume your subscription quota and incur $0 per-token API spend, but show non-zero estimated cost here.",
         costs,
         revenue,
+        outcomes,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

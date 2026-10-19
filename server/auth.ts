@@ -585,6 +585,8 @@ const SCOPE_RULES: Array<{ method?: string; pattern: RegExp; scopes: ApiScope[] 
   { method: "GET", pattern: /^\/api\/v1\/agents$/, scopes: ["read", "chat"] },
   { method: "POST", pattern: /^\/api\/v1\/agents\/dispatch$/, scopes: ["chat"] },
   { method: "GET", pattern: /^\/api\/v1\/spark\/outbox$/, scopes: ["chat"] },
+  { method: "GET", pattern: /^\/api\/v1\/spark\/reports(?:\/\d+)?$/, scopes: ["read", "chat"] },
+  { method: "POST", pattern: /^\/api\/v1\/spark\/reports\/\d+\/reply$/, scopes: ["chat"] },
   { method: "GET", pattern: /^\/api\/v1\/grok\/outbox$/, scopes: ["chat"] },
   { method: "GET", pattern: /^\/api\/v1\/instinct\/outbox$/, scopes: ["chat"] },
   { method: "POST", pattern: /^\/api\/v1\/conversations\/\d+\/messages$/, scopes: ["chat"] },

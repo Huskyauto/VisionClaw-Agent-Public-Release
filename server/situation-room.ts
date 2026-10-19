@@ -156,7 +156,7 @@ async function getPersonaWorkloads(tenantId: number): Promise<PersonaWorkload[]>
         COUNT(DISTINCT c.id) as conv_count,
         MAX(m.created_at) as last_active
       FROM conversations c
-      LEFT JOIN messages m ON m.conversation_id = c.id
+      LEFT JOIN messages m ON m.conversation_id = c.id AND m.tenant_id = ${tenantId}
       WHERE c.tenant_id = ${tenantId}
         AND c.persona_id IS NOT NULL
         AND m.created_at > NOW() - INTERVAL '24 hours'

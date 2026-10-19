@@ -55,8 +55,8 @@ export function reserveIncomeClaudeBudget(model: IncomeClaudeModel, prompt: stri
 }
 
 /** The two paid income seats share one synchronous owner-jury ceiling. */
-export function reserveIncomeApiBudget(model: IncomeClaudeModel | "gpt-5.4", prompt: string, budget: IncomeClaudeBudget): number {
-  if (!["claude-sonnet-5-5", "claude-opus-5-5", "gpt-5.4"].includes(model) || prompt.length > 200_000) {
+export function reserveIncomeApiBudget(model: IncomeClaudeModel | "gpt-5.4" | "google/gemini-4-argon", prompt: string, budget: IncomeClaudeBudget): number {
+  if (!["claude-sonnet-5-5", "claude-opus-5-5", "gpt-5.4", "google/gemini-4-argon"].includes(model) || prompt.length > 200_000) {
     throw new Error("Income API budget input outside bounded contract");
   }
   // One input token per UTF-8 byte plus a framing/system allowance deliberately

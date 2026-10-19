@@ -5,6 +5,7 @@ import { db } from "./db";
 import { verifyDeliverable } from "./deliverable-verifier";
 import type { DeliveryLog } from "@shared/schema";
 import type { DeliveryRequest, DeliveryResult } from "./delivery-pipeline";
+import { retainedAcceptanceCriteria } from "./lib/customer-artifact-backcheck";
 
 /**
  * Delivery is a security boundary, not just a reporting action. Keep the
@@ -84,6 +85,9 @@ function normalizeWorkspaceRelativePath(candidate: unknown): string | null {
 
 export function metadataWithDeliverySource(req: DeliveryRequest): Record<string, any> | null {
   const metadata = req.metadata ? { ...req.metadata } : {};
+  // Server-owned metadata key; arbitrary metadata cannot replace typed criteria.
+  delete metadata._customerAcceptanceCriteria;
+  if (req.acceptanceCriteria !== undefined) metadata._customerAcceptanceCriteria = req.acceptanceCriteria;
   const sourcePath = normalizeWorkspaceRelativePath(req.filePath);
   if (sourcePath) metadata[DELIVERY_SOURCE_PATH_METADATA_KEY] = sourcePath;
   if (typeof req.mimeType === "string" && req.mimeType) metadata[DELIVERY_MIME_TYPE_METADATA_KEY] = req.mimeType;
@@ -183,6 +187,7 @@ export function buildRetryDeliveryRequest(
     stripePaymentId: log.stripePaymentId || undefined,
     idempotencyKey: log.idempotencyKey || undefined,
     metadata: (log.metadata as Record<string, any>) || undefined,
+    acceptanceCriteria: retainedAcceptanceCriteria(undefined, metadata),
   };
 }
 

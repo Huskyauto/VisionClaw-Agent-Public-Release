@@ -16,7 +16,6 @@
  */
 
 import type { ToolDefinition } from "../../types";
-import { treasuryPaperSimulationDefinition } from "../treasury-paper/definitions";
 
 export const forecastTickerDefinition: ToolDefinition = {
   type: "function" as const,
@@ -57,5 +56,4 @@ export const analyzePortfolioDefinition: ToolDefinition = {
 export const treasuryDomainDefinitions: ToolDefinition[] = [
   forecastTickerDefinition,
   analyzePortfolioDefinition,
-  treasuryPaperSimulationDefinition,
 ];

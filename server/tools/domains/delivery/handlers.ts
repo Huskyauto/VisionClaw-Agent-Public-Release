@@ -101,6 +101,7 @@ async function deliverProductHandler(
     emailSubject,
     emailBody,
     sendEmail: !!customerEmail,
+    acceptanceCriteria: params.acceptanceCriteria,
   });
   return redacted ? { ...(result as any), redactionWarning: "Outbound payload redacted by R95 safety gate." } : result;
 }

@@ -24,6 +24,7 @@ import { produceVideoParallel, type ChapterSpec } from "../server/mpeg-engine";
 import { deliverDigitalProduct } from "../server/delivery-pipeline";
 import { pool } from "../server/db";
 import { validateBwbScript, assertRenderableFormat, assertBobVoice, resolveBwbVoice } from "./lib/bwb-validate";
+import { reviewBwbPackaging } from "./lib/bwb-packaging";
 import { openCheckpoints } from "../server/agentic/pipeline-checkpoint";
 import { imageMatchesPrompt, writeScenePromptSidecar, pruneStaleSceneImages } from "./lib/bwb-scene-fingerprint";
 
@@ -55,6 +56,7 @@ interface VideoScript {
   youtubeDescription: string;
   youtubeTags: string[];
   thumbnailPrompt?: string;
+  packagingReview?: unknown;
   scenes: SceneSpec[];
 }
 
@@ -82,6 +84,8 @@ async function main() {
   const script: VideoScript = JSON.parse(readFileSyncEIO(scriptPath!, "utf8"));
   console.log(`[build-bwb-video] Loaded ${scriptPath} — ${script.videoId} / ${script.playlist}`);
   validateBwbScript(script, fail);
+  const packaging = reviewBwbPackaging(script);
+  console.log(`[build-bwb-video] ${packaging.summary}`);
   assertRenderableFormat(script, fail);
   assertBobVoice(VOICE, fail);
   console.log(`[build-bwb-video] Validation OK — ${script.scenes.length} scenes, voice=${VOICE}`);
@@ -287,7 +291,8 @@ async function main() {
         sendEmail: !process.env.BWB_ORCHESTRATOR_RUN_ID,
         idempotencyKey: `bwb-weekly:${process.env.BWB_JOB_KEY || script.videoId}:delivery`,
         emailSubject: `${script.videoId} ready — ${script.title}`,
-        emailBody: `Video ready for review and YouTube upload.\n\nPlaylist: ${script.playlist}\nLength: ~${renderInfo.durationSeconds.toFixed(0)} seconds\nFile: ${path.basename(finalMp4)}\n\nUse Play to stream on phone, Download to save the MP4 for upload.\n\nYouTube package below — copy/paste into YouTube Studio (or auto-upload via the youtube_upload tool).\n\n— TITLE —\n${script.title}\n\n— DESCRIPTION —\n${script.youtubeDescription}\n\n— TAGS —\n${script.youtubeTags.join(", ")}\n\n— THUMBNAIL —\n${thumbnailPath ? thumbnailPath : "(none — generate manually or rerun with thumbnailPrompt set)"}\n`,
+        metadata: { packagingReview: packaging },
+        emailBody: `Video ready for review and YouTube upload.\n\n${packaging.summary}\n\nPlaylist: ${script.playlist}\nLength: ~${renderInfo.durationSeconds.toFixed(0)} seconds\nFile: ${path.basename(finalMp4)}\n\nUse Play to stream on phone, Download to save the MP4 for upload.\n\nYouTube package below — copy/paste into YouTube Studio (or auto-upload via the youtube_upload tool).\n\n— TITLE —\n${script.title}\n\n— DESCRIPTION —\n${script.youtubeDescription}\n\n— TAGS —\n${script.youtubeTags.join(", ")}\n\n— THUMBNAIL —\n${thumbnailPath ? thumbnailPath : "(none — generate manually or rerun with thumbnailPrompt set)"}\n`,
       });
       return {
         deliveryId: d.deliveryId,
@@ -312,6 +317,7 @@ async function main() {
         {
           videoId: script.videoId,
           title: script.title,
+          packagingReview: packaging,
           playlist: script.playlist,
           description: script.youtubeDescription,
           tags: script.youtubeTags,

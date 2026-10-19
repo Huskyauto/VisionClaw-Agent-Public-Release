@@ -369,6 +369,7 @@ tool_performance_report
 track_intervention
 track_outcome
 treasury_paper_simulation
+business_pilot
 tree_of_thought
 trend_research
 typesafe_jev_advisory

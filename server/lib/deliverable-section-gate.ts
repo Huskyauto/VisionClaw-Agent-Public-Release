@@ -39,6 +39,7 @@ export function buildNoContentPlaceholder(suffix?: string): string {
 export function isFailedSectionBody(body: string | undefined | null): boolean {
   const t = (body ?? "").trim();
   if (!t) return true;
+  if (!/[\p{L}\p{N}]/u.test(t) || /^[\p{L}\p{N}]{1,3}$/u.test(t)) return true;
   return SECTION_PLACEHOLDER_PREFIXES.some((p) => t.startsWith(p));
 }
 

@@ -13,6 +13,10 @@ export async function setupVite(server: Server, app: Express) {
     middlewareMode: true,
     hmr: { server, path: "/vite-hmr" },
     allowedHosts: true as const,
+    fs: {
+      ...viteConfig.server?.fs,
+      deny: [...(viteConfig.server?.fs?.deny || []), "**/data/private-alert-logs/**"],
+    },
   };
 
   const vite = await createViteServer({
@@ -21,6 +25,11 @@ export async function setupVite(server: Server, app: Express) {
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
+        // Expected file-access refusals must return 403, not terminate the app.
+        if (msg.includes("outside of Vite serving allow list")) {
+          viteLogger.warn(msg);
+          return;
+        }
         viteLogger.error(msg, options);
         process.exit(1);
       },

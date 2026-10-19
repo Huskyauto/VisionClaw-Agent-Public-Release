@@ -118,6 +118,7 @@ import "./domains/audit-fixkit";
 import "./domains/derived-api";
 import "./domains/typesafe-jev";
 import "./domains/cmmc-prospecting";
+import "./domains/business-pilots";
 
 export async function dispatchTool(
   name: string,
@@ -138,6 +139,7 @@ export async function dispatchTool(
       console.warn("[silent-catch] server/tools/dispatcher.ts:", (e as any)?.message ?? e);
     }
     const ctx = buildToolContext({
+      invokedVia: typeof params._invokedVia === "string" ? params._invokedVia : undefined,
       tenantId: typeof params._tenantId === "number" ? params._tenantId : undefined,
       personaId: typeof params._personaId === "number" ? params._personaId : undefined,
       conversationId: typeof params._conversationId === "number" ? params._conversationId : undefined,

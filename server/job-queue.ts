@@ -390,7 +390,7 @@ export async function completeJob(
         completed_at = NOW(),
         lease_until = NULL
     WHERE id = ${id}
-      AND (${tenantId}::int IS NULL OR tenant_id = ${tenantId})
+      AND tenant_id IS NOT DISTINCT FROM ${tenantId}
       AND status = 'running'
       AND attempts = ${attempts}
       AND lease_until IS NOT NULL

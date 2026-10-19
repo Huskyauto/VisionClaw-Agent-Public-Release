@@ -387,6 +387,22 @@ registerJobHandler("research_digest", async (job) => {
   };
 });
 
+registerJobHandler("business_report_review", async (job) => {
+  const { advanceBusinessReportReview } = await import("./lib/business-report-review");
+  const missionId = job.payload.input?.deliveryContext?.missionId;
+  // Async continuation retains the SAME tenant and mission cost attribution.
+  if (Number.isSafeInteger(missionId) && missionId > 0) {
+    const { withMissionCostAttribution } = await import("./agentic/cost-ledger");
+    return withMissionCostAttribution(missionId, () => advanceBusinessReportReview(job));
+  }
+  return advanceBusinessReportReview(job);
+});
+
+registerJobHandler("company_report_package", async job => {
+  const { advanceCompanyReportPackage } = await import("./lib/company-report-package");
+  return advanceCompanyReportPackage(job);
+});
+
 registerJobHandler("astra_report_batch", async (job) => {
   if (
     job.tenantId == null ||

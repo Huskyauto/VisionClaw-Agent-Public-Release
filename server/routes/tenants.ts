@@ -13,6 +13,7 @@ import { DEFAULT_CHAT_MODEL_ID } from "../chat-model-default";
 import { db } from "../db";
 import { fileStorage } from "@shared/schema";
 import { validate, tenantProfilePatchSchema } from "../validation";
+import { tenantFileAccessFilter } from "../lib/private-business-pilot-files";
 
 type TenantsPublicHelpers = {
   loginLimiter: any;
@@ -109,7 +110,7 @@ export function registerTenantFilesRoutes(app: Express, helpers: TenantFilesHelp
         storageKey: fileStorage.storageKey,
         driveUrl: fileStorage.driveUrl,
         createdAt: fileStorage.createdAt,
-      }).from(fileStorage).where(eq(fileStorage.tenantId, tenantId)).orderBy(desc(fileStorage.createdAt));
+      }).from(fileStorage).where(tenantFileAccessFilter(tenantId)).orderBy(desc(fileStorage.createdAt));
       res.json(files);
     } catch (err) {
       console.error("[tenant-files] List failed:", (err as Error).message);
@@ -125,7 +126,7 @@ export function registerTenantFilesRoutes(app: Express, helpers: TenantFilesHelp
       if (isNaN(fileId)) return res.status(400).json({ error: "Invalid file ID" });
       const { eq, and } = await import("drizzle-orm");
       const [file] = await db.select().from(fileStorage).where(
-        and(eq(fileStorage.id, fileId), eq(fileStorage.tenantId, tenantId))
+        and(eq(fileStorage.id, fileId), tenantFileAccessFilter(tenantId))
       ).limit(1);
       if (!file) return res.status(404).json({ error: "File not found" });
 
@@ -169,7 +170,7 @@ export function registerTenantFilesRoutes(app: Express, helpers: TenantFilesHelp
       if (isNaN(fileId)) return res.status(400).json({ error: "Invalid file ID" });
       const { eq, and } = await import("drizzle-orm");
       const [file] = await db.select().from(fileStorage).where(
-        and(eq(fileStorage.id, fileId), eq(fileStorage.tenantId, tenantId))
+        and(eq(fileStorage.id, fileId), tenantFileAccessFilter(tenantId))
       ).limit(1);
       if (!file) return res.status(404).json({ error: "File not found" });
 
@@ -183,7 +184,7 @@ export function registerTenantFilesRoutes(app: Express, helpers: TenantFilesHelp
       }
 
       await db.delete(fileStorage).where(
-        and(eq(fileStorage.id, fileId), eq(fileStorage.tenantId, tenantId))
+        and(eq(fileStorage.id, fileId), tenantFileAccessFilter(tenantId))
       );
       res.json({ success: true });
     } catch (err) {

@@ -33,6 +33,7 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import { readFileSyncEIO, existsSyncEIO, writeFileSyncEIO } from "./lib/eio-read";
 import { bwbScriptCommand } from "./lib/bwb-script-runner";
+import { BWB_PACKAGING_INSTRUCTIONS } from "./lib/bwb-packaging";
 import { renderFailureReason } from "./lib/bwb-render-failure";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
@@ -227,6 +228,7 @@ interface VideoScript {
   youtubeDescription: string;
   youtubeTags: string[];
   thumbnailPrompt?: string;
+  packagingReview?: unknown;
   scenes: PlannedScene[];
 }
 
@@ -307,6 +309,8 @@ ${factsBlock}
 ${NARRATION_RULES}
 
 ${IMAGE_RULES}
+${BWB_PACKAGING_INSTRUCTIONS}
+Use scene 2+ for packaging evidence: scene 1 is replaced by the locked opener.
 ${photosBlock ? "\n" + photosBlock + "\n" : ""}
 Return STRICT JSON only (no markdown):
 {
@@ -587,6 +591,7 @@ Return STRICT JSON only (no markdown):
     youtubeDescription: String(j.youtubeDescription || `Built With Bob — ${cfg.weekLabel}.`).trim(),
     youtubeTags: Array.isArray(j.youtubeTags) ? j.youtubeTags.map((t: any) => String(t)).slice(0, 12) : ["built with bob", "weekly recap"],
     thumbnailPrompt: j.thumbnailPrompt ? String(j.thumbnailPrompt) : undefined,
+    packagingReview: j.packagingReview,
     scenes,
   };
 }

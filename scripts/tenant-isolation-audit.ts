@@ -661,6 +661,7 @@ function noteUnreadable(f: string, e: unknown) {
   log(`WARNING: could not read ${f} — excluded from corpus (${(e as Error)?.message || e})`);
 }
 
+let alertReportSnapshots: Array<{ name: string; content: string }> = [];
 function writeReport(
   findings: Finding[],
   cov: Coverage,
@@ -820,6 +821,10 @@ function writeReport(
       degradedReportJson: DEGRADED_REPORT_JSON,
     },
   });
+  alertReportSnapshots = [
+    { name: degraded ? "tenant-isolation-degraded.md" : "tenant-isolation-full.md", content: md },
+    { name: degraded ? "tenant-isolation-degraded.json" : "tenant-isolation-full.json", content: reportJson },
+  ];
   log(`report → ${written.markdownPath} + ${written.jsonPath}`);
   if (degraded) {
     log(`authoritative completed report preserved; degraded diagnostic written separately`);
@@ -837,7 +842,10 @@ async function notifyOwner(subject: string, body: string) {
       const { ADMIN_TENANT_ID } = await import("../server/tenant-constants");
       const { getOrCreateTenantInbox, sendEmail } = await import("../server/email");
       const { inboxId } = await getOrCreateTenantInbox(ADMIN_TENANT_ID);
-      await sendEmail({ inboxId, to: ownerEmail, subject, text: body });
+      await sendEmail({
+        inboxId, to: ownerEmail, subject, text: body, source: "tenant-isolation-audit",
+        alertReports: alertReportSnapshots,
+      });
     });
     log(`owner notified at ${ownerEmail}`);
   } catch (e) {

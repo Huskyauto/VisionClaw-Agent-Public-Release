@@ -27,7 +27,7 @@ export const deliverProductDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "deliver_product",
-    description: "Full automated digital product delivery pipeline. Creates a dated subfolder in Google Drive, uploads the file, makes it publicly shareable, sends a branded delivery email to the customer, and logs the entire transaction. Use this for any order fulfillment or digital product delivery. Returns working download/folder links and delivery tracking ID. If no filePath is given, looks in uploads/ for the fileName.",
+    description: "Deliver a customer product only after artifact verification. Pass acceptanceCriteria from the customer's request, identical to verify_deliverable criteria; PDFs are parsed and required text/exact clickable links checked before upload/email. Returns verified links and tracking. Never treat a backcheck as fact, visual or audio certification.",
     parameters: {
       type: "object",
       properties: {
@@ -40,6 +40,15 @@ export const deliverProductDefinition: ToolDefinition = {
         stripePaymentId: { type: "string", description: "Optional Stripe payment ID to link delivery to payment" },
         emailSubject: { type: "string", description: "Custom email subject line. Default: 'Your order is ready: {productName}'" },
         emailBody: { type: "string", description: "Custom email body text. Default: branded template with download link" },
+        acceptanceCriteria: {
+          type: "object", additionalProperties: false,
+          description: "Primary artifact requirements, identical to verify_deliverable.acceptance_criteria. Retained on retry; changed criteria require a new delivery identity.",
+          properties: {
+            requiredText: { type: "array", maxItems: 20, items: { type: "string", maxLength: 250 } },
+            expectedLinks: { type: "array", maxItems: 20, items: { type: "string", maxLength: 2048 } },
+            minimumPages: { type: "integer", minimum: 1, maximum: 80 },
+          },
+        },
       },
       required: ["customerName", "productName", "fileName"],
     },

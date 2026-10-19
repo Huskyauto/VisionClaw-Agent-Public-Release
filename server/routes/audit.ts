@@ -10,8 +10,13 @@ import { runAudit, AuditFetchError } from "../audit-engine";
 import { enforceBotProtection } from "../lib/bot-protection";
 import { fulfillReadinessAudit } from "../audit-fulfillment";
 import { fulfillExecutiveReport } from "../executive-report-fulfillment";
+import { ALDON_JURY_BATCH, ALDON_COMPLETION_BATCH, ALDON_RERUN_BATCH, ALDON_RECOVERY_BATCH } from "../lib/business-report-paid-budget";
+import { manualReportOnlySchema, manualReportDelivery } from "../lib/manual-report-delivery";
 import { fulfillSmartLeadsDossiers, SMART_LEADS_MAX_BATCH } from "../smart-leads-fulfillment";
 import { createQuickAuditPdf } from "../quick-audit-pdf";
+import { agentJourneySchema, auditChecksForStorage } from "../lib/agent-journey-schema";
+import { registerReportRecoveryRoute } from "./report-recovery";
+import { registerCompanyReportPackages } from "./company-report-packages";
 
 const AUDIT_TENANT_ID = 1; // platform-owner storefront
 
@@ -291,7 +296,7 @@ export function registerAuditRoutes(app: Express) {
       const result = await runAudit(url);
       const ipHash = hashIp(req);
       const ua = String(req.headers["user-agent"] || "").slice(0, 500);
-      const checksLit = JSON.stringify(result.checks);
+      const checksLit = JSON.stringify(auditChecksForStorage(result.checks, result.agentJourney));
       const recsLit = JSON.stringify(result.recommendations);
       let reportId: number | null = null;
       try {
@@ -366,10 +371,67 @@ interface FullAuditJob {
   error?: string;
   customerEmail?: string;
   customerName?: string;
+  reportOnly?: boolean;
   /** Set when the finished PDF was enqueued into the service review queue. */
   queuedReviewId?: string;
+  evidenceReviewJobId?: number;
+  reviewPhase?: string;
 }
 const FULL_AUDIT_JOBS = new Map<string, FullAuditJob>();
+async function lookupFullAuditJob(id: string, tenantId: number): Promise<FullAuditJob | undefined> {
+  const cached = FULL_AUDIT_JOBS.get(id);
+  if (cached?.evidenceReviewJobId || cached?.status === "done") return cached;
+  if (!/^[a-f0-9-]{36}$/i.test(id)) return cached;
+  const { db } = await import("../db");
+  const { sql } = await import("drizzle-orm");
+  const result: any = await db.execute(sql`SELECT id, payload, created_at FROM agent_jobs
+    WHERE tenant_id = ${tenantId} AND kind = 'business_report_review'
+      AND payload->'input'->>'operatorJobId' = ${id}
+    ORDER BY id DESC LIMIT 1`);
+  const row = (result.rows || result)[0];
+  if (!row || row.payload.input?.tenantId !== tenantId) return cached;
+  const input = row.payload.input;
+  const job: FullAuditJob = { id, kind: input.kind === "executive" ? "exec-report" : "audit",
+    status: "running", startedAt: new Date(row.created_at).getTime(), evidenceReviewJobId: Number(row.id),
+    company: input.intake?.company, website: input.intake?.website,
+    reportOnly: input.reportOnly,
+    customerEmail: input.reportOnly ? undefined : input.deliveryContext?.customerEmail,
+    customerName: input.reportOnly ? undefined : input.deliveryContext?.customerName };
+  FULL_AUDIT_JOBS.set(id, job);
+  return job;
+}
+async function refreshEvidenceReviewJob(job: FullAuditJob, tenantId: number): Promise<void> {
+  if (!job.evidenceReviewJobId || job.status === "done") return;
+  const { db } = await import("../db");
+  const { sql } = await import("drizzle-orm");
+  const rows: any = await db.execute(sql`SELECT status, result, error,
+    CASE WHEN payload->'state'->>'phase'='wait_muse'
+      AND payload->'state'->>'compilerSetupRequired'='true' THEN 'compiler_setup'
+      ELSE payload->'state'->>'phase' END AS phase
+    FROM agent_jobs WHERE id = ${job.evidenceReviewJobId} AND tenant_id = ${tenantId}
+      AND kind = 'business_report_review' LIMIT 1`);
+  const row = (rows.rows || rows)[0];
+  if (!row) throw new Error("Durable report review job not found");
+  job.reviewPhase = row.phase;
+  if (row.status === "succeeded" && row.result?.success && row.result.filePath) {
+    job.status = "done";
+    job.finishedAt = Date.now();
+    job.filePath = row.result.filePath;
+    job.fileName = row.result.fileName;
+    job.pages = row.result.pages;
+    job.queuedReviewId = row.result.queuedReviewId;
+    job.error = undefined;
+    saveFullAuditJobs();
+  } else if (["failed_terminal", "cancelled"].includes(row.status)) {
+    job.status = "error";
+    job.error = row.error || "Evidence review stopped; no customer report was approved.";
+    job.finishedAt = Date.now();
+    saveFullAuditJobs();
+  } else {
+    job.status = "running";
+    job.error = undefined;
+  }
+}
 // Durable job metadata (same dotfile-in-uploads pattern as the service review
 // queue). Dotfiles are excluded from the servable-uploads sync, so this is
 // never publicly reachable. Survives server restarts within a deploy; jobs
@@ -388,7 +450,7 @@ function loadFullAuditJobs(): void {
     if (!Array.isArray(raw)) return;
     for (const j of raw) {
       if (!j || typeof j.id !== "string") continue;
-      if (j.status === "running") {
+      if (j.status === "running" && !j.evidenceReviewJobId) {
         j.status = "error";
         j.error = "The server restarted while this audit was generating. Please run it again.";
         j.finishedAt = Date.now();
@@ -432,8 +494,11 @@ const adminQuickPdfBody = z.object({
     recommendation: z.string().max(3000).optional(),
   })).max(50),
   recommendations: z.array(z.string().max(3000)).max(20),
+  agentJourney: agentJourneySchema.optional(),
 });
 const adminFullBody = z.object({
+  paidJuryBatch: z.enum([ALDON_JURY_BATCH, ALDON_COMPLETION_BATCH, ALDON_RERUN_BATCH, ALDON_RECOVERY_BATCH]).optional(),
+  reportOnly: manualReportOnlySchema,
   company: z.string().min(1).max(200),
   website: z.string().min(4).max(300),
   industry: z.string().max(200).optional().nullable(),
@@ -464,6 +529,18 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
     }
     return tenantId;
   }
+
+  registerReportRecoveryRoute(app, {
+    authMiddleware, requireAdmin,
+    recovered: operatorId => {
+        const cached = FULL_AUDIT_JOBS.get(operatorId);
+        if (cached) {
+          cached.status = "running"; cached.error = undefined; cached.finishedAt = undefined;
+          cached.reviewPhase = "initial_jury"; saveFullAuditJobs();
+        }
+    },
+  });
+  registerCompanyReportPackages(app, { authMiddleware, requireAdmin });
 
   // Instant audit (same engine as the public /audit page, no Turnstile /
   // public rate limits — operator is authenticated).
@@ -516,22 +593,37 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
       }
     }
     const { company, website, industry, crm, notes } = parsed.data;
-    const custEmail = (parsed.data.customerEmail || "").trim();
+    const delivery = manualReportDelivery(parsed.data, ownerEmail());
+    const custEmail = delivery.deliveryEmail || "";
     const custName = (parsed.data.customerName || "").trim();
     const jobId = crypto.randomUUID();
     const job: FullAuditJob = {
-      id: jobId, status: "running", startedAt: Date.now(), company, website,
+      id: jobId, status: "running", startedAt: Date.now(), company, website, reportOnly: delivery.reportOnly,
       customerEmail: custEmail || undefined, customerName: custName || undefined,
     };
     FULL_AUDIT_JOBS.set(jobId, job);
     saveFullAuditJobs();
-    const customerEmail = custEmail || ownerEmail() || "operator@visionclaw";
+    const customerEmail = delivery.customerEmail;
     fulfillReadinessAudit({
       intake: { company, website, industry: industry || undefined, crm: crm || undefined, notes: notes || undefined },
       customerEmail,
       orderId: `manual-${jobId.slice(0, 8)}`,
       tenantId,
+      operatorJobId: jobId,
+      paidJuryBatch: parsed.data.paidJuryBatch,
+      reportOnly: delivery.reportOnly,
+      deliveryContext: custEmail ? {
+        sessionId: `manual-${jobId}`, sku: "sample-audit-sku-001",
+        productName: `AI Readiness Audit — ${company}`, customerName: custName || custEmail,
+        customerEmail: custEmail, paymentKey: "offline",
+      } : undefined,
     }).then(async (result) => {
+      if (result.pending && result.jobId) {
+        job.evidenceReviewJobId = result.jobId;
+        job.reviewPhase = "initial_jury";
+        saveFullAuditJobs();
+        return;
+      }
       job.finishedAt = Date.now();
       if (result.success && result.filePath) {
         job.status = "done";
@@ -592,10 +684,14 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
   app.get("/api/admin/audit/full/:jobId", authMiddleware, async (req: Request, res: Response) => {
     const tenantId = await requireAdmin(req, res);
     if (tenantId === null) return;
-    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    let job: FullAuditJob | undefined;
+    try { job = await lookupFullAuditJob(String(req.params.jobId), tenantId); }
+    catch { return res.status(503).json({ error: "Report state temporarily unavailable" }); }
     // (job.kind ?? "audit") keeps pre-kind persisted jobs working while
     // enforcing job-type isolation reciprocally with the exec-report routes.
     if (!job || (job.kind ?? "audit") !== "audit") return res.status(404).json({ error: "Job not found (jobs are kept for 24h)." });
+    try { await refreshEvidenceReviewJob(job, tenantId); }
+    catch { return res.status(503).json({ error: "Report review status temporarily unavailable" }); }
     res.json({
       jobId: job.id,
       status: job.status,
@@ -607,14 +703,23 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
       fileName: job.fileName ?? null,
       error: job.error ?? null,
       customerEmail: job.customerEmail ?? null,
+      reportOnly: job.reportOnly ?? false,
       queuedReviewId: job.queuedReviewId ?? null,
+      evidenceReviewJobId: job.evidenceReviewJobId ?? null,
+      reviewPhase: job.reviewPhase ?? null,
     });
   });
 
   app.get("/api/admin/audit/full/:jobId/download", authMiddleware, async (req: Request, res: Response) => {
     const tenantId = await requireAdmin(req, res);
     if (tenantId === null) return;
-    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    let job: FullAuditJob | undefined;
+    try { job = await lookupFullAuditJob(String(req.params.jobId), tenantId); }
+    catch { return res.status(503).json({ error: "Report state temporarily unavailable" }); }
+    if (job) {
+      try { await refreshEvidenceReviewJob(job, tenantId); }
+      catch { return res.status(503).json({ error: "Report review status temporarily unavailable" }); }
+    }
     if (!job || (job.kind ?? "audit") !== "audit" || job.status !== "done" || !job.filePath) {
       return res.status(404).json({ error: "PDF not ready or job not found." });
     }
@@ -646,6 +751,8 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
   // ---------------------------------------------------------------------------
 
   const execReportBody = z.object({
+    paidJuryBatch: z.enum([ALDON_JURY_BATCH, ALDON_COMPLETION_BATCH, ALDON_RERUN_BATCH, ALDON_RECOVERY_BATCH]).optional(),
+    reportOnly: manualReportOnlySchema,
     focus: z.enum(["full", "opportunities"]).optional().nullable(),
     company: z.string().min(1).max(200),
     website: z.string().min(4).max(300),
@@ -674,17 +781,18 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
     const d = parsed.data;
     const focus: "full" | "opportunities" = d.focus === "opportunities" ? "opportunities" : "full";
     const reportLabel = focus === "opportunities" ? "Money-Making Opportunities Report" : "Executive Opportunity Report";
-    const principalEmail = (d.principalEmail || "").trim();
+    const delivery = manualReportDelivery({ reportOnly: d.reportOnly, customerEmail: d.principalEmail }, ownerEmail());
+    const principalEmail = delivery.deliveryEmail || "";
     const principalName = (d.principalName || "").trim();
     const jobId = crypto.randomUUID();
     const job: FullAuditJob = {
       id: jobId, kind: "exec-report", status: "running", startedAt: Date.now(),
-      company: d.company, website: d.website,
+      company: d.company, website: d.website, reportOnly: delivery.reportOnly,
       customerEmail: principalEmail || undefined, customerName: principalName || undefined,
     };
     FULL_AUDIT_JOBS.set(jobId, job);
     saveFullAuditJobs();
-    const customerEmail = principalEmail || ownerEmail() || "operator@visionclaw";
+    const customerEmail = delivery.customerEmail;
     fulfillExecutiveReport({
       intake: {
         focus,
@@ -700,7 +808,21 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
       customerEmail,
       orderId: `manual-${jobId.slice(0, 8)}`,
       tenantId,
+      operatorJobId: jobId,
+      paidJuryBatch: d.paidJuryBatch,
+      reportOnly: delivery.reportOnly,
+      deliveryContext: principalEmail ? {
+        sessionId: `manual-${jobId}`, sku: "sample-exec-report-sku-001",
+        productName: `${reportLabel} — ${d.company}`, customerName: principalName || principalEmail,
+        customerEmail: principalEmail, paymentKey: "offline",
+      } : undefined,
     }).then(async (result) => {
+      if (result.pending && result.jobId) {
+        job.evidenceReviewJobId = result.jobId;
+        job.reviewPhase = "initial_jury";
+        saveFullAuditJobs();
+        return;
+      }
       job.finishedAt = Date.now();
       if (result.success && result.filePath) {
         job.status = "done";
@@ -761,8 +883,12 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
   app.get("/api/admin/exec-report/:jobId", authMiddleware, async (req: Request, res: Response) => {
     const tenantId = await requireAdmin(req, res);
     if (tenantId === null) return;
-    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    let job: FullAuditJob | undefined;
+    try { job = await lookupFullAuditJob(String(req.params.jobId), tenantId); }
+    catch { return res.status(503).json({ error: "Report state temporarily unavailable" }); }
     if (!job || job.kind !== "exec-report") return res.status(404).json({ error: "Job not found (jobs are kept for 24h)." });
+    try { await refreshEvidenceReviewJob(job, tenantId); }
+    catch { return res.status(503).json({ error: "Report review status temporarily unavailable" }); }
     res.json({
       jobId: job.id,
       status: job.status,
@@ -774,14 +900,23 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
       fileName: job.fileName ?? null,
       error: job.error ?? null,
       customerEmail: job.customerEmail ?? null,
+      reportOnly: job.reportOnly ?? false,
       queuedReviewId: job.queuedReviewId ?? null,
+      evidenceReviewJobId: job.evidenceReviewJobId ?? null,
+      reviewPhase: job.reviewPhase ?? null,
     });
   });
 
   app.get("/api/admin/exec-report/:jobId/download", authMiddleware, async (req: Request, res: Response) => {
     const tenantId = await requireAdmin(req, res);
     if (tenantId === null) return;
-    const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
+    let job: FullAuditJob | undefined;
+    try { job = await lookupFullAuditJob(String(req.params.jobId), tenantId); }
+    catch { return res.status(503).json({ error: "Report state temporarily unavailable" }); }
+    if (job) {
+      try { await refreshEvidenceReviewJob(job, tenantId); }
+      catch { return res.status(503).json({ error: "Report review status temporarily unavailable" }); }
+    }
     if (!job || job.kind !== "exec-report" || job.status !== "done" || !job.filePath) {
       return res.status(404).json({ error: "PDF not ready or job not found." });
     }

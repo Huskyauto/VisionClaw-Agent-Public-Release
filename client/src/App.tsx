@@ -38,6 +38,7 @@ const AdminCmmcPage = lazy(() => import("@/pages/admin-cmmc"));
 const AdminToolsPage = lazy(() => import("@/pages/admin-tools"));
 const TypeSafeJevPage = lazy(() => import("@/pages/typesafe-jev"));
 const WebsiteAuditPage = lazy(() => import("@/pages/website-audit"));
+const AdminPilotToolsPage = lazy(() => import("@/pages/admin-pilot-tools"));
 const ExecutiveReportPage = lazy(() => import("@/pages/executive-report"));
 const SmartLeadsPage = lazy(() => import("@/pages/smart-leads"));
 const AdminResearchReportPage = lazy(() => import("@/pages/admin-research-report"));
@@ -81,6 +82,7 @@ const ProcedureEditsPage = lazy(() => import("@/pages/procedure-edits"));
 const ProjectsPage = lazy(() => import("@/pages/projects"));
 const JobsPage = lazy(() => import("@/pages/jobs"));
 const FilesPage = lazy(() => import("@/pages/files"));
+const AlertLogsPage = lazy(() => import("@/pages/alert-logs"));
 const ResearchPage = lazy(() => import("@/pages/research"));
 const CodeProposalsPage = lazy(() => import("@/pages/code-proposals"));
 const TreasuryPage = lazy(() => import("@/pages/treasury"));
@@ -234,6 +236,7 @@ function PageRouter() {
         {isAdmin && <Route path="/admin/tools" component={AdminToolsPage} />}
         {isAdmin && <Route path="/admin/tools/typesafe-jev" component={TypeSafeJevPage} />}
         {isAdmin && <Route path="/admin/website-audit" component={WebsiteAuditPage} />}
+        {isPlatformAdmin && <Route path="/admin/pilot-tools" component={AdminPilotToolsPage} />}
         {isAdmin && <Route path="/admin/executive-report" component={ExecutiveReportPage} />}
         {isAdmin && <Route path="/admin/smart-leads" component={SmartLeadsPage} />}
         {isAdmin && <Route path="/admin/research-report" component={AdminResearchReportPage} />}
@@ -265,6 +268,7 @@ function PageRouter() {
         <Route path="/knowledge" component={KnowledgePage} />
         <Route path="/documents" component={DocumentsPage} />
         <Route path="/files" component={FilesPage} />
+        <Route path="/admin/alert-logs" component={AlertLogsPage} />
         {isAdmin && <Route path="/payments" component={PaymentsPage} />}
         <Route path="/analytics" component={AnalyticsPage} />
         <Route path="/email" component={EmailPage} />

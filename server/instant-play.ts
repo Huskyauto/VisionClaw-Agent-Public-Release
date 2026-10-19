@@ -42,6 +42,22 @@ export interface InstantPlayResult {
   publicPath: string;
 }
 
+/** Publish only the immutable inspected bytes; never reopen a result-authored
+ * path (including aliases or a symlink) after verification. */
+export async function publishVerifiedMediaSnapshot(opts: {
+  bytes: Buffer; fileName: string; sha256: string;
+}): Promise<InstantPlayResult | null> {
+  if (!Buffer.isBuffer(opts.bytes) || !opts.bytes.length || opts.bytes.length > 10 * 1024 * 1024 ||
+      !/^[a-f0-9]{64}$/.test(opts.sha256) ||
+      crypto.createHash("sha256").update(opts.bytes).digest("hex") !== opts.sha256) return null;
+  const ext = path.extname(opts.fileName).toLowerCase();
+  if (!/^\.(mp4|webm|mov|mp3|wav|m4a|ogg)$/.test(ext)) return null;
+  const token = crypto.randomBytes(16).toString("hex");
+  const publicName = `${token}${ext}`, dest = path.join(PUBLIC_VIDEOS_DIR, publicName);
+  await fs.promises.writeFile(dest, opts.bytes, { flag: "wx" });
+  return { token, publicPath: dest, mediaUrl: `${getBaseUrl()}/v/${publicName}`, watchUrl: `${getBaseUrl()}/watch/${publicName}` };
+}
+
 export function publishMediaForInstantPlay(opts: {
   filePath: string;
   fileName?: string;

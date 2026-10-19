@@ -418,6 +418,9 @@ export const TOOL_POLICIES: Record<string, ToolPolicy> = {
   add_customer:                   { name: "add_customer", risk: "sensitive", riskClass: "MEDIUM", requiresStructuredArgs: true },
   advance_sequence:               { name: "advance_sequence", risk: "sensitive", riskClass: "MEDIUM", requiresStructuredArgs: true },
   agent_cost_summary:             { name: "agent_cost_summary", risk: "safe", riskClass: "LOW" },
+  // Private owner reports and bounded public reads; server receipt narrows further
+  // to Felix/Forge interactive owner conversations. No delete/consequential action.
+  business_pilot: { name: "business_pilot", risk: "sensitive", riskClass: "MEDIUM", trustedPersonasOnly: true, requiresStructuredArgs: true },
   agent_security_scan:            { name: "agent_security_scan", risk: "sensitive", riskClass: "MEDIUM", requiresStructuredArgs: true },
   agent_status:                   { name: "agent_status", risk: "safe", riskClass: "LOW" },
   agentic_cache_stats:            { name: "agentic_cache_stats", risk: "safe", riskClass: "LOW" },

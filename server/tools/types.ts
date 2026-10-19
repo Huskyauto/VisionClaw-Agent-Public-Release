@@ -29,6 +29,8 @@ export interface ToolDefinition {
  * stripped upstream; see the plan-step-authz hardening history).
  */
 export interface ToolContext {
+  /** Guarded invoker channel; new capabilities must also require their receipt. */
+  invokedVia?: string;
   tenantId?: number;
   personaId?: number;
   conversationId?: number;

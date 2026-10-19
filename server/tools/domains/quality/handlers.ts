@@ -230,6 +230,7 @@ async function verifyDeliverableHandler(
       deliverableType: type,
       filePath: params.file_path,
       fileUrl: params.file_url,
+      acceptanceCriteria: params.acceptance_criteria,
     });
     return { success: true, ...result };
   } catch (e) {

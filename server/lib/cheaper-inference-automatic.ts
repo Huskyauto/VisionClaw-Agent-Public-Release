@@ -3,6 +3,13 @@ import OpenAI from "openai";
 import { cheaperInferenceReady, CHEAPER_INFERENCE_BASE_URL } from "./cheaper-inference";
 import { currentTenantId } from "./tenant-context";
 
+export function cheaperMinimumDiscount(env: Record<string, string | undefined> = process.env): number {
+  const raw = env.CHEAPER_INFERENCE_MIN_DISCOUNT_PERCENT ?? "40";
+  if (!/^(?:0|[1-9]\d?|100)$/.test(raw))
+    throw new Error("CheaperInference minimum discount must be an integer from 0 to 100");
+  return Number(raw);
+}
+
 export function cheaperAutomaticAllowed(tenantId: number | undefined, env = process.env): boolean {
   return tenantId === 1 && (currentTenantId() === null || currentTenantId() === 1) &&
     env.CHEAPER_INFERENCE_AUTOMATIC_ENABLED === "1" &&
@@ -39,14 +46,18 @@ export function parseCheaperCatalog(body: any): CheaperCatalogEntry[] {
     throw new Error("CheaperInference catalog shape is invalid");
   }
   const ids = new Set<string>();
-  return body.data.map((m: any) => {
+  return body.data.flatMap((m: any): CheaperCatalogEntry[] => {
     if (typeof m?.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,119}$/.test(m.id) ||
-        ids.has(m.id) || !["text", "image", "video"].includes(m.type) ||
+        ids.has(m.id) || !["text", "image", "video", "decision"].includes(m.type) ||
         !(m.type === "text" ? ["/v1/chat/completions", "/v1/responses"] :
-          m.type === "image" ? ["/v1/images/generations"] : ["/v1/videos/generations"]).includes(m.endpoint)) {
+          m.type === "image" ? ["/v1/images/generations"] :
+          m.type === "decision" ? ["/v1/decisions"] : ["/v1/videos/generations"]).includes(m.endpoint)) {
       throw new Error("CheaperInference catalog identity or endpoint is invalid");
     }
     ids.add(m.id);
+    // Recognized discovery-only modality, not a chat/media dispatch capability.
+    // Validate its identity and exact endpoint, but never admit it for inference.
+    if (m.type === "decision") return [];
     const context = m.type !== "text" ? 0 : Number(m.context_length);
     if (m.type === "text" && (!Number.isSafeInteger(context) || context < 1 || context > 10_000_000)) {
       throw new Error("CheaperInference context bound is invalid");
@@ -55,9 +66,9 @@ export function parseCheaperCatalog(body: any): CheaperCatalogEntry[] {
     const input = rate(p?.input_per_million);
     const output = rate(p?.output_per_million);
     // Include long-context, cache-write and all service-tier rates conservatively.
-    // A 40% minimum-discount request cannot cost more than 60% of maker rates.
-    let maximumInput = Math.max(input, rate(p?.list_input_per_million, true) * 0.6);
-    let maximumOutput = Math.max(output, rate(p?.list_output_per_million, true) * 0.6);
+    // Reserve full maker rates, regardless of the operator's discount floor.
+    let maximumInput = Math.max(input, rate(p?.list_input_per_million, true));
+    let maximumOutput = Math.max(output, rate(p?.list_output_per_million, true));
     const scan = (node: any, depth: number): void => {
       if (!node || typeof node !== "object" || depth > 12) return;
       for (const [key, value] of Object.entries(node)) {
@@ -73,10 +84,10 @@ export function parseCheaperCatalog(body: any): CheaperCatalogEntry[] {
       }
     };
     scan(p, 0);
-    return { id: m.id, type: m.type, endpoint: m.endpoint, context, vision: m.capabilities?.vision === true,
+    return [{ id: m.id, type: m.type, endpoint: m.endpoint, context, vision: m.capabilities?.vision === true,
       input, output, maximumInput, maximumOutput,
       imagePrice: p?.media_unit === "image" && p.media_unit_price != null ? rate(p.media_unit_price) : undefined,
-      discount: rate(p?.discount_percent, true) };
+      discount: rate(p?.discount_percent, true) }];
   });
 }
 

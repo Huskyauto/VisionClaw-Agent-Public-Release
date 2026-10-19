@@ -524,6 +524,10 @@ async function main() {
       logErr(`oversight shadow skipped after durable approval creation: ${error?.message || error}`);
     }
 
+    const packagingSummary = typeof result.packagingReview?.summary === "string"
+      ? result.packagingReview.summary.slice(0, 1800)
+      : "Packaging needs editorial review. No transcript-linked candidate review was recorded; this is not approval.";
+    const packagingSummaryHtml = packagingSummary.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
     await sendEmailDirect({
       to: OWNER_EMAIL,
       subject: `Approve this week's Built With Bob recap? — ${ctx.title}`,
@@ -531,6 +535,7 @@ async function main() {
         `<div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto;">` +
         `<h2 style="margin:0 0 8px;">Built With Bob — Weekly Recap ready</h2>` +
         `<p style="color:#555;"><b>${ctx.title}</b><br/>Playlist: ${ctx.playlist}</p>` +
+        `<p style="font-size:13px;color:#555;">${packagingSummaryHtml}</p>` +
         `<p><a href="${ctx.deliveryUrl}" style="color:#2563eb;font-weight:600;">▶ Preview / Download the video</a></p>` +
         // Durable link (2026-08-16): the self-hosted preview link dies when the
         // dev workspace sleeps or the app is republished (signed URL also
@@ -554,6 +559,7 @@ async function main() {
         `</div>`,
       text:
         `Built With Bob weekly recap ready: "${ctx.title}" (playlist ${ctx.playlist}).\n\n` +
+        `${packagingSummary}\n\n` +
         `Preview/Download: ${ctx.deliveryUrl}\n` +
         (result.driveViewUrl && result.driveViewUrl !== ctx.deliveryUrl ? `Google Drive copy (permanent): ${result.driveViewUrl}\n` : "") +
         `\n` +

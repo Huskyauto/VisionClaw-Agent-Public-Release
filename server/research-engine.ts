@@ -15,6 +15,7 @@ import { parseProposalDiff, findExactMatch } from "./lib/proposal-diff";
 import { redactPiiForStorage } from "./storage-helpers/pii-redaction-guard";
 import { assertMemoryValueNotTombstoned } from "./memory/tombstones";
 import { SCORING_SYSTEM_PROMPT } from "./research-scoring-prompt";
+import { RESEARCH_EVIDENCE_INSTRUCTIONS } from "./research-evidence-instructions";
 import {
   persistResearchDiscoveryAdapters,
   type ResearchDiscoveryAdapterSession,
@@ -677,6 +678,7 @@ ${session.personaName ? `\nYou are operating as ${session.personaName}.` : ""}
 ${previousContext ? `\n---BEGIN PREVIOUS RESULTS---${previousContext}\n---END PREVIOUS RESULTS---` : previousContext}
 
 RULES:
+${RESEARCH_EVIDENCE_INSTRUCTIONS}
 - Produce concrete, specific findings. Include code snippets, patterns, configurations, or implementation steps where relevant.
 - Your expert analysis IS valuable research. You do not need external data to produce useful findings.
 - Focus on DEPTH over BREADTH — one well-developed finding is better than a surface-level survey.

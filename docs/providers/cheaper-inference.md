@@ -38,16 +38,23 @@ token estimates are marked by their nature, not claimed as an invoice.
 Accounting remains separate from authorization. The ordinary cost ledger must
 not become a second permission gate.
 
-Automatic text calls request `min_discount_percent:40`. This enforces a
-discount against the model maker's list rates, **not every competing service**.
-Unavailable qualifying supply can return 503; discounts across the catalog
-vary and must not be advertised as a universal 40%.
+Automatic text calls request the operator's validated
+`CHEAPER_INFERENCE_MIN_DISCOUNT_PERCENT` (integer 0–100; default 40).
+Owner-authorized recovery uses **15**, matching the current Luna catalog.
+All three boundaries (selection, request admission and upstream request) use
+the same value. Invalid configuration fails closed; it never relaxes to zero.
+This discount is against maker list rates, **not every competing service**.
+Reservations use full maker/maximum catalog rates regardless of the floor.
+Unavailable qualifying supply can return 503. The shared $20 daily cap and
+owner-only admission remain unchanged; this is not global metered enablement.
 
 ## Catalog and agent usage
 
-Authenticated catalog on 2026-10-11: **97 entries**, comprising 91 text,
-5 image and 1 video. Of these, **90 are Chat Completions compatible** and
-**63 chat models declare vision**. One text model is Responses-only.
+Authenticated catalog on 2026-10-19: **98 entries**, including one decision
+model on `/v1/decisions`. Its identity/endpoint are validated but it is excluded
+from our dispatch catalog, leaving **97 supported entries**. Unknown types,
+duplicate identities, mismatched endpoints and malformed callable billing data
+still fail closed. The authenticated model list is not inference proof.
 The owner model picker adds only chat-compatible entries, with disambiguated
 `cheaperinference/<id>` names and declared vision capabilities. Catalog metadata
 is validated, single-flight fetched, held for 15 minutes in memory, and safely
@@ -93,3 +100,31 @@ vision support means image generation.
 Official references: https://platform.cheaperinference.com/docs and
 https://platform.cheaperinference.com/models/gpt-5.6-luna.
 Publication, Git push, standby activation and release emails remain held.
+
+## Recovery verification
+
+On 2026-10-19 the budgeted client produced a real `ONLINE` completion with
+provider-reported USD0.000006 usage cost. With failing flat lanes operator-stopped,
+authenticated automatic Felix/Forge conversations then invoked the guarded
+business pilot successfully. This is development proof; publication and
+post-publication production verification remain separate.
+
+The exact Openference operator stop (`OPENFERENCE_ENABLED=0`) is temporary
+during the 529 outage; its Secret is retained. Profundo is stopped in development
+as well (it was already stopped in production). Re-enable only after substantive
+inference succeeds, not just model discovery. Unstopped healthy free/flat
+transports still precede this paid lane.
+
+## Post-publication test boundary — 2026-10-19
+
+After the owner republished, the authenticated production picker exposed90
+CheaperInference chat entries, including Luna. A real pinned chat request then
+hit the chat engine's **12-second stream-creation deadline** and switched to
+Replit. This is a failed/unverified paid-stream smoke, not evidence of successful
+Luna serving or an invoice. The60-second SDK deadline cannot prevent an outer
+12-second abort. Production retained a **4-cent reservation** with no settled
+actual charge; no ambiguous paid retry or manual hold release was attempted.
+
+Automatic routing/floor/cap/tenant tests passed locally, but an intentional
+production outage or wallet exhaustion was not induced. Explicit-pin behavior
+and streaming deadline alignment remain open verification/fix requirements.

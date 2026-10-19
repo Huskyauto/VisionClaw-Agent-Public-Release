@@ -904,6 +904,11 @@ export class WebhookHandlers {
                 customerEmail,
                 orderId: session.id,
                 tenantId: PLATFORM_OWNER_TENANT_ID,
+                deliveryContext: {
+                  sessionId: session.id, sku: bundleSku, productName: productName || bundleSku,
+                  customerName: customerName || customerEmail || 'Customer', customerEmail: customerEmail || '',
+                  paymentKey, missionId: fulfillmentMissionId ?? undefined,
+                },
               }));
             } else {
               const { fulfillResearchReport } = await import('./research-report-fulfillment');

@@ -238,12 +238,13 @@ export async function listUploadsHandler(params: Record<string, any>, ctx: ToolC
     // tenant. Fail CLOSED — a missing/non-numeric tenant context skips the DB
     // query entirely rather than leaking every tenant's filenames/metadata.
     if (typeof ctx.tenantId === "number") {
+      const { tenantFileAccessFilter } = await import("../../../lib/private-business-pilot-files");
       const all = await db.select({
         filename: fileStorage.filename,
         originalName: fileStorage.originalName,
         mimeType: fileStorage.mimeType,
         size: fileStorage.size,
-      }).from(fileStorage).where(eq(fileStorage.tenantId, ctx.tenantId));
+      }).from(fileStorage).where(tenantFileAccessFilter(ctx.tenantId));
       dbFiles.push(...all.map(f => ({ ...f, source: "uploads" as const })));
     }
   } catch (_silentErr) { logSilentCatch("server/tools/domains/files/handlers.ts", _silentErr); }
@@ -337,6 +338,9 @@ export async function readFileHandler(
   }
   // Block bare dotfiles at workspace root that aren't explicitly safe.
   const basenameLower = path.basename(safeLower);
+  const { tenantFileAccessFilter, isPrivateOwnerApplicationFile } = await import("../../../lib/private-business-pilot-files");
+  if (isPrivateOwnerApplicationFile(basenameLower))
+    return { error: "Private owner application files are available only through their dedicated owner workbench." };
   const SAFE_DOTFILES = new Set([".cursorrules", ".gitignore", ".prettierrc", ".eslintrc"]);
   if (basenameLower.startsWith(".") && !SAFE_DOTFILES.has(basenameLower) && !safeLower.includes("/")) {
     return { error: `Access denied: '${basenameLower}' is a top-level dotfile not on the safe-read list.` };
@@ -374,7 +378,7 @@ export async function readFileHandler(
           mimeType: fileStorage.mimeType,
         })
           .from(fileStorage)
-          .where(and(or(eq(fileStorage.filename, basename), eq(fileStorage.originalName, basename)), ctx.tenantId ? eq(fileStorage.tenantId, ctx.tenantId) : eq(fileStorage.tenantId, -1)))
+          .where(and(or(eq(fileStorage.filename, basename), eq(fileStorage.originalName, basename)), tenantFileAccessFilter(ctx.tenantId ?? -1)))
           .orderBy(desc(fileStorage.createdAt))
           .limit(1);
         if (dbRow.length > 0) {
@@ -864,10 +868,21 @@ export async function writeFileHandler(
       probe = path.dirname(probe);
     }
   } catch (_silentErr) { logSilentCatch("server/tools/domains/files/handlers.ts", _silentErr); }
+  const { verifyWrittenRegion } = await import("../../../lib/file-write-readback");
+  let writtenOffset = 0;
   if (params.append && fs.existsSync(absPath)) {
+    // Read-back offset is captured BEFORE mutation; UTF-8 chars != byte count.
+    writtenOffset = fs.statSync(absPath).size;
     fs.appendFileSync(absPath, content, "utf-8");
   } else {
     fs.writeFileSync(absPath, content, "utf-8");
+  }
+  let writeVerification: ReturnType<typeof verifyWrittenRegion>;
+  try { writeVerification = verifyWrittenRegion(absPath, content, writtenOffset); }
+  catch {
+    return { success: false, completionUncertain: true, localWriteAttempted: true,
+      _writeVerification: { version: 1, status: "failed", scope: "written_region" },
+      message: "Local write read-back failed. No Drive upload attempted. Inspect the existing file before retrying, especially append." };
   }
   const stat = fs.statSync(absPath);
   console.log(`[write_file] Written: ${safeParts} (${stat.size} bytes)`);
@@ -1013,6 +1028,7 @@ export async function writeFileHandler(
     success: true,
     path: safeParts,
     size: stat.size,
+    _writeVerification: writeVerification,
     upload_success: !!driveUrl,
     upload_error: !driveUrl
       ? (secretScanBlockReason || "Google Drive upload failed or unavailable — file saved locally only")

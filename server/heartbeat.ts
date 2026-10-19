@@ -1672,8 +1672,8 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
     const ebStart = Date.now();
     try {
       const { generateEmbedding } = await import("./embeddings");
-      const memMissing = await storage.getMemoriesWithoutEmbeddings(50);
-      const knMissing = await storage.getKnowledgeWithoutEmbeddings(50);
+      const memMissing = await storage.getMemoriesWithoutEmbeddings(50, task.tenantId);
+      const knMissing = await storage.getKnowledgeWithoutEmbeddings(50, task.tenantId);
       let memDone = 0, memSkipped = 0, knDone = 0, knSkipped = 0;
       for (const m of memMissing) {
         const text = `${(m as any).title || ""}\n${(m as any).content || ""}`.trim();

@@ -30,6 +30,8 @@ export interface FulfillmentResult {
   error?: string;
   pages?: number;
   modelUsed?: string;
+  /** Verified Drive view link to the complete spoken business report. */
+  audio?: { viewUrl: string; tracks?: Array<{ heading: string; viewUrl: string }> };
   /** Sections actually written to the PDF — exposed so the review-queue QA can inspect them. */
   sections?: { heading: string; body: string }[];
   pending?: boolean;

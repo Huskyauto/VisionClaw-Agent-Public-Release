@@ -10,6 +10,10 @@ test("real content passes", () => {
   assert.equal(isFailedSectionBody("Herchenbach Mechanical is well positioned..."), false);
 });
 
+test("gateway fragments from a report run are failures, not report sections", () => {
+  for (const body of ["-", "---", "Ver", "...", " • "]) assert.equal(isFailedSectionBody(body), true);
+});
+
 test("error placeholder is a failed section", () => {
   assert.equal(isFailedSectionBody("(This section could not be generated automatically. Error: 400 Unsupported parameter: 'max_tokens'...)"), true);
 });

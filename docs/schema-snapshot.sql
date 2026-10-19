@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FAhiNriCjNrTZMZ7gycYPY2nnThRwkjzQ3e74HV3QugZ7zMqQMQWafHIe3l4TzY
+\restrict SMt25PGlH8ziMdFb2nbAud0S2aLG9lT4DJTZzH4Bwn54I2lZJj0xHOa4TWbc6u0
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -7263,6 +7263,22 @@ CREATE SEQUENCE public.outreach_sequences_id_seq
 --
 
 ALTER SEQUENCE public.outreach_sequences_id_seq OWNED BY public.outreach_sequences.id;
+
+
+--
+-- Name: owner_alert_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.owner_alert_logs (
+    id text NOT NULL,
+    tenant_id integer NOT NULL,
+    subject text NOT NULL,
+    source text NOT NULL,
+    severity text NOT NULL,
+    size_bytes integer NOT NULL,
+    record jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
 
 
 --
@@ -15289,6 +15305,14 @@ ALTER TABLE ONLY public.outreach_sequences
 
 
 --
+-- Name: owner_alert_logs owner_alert_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.owner_alert_logs
+    ADD CONSTRAINT owner_alert_logs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: parallel_job_findings parallel_job_findings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -19018,6 +19042,13 @@ CREATE INDEX idx_outreach_steps_seq ON public.outreach_sequence_steps USING btre
 
 
 --
+-- Name: idx_owner_alert_logs_tenant_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_owner_alert_logs_tenant_created ON public.owner_alert_logs USING btree (tenant_id, created_at);
+
+
+--
 -- Name: idx_pa_tenant; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -21753,6 +21784,14 @@ ALTER TABLE ONLY public.mvp_briefs
 
 
 --
+-- Name: owner_alert_logs owner_alert_logs_tenant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.owner_alert_logs
+    ADD CONSTRAINT owner_alert_logs_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+--
 -- Name: plans plans_ceo_decided_by_persona_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -22538,5 +22577,5 @@ ALTER TABLE public.skill_optimization_versions ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FAhiNriCjNrTZMZ7gycYPY2nnThRwkjzQ3e74HV3QugZ7zMqQMQWafHIe3l4TzY
+\unrestrict SMt25PGlH8ziMdFb2nbAud0S2aLG9lT4DJTZzH4Bwn54I2lZJj0xHOa4TWbc6u0
 

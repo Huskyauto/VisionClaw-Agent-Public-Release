@@ -195,6 +195,7 @@ import {
   revenueVsCostDefinition,
   agentCostSummaryDefinition,
 } from "./tools/domains/cost-ledger";
+import { businessPilotDefinition } from "./tools/domains/business-pilots";
 import { copilotChatDefinition } from "./tools/domains/copilot";
 import {
   learnFromReferenceDefinition,
@@ -562,6 +563,7 @@ import {
 import {
   treasuryDomainDefinitions,
 } from "./tools/domains/treasury";
+import { treasuryPaperSimulationDefinition } from "./tools/domains/treasury-paper/definitions";
 // Tools-layer-split S25n: agent-eval domain — the 2 persona-benchmark defs
 // move (spliced as const refs at original positions) and both handlers
 // migrate. Backed by ./agent-eval; see domains/agent-eval/handlers.ts header.
@@ -626,6 +628,9 @@ import { recordToolPerformance } from "./tools/middleware/performance-ledger";
 import { recordStepLedger } from "./tools/middleware/step-ledger-record";
 import { withActionLedger } from "./tools/middleware/action-ledger";
 import { attachProductVerification } from "./tools/middleware/product-verification";
+import { postflightToolOutput } from "./tools/middleware/output-verification";
+import { getVerifiedToolSnapshot, inspectProducedArtifact } from "./lib/tool-artifact-postflight";
+import { createToolOutputAuthority, withToolOutputAuthority } from "./lib/tool-output-authority";
 import { attachInstantPlayUrls } from "./tools/middleware/instant-play";
 // S24: isInstantPlayPathSafe moved to the instant-play middleware; re-export it
 // so scripts/test-instant-play-gates.ts (import("../server/tools")) still resolves.
@@ -977,6 +982,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   // (dispatcher-routed). Defs spliced here as const refs so the facade
   // TOOL_DEFINITIONS surface stays byte-identical.
   ...treasuryDomainDefinitions,
+  treasuryPaperSimulationDefinition,
   {
     type: "function",
     function: {
@@ -2317,6 +2323,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   revenueVsCostDefinition,
   copilotChatDefinition,
   agentCostSummaryDefinition,
+  businessPilotDefinition,
   // Tools-layer-split S20: agentic domain — self_heal trio migrated to
   // server/tools/domains/agentic/ (definitions verbatim, original positions).
   selfHealDefinition,
@@ -3398,6 +3405,7 @@ export async function executeTool(name: string, params: Record<string, any>): Pr
   }
 
   const _ledgerStart = Date.now();
+  const outputAuthority = createToolOutputAuthority();
   let _execError: unknown = null;
   let result: unknown;
   try {
@@ -3408,12 +3416,20 @@ export async function executeTool(name: string, params: Record<string, any>): Pr
     // Action Ledger S2 (contract: data/feature-contracts/action-ledger/):
     // ledger-mandatory (destructive-risk) tools get a durable prepared→settled
     // attempt row around dispatch; all other tools pass through unchanged.
-    result = await runWithToolSpan(name, params, () =>
+    result = await withToolOutputAuthority(outputAuthority, () => runWithToolSpan(name, params, () =>
       withActionLedger(name, params, () => _executeToolInner(name, params)),
-    );
+    ));
     // Surface the actionId on success so the agent/UI can offer "Undo".
     if (_tnrActionId && result && typeof result === "object" && !("error" in result)) {
-      Object.assign(result, { __tnr: { actionId: _tnrActionId, expiresAt: _tnrExpiresAt?.toISOString() } });
+      try {
+        if (!Array.isArray(result) && Object.getPrototypeOf(result) === Object.prototype) {
+          const descriptors = Object.getOwnPropertyDescriptors(result);
+          delete descriptors.__tnr;
+          const copy = Object.defineProperties({}, descriptors);
+          Object.defineProperty(copy, "__tnr", { enumerable: true, value: { actionId: _tnrActionId, expiresAt: _tnrExpiresAt?.toISOString() } });
+          result = copy;
+        }
+      } catch { console.warn("[TNR] result annotation unavailable; action is not retried"); }
     }
   } catch (err) {
     _execError = err;
@@ -3433,8 +3449,13 @@ export async function executeTool(name: string, params: Record<string, any>): Pr
   // surfaces them to the end user verbatim — no reliance on async/email-only
   // delivery, no risk of an agent quoting the slow Drive URL instead.
   let finalResult = PRODUCT_OUTPUT_TOOLS.has(name) ? attachProductVerification(name, result) : result;
-  if (shouldPublishLocalProductOutput(params)) {
-    finalResult = await attachInstantPlayUrls(name, finalResult, params);
+  const postflight = await postflightToolOutput(name, finalResult, {
+    productOutput: PRODUCT_OUTPUT_TOOLS.has(name),
+    inspectArtifact: PRODUCT_OUTPUT_TOOLS.has(name) ? () => inspectProducedArtifact(finalResult, params._tenantId, outputAuthority) : undefined,
+  });
+  finalResult = postflight.result;
+  if (shouldPublishLocalProductOutput(params) && postflight.report.status === "checked") {
+    finalResult = await attachInstantPlayUrls(name, finalResult, params, getVerifiedToolSnapshot(outputAuthority));
   }
   // S24: R68 step-ledger auto-record extracted to
   // server/tools/middleware/step-ledger-record.ts — MECHANICAL,
@@ -9634,7 +9655,9 @@ export async function executeToolWithTimeout(name: string, params: Record<string
     ]);
     // R74.13z-quint+9 — auto-deliver-by-email guarantee for product output tools.
     // Fire-and-forget; never blocks the tool return.
-    void maybeAutoDeliverByEmail(name, params, result);
+    // A local artifact check is NOT an authoritative customer delivery receipt.
+    // The canonical delivery pipeline owns verified ready emails; this legacy
+    // URL-only shortcut must not send a second, unverified notification.
     return result;
   } catch (err) {
     executionError = err;
@@ -9686,7 +9709,7 @@ export async function executeToolWithTimeout(name: string, params: Record<string
                   }),
                 ]);
                 executionError = null;
-                void maybeAutoDeliverByEmail(name, params, retryResult);
+                // Same delivery-proof boundary as the normal return lane.
                 return retryResult;
               } finally {
                 clearTimeout(retryTimer);

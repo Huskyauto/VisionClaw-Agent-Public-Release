@@ -37,8 +37,8 @@ test("S24: executeTool imports+delegates and re-exports isInstantPlayPathSafe", 
     "executeTool must import attachInstantPlayUrls",
   );
   assert.ok(
-    toolsSrc.includes("attachInstantPlayUrls(name, finalResult, params)"),
-    "executeTool must call attachInstantPlayUrls",
+    toolsSrc.includes("attachInstantPlayUrls(name, finalResult, params, getVerifiedToolSnapshot(outputAuthority))"),
+    "executeTool must call attachInstantPlayUrls with its verified snapshot",
   );
   assert.ok(
     toolsSrc.includes('export { isInstantPlayPathSafe } from "./tools/middleware/instant-play"'),

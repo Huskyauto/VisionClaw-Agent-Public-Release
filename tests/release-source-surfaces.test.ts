@@ -11,9 +11,9 @@ const updates = JSON.parse(read("client/src/data/updates.json"));
 const release = /CURRENT_SOURCE_RELEASE = "([^"]+)"/.exec(notice)?.[1];
 
 test("current release agrees across shared summary, dashboard data and both READMEs", () => {
-  assert.equal(release, "R136.2");
+  assert.equal(release, "R137+sec");
   assert.equal(updates[0].version, release);
-  assert.equal(updates[0].date, "October 14, 2026");
+  assert.equal(updates[0].date, "October 19, 2026");
   const readmes = isPrivateSource ? ["README.md", "README.md"] : ["README.md"];
   for (const file of [...readmes, "ROADMAP.md"]) {
     assert.ok(read(file).slice(0, 18000).includes(release!));
@@ -28,6 +28,19 @@ test("both landing menus target the rendered recent-update section", () => {
   assert.match(landing, /<RecentPlatformUpdates\s*\/>/);
   assert.match(landing, /<RecentPlatformUpdates technical\s*\/>/);
   assert.match(read("client/src/components/recent-platform-updates.tsx"), /id="section-recent-updates"/);
+});
+
+test("last-72-hour features reach both landing views and the shared dashboard release feed", () => {
+  const current = read("client/src/components/recent-platform-updates.tsx");
+  for (const term of ["Business health", "Release readiness", "Governance", "Cost/routing",
+    "Website readiness", "Company report", "Alert logs", "Outcome-first", "Video packaging"]) {
+    assert.ok(current.includes(term), `missing current feature: ${term}`);
+  }
+  assert.match(current, /October 19/);
+  assert.match(current, /owner-only/i);
+  assert.match(JSON.stringify(updates[0]), /production/i);
+  assert.match(JSON.stringify(updates[0]), /not certification/i);
+  assert.match(read("client/src/pages/home.tsx"), /HOME_RELEASES\.slice/);
 });
 
 test("navigation retains owner gating and existing routes instead of phantom tools", () => {

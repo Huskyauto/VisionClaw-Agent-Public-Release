@@ -101,12 +101,16 @@ export function isInstantPlayPathSafe(absOrRel: string): boolean {
   return false;
 }
 
-export async function attachInstantPlayUrls(toolName: string, result: any, params?: Record<string, any>): Promise<any> {
+export async function attachInstantPlayUrls(toolName: string, result: any, params?: Record<string, any>,
+  snapshot?: { bytes: Buffer; fileName: string; sha256: string }): Promise<any> {
   try {
     if (!result || typeof result !== "object" || Array.isArray(result)) return result;
     if (result.error) return result;
-    // Already populated by the tool itself (e.g. produce_video) — preserve.
-    if (result.watch_url) return result;
+    // Result paths/URLs are not authority, even when an unrelated local file
+    // passed inspection. The primary dispatcher supplies the exact snapshot.
+    if (!snapshot) return result;
+    result = { ...result };
+    // Do not preserve a producer-authored URL as evidence of this snapshot.
     const filePath: string | undefined =
       result.file_path || result.filePath || result.local_path || result.localPath || result.output_path || result.outputPath;
     if (!filePath || typeof filePath !== "string") return result;
@@ -125,11 +129,10 @@ export async function attachInstantPlayUrls(toolName: string, result: any, param
       return result;
     }
 
-    // R74.13z-quint+10c (architect-fix): use the async sibling so we don't
-    // block the Node event loop while a 50-500MB video is copied byte-for-byte.
-    // Existence check is folded into publishMediaForInstantPlayAsync via fs.promises.stat.
-    const { publishMediaForInstantPlayAsync } = await import("../../instant-play");
-    const ip = await publishMediaForInstantPlayAsync({ filePath });
+    // Publish only the bounded verified snapshot. No result-authored path is
+    // reopened here, so conflicting aliases and replaced symlinks cannot win.
+    const { publishVerifiedMediaSnapshot } = await import("../../instant-play");
+    const ip = await publishVerifiedMediaSnapshot(snapshot);
     if (!ip) return result;
 
     result.watch_url = ip.watchUrl;

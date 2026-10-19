@@ -107,7 +107,8 @@ const INTERNAL_DEPS = new Set<string>([
   // no network destination or independently processing third party.
   "proxy-addr", "@xmldom/xmldom", "brace-expansion", "source-map-js",
   "undici", "hono", "ip-address", "qs",
-  "sharp", "tsx", "ws", "zod", "zod-validation-error",
+  // In-process schema conversion only; it sends no data to a processor.
+  "sharp", "tsx", "ws", "zod", "zod-validation-error", "zod-to-json-schema",
 ]);
 
 function isTypesPackage(dep: string): boolean {

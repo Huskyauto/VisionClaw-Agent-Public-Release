@@ -32,6 +32,16 @@ export class StreamCreateTimeoutError extends Error {
   }
 }
 
+/**
+ * Paid dispatch can have uncertain completion after any abort. Give its
+ * 60-second SDK deadline time to settle, but never retry/route around it.
+ * Free transports retain the existing bounded recovery behavior.
+ */
+export function paidStreamRecoveryPolicy(modelId: string, defaultTimeoutMs: number) {
+  const paid = modelId.startsWith("cheaperinference/");
+  return { creationTimeoutMs: paid ? 65_000 : defaultTimeoutMs, allowRecovery: !paid };
+}
+
 export async function createCompletionWithTimeout<T>(
   createFn: (signal: AbortSignal) => Promise<T>,
   sharedSignal: AbortSignal,

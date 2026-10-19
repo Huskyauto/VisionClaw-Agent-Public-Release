@@ -42,7 +42,7 @@ const PREFIX_RE = new RegExp(
 
 const SECRET_ENV_NAMES = `(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH)`;
 const ENV_ASSIGN_RE = new RegExp(
-  `([A-Z_]*${SECRET_ENV_NAMES}[A-Z_]*)\\s*=\\s*(['"]?)(\\S+)\\2`,
+  `(?<![A-Z0-9_])([A-Z_]*${SECRET_ENV_NAMES}[A-Z_]*)\\s*=\\s*(['"]?)(\\S+)\\2`,
   "gi",
 );
 
@@ -65,9 +65,9 @@ function maskToken(token: string): string {
   return `${token.slice(0, 6)}...${token.slice(-4)}`;
 }
 
-export function redactSensitiveText(text: string): string {
+export function redactSensitiveText(text: string, options: { force?: boolean } = {}): string {
   if (!text) return text;
-  if (process.env.VISIONCLAW_REDACT_SECRETS &&
+  if (!options.force && process.env.VISIONCLAW_REDACT_SECRETS &&
       ["0", "false", "no", "off"].includes(process.env.VISIONCLAW_REDACT_SECRETS.toLowerCase())) {
     return text;
   }

@@ -47,9 +47,9 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **The app runs with just one LLM key and a Postgres database.** Everything else — email, payments, voice, Drive — is optional and appears automatically when you add the key.
 
-**Latest source update — R136.2 (October 14, 2026): Current features, navigation, reliability and repository documentation.** Treasury stock/crypto paper replays, optional AgentID sign-in, Robert personal support, model-route evidence, opt-in capped owner paid fallback, correction-aware conversation recovery, tenant/file hardening and portable builds. Forks need their own credentials, entitlements and feature configuration; source availability is not website publication or universal verification.
+**Latest source update — R137+sec (October 19, 2026): Business pilots, company report packages and evidence-first operations.** Owner-only health/re-scan, release, governance and cost/routing pilots; read-only website readiness; sourced company reports with required audio; private alert logs; receipt-backed delivery checks, outcome-first briefings and video packaging. Private report packages are excluded from generic tenant file access. [Feature/access matrix](docs/platform-update-2026-10-19.md). Forks need their own credentials, entitlements and configuration. Focused live pilot verification is not universal certification; GitHub synchronization is not website publication.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **427 total registered tools · 386 public documented tools · 68 total skills · 144 active capabilities · 18 personas · 194 declared / 275 live development tables · 41 governance rules · 885 platform indexes · 86 curated AI models · 6 AI providers · 6 deployment targets.** These are an October 8 **development evidence snapshot**, not live production telemetry. Documentation was reconciled October 14 without relabeling historical measurements as fresh telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **428 total registered tools · 386 public documented tools · 68 total skills · 146 active capabilities · 18 personas · 195 declared / 276 live development tables · 41 governance rules · 887 platform indexes · 86 curated AI models · 6 AI providers · 6 deployment targets.** These are an October 19 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 ### October 9–14 source updates
 
@@ -148,7 +148,7 @@ flowchart TB
     P1 --> TOOLS
     P2 --> TOOLS
 
-    subgraph TOOLS["Tool layer — 427 total registered tools"]
+    subgraph TOOLS["Tool layer — 428 total registered tools"]
         direction TB
         T1["File I/O · web · email · LLM · payments · drive"]
         T2["TNR snapshots — irreversible calls are undoable"]
@@ -182,7 +182,7 @@ flowchart TB
     Engineer)        Writer)          Research)              runtime adapter)
         │                │                │                       │
         └──────┬─────────┴────────────────┴───────────────────────┘
-               │  tool dispatch (427 total registered tools)
+               │  tool dispatch (428 total registered tools)
                ▼
    ┌──────────────────────────────────────────────────────────────┐
    │  Tool layer: file I/O · web · email · LLM · payments · drive │
@@ -304,14 +304,14 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 
 ---
 
-## Platform at a Glance — October 8 Development Evidence
+## Platform at a Glance — October 19 Development Evidence
 
-> This is the dated development snapshot, not live production telemetry. Counts agree with [docs/release-facts.json](docs/release-facts.json) and [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md); documentation was reconciled October 14.
+> This is the dated development snapshot, not live production telemetry. Counts agree with [docs/release-facts.json](docs/release-facts.json) and [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md); documentation was reconciled October 19.
 
 | Metric | Count |
 |--------|-------|
 | AI Agents (Personas) | 18 |
-| Tools (total registered) | 427 |
+| Tools (total registered) | 428 |
 | Tools (public documented) | 386 |
 | AI Models in Core Registry | 86 curated |
 | Daily Catalog Discovery | 1000+ models scanned on OpenRouter |
@@ -322,8 +322,8 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | Skills | 68 total (63 DB-seeded skills + 5 platform agent skills) |
 | Frontend Pages | 40+ |
 | API Endpoints | 300+ |
-| Database Tables | 194 declared / 275 live development |
-| Platform Indexes | 885 (616 non-PK) |
+| Database Tables | 195 declared / 276 live development |
+| Platform Indexes | 887 (617 non-PK) |
 
 ---
 
@@ -347,7 +347,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
                    │             │              │
                    ▼             ▼              ▼
             ┌─────────────────────────────────────────┐
-            │     427 Total Registered Tools          │
+            │     428 Total Registered Tools          │
             │  Search · Write · Build · Analyze ·     │
             │  Email · Pay · Generate · Research       │
             └──────────────────┬──────────────────────┘
@@ -357,11 +357,11 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
         ┌────────────┐   ┌────────────┐   ┌────────────┐
         │ PostgreSQL │   │ Google     │   │ 6 AI       │
         │ + pgvector │   │ Drive      │   │ providers  │
-        │ D194/L275  │   │ storage    │   │ 86 curated │
+        │ D195/L276  │   │ storage    │   │ 86 curated │
         └────────────┘   └────────────┘   └────────────┘
 ```
 
-Database diagram: D = declared tables; L = live development tables. Counts use the October 8 evidence snapshot, not live production telemetry.
+Database diagram: D = declared tables; L = live development tables. Counts use the October 19 evidence snapshot, not live production telemetry.
 
 **Example flow:** You say "Research competitor pricing and build me a comparison spreadsheet."
 1. The **Chat Engine** routes to **Felix** (CEO) who sees this needs research + document production
@@ -542,7 +542,7 @@ client/                       # React frontend
 server/                       # Express backend
   chat-engine.ts              # Core AI conversation engine with streaming
   tools.ts                    # Legacy tool facade + dispatcher (strangler-fig split in progress)
-  tools/                      # 427 total registered tools — per-domain modules (70+ domains) + shared middleware
+  tools/                      # 428 total registered tools — per-domain modules (70+ domains) + shared middleware
     domains/                  # crm, finance, media, legal, knowledge, delivery, governance, ...
     middleware/               # Extracted dispatch middleware (policy, telemetry, tenant seam)
   routes.ts                   # 300+ API endpoints
