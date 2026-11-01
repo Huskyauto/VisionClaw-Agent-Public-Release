@@ -102,7 +102,9 @@ const PRICING_PER_M_TOKENS: Array<[string, { in: number; out: number }]> = [
   ["xiaomi/mimo-v2-flash", { in: 0.09, out: 0.27 }],
   ["xiaomi/mimo-v2-omni", { in: 0.4, out: 1.2 }],
   // kimi-k3 must sit ABOVE the generic "moonshotai/kimi" prefix (first-match-wins)
+  ["moonshotai/kimi-k3.1-pro", { in: 2, out: 10 }],
   ["moonshotai/kimi-k3", { in: 3.0, out: 15.0 }],
+  ["mistralai/mistral-large-4-0", { in: 1.36, out: 4.18 }],
   // kimi-k2.6 also sits above the generic prefix.
   ["moonshotai/kimi-k2.6", { in: 0.95, out: 4 }],
   ["moonshotai/kimi", { in: 0.5, out: 1.5 }],

@@ -116,7 +116,8 @@ test("capped report jury does not add an unreserved TypeSafe model call", async 
   }
 });
 
-test("durable reservations serialize overlapping workers, enforce lease and survive a reconstructed caller", async () => {
+test("durable reservations serialize overlapping workers, enforce lease and survive a reconstructed caller", async t => {
+  t.mock.method(Date, "now", () => Date.parse("2026-10-16T12:00:00Z"));
   const input: any = { tenantId: 1, kind: "executive", operatorJobId: "operator",
     paidJuryBatch: ALDON_JURY_BATCH, intake: { focus: "full", company: "Aldon Company", website: "https://www.aldonco.com/" } };
   let record: any, tail = Promise.resolve(), live = true, lockSeen = false;
@@ -169,7 +170,7 @@ test("real paid grant wrapper matches the durable reservation and bounded output
       const result = await executeBoundedReportSeat({ modelId, providerLane }, "Review a retained snapshot", 1,
         async usd => { reserved = usd; }, { dispatch: async (spec, _prompt, tenant, paid) => {
           assert.ok(reserved > 0 && reserved <= 2);
-          assert.equal(spec.maxTokens, 4096); assert.equal(spec.noRetry, true);
+          assert.equal(spec.maxTokens, providerLane === "anthropic-api" ? 16384 : 4096); assert.equal(spec.noRetry, true);
           assert.equal(tenant, 1); assert.equal(paid, true);
           spec.beforeDispatch!(); calls++;
           return { modelId, provider: providerLane, ok: true, answer: "VERDICT: REJECT", latencyMs: 1 };
@@ -182,7 +183,8 @@ test("real paid grant wrapper matches the durable reservation and bounded output
   }
 });
 
-test("paid report runner collects each seat's evidence, reserves before dispatch and makes no synthesis call", async () => {
+test("paid report runner collects each seat's evidence, reserves before dispatch and makes no synthesis call", async t => {
+  t.mock.method(Date, "now", () => Date.parse("2026-10-16T12:00:00Z"));
   let state: any = {}, reads = 0, calls = 0, audits = 0;
   const input: any = { tenantId: 1, kind: "executive", operatorJobId: "operator",
     paidJuryBatch: ALDON_JURY_BATCH, intake: { focus: "full", company: "Aldon Company", website: "https://www.aldonco.com/" } };
@@ -228,7 +230,8 @@ test("paid review is limited to the approved owner, company, domain and expirati
   assert.throws(() => assertReportJuryApproval(input, Date.parse("2026-10-18")), /expired/);
 });
 
-test("retained seat failures do not contain private SQL or provider exception payloads", async () => {
+test("retained seat failures do not contain private SQL or provider exception payloads", async t => {
+  t.mock.method(Date, "now", () => Date.parse("2026-10-16T12:00:00Z"));
   const input: any = { tenantId: 1, kind: "executive", operatorJobId: "operator",
     paidJuryBatch: ALDON_JURY_BATCH, intake: {
       focus: "full", company: "Aldon Company", website: "https://www.aldonco.com/",

@@ -838,7 +838,7 @@ function renderSection(sec: PdfSection): string {
 
   if (sec.subsections) {
     for (const sub of sec.subsections) {
-      html += `<div class="sub-title">${escHtml(sub.title)}</div>`;
+      if (sub.title) html += `<div class="sub-title">${escHtml(sub.title)}</div>`;
       html += renderSection(sub);
     }
   }

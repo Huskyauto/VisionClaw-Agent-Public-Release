@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { initialBusinessReportReview, buildMuseReportRequest, validateMuseReportReply,
   advanceBusinessReportReview, type BusinessReportReviewInput, type BusinessReportReviewState,
-  type ReportReviewDependencies, reportJuryFailureSummary } from "../../server/lib/business-report-review";
+  type ReportReviewDependencies, reportJuryFailureSummary, finalizedReportSections } from "../../server/lib/business-report-review";
 import { hashReportBytes } from "../../server/lib/business-report-evidence";
 import { sanitizeAgentOutput } from "../../server/safety-layer";
 import type { AgentJob } from "../../server/job-queue";
+import { aggregateReviewPackets } from "../../server/lib/company-package-completion";
+import { packageContentDigest } from "../../server/lib/company-report-final-review";
 
 const input: BusinessReportReviewInput = {
   compilerMode: "muse-legacy",
@@ -39,6 +41,16 @@ const compiled = { sections: [{ heading: "Summary", blocks: [
   { type: "recommendation", text: "Pilot a lead follow-up workflow and measure booked appointments and gross margin before expanding the program.", sourceIds: ["S1"] },
 ] }], unknowns: ["Actual booking conversion is unknown."] };
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+test("overall review and rendering share complete sources, unknowns and final report text", () => {
+  const state: BusinessReportReviewState = { ...initialBusinessReportReview(input), phase: "finalizing",
+    reply: compiled, approvedSections: [{ heading: "Summary", body: "Retained reviewed prose" }],
+    juryHistory: [{ verdict: "REJECT", rationale: "No material defects" }] };
+  const sections = finalizedReportSections(input, state);
+  assert.ok(sections.some(s => s.heading === "Sources & Evidence Documentation" && s.body.includes(input.evidence.sources[0].text)));
+  assert.ok(sections.some(s => s.heading === "Limits, Assumptions & Validation Needed" && s.body.includes(compiled.unknowns[0])));
+  assert.ok(sections[0].body.includes("Pilot a lead follow-up workflow"));
+});
 
 test("native compilation requests section overviews and detailed analysis without short-brief limits", () => {
   const full = { ...input, compilerMode: "gemini-direct-v1" as const, qualityContractVersion: 1 as const,
@@ -195,6 +207,51 @@ function harness(verdicts: string[] = ["FIX", "REJECT"]) {
     get job() { return job; }, set job(next) { job = next; },
     stats: () => ({ juryCalls, finalized, signals, receipts: receipts.length }) };
 }
+
+test("real finalization workers rendezvous before rendering, bind full text and reuse completed artifacts after restart", async () => {
+  const kinds = ["readiness", "executive", "opportunities"];
+  const workers = kinds.map((kind, index) => {
+    const h = harness();
+    h.job.id = 70 + index;
+    h.job.payload.input = { ...clone(input), orderId: `company-package:50:${kind}`,
+      paidJuryBatch: "company-package:50", reportOnly: true };
+    h.job.payload.state = { ...h.job.payload.state, phase: "finalizing", reply: compiled,
+      approvedSections: [{ heading: "Summary", body: "Reviewed" }],
+      juryHistory: [{ verdict: "REJECT", rationale: "Approved" }] };
+    return h;
+  });
+  const parent: any = { completionAdmission: { version: 1 }, state: {
+    phase: "reviewing", research: { evidence: clone(input.evidence), coverage: {} },
+    reports: Object.fromEntries(kinds.map((k, index) => [k, { jobId: workers[index].job.id, status: "pending" }])) } };
+  const dialect = new PgDialect();
+  for (const worker of workers) {
+    const original = worker.deps.db!.execute;
+    worker.deps.db!.execute = async query => {
+      const q = dialect.sqlToQuery(query);
+      if (q.sql.includes("SELECT payload FROM agent_jobs")) {
+        if (q.sql.includes("kind='company_report_package'")) return { rows: [{ payload: parent }] };
+        const selected = workers.find(w => q.params.includes(w.job.id));
+        if (selected) return { rows: [{ payload: clone(selected.job.payload) }] };
+      }
+      return original(query);
+    };
+  }
+  for (const worker of workers) await worker.advance();
+  assert.deepEqual(workers.map(w => w.stats().finalized), [0, 0, 0]);
+  const reports = workers.map((w, i) => ({ kind: kinds[i], model: w.job.payload.input.modelId,
+    sections: finalizedReportSections(w.job.payload.input, w.job.payload.state) }));
+  const packetDigests = aggregateReviewPackets(reports, parent.state.research.evidence, {}).map(p => hashReportBytes(p.packet));
+  const digest = packageContentDigest(reports);
+  parent.packageContentReview = { approved: true, digest,
+    manifestDigest: hashReportBytes(JSON.stringify({ digest, packetDigests })),
+    packets: Object.fromEntries(packetDigests.map(d => [d, { approved: true, report: { approved: true, issues: [] } }])) };
+  for (const worker of workers) {
+    await worker.advance();
+    assert.equal(worker.stats().finalized, 1);
+    await worker.advance();
+    assert.equal(worker.stats().finalized, 1, "A restarted worker must reuse the accepted fulfillment");
+  }
+});
 
 test("new report replies reject missing action plans before final paid review and expose public advisory guidance", () => {
   const current = { ...clone(input), qualityContractVersion: 1 as const };

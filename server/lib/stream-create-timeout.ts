@@ -38,7 +38,7 @@ export class StreamCreateTimeoutError extends Error {
  * Free transports retain the existing bounded recovery behavior.
  */
 export function paidStreamRecoveryPolicy(modelId: string, defaultTimeoutMs: number) {
-  const paid = modelId.startsWith("cheaperinference/");
+  const paid = modelId.startsWith("cheaperinference/") || modelId.startsWith("mammouth/");
   return { creationTimeoutMs: paid ? 65_000 : defaultTimeoutMs, allowRecovery: !paid };
 }
 
@@ -51,9 +51,18 @@ export async function createCompletionWithTimeout<T>(
   const localAc = new AbortController();
   let timedOut = false;
 
-  const onShared = () => localAc.abort();
-  if (sharedSignal.aborted) {
+  let rejectCancellation!: (reason: unknown) => void;
+  const cancellationP = new Promise<never>((_resolve, reject) => {
+    rejectCancellation = reject;
+  });
+  const onShared = () => {
     localAc.abort();
+    // Cooperative clients can preserve their original abort error; uncooperative
+    // clients must still release the awaiting chat turn without waiting for timeout.
+    queueMicrotask(() => rejectCancellation(new DOMException("Request cancelled", "AbortError")));
+  };
+  if (sharedSignal.aborted) {
+    onShared();
   } else {
     sharedSignal.addEventListener("abort", onShared, { once: true });
   }
@@ -71,11 +80,13 @@ export async function createCompletionWithTimeout<T>(
   // the abort signal still can't hold the turn open past timeoutMs. The losing
   // create() is aborted (best-effort) and its late settle is swallowed so it
   // can never surface as an unhandled rejection.
-  const createP = createFn(localAc.signal);
-  createP.catch(() => {});
-
   try {
-    return await Promise.race([createP, timeoutP]);
+    const createP = Promise.resolve().then(() => {
+      localAc.signal.throwIfAborted();
+      return createFn(localAc.signal);
+    });
+    createP.catch(() => {});
+    return await Promise.race([createP, timeoutP, cancellationP]);
   } catch (err: any) {
     // Only translate to a creation-timeout when WE tripped the timer AND the
     // shared signal is not aborted (i.e. it was not a client disconnect). This

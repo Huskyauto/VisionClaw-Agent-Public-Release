@@ -67,6 +67,7 @@ const AdminRevenueMissionsPage = lazy(() => import("@/pages/admin-revenue-missio
 const AdminIncomeOpportunitiesPage = lazy(() => import("@/pages/admin-income-opportunities"));
 const AdminFelixSparkOffersPage = lazy(() => import("@/pages/admin-felix-spark-offers"));
 const AdminAiTaskFitAuditPage = lazy(() => import("@/pages/admin-ai-task-fit-audit"));
+const AdminAiStackDecisionReviewPage = lazy(() => import("@/pages/admin-ai-stack-decision-review"));
 const AdminResearchFrontierPage = lazy(() => import("@/pages/admin-research-frontier"));
 const AdminHumanAiSynergyTrialPage = lazy(() => import("@/pages/admin-human-ai-synergy-trial"));
 const OperatorPage = lazy(() => import("@/pages/operator"));
@@ -256,6 +257,7 @@ function PageRouter() {
         {isPlatformAdmin && <Route path="/admin/income-opportunities" component={AdminIncomeOpportunitiesPage} />}
         {isPlatformAdmin && <Route path="/admin/felix-spark-offers" component={AdminFelixSparkOffersPage} />}
         {isPlatformAdmin && <Route path="/income-opportunities/ai-task-fit-audit" component={AdminAiTaskFitAuditPage} />}
+        {isPlatformAdmin && <Route path="/income-opportunities/ai-stack-decision-review" component={AdminAiStackDecisionReviewPage} />}
          {isPlatformAdmin && config.researchFrontierEnabled && <Route path="/admin/research-frontier" component={AdminResearchFrontierPage} />}
         {isPlatformAdmin && humanAiSynergyTrialEnabled && <Route path="/admin/human-ai-synergy-trial" component={AdminHumanAiSynergyTrialPage} />}
         {isAdmin && <Route path="/admin/persona-cost" component={AdminPersonaCostPage} />}

@@ -42,22 +42,42 @@ function rate(value: unknown, optional = false): number {
 
 /** Typed projection only: never import provider descriptions, URLs or instructions. */
 export function parseCheaperCatalog(body: any): CheaperCatalogEntry[] {
-  if (!Array.isArray(body?.data) || body.data.length < 1 || body.data.length > 300) {
-    throw new Error("CheaperInference catalog shape is invalid");
+  if (!Array.isArray(body?.data) || body.data.length < 1 || body.data.length > 1000) {
+    throw new Error("CheaperInference catalog shape is invalid", { cause: {
+      auditCatalogShape: { array: Array.isArray(body?.data), count: Array.isArray(body?.data) ? body.data.length : null },
+    } });
   }
   const ids = new Set<string>();
+  // Known discovery-only API families. Never infer dispatch permission from discovery.
+  const discoveryEndpoints: Record<string, string> = {
+    decision: "/v1/decisions", embedding: "/v1/embeddings",
+    speech: "/v1/audio/speech", transcription: "/v1/audio/transcriptions", realtime: "/v1/realtime",
+    rerank: "/v1/rerank",
+  };
   return body.data.flatMap((m: any): CheaperCatalogEntry[] => {
     if (typeof m?.id !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,119}$/.test(m.id) ||
-        ids.has(m.id) || !["text", "image", "video", "decision"].includes(m.type) ||
-        !(m.type === "text" ? ["/v1/chat/completions", "/v1/responses"] :
-          m.type === "image" ? ["/v1/images/generations"] :
-          m.type === "decision" ? ["/v1/decisions"] : ["/v1/videos/generations"]).includes(m.endpoint)) {
-      throw new Error("CheaperInference catalog identity or endpoint is invalid");
+        ids.has(m.id) || !["text", "image", "video", ...Object.keys(discoveryEndpoints)].includes(m.type) ||
+        !(m.type === "text" ? ["/v1/chat/completions", "/v1/responses", "/v4/ai/batch"] :
+          m.type === "image" ? ["/v1/images/generations", "/v1/images/edits", "/v1/chat/completions"] :
+          Object.hasOwn(discoveryEndpoints, m.type) ? [discoveryEndpoints[m.type]] :
+          ["/v1/videos/generations"]).includes(m.endpoint)) {
+      throw new Error("CheaperInference catalog identity or endpoint is invalid", { cause: {
+        auditCatalogEntry: {
+          validId: typeof m?.id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,119}$/.test(m.id),
+          duplicate: ids.has(m?.id),
+          type: typeof m?.type === "string" ? m.type.replace(/[^a-z-]/gi, "").slice(0,40) : "missing",
+          endpoint: typeof m?.endpoint === "string" ? m.endpoint.replace(/[^a-z0-9/_-]/gi, "").slice(0,100) : "missing",
+          catalogKinds: [...new Set(body.data.map((entry: any) =>
+            `${String(entry?.type).replace(/[^a-z-]/gi, "").slice(0,30)}:${String(entry?.endpoint).replace(/[^a-z0-9/_-]/gi, "").slice(0,100)}`))].slice(0,30),
+        },
+      } });
     }
     ids.add(m.id);
     // Recognized discovery-only modality, not a chat/media dispatch capability.
     // Validate its identity and exact endpoint, but never admit it for inference.
-    if (m.type === "decision") return [];
+    if (Object.hasOwn(discoveryEndpoints, m.type) ||
+        (m.type === "text" && m.endpoint === "/v4/ai/batch") ||
+        (m.type === "image" && ["/v1/images/edits", "/v1/chat/completions"].includes(m.endpoint))) return [];
     const context = m.type !== "text" ? 0 : Number(m.context_length);
     if (m.type === "text" && (!Number.isSafeInteger(context) || context < 1 || context > 10_000_000)) {
       throw new Error("CheaperInference context bound is invalid");
@@ -146,6 +166,7 @@ interface BudgetDeps {
 export async function runCheaperBudgeted(
   tenantId: number, maximumUsd: number, invoke: () => Promise<any>,
   usageCost: (usage: any) => number | undefined, injected?: BudgetDeps,
+  beforeDispatch?: () => void,
 ): Promise<any> {
   if (tenantId !== 1 || (currentTenantId() !== null && currentTenantId() !== 1) ||
       !Number.isFinite(maximumUsd) || maximumUsd <= 0 || maximumUsd > 20) {
@@ -169,6 +190,8 @@ export async function runCheaperBudgeted(
       console.error("[cheaper-budget] Settlement failed; reservation remains held", error);
     }
   };
+  // No await between the final operator/abort check and actual invocation.
+  beforeDispatch?.();
   const result = await invoke();
   if (!result?.[Symbol.asyncIterator]) { await finish(result?.usage); return result; }
   let started = false;

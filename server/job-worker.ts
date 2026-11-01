@@ -26,6 +26,7 @@ import {
 } from "./job-queue";
 import { HeavyWorkDeferred } from "./lib/heavy-work-lane";
 import { webVerifierQueueScope } from "./lib/verifier-job-scope";
+import { TenantAuditStop, deferAuditCapacity } from "./lib/tenant-audit-job-state";
 
 export type WeeklyJobContext = {
   assertLeaseOwned(): Promise<void>;
@@ -222,6 +223,10 @@ async function runOneJob(job: AgentJob): Promise<void> {
         console.warn(`[job-worker] Job #${job.id} (${job.kind}) completion fenced; live lease no longer owned`);
       }
     } catch (err: unknown) {
+      if (err instanceof TenantAuditStop) {
+        await failJob(job.id, job.attempts, err.message, job.tenantId, { stopRetry: true, failureClass: "unknown" });
+        return;
+      }
       if (err instanceof WeeklyJobLeaseLost) {
         // Leave the row running for lease reclamation; do not fail or complete
         // an attempt after losing ownership.
@@ -235,7 +240,9 @@ async function runOneJob(job: AgentJob): Promise<void> {
       if (err instanceof HeavyWorkDeferred) {
         // Do not complete or fail a job that never entered its handler.
         // A fenced capacity deferral preserves all real execution retries.
-        const deferred = await deferJobForHeavyLane(job.id, job.attempts, getResearchJobTenantId(job), 2 * 60_000);
+        const deferred = job.kind === "tenant_isolation_audit"
+          ? await deferAuditCapacity({ id: job.id, attempt: job.attempts }).then(() => true)
+          : await deferJobForHeavyLane(job.id, job.attempts, getResearchJobTenantId(job), 2 * 60_000);
         if (!deferred) console.warn(`[job-worker] Heavy job #${job.id} no longer owns its lease`);
         else console.log(`[job-worker] Heavy job #${job.id} (${job.kind}) deferred for 2m`);
         if (deferred && (job.kind === "research_proposal_verification" || job.kind === "source_repair_verification")
@@ -465,6 +472,11 @@ registerJobHandler("astra_report_batch", async (job) => {
     });
   }
   return { ...fulfillment, usedAstra: advanced.usedAstra, batch: advanced.record };
+});
+
+registerJobHandler("tenant_isolation_audit", async job => {
+  const { runTenantAuditJob } = await import("./lib/tenant-audit-runner");
+  return runTenantAuditJob(job);
 });
 
 registerJobHandler("weekly_maintenance", async (job, context) => {

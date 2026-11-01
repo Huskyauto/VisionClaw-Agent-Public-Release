@@ -28,6 +28,9 @@ project-assets/felix-spark-income-ideas/*
 # Customer Revenue Launchpad is a versioned owner template, not runtime upload state.
 !project-assets/customer-revenue-launchpad/
 !project-assets/customer-revenue-launchpad/**
+!project-assets/ai-stack-decision-review/
+project-assets/ai-stack-decision-review/*
+!project-assets/ai-stack-decision-review/README.md
 project-transcripts/
 .whatsapp-auth/
 data/browser-config.json

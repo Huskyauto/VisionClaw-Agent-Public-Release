@@ -275,7 +275,7 @@ export async function connectWhatsApp(tenantId?: number): Promise<{ qr?: string;
         s.reconnectAttempts = 0;
         s.connectedPhone = s.socket?.user?.id ? jidNormalizedUser(s.socket.user.id) : null;
         s.connectedLid = s.socket?.user?.lid || null;
-        console.log(`${prefix} Connected as ${s.connectedPhone} (lid: ${s.connectedLid})`);
+        console.log(`${prefix} Connected; phone and linked-device identifiers omitted`);
       }
 
       if (connection === "close") {
@@ -339,7 +339,7 @@ export async function connectWhatsApp(tenantId?: number): Promise<{ qr?: string;
         const selfChat = isSelfJid(jid, s);
 
         if (type === "notify" || (selfChat && fromMe && hasMsg)) {
-          console.log(`${prefix} Incoming: type=${type} jid=${jid} fromMe=${fromMe} isSelf=${selfChat} msgId=${msg.key.id}`);
+          console.log(`${prefix} Incoming: type=${type} fromMe=${fromMe} isSelf=${selfChat}`);
           await handleIncomingMessage(msg, s);
         }
       }
@@ -399,12 +399,12 @@ async function handleIncomingMessage(msg: typeof proto.IWebMessageInfo, s: Tenan
   try {
     const { handleWhatsAppApprovalCommand } = await import("./whatsapp-approval");
     if (handleWhatsAppApprovalCommand(text, jid, s.tenantId)) {
-      console.log(`${logPrefix(s.tenantId)} Handled as approval command from ${jid}`);
+      console.log(`${logPrefix(s.tenantId)} Handled approval command; sender omitted`);
       return;
     }
   } catch (err: any) {
     // R74.13c — M7 fix. Don't swallow approval-command import/eval failures.
-    console.error(`${logPrefix(s.tenantId)} Approval-command handler failed for ${jid}:`, err?.message ?? err);
+    console.error(`${logPrefix(s.tenantId)} Approval-command handler failed; sender omitted`);
   }
 
   if (!selfChat) {
@@ -417,7 +417,7 @@ async function handleIncomingMessage(msg: typeof proto.IWebMessageInfo, s: Tenan
 
   try {
     const label = selfChat ? "self-chat" : jid;
-    console.log(`${logPrefix(s.tenantId)} Message from ${label}: ${text.slice(0, 80)}...`);
+    console.log(`${logPrefix(s.tenantId)} Incoming message; sender and content omitted`);
 
     await s.socket?.readMessages([msg.key]);
 
@@ -455,7 +455,7 @@ async function handleIncomingMessage(msg: typeof proto.IWebMessageInfo, s: Tenan
       await sendWhatsAppMessage(replyTo, kernelResult.responseText, s.tenantId);
     }
   } catch (err: any) {
-    console.error(`${logPrefix(s.tenantId)} Error handling message from ${jid}:`, err.message);
+    console.error(`${logPrefix(s.tenantId)} Error handling message; sender and content omitted`);
     try {
       const replyTo = selfChat && s.connectedPhone ? s.connectedPhone : jid;
       await sendWhatsAppMessage(replyTo, "Sorry, I encountered an error processing that. Please try again.", s.tenantId);
@@ -514,7 +514,7 @@ async function getOrCreateConversation(jid: string, s: TenantWAState): Promise<n
         if (firstJid !== undefined) _warnedAdminFallback.delete(firstJid);
       }
       _warnedAdminFallback.add(jid);
-      console.warn(`[whatsapp] NOTICE: incoming message from ${jid} is being assigned to admin tenant (${ADMIN_TENANT_ID}) because the WA session has no tenantId claim, but ${otherTenantSessions} tenant-bound WA session(s) are also connected. If this WA line should belong to a specific tenant, reconnect via connectWhatsApp(tenantId). (One warning per JID per process.)`);
+      console.warn(`[whatsapp] NOTICE: an incoming message is being assigned to admin tenant (${ADMIN_TENANT_ID}) because the WA session has no tenantId claim, but ${otherTenantSessions} tenant-bound WA session(s) are also connected. If this WA line should belong to a specific tenant, reconnect via connectWhatsApp(tenantId). Sender omitted.`);
     }
   }
 
@@ -602,7 +602,7 @@ export async function sendWhatsAppMessage(jid: string, text: string, tenantId?: 
   // because the recipient saw a fragmented reply.
   const providerAccepted = chunkCount > 0 && messageIds.length === chunkCount;
   if (!providerAccepted) {
-    console.warn(`${prefix} Send to ${normalizedJid} was NOT fully accepted by WhatsApp provider (${messageIds.length}/${chunkCount} chunks ack'd). Text preview: ${text.slice(0, 80).replace(/\n/g, " ")}${text.length > 80 ? "..." : ""}`);
+    console.warn(`${prefix} Send was NOT fully accepted by WhatsApp provider (${messageIds.length}/${chunkCount} chunks ack'd); recipient and content omitted`);
   }
   return { ok: true, providerAccepted, messageIds };
 }

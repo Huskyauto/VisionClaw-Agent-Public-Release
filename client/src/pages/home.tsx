@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ErrorState } from "@/components/error-state";
 import OnboardingWelcome from "@/components/onboarding-welcome";
 import UsageDashboard from "@/components/usage-dashboard";
+import PlanReviewDetails from "@/components/plan-review-details";
 import {
   TEMPLATE_ICONS, PLAYBOOKS, StatusPulse, renderBoldText, BriefingSpeakButton,
   type Stats, type HealthReport, type HeartbeatLogEntry,
@@ -812,7 +813,7 @@ export default function HomePage() {
                       <div key={p.id} className="border rounded-md p-3 space-y-2" data-testid={`plan-row-${p.id}`}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate" data-testid={`text-plan-objective-${p.id}`}>
+                            <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium" data-testid={`text-plan-objective-${p.id}`}>
                               {p.objective}
                             </div>
                             <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
@@ -820,31 +821,28 @@ export default function HomePage() {
                               <span>·</span>
                               <span>{stepCount} steps</span>
                               <span>·</span>
-                              <span>~{totalMin} min</span>
+                              <span>Estimated ~{totalMin} min</span>
                               <span>·</span>
-                              <span>~${Number(totalCost).toFixed(2)}</span>
+                              <span>Estimated ~${Number(totalCost).toFixed(2)}</span>
                               <span>·</span>
                               <span>{formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}</span>
                             </div>
                           </div>
                         </div>
-                        {Array.isArray(p.plan_json?.steps) && (
-                          <div className="text-[11px] text-muted-foreground space-y-0.5 pl-1">
-                            {p.plan_json.steps.slice(0, 4).map((s: any) => (
-                              <div key={s.n} className="truncate" data-testid={`text-plan-step-${p.id}-${s.n}`}>
-                                <span className="font-mono">{s.n}.</span> <span className="font-medium text-foreground/80">{s.agent}</span> — {s.task}
-                              </div>
-                            ))}
-                            {p.plan_json.steps.length > 4 && (
-                              <div className="text-muted-foreground/60">+ {p.plan_json.steps.length - 4} more steps</div>
-                            )}
-                          </div>
-                        )}
+                        <PlanReviewDetails
+                          steps={p.plan_json?.steps}
+                          planDetails={p.plan_json && typeof p.plan_json === "object"
+                            ? Object.fromEntries(Object.entries(p.plan_json).filter(([key]) => key !== "steps"))
+                            : undefined}
+                        />
                          {recovery && (
                            <div className="text-[11px] border border-amber-500/30 rounded p-2 text-amber-700 dark:text-amber-300">
-                             Approval authorizes only the exact unresolved suffix shown below. No new tool, arguments, tenant, or trust fields may be introduced.
+                             Approval authorizes only the exact unresolved suffix listed in this plan. No new tool, arguments, tenant, or trust fields may be introduced.
                            </div>
                          )}
+                         <p className="text-[11px] leading-relaxed text-muted-foreground">
+                           Approval does not bypass per-tool safeguards. Each tool action remains subject to its own permissions and safety checks.
+                         </p>
                          <div className="flex items-center gap-2 pt-1">
                           <Button
                             size="sm"

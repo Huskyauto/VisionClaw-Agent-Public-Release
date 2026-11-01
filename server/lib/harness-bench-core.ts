@@ -64,6 +64,8 @@ export interface HarnessBenchReport {
   degraded: boolean;
   securityFailed: boolean;
   comparable: boolean;
+  /** Same declared task IDs and repetition counts across configurations. */
+  taskSetsMatched: boolean;
   configurations: HarnessBenchConfigurationSummary[];
 }
 
@@ -179,6 +181,12 @@ export function buildHarnessBenchReport(
     groups.set(key, existing);
   }
 
+  // Coverage only describes supplied records: an omitted task otherwise looks
+  // like 100% coverage. Match multisets so skipped tasks or unequal repetitions
+  // cannot silently change comparison weights. This is not dataset provenance.
+  const taskSetsMatched = new Set([...groups.values()].map((runs) =>
+    JSON.stringify(runs.map((run) => run.taskId).sort()),
+  )).size <= 1;
   const configurations = [...groups.values()].map((runs) => {
     const valid = runs.filter((run) => run.evaluated);
     const configCoverage = runs.length > 0 ? valid.length / runs.length : 0;
@@ -191,7 +199,7 @@ export function buildHarnessBenchReport(
       evaluatedRuns: valid.length,
       coverage: round(configCoverage),
       securityFailed,
-      eligibleForComparison: configCoverage >= minCoverage && valid.length > 0 && !securityFailed,
+      eligibleForComparison: taskSetsMatched && configCoverage >= minCoverage && valid.length > 0 && !securityFailed,
       completionScore: average(valid.map((run) => run.completionScore!)),
       processScore: average(valid.map((run) => run.processScore!)),
       securityPassRate: average(valid.map((run) => run.securityScore!)),
@@ -217,7 +225,8 @@ export function buildHarnessBenchReport(
     minCoverage,
     degraded,
     securityFailed,
-    comparable: !degraded && !securityFailed,
+    comparable: taskSetsMatched && !degraded && !securityFailed,
+    taskSetsMatched,
     configurations,
   };
 }

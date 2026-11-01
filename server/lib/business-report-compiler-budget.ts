@@ -3,14 +3,22 @@ import type { BusinessReportReviewInput, BusinessReportReviewState } from "./bus
 import { reservePaidReportJury } from "./business-report-paid-budget";
 import { REPORT_GEMINI_MODEL } from "./business-report-gemini";
 import { hashReportBytes } from "./business-report-evidence";
+import { inspectInvalidCompilerReply } from "./business-report-compiler-failure";
+import { retainedCompilerReviewMatches } from "./company-report-retained-review";
 
 export const REPORT_COMPILER_CAP_MICROS = 5_000_000;
 
-function validPriorRecovery(prior: Record<string, any>, grant: any, base: string, state: BusinessReportReviewState): boolean {
+function validPriorRecovery(prior: Record<string, any>, grant: any, base: string, state: BusinessReportReviewState,
+  input: BusinessReportReviewInput): boolean {
   const key = grant.priorKey;
   if (typeof key !== "string") return false;
   const original = prior[key];
   if (!original || original.requestId !== state.requestId || original.digest !== state.digest) return false;
+  if (grant.kind === "confirmed-invalid") {
+    const inspected = inspectInvalidCompilerReply(input, state, original);
+    return key === base && Object.keys(prior).length === 1 && !!inspected &&
+      inspected.responseHash === grant.priorResponseHash && inspected.diagnosticHash === grant.diagnosticHash;
+  }
   if (key === base) {
     return original.status === "claimed" && !Object.hasOwn(original, "response") &&
       !Object.hasOwn(original, "candidate") && !Object.hasOwn(original, "receipt");
@@ -82,8 +90,11 @@ export async function reserveReportCompiler(
           grant.round !== state.round || typeof grant.authorizedAt !== "string" ||
           !Number.isFinite(Date.parse(grant.authorizedAt)) ||
           !Number.isSafeInteger(grant.maxAdditionalMicros) || grant.maxAdditionalMicros <= 0 ||
-          reservedMicros > grant.maxAdditionalMicros || !validPriorRecovery(prior, grant, base, state)) {
+          reservedMicros > grant.maxAdditionalMicros || !validPriorRecovery(prior, grant, base, state, payload.input)) {
         throw new Error("Report compiler recovery authorization does not match its uncertain operation");
+      }
+      if (grant.kind === "confirmed-invalid" && !retainedCompilerReviewMatches(payload, jobId)) {
+        throw new Error("Report compiler correction obligations do not match the retained paid ballots");
       }
     }
     if (amounts.reduce((sum, value) => sum + value, 0) + reservedMicros > REPORT_COMPILER_CAP_MICROS) {

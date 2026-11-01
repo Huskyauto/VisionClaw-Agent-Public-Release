@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SMt25PGlH8ziMdFb2nbAud0S2aLG9lT4DJTZzH4Bwn54I2lZJj0xHOa4TWbc6u0
+\restrict 0bYohEtKsHEgGm6c1MXm9vp5dTx2uCo4lJNnIDjTJwVbPYi72pHI5iGUgvU4aJg
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -1230,6 +1230,17 @@ CREATE SEQUENCE public.ai_insights_id_seq
 --
 
 ALTER SEQUENCE public.ai_insights_id_seq OWNED BY public.ai_insights.id;
+
+
+--
+-- Name: ai_transport_cooldowns; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_transport_cooldowns (
+    transport text NOT NULL,
+    cooldown_until timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
 
 
 --
@@ -13985,6 +13996,14 @@ ALTER TABLE ONLY public.ai_insights
 
 
 --
+-- Name: ai_transport_cooldowns ai_transport_cooldowns_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_transport_cooldowns
+    ADD CONSTRAINT ai_transport_cooldowns_pkey PRIMARY KEY (transport);
+
+
+--
 -- Name: api_keys api_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -22577,5 +22596,5 @@ ALTER TABLE public.skill_optimization_versions ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SMt25PGlH8ziMdFb2nbAud0S2aLG9lT4DJTZzH4Bwn54I2lZJj0xHOa4TWbc6u0
+\unrestrict 0bYohEtKsHEgGm6c1MXm9vp5dTx2uCo4lJNnIDjTJwVbPYi72pHI5iGUgvU4aJg
 

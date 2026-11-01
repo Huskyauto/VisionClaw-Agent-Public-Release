@@ -837,6 +837,13 @@ app.use((req, res, next) => {
     log(`Weekly maintenance scheduler failed to start: ${e.message}`, "weekly-maintenance");
   }
 
+  try {
+    const { startTenantAuditScheduler } = await import("./tenant-audit-cron");
+    startTenantAuditScheduler();
+  } catch (e: any) {
+    log(`Tenant audit scheduler failed to start: ${e.message}`, "tenant-audit");
+  }
+
   // Built With Bob — autonomous weekly recap scheduler. Disarmed unless
   // BWB_WEEKLY_ENABLED=1. Spawns the orchestrator (discover this week's Shorts →
   // synthesize one ~5-min weekly story in Bob's Fish voice → deliver →

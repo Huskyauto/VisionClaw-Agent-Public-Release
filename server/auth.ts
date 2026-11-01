@@ -201,6 +201,8 @@ async function validateApiKey(rawKey: string, req: any): Promise<boolean> {
     if (rows.length === 0) return false;
     const key = rows[0];
     if (key.expiresAt && new Date(key.expiresAt) < new Date()) return false;
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, key.tenantId));
+    if (!tenant?.isActive) return false;
     (req as any).tenantId = key.tenantId;
     (req as any).apiKeyId = key.id;
     (req as any).apiKeyScopes = key.scopes;
@@ -398,7 +400,17 @@ export async function getOrCreateTenantForReplitUser(replitUserId: string, email
   }
   if (replitUserId.startsWith("agentid:")) throw new Error("Reserved identity namespace");
   const cached = tenantCacheByReplitUser.get(replitUserId);
-  if (cached) return cached.tenantId;
+  if (cached) {
+    // Identity caches are not revocation caches. Recheck the authoritative row
+    // on each request, including requests handled by a different worker.
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, cached.tenantId));
+    if (!tenant?.isActive || tenant.replitUserId !== replitUserId) {
+      tenantCacheByReplitUser.delete(replitUserId);
+      throw new Error("Workspace is unavailable");
+    }
+    tenantCacheByReplitUser.set(replitUserId, { tenantId: tenant.id, isAdmin: tenant.id === ADMIN_TENANT_ID || !!tenant.isAdmin });
+    return tenant.id;
+  }
 
   const replitOwner = process.env.REPL_OWNER;
   // OWNER_EMAIL (singular) is the secret that actually exists in this workspace;
@@ -414,6 +426,7 @@ export async function getOrCreateTenantForReplitUser(replitUserId: string, email
   if (isOwner) {
     const [adminTenant] = await db.select().from(tenants).where(eq(tenants.id, ADMIN_TENANT_ID));
     if (adminTenant) {
+      if (!adminTenant.isActive) throw new Error("Workspace is unavailable");
       // Architect hardening: an email match alone must NOT rebind an admin tenant that is
       // already bound to a DIFFERENT Replit subject — that would let an account presenting
       // the owner email take over tenant #1. First bind (empty replitUserId) or exact
@@ -433,6 +446,7 @@ export async function getOrCreateTenantForReplitUser(replitUserId: string, email
 
   const [existing] = await db.select().from(tenants).where(eq(tenants.replitUserId, replitUserId));
   if (existing) {
+    if (!existing.isActive) throw new Error("Workspace is unavailable");
     tenantCacheByReplitUser.set(replitUserId, { tenantId: existing.id, isAdmin: existing.id === ADMIN_TENANT_ID || !!existing.isAdmin });
     return existing.id;
   }
@@ -440,6 +454,7 @@ export async function getOrCreateTenantForReplitUser(replitUserId: string, email
   if (email) {
     const [byEmail] = await db.select().from(tenants).where(eq(tenants.email, email.toLowerCase().trim()));
     if (byEmail && !byEmail.replitUserId) {
+      if (!byEmail.isActive) throw new Error("Workspace is unavailable");
       await db.update(tenants).set({ replitUserId }).where(eq(tenants.id, byEmail.id));
       tenantCacheByReplitUser.set(replitUserId, { tenantId: byEmail.id, isAdmin: byEmail.id === ADMIN_TENANT_ID || !!byEmail.isAdmin });
       return byEmail.id;
@@ -745,6 +760,9 @@ export function isPublicPath(rawPath: string): boolean {
   // Strip query, lowercase, strip a single trailing slash (but keep "/").
   let p = (rawPath || "").split("?")[0].toLowerCase();
   if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
+  // These owner-only handlers predate the public prefix. They must still run
+  // authoritative authentication before consulting synchronous admin helpers.
+  if (p === "/api/public/stats" || p === "/api/public/architecture") return false;
   if (PUBLIC_EXACT_PATHS.has(p)) return true;
   for (const prefix of PUBLIC_PATH_PREFIXES) {
     if (p.startsWith(prefix)) return true;
@@ -834,8 +852,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         replitUser.provider
       );
     } catch (error) {
-      if (replitUser.provider !== "agentid") throw error;
-      return res.status(401).json({ error: "AgentID workspace is unavailable" });
+      return res.status(401).json({ error: "Workspace is unavailable" });
     }
     if (typeof replitTid === "number") {
       (req as any).tenantId = replitTid;

@@ -19,6 +19,11 @@ type Budget = Partial<Record<"executive" | "readiness", Slot>>;
 
 export function assertReportJuryApproval(input: Pick<BusinessReportReviewInput,
   "tenantId" | "paidJuryBatch" | "kind" | "operatorJobId" | "intake">, now = Date.now()) {
+  // Owner-created package approvals are additionally proven against the live
+  // parent and exact child by reservePackageOperation BEFORE any dispatch.
+  if (input.tenantId === 1 && /^company-package:[1-9]\d{0,9}$/.test(input.paidJuryBatch || "") &&
+      input.operatorJobId === input.paidJuryBatch && ["readiness", "executive"].includes(input.kind) &&
+      process.env.REPORT_EVIDENCE_HANDOFFS_DISABLED !== "1") return;
   if (input.tenantId !== 1 || ![ALDON_JURY_BATCH, ALDON_COMPLETION_BATCH, ALDON_RERUN_BATCH, ALDON_RECOVERY_BATCH].includes(input.paidJuryBatch || "") ||
       !["executive", "readiness"].includes(input.kind) || !input.operatorJobId ||
       input.intake.company !== "Aldon Company" || input.intake.website !== "https://www.aldonco.com/" ||
@@ -60,6 +65,11 @@ export async function reservePaidReportJury(
   dependencies?: { db: Pick<typeof import("../db").db, "transaction"> },
 ) {
   assertReportJuryApproval(input);
+  if (input.paidJuryBatch?.startsWith("company-package:")) {
+    const { reservePackageOperation } = await import("./company-report-production");
+    return reservePackageOperation(Number(input.paidJuryBatch.split(":")[1]), input.tenantId,
+      `review:${jobId}:${phaseKey}:${model}`, amount, { childId: jobId, childAttempt: attempt, phaseKey });
+  }
   const { db } = dependencies ?? await import("../db");
   const { sql } = await import("drizzle-orm");
   const compiler = phaseKey.startsWith("compiler:");

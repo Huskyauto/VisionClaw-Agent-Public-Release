@@ -1,4 +1,6 @@
 /** Editorial research discipline, not a substitute for deterministic evaluators. */
+import { HYPOTHESIS_RESEARCH_GUIDANCE } from "./lib/report-hypothesis-backup";
+
 export const RESEARCH_EVIDENCE_INSTRUCTIONS = `EVIDENCE DISCIPLINE:
 Inside the existing RESULT paragraph, label OBSERVED (directly inspected source or executed
 measurement, with reference and conditions), INFERRED (reasoned interpretation), UNKNOWN
@@ -11,4 +13,5 @@ may be useful but must be labeled inferred. When proposing adoption, require ind
 held-out cases, realistic end-to-end costs including failures/retries/operating overhead,
 and retained rejected/inconclusive experiments. Tool/setup availability is not execution.
 Recommendations are not execution approval; existing tenant, safety, spend and publish
-controls still apply. Explicit owner-directed implementation does not turn uncertainty into proof.`;
+controls still apply. Explicit owner-directed implementation does not turn uncertainty into proof.
+${HYPOTHESIS_RESEARCH_GUIDANCE}`;

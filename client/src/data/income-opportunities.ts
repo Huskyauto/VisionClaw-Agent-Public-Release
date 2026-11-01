@@ -24,6 +24,20 @@ export interface IncomeOpportunity {
 
 export const INCOME_OPPORTUNITIES: IncomeOpportunity[] = [
   {
+    slug: "ai-stack-decision-review",
+    name: "AI Stack Decision Review",
+    category: "Assessment",
+    evidence: "Idea",
+    buyer: "Small AI implementation agencies and technical founders choosing a stack for an upcoming project",
+    problem: "Tool demos and benchmark claims hide recovery, customer-isolation, maintenance and operating-cost gaps.",
+    entryOffer: "One workflow, up to three candidate systems, an evidence-backed decision report and a 30-day validation plan.",
+    price: "$350 founding pilot hypothesis",
+    expansion: "Focused buyer guides and separately scoped agency research partnerships after paid validation",
+    nextStep: "Open the complete launch package, review the sample, then validate the fixed scope with three paid pilots.",
+    featured: true,
+    actionPath: "/income-opportunities/ai-stack-decision-review",
+  },
+  {
     slug: "ai-task-fit-human-agency-audit",
     name: "AI Task Fit & Human Agency Audit",
     category: "Assessment",

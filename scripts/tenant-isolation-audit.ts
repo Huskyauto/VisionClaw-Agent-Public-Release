@@ -42,10 +42,15 @@
  *   3  fatal runtime error
  *
  * Flags / env:
- *   AUDIT_MODEL=<id>          model to use (default: gemini-2.5-flash — FREE Replit modelfarm lane. Was gemini-3.5-flash but that bills the metered Google API key (~$0.12/call); a whole-codebase nightly audit on it cost ~$88/run, 2026-06-13. 2.5-flash handles this classification work fine; set AUDIT_MODEL=gemini-3.5-flash only for a one-off deep audit. Claude stays off the nightly autonomous path 2026-06-12 to avoid metered Anthropic charges.)
+ *   AUDIT_MODEL=<id>          model to use (legacy default: gemini-2.5-flash).
+ *   AUDIT_PROVIDER_LANE=<id>  primary: profundo, openference or replit; two explicit backups follow.
+ *                            An unavailable pin FAILS; no provider substitution or metered fallback.
+ *                            Current workflow uses Profundo claude-sonnet-5 at flat membership cost,
+ *                            enabled only inside that audit process. Replit's integration labels
+ *                            are not proof of zero account billing.
  *   AUDIT_MAX_CHUNKS=<n>      cap the number of chunks audited (smoke test). 0 = all.
  *   AUDIT_DRY_RUN=1           run the audit + write the report, but do NOT email.
- *   MAX_CHUNK_CHARS=<n>       per-chunk source budget (default 240000).
+ *   MAX_CHUNK_CHARS=<n>       per-chunk source budget (default 60000).
  *   AUDIT_CHUNK_TIMEOUT_MS=<n> hard deadline per model call (default 120000).
  *   AUDIT_TRIAGE_TIMEOUT_MS=<n> hard deadline per precision batch (default 120000).
  *   AUDIT_JURY_TIMEOUT_MS=<n> hard deadline per optional jury vote (default 120000).
@@ -60,6 +65,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { auditJobIdentity, auditJobState } from "../server/lib/tenant-audit-job-state";
 import {
   computeTenantAuditCheckpointSourceHash,
   computeTenantAuditEvidenceHash,
@@ -81,9 +87,55 @@ import { matchVerdictToFinding } from "./lib/triage-verdict-match";
 import { loadSuppressions, matchSuppression, loadDeferrals, matchDeferral } from "../server/lib/audit-suppressions";
 import { withDeadline } from "../server/reasoning-front-door-core";
 import { meteredLlmEnabled } from "../server/provider-recovery";
+import { tenantAuditProviderOptions } from "./lib/tenant-audit-provider-policy";
+import { auditRoutes, runAuditFallback, AuditProvidersExhausted,
+  splitAuditUnits, resumeAuditUnits, auditUnitLocationMatches, AUDIT_UNIT_CHARS,
+  type AuditPendingUnits, type AuditRoute } from "./lib/tenant-audit-fallback";
+import { invokeAuditRoute, parseAuditObject, auditFailureSummary, readAuditProviderHealth,
+  auditHealthKey, auditProviderFailure, auditRouteConfigured } from "./lib/tenant-audit-completion";
 
-const MODEL = process.env.AUDIT_MODEL || "gemini-2.5-flash";
-const MAX_CHUNK_CHARS = Number(process.env.MAX_CHUNK_CHARS) || 240_000;
+const MODEL = process.env.AUDIT_MODEL || auditRoutes(process.env.AUDIT_PROVIDER_LANE || "profundo")[0].model;
+const AUDIT_PROVIDER_OPTIONS = tenantAuditProviderOptions(
+  process.env.AUDIT_PROVIDER_LANE, meteredLlmEnabled(),
+);
+const AUDIT_ROUTES = auditRoutes(process.env.AUDIT_PROVIDER_LANE || "profundo", MODEL);
+let providerRecoveryNeeded = false;
+const precisionLocalPath = path.resolve("data/tenant-isolation-audit/precision-progress.json");
+async function precisionState(field: "auditPrecision" | "auditHandoff" | "auditProviderHealth", value?: unknown): Promise<any> {
+  if (auditJobIdentity()) return auditJobState(field, value);
+  let state: Record<string, any> = {};
+  try { state = JSON.parse(fs.readFileSync(precisionLocalPath, "utf8")); }
+  catch (error: any) { if (error?.code !== "ENOENT") throw error; }
+  if (value === undefined) return state[field];
+  state[field] = value;
+  const body = JSON.stringify(state);
+  if (Buffer.byteLength(body) > 8 * 1024 * 1024) throw new Error("Precision checkpoint capacity exhausted");
+  fs.mkdirSync(path.dirname(precisionLocalPath), { recursive: true });
+  fs.writeFileSync(`${precisionLocalPath}.tmp`, body, { mode: 0o600 });
+  fs.renameSync(`${precisionLocalPath}.tmp`, precisionLocalPath);
+  return value;
+}
+async function auditRouteAvailable(route: AuditRoute): Promise<boolean> {
+  if (!await auditRouteConfigured(route)) {
+    log(`audit route ${route.providerLane}: operator-disabled or not configured; skipped`);
+    return false;
+  }
+  const health = readAuditProviderHealth(await precisionState("auditProviderHealth"));
+  if ((health[auditHealthKey(route)]?.until ?? 0) > Date.now()) {
+    log(`audit route ${route.providerLane}: saved cooldown active; skipped without model call`);
+    return false;
+  }
+  return true;
+}
+async function auditRouteFailed(route: AuditRoute, error: unknown): Promise<void> {
+  log(`audit route ${route.providerLane} failed (${auditFailureSummary(error)}); saving cooldown, advancing fallback`);
+  const health = readAuditProviderHealth(await precisionState("auditProviderHealth"));
+  await precisionState("auditProviderHealth", auditProviderFailure(health, route, error));
+}
+// The 240k default made the first gpt-5.4 request time out on every attempt,
+// leaving the entire nightly at zero coverage. Smaller complete-source windows
+// keep the existing deadline, overlap, checkpoint and fail-closed semantics.
+const MAX_CHUNK_CHARS = Number(process.env.MAX_CHUNK_CHARS) || 60_000;
 const MAX_CHUNKS = Number(process.env.AUDIT_MAX_CHUNKS) || 0; // 0 = no cap
 const SLICE_CHUNKS = Number.isFinite(Number(process.env.AUDIT_SLICE_CHUNKS))
   ? Math.min(20, Math.max(0, Math.floor(Number(process.env.AUDIT_SLICE_CHUNKS))))
@@ -97,7 +149,6 @@ const EST_USD_PER_CHUNK = Number(process.env.AUDIT_EST_USD_PER_CHUNK) || 0.5;
 // 31/38 chunk failures, 2026-06-14). Give it real output headroom; keep thinking
 // ON (audit quality). gemini-2.5-flash supports up to 65536 output tokens.
 const AUDIT_MAX_TOKENS = Number(process.env.AUDIT_MAX_TOKENS) || 32_000;
-const AUDIT_RETRY_MAX_TOKENS = Number(process.env.AUDIT_RETRY_MAX_TOKENS) || 60_000;
 function boundedTimeoutMs(raw: string | undefined, fallbackMs = 120_000): number {
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 1_000
@@ -108,18 +159,7 @@ const AUDIT_CHUNK_TIMEOUT_MS = boundedTimeoutMs(process.env.AUDIT_CHUNK_TIMEOUT_
 const AUDIT_TRIAGE_TIMEOUT_MS = boundedTimeoutMs(process.env.AUDIT_TRIAGE_TIMEOUT_MS);
 const AUDIT_JURY_TIMEOUT_MS = boundedTimeoutMs(process.env.AUDIT_JURY_TIMEOUT_MS);
 const AUDIT_OPERATION_TIMEOUT_MS = boundedTimeoutMs(process.env.AUDIT_OPERATION_TIMEOUT_MS, 30_000);
-// Per-chunk re-roll budget for an UNPARSEABLE (non-truncated) response or a
-// transient model-call failure. The free modelfarm lane (gpt-5.4) is a
-// stochastic reasoning model: a single garbled JSON blob on one chunk used to
-// fail the WHOLE nightly closed + page the owner, even though a plain re-roll
-// almost always parses. We retry up to N extra attempts; only after they're all
-// exhausted does the chunk count as a genuine DEGRADED failure (fail-closed is
-// preserved — we never read green on incomplete coverage). Successful chunks
-// make exactly ONE call, so this adds cost only on already-failing chunks (and
-// $0 on the free lane). Set 0 to disable.
-const AUDIT_PARSE_RETRY_MAX = Number.isFinite(Number(process.env.AUDIT_PARSE_RETRY_MAX))
-  ? Math.min(2, Math.max(0, Math.floor(Number(process.env.AUDIT_PARSE_RETRY_MAX))))
-  : 2;
+// One attempt per independent route; the durable scheduler owns delayed recovery.
 
 async function withAuditDeadline<T>(
   label: string,
@@ -171,7 +211,7 @@ const PENDING_APPROVAL = path.join(REPORT_JSON_DIR, "pending-approval.json");
 // TENANT_AUDIT_PRECISION=off (or 0) restores the raw exit-on-any-severe behavior.
 const PRECISION_ON =
   process.env.TENANT_AUDIT_PRECISION !== "off" && process.env.TENANT_AUDIT_PRECISION !== "0";
-const TRIAGE_MODEL = process.env.AUDIT_TRIAGE_MODEL || "gpt-5.4";
+const TRIAGE_MODEL = process.env.AUDIT_TRIAGE_MODEL || MODEL;
 const TRIAGE_BATCH = Math.max(1, Number(process.env.AUDIT_TRIAGE_BATCH) || 12);
 const TRIAGE_MAX_BATCHES = Number.isFinite(Number(process.env.AUDIT_TRIAGE_MAX_BATCHES))
   ? Math.max(0, Number(process.env.AUDIT_TRIAGE_MAX_BATCHES))
@@ -213,6 +253,7 @@ interface AuditCheckpoint {
   model: string;
   chunksTotal: number;
   completed: Record<string, Finding[]>;
+  pending?: AuditPendingUnits<Finding>;
   updatedAt: string;
   checksum: string;
 }
@@ -278,7 +319,10 @@ const OVERLAP_LINES = Number(process.env.AUDIT_OVERLAP_LINES) || 150;
 // Split one oversized file (its numbered-source block exceeds MAX_CHUNK_CHARS, so
 // sending it WHOLE would blow the model's hard input-token limit — root cause of
 // the chunk-36 "Input tokens exceed the configured limit" failure, 2026-06-17)
-// into overlapping line-windows. Each window is labelled with its line range and
+// into overlapping line-windows. A single line bigger than the entire input
+// budget is unprocessable: record it as uncovered rather than sending an
+// oversized request or pretending a character slice has complete query context.
+// Each window is labelled with its line range and
 // carries the OVERLAP_LINES tail of the previous window at its head, so no query
 // is ever cut mid-statement. Each window becomes its own chunk; the file is
 // considered audited only if EVERY window succeeds (the caller tracks audited
@@ -291,13 +335,16 @@ function splitOversizedFile(f: string, numbered: string[]): { files: string[]; t
   const out: { files: string[]; text: string }[] = [];
   let start = 0;
   while (start < total) {
+    if (numbered[start].length > bodyBudget) {
+      noteUnreadable(f, new Error(`source line ${start + 1} exceeds the ${MAX_CHUNK_CHARS}-character audit input budget`));
+      break; // the coverage gate rejects this file; never send a partial-source request
+    }
     let end = start;
     let len = 0;
     while (end < total && len + numbered[end].length + 1 <= bodyBudget) {
       len += numbered[end].length + 1;
       end++;
     }
-    if (end === start) end = start + 1; // a single >budget line: take it alone
     const body = numbered.slice(start, end).join("\n");
     const label = `\n===== FILE: ${f} (lines ${start + 1}-${end} of ${total}) =====\n`;
     out.push({ files: [f], text: `${label}${body}\n` });
@@ -353,11 +400,12 @@ function sourceFingerprint(
   return computeTenantAuditCheckpointSourceHash(evidenceHash, {
     version: 2,
     model: MODEL,
+    providerLane: AUDIT_PROVIDER_OPTIONS.providerLane,
+    routes: AUDIT_ROUTES,
+    unitChars: AUDIT_UNIT_CHARS,
     maxChunkChars: MAX_CHUNK_CHARS,
     overlapLines: OVERLAP_LINES,
     maxTokens: AUDIT_MAX_TOKENS,
-    retryMaxTokens: AUDIT_RETRY_MAX_TOKENS,
-    parseRetryMax: AUDIT_PARSE_RETRY_MAX,
     prompt: SYSTEM_PROMPT,
   }, chunks);
 }
@@ -387,19 +435,24 @@ function isFinding(value: unknown, allowedFiles: Set<string>): value is Finding 
   );
 }
 
-function loadCheckpoint(
+async function loadCheckpoint(
   sourceHash: string,
   chunks: { files: string[]; text: string }[],
-): AuditCheckpoint {
+): Promise<AuditCheckpoint> {
   const fresh = () => freshCheckpoint(sourceHash, chunks.length);
-  if (!fs.existsSync(CHECKPOINT_JSON)) return fresh();
+  // Production recovery is database-backed; a previous publish's local files
+  // are never substituted for a scheduled job's own checkpoint.
+  const durable = auditJobIdentity() ? await auditJobState("auditCheckpoint") : undefined;
+  if (!auditJobIdentity() && !fs.existsSync(CHECKPOINT_JSON)) return fresh();
   try {
-    const parsed = JSON.parse(fs.readFileSync(CHECKPOINT_JSON, "utf8")) as Partial<AuditCheckpoint>;
+    const parsed = (auditJobIdentity() ? durable ?? {} :
+      JSON.parse(fs.readFileSync(CHECKPOINT_JSON, "utf8"))) as Partial<AuditCheckpoint>;
     if (!isTenantAuditCheckpointValid({
       checkpoint: parsed,
       sourceHash,
       model: MODEL,
       chunksTotal: chunks.length,
+      routeCount: AUDIT_ROUTES.length,
       isCompletedEntryValid: (finding, index) => isFinding(finding, new Set(chunks[index].files)),
     })) {
       log("checkpoint fingerprint/integrity invalid — restarting from chunk 1.");
@@ -412,11 +465,13 @@ function loadCheckpoint(
   }
 }
 
-function saveCheckpoint(checkpoint: AuditCheckpoint): void {
+async function saveCheckpoint(checkpoint: AuditCheckpoint): Promise<void> {
   fs.mkdirSync(REPORT_JSON_DIR, { recursive: true });
   checkpoint.updatedAt = new Date().toISOString();
   const { checksum: _oldChecksum, ...unsigned } = checkpoint;
   checkpoint.checksum = tenantAuditCheckpointChecksum(unsigned);
+  // Await the fenced durable write BEFORE another chunk can spend.
+  await auditJobState("auditCheckpoint", checkpoint);
   const body = JSON.stringify(checkpoint, null, 2);
   const tmp = `${CHECKPOINT_JSON}.tmp`;
   fs.writeFileSync(tmp, body);
@@ -459,20 +514,15 @@ If you find nothing in this batch, respond exactly: {"findings":[]}`;
 // never as "zero issues", which would let a garbled response masquerade as clean.
 function parseFindings(raw: string): Finding[] | null {
   if (!raw || !raw.trim()) return null;
-  let txt = raw.trim();
-  // strip ```json ... ``` fences if present
-  txt = txt.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-  // grab the outermost {...}
-  const first = txt.indexOf("{");
-  const last = txt.lastIndexOf("}");
-  if (first === -1 || last === -1 || last <= first) return null;
   let obj: any;
   try {
-    obj = JSON.parse(txt.slice(first, last + 1));
+    obj = parseAuditObject(raw);
   } catch {
     return null;
   }
-  if (!obj || !Array.isArray(obj.findings)) return null;
+  if (!obj || !Array.isArray(obj.findings) ||
+      !obj.findings.every((f: any) => f && typeof f.file === "string" && f.file &&
+        typeof f.issue === "string" && f.issue && typeof f.severity === "string")) return null;
   return obj.findings
     .filter((f: any) => f && f.file && f.issue && f.severity)
     .map((f: any) => ({
@@ -548,95 +598,45 @@ async function auditChunk(
   chunk: { files: string[]; text: string },
   idx: number,
   total: number,
+  checkpoint: AuditCheckpoint | null,
 ): Promise<{ ok: boolean; findings: Finding[]; reason?: string }> {
-  // One model call. Returns the raw content + whether the provider truncated it
-  // (finish_reason "length") so the caller can retry with a bigger budget.
-  async function call(maxTokens: number): Promise<{ raw: string; truncated: boolean }> {
-    const resp = await withAuditDeadline(
-      `tenant audit chunk ${idx + 1}/${total}`,
-      AUDIT_CHUNK_TIMEOUT_MS,
-      async (signal) => {
-        const { getClientForModel } = await import("../server/providers");
-        const { client, actualModelId } = await getClientForModel(MODEL, 1);
-        // gpt-5 / o-series reasoning models reject `max_tokens` (require
-        // `max_completion_tokens`) AND reject any non-default `temperature`.
-        const isOpenAIReasoning = /^(gpt-5|gpt-4\.1|o[1-9])/i.test(actualModelId);
-        const params: any = {
-          model: actualModelId,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: `Audit this batch of ${chunk.files.length} file(s):\n${chunk.text}` },
-          ],
-        };
-        if (isOpenAIReasoning) params.max_completion_tokens = maxTokens;
-        else {
-          params.max_tokens = maxTokens;
-          params.temperature = 0;
-        }
-        log(`chunk ${idx + 1}/${total}: ${chunk.files.length} file(s), ${chunk.text.length} chars → ${actualModelId} (max ${maxTokens})`);
-        return client.chat.completions.create(params, { signal });
+  const units = splitAuditUnits(chunk.text);
+  const pending: AuditPendingUnits<Finding> = checkpoint?.pending ??
+    { chunk: idx, completed: {}, nextRoute: 0 };
+  if (pending.chunk !== idx || Object.keys(pending.completed).length > units.length)
+    throw new Error("Audit unit checkpoint does not match current source");
+  const persist = async () => {
+    if (checkpoint) { checkpoint.pending = pending; await saveCheckpoint(checkpoint); }
+  };
+  try {
+    const findings = await resumeAuditUnits({
+      units, pending, routes: AUDIT_ROUTES,
+      persist: async () => { await auditJobState(); await persist(); },
+      invoke: async (route, source) => {
+        const result = await auditCompletion(route, SYSTEM_PROMPT,
+          `Audit this source unit; report only files explicitly labelled below:\n${source}`,
+          AUDIT_MAX_TOKENS, AUDIT_CHUNK_TIMEOUT_MS);
+        const findings = parseFindings(result.raw);
+        if (findings === null || !findings.every(f => isFinding(f, new Set(chunk.files)) &&
+            auditUnitLocationMatches(source, f.file, f.line)))
+          throw new Error("Invalid or out-of-scope findings");
+        log(`chunk ${idx + 1}/${total}: unit complete via ${route.providerLane}/${result.model}`);
+        return { findings, provider: route.providerLane, model: result.model };
       },
-    );
-    return {
-      raw: resp.choices?.[0]?.message?.content || "",
-      truncated: resp.choices?.[0]?.finish_reason === "length",
-    };
+      failed: auditRouteFailed, available: auditRouteAvailable,
+    });
+    return { ok: true, findings };
+  } catch (error) {
+    if (!(error instanceof AuditProvidersExhausted)) throw error;
+    providerRecoveryNeeded = true;
+    return { ok: false, findings: Object.values(pending.completed).flatMap(r => r.findings),
+      reason: error.message };
   }
+}
 
-  // Re-roll loop: a successful parse returns immediately (one call for healthy
-  // chunks). An unparseable response or a transient model-call error retries up
-  // to AUDIT_PARSE_RETRY_MAX extra times — the free reasoning lane is stochastic,
-  // so a plain re-roll usually parses. Only after attempts are exhausted does the
-  // chunk count as a DEGRADED failure (fail-closed preserved).
-  const maxAttempts = 1 + AUDIT_PARSE_RETRY_MAX;
-  let lastRaw = "";
-  let lastTruncated = false;
-  let lastReason = "unparseable-output";
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    let raw: string;
-    let truncated: boolean;
-    try {
-      ({ raw, truncated } = await call(AUDIT_MAX_TOKENS));
-      // Parse failed AND the provider truncated the output → the thinking trace
-      // ate the budget. Retry ONCE with a larger ceiling (independent of the
-      // re-roll loop) before treating this attempt as unparseable.
-      if (parseFindings(raw) === null && truncated && AUDIT_RETRY_MAX_TOKENS > AUDIT_MAX_TOKENS) {
-        log(`chunk ${idx + 1}/${total}: output truncated (finish_reason=length) — retrying at max_tokens ${AUDIT_RETRY_MAX_TOKENS}`);
-        ({ raw, truncated } = await call(AUDIT_RETRY_MAX_TOKENS));
-      }
-    } catch (e) {
-      lastReason = `model-call-failed: ${(e as Error)?.message || e}`;
-      log(`chunk ${idx + 1}/${total}: attempt ${attempt}/${maxAttempts} FAILED — ${lastReason}`);
-      continue; // transient model/network error → re-roll if attempts remain
-    }
-
-    const findings = parseFindings(raw);
-    if (findings !== null) {
-      log(`chunk ${idx + 1}/${total}: ${findings.length} finding(s)${attempt > 1 ? ` (attempt ${attempt})` : ""}`);
-      return { ok: true, findings };
-    }
-
-    // Unparseable this attempt — remember context and re-roll if attempts remain.
-    lastRaw = raw;
-    lastTruncated = truncated;
-    lastReason = truncated
-      ? `truncated-output (finish_reason=length, ${raw.length} chars)`
-      : `unparseable-output (${raw.length} chars)`;
-    log(`chunk ${idx + 1}/${total}: attempt ${attempt}/${maxAttempts} unparseable — ${lastReason}`);
-  }
-
-  // All attempts exhausted, still unparseable → DEGRADED (fail-closed). If the
-  // final attempt was truncated, salvage its complete leading findings so they
-  // aren't thrown away (but keep ok:false so coverage stays honest).
-  if (lastTruncated) {
-    const salvaged = salvageFindings(lastRaw);
-    const reason = `truncated-output (finish_reason=length, ${lastRaw.length} chars, salvaged ${salvaged.length})`;
-    log(`chunk ${idx + 1}/${total}: FAILED after ${maxAttempts} attempt(s) — ${reason}`);
-    return { ok: false, findings: salvaged, reason };
-  }
-  log(`chunk ${idx + 1}/${total}: FAILED after ${maxAttempts} attempt(s) — ${lastReason}`);
-  return { ok: false, findings: [], reason: lastReason };
+async function auditCompletion(route: AuditRoute, system: string, user: string,
+  maxTokens: number, timeoutMs: number): Promise<{ raw: string; model: string }> {
+  return invokeAuditRoute(route, system, user, maxTokens, { timeoutMs });
 }
 
 interface Coverage {
@@ -662,7 +662,7 @@ function noteUnreadable(f: string, e: unknown) {
 }
 
 let alertReportSnapshots: Array<{ name: string; content: string }> = [];
-function writeReport(
+async function writeReport(
   findings: Finding[],
   cov: Coverage,
   suppressed: TriageVerdict[] = [],
@@ -748,7 +748,9 @@ function writeReport(
 
   const md =
     `# Tenant-Isolation Audit Report\n\n` +
-    `_Generated ${ts} by \`scripts/tenant-isolation-audit.ts\` using \`${MODEL}\`._\n\n` +
+    `_Generated ${ts} by \`scripts/tenant-isolation-audit.ts\` using \`${MODEL}\`` +
+    (AUDIT_PROVIDER_OPTIONS.providerLane ? ` pinned to \`${AUDIT_PROVIDER_OPTIONS.providerLane}\`` : "") +
+    `._\n\n` +
     `**READ-ONLY audit** — findings below are surfaced for human review. No code was changed.\n` +
     coverageBanner +
     `\n- Coverage: **${cov.filesAudited}/${cov.scanned}** file(s) audited · ` +
@@ -771,6 +773,7 @@ function writeReport(
         generatedAt: ts,
         evidenceHash,
         model: MODEL,
+        providerLane: AUDIT_PROVIDER_OPTIONS.providerLane,
         triageModel: suppressed.length ? TRIAGE_MODEL : undefined,
         degraded,
         coverage: cov,
@@ -810,6 +813,7 @@ function writeReport(
       null,
       2,
     );
+  await auditJobState("auditReport", JSON.parse(reportJson));
   const written = writeTenantAuditReportFiles({
     degraded,
     markdown: md,
@@ -1108,6 +1112,7 @@ async function precisionTriage(
 ): Promise<{ kept: Finding[]; suppressed: TriageVerdict[]; ran: boolean; degraded: boolean; reason?: string }> {
   if (!PRECISION_ON) return { kept: severe, suppressed: [], ran: false, degraded: false, reason: "disabled" };
   if (severe.length === 0) return { kept: [], suppressed: [], ran: false, degraded: false };
+  const precisionSourceHash = computeTenantAuditEvidenceHash(ROOT);
 
   const schema = buildSchemaIndex();
   if (!schema.ok) {
@@ -1153,30 +1158,45 @@ async function precisionTriage(
     const batch = batches[b];
     const userContent = batch.map((f, i) => renderFindingForTriage(f, i, idx)).join("\n\n");
     try {
-      const resp = await withAuditDeadline(
-        `tenant audit precision batch ${b + 1}/${runBatches}`,
-        AUDIT_TRIAGE_TIMEOUT_MS,
-        async (signal) => {
-          const { getClientForModel } = await import("../server/providers");
-          const { client, actualModelId } = await getClientForModel(TRIAGE_MODEL, 1);
-          const isOpenAIReasoning = /^(gpt-5|gpt-4\.1|o[1-9])/i.test(actualModelId);
-          const params: any = {
-            model: actualModelId,
-            messages: [
-              { role: "system", content: TRIAGE_SYSTEM_PROMPT },
-              { role: "user", content: `Classify these ${batch.length} finding(s):\n\n${userContent}` },
-            ],
-          };
-          if (isOpenAIReasoning) params.max_completion_tokens = TRIAGE_MAX_TOKENS;
-          else {
-            params.max_tokens = TRIAGE_MAX_TOKENS;
-            params.temperature = 0;
-          }
-          log(`precision batch ${b + 1}/${runBatches}: ${batch.length} finding(s) → ${actualModelId}`);
-          return client.chat.completions.create(params, { signal });
-        },
-      );
-      const parsed = parseVerdicts(resp.choices?.[0]?.message?.content || "");
+      await auditJobState();
+      const routes = auditRoutes(process.env.AUDIT_PROVIDER_LANE || "profundo", TRIAGE_MODEL);
+      const cacheKey = createHash("sha256").update(JSON.stringify({
+        contract: "validated-fallback-v2", routes,
+        prompt: TRIAGE_SYSTEM_PROMPT, userContent, maxTokens: TRIAGE_MAX_TOKENS,
+        sourceHash: precisionSourceHash,
+      })).digest("hex");
+      const precisionCache = await precisionState("auditPrecision") ?? {};
+      let retainedRaw: string | undefined = precisionCache[cacheKey];
+      // JSON escaping can expand one raw byte to six bytes. Reserve for the
+      // entire permitted response plus its key BEFORE calling the provider.
+      if (retainedRaw === undefined &&
+          Buffer.byteLength(JSON.stringify(precisionCache)) + 6 * 512 * 1024 + 256 > 8 * 1024 * 1024)
+        throw new Error("Precision checkpoint capacity exhausted before dispatch");
+      if (retainedRaw === undefined) {
+        const handoff = await precisionState("auditHandoff");
+        retainedRaw = await runAuditFallback({
+          routes, cursor: handoff?.key === cacheKey ? handoff.nextRoute : 0,
+          beforeAttempt: async nextRoute => {
+            await auditJobState();
+            await precisionState("auditHandoff", { key: cacheKey, nextRoute });
+          },
+          invoke: async route => {
+            const response = await auditCompletion(route, TRIAGE_SYSTEM_PROMPT,
+              `Classify these ${batch.length} finding(s):\n\n${userContent}`, TRIAGE_MAX_TOKENS, AUDIT_TRIAGE_TIMEOUT_MS);
+            const parsed = parseVerdicts(response.raw);
+            const targets = parsed?.map(v => matchVerdictToFinding(batch, v));
+            if (!targets || targets.length !== batch.length || targets.some(f => !f) ||
+                new Set(targets).size !== batch.length)
+              throw new Error("Incomplete or ambiguous precision response");
+            log(`precision batch ${b + 1}/${runBatches} completed via ${route.providerLane}/${response.model}`);
+            return response.raw;
+          },
+          failed: auditRouteFailed, available: auditRouteAvailable,
+        });
+        // Identity is the exact task, not the provider that happened to finish.
+        await precisionState("auditPrecision", { ...precisionCache, [cacheKey]: retainedRaw });
+      }
+      const parsed = parseVerdicts(retainedRaw);
       if (!parsed) {
         degraded = true;
         log(`precision batch ${b + 1}/${runBatches}: unparseable verdicts — keeping all ${batch.length} (fail closed).`);
@@ -1194,6 +1214,11 @@ async function precisionTriage(
         verdicts.set(f, { finding: f, verdict: "SUPPRESS", pattern: v.pattern, reason: v.reason || "cleared by precision pass" });
       }
     } catch (e) {
+      if (e instanceof AuditProvidersExhausted) {
+        providerRecoveryNeeded = true;
+        degraded = true;
+        break; // Never spend on later batches while every provider is down.
+      }
       degraded = true;
       log(`precision batch ${b + 1}/${runBatches} FAILED — ${(e as Error)?.message || e}; keeping all ${batch.length} (fail closed).`);
       continue;
@@ -1343,7 +1368,7 @@ async function main() {
 
   const resumable = SLICE_CHUNKS > 0 && MAX_CHUNKS === 0;
   const checkpoint = resumable
-    ? loadCheckpoint(sourceFingerprint(chunks, evidenceHash), chunks)
+    ? await loadCheckpoint(sourceFingerprint(chunks, evidenceHash), chunks)
     : null;
   const completedIndexes = checkpoint
     ? Object.keys(checkpoint.completed)
@@ -1401,7 +1426,7 @@ async function main() {
         failures: [{ chunk: 0, reason: failureReason }],
         unreadableFiles: [...UNREADABLE_FILES],
       };
-      writeReport([], cov, [], evidenceHash);
+      await writeReport([], cov, [], evidenceHash);
       if (!DRY_RUN) {
         await notifyOwner(
           "TENANT-ISOLATION AUDIT: DEGRADED — budget gate unavailable",
@@ -1424,14 +1449,16 @@ async function main() {
   const failedFiles = new Set<string>();
   const failures: { chunk: number; reason: string }[] = [];
   for (let i = runStart; i < runEnd; i++) {
-    const r = await auditChunk(chunks[i], i, requiredChunks);
+    await auditJobState();
+    const r = await auditChunk(chunks[i], i, requiredChunks, checkpoint);
     if (r.ok) {
       chunksSucceeded++;
       for (const f of chunks[i].files) okFiles.add(f);
       all.push(...r.findings);
       if (checkpoint) {
         checkpoint.completed[String(i)] = r.findings;
-        saveCheckpoint(checkpoint);
+        delete checkpoint.pending;
+        await saveCheckpoint(checkpoint);
       }
     } else {
       // Failed chunk stays DEGRADED (not counted as success → coverage honest),
@@ -1521,7 +1548,7 @@ async function main() {
   // snapshot; that run must go to degraded diagnostics, never authoritative latest.
   cov.sourceChangedDuringRun =
     cov.sourceChangedDuringRun || computeTenantAuditEvidenceHash(ROOT) !== evidenceHash;
-  writeReport(findings, cov, allSuppressed, evidenceHash, {
+  await writeReport(findings, cov, allSuppressed, evidenceHash, {
     kept: severe,
     precisionFalsePositive: precision.suppressed,
     allowlistFalsePositive: allow.suppressed,
@@ -1573,7 +1600,7 @@ async function main() {
           `\n\nFull report: ${REPORT_MD}`,
       );
     }
-    process.exit(5);
+    process.exit(providerRecoveryNeeded ? 8 : 5);
   }
 
   if (precision.degraded) {
@@ -1584,7 +1611,7 @@ async function main() {
           `No clean result is permitted. Full report: ${REPORT_MD}`,
       );
     }
-    process.exit(5);
+    process.exit(providerRecoveryNeeded ? 8 : 5);
   }
 
   if (cov.sourceChangedDuringRun) {
@@ -1657,4 +1684,20 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((e) => die(3, `fatal: ${String((e as Error)?.stack || e)}`));
+if (process.argv.includes("--preflight-only")) {
+  // Explicit offline production-bundle probe. No job state, model, budget,
+  // report write, email or remediation is invoked.
+  try {
+    const files = collectFiles();
+    const schema = buildSchemaIndex();
+    if (!files.length || !schema.ok) throw new Error("Audit source/schema unavailable");
+    console.log(JSON.stringify({ mode: "preflight-only", auditExecuted: false,
+      files: files.length, chunks: buildChunks(files).length,
+      evidenceHash: computeTenantAuditEvidenceHash(ROOT) }));
+  } catch (error) {
+    console.error("[tenant-audit-preflight] failed", error);
+    process.exitCode = 2;
+  }
+} else {
+  main().catch((e) => die(3, `fatal: ${String((e as Error)?.stack || e)}`));
+}

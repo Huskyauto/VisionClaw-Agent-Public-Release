@@ -14,6 +14,7 @@
  */
 
 import { isIP as _netIsIP } from "node:net";
+import { Agent } from "undici";
 
 // Package acyclicity invariant (plan.md S2): no static imports outside
 // server/tools/. isUrlSafeSync is SYNC, so the silent-catch logger is loaded
@@ -120,20 +121,21 @@ export function isUrlSafeSync(urlStr: string): { safe: boolean; error?: string; 
 // metadata) or to 10.x/192.168.x. We resolve all A/AAAA records and
 // reject if ANY address falls in a private/loopback/metadata range.
 // Literal IPs are already validated by isUrlSafeSync via isPrivateIp.
-export async function isUrlSafe(urlStr: string): Promise<{ safe: boolean; error?: string }> {
+export async function isUrlSafe(urlStr: string): Promise<{ safe: boolean; error?: string; addresses?: string[] }> {
   const sync = isUrlSafeSync(urlStr);
   if (!sync.safe) return sync;
-  if (sync.isLiteralIp) return { safe: true };
+  if (sync.isLiteralIp) return { safe: true, addresses: [sync.host!] };
   const host = sync.host!;
   try {
     const dns = await import("dns");
     const addrs = await dns.promises.lookup(host, { all: true, verbatim: true });
+    if (addrs.length === 0) return { safe: false, error: "DNS returned no addresses" };
     for (const a of addrs) {
       if (isPrivateIp(a.address)) {
         return { safe: false, error: `Host ${host} resolves to private/loopback/metadata IP ${a.address}` };
       }
     }
-    return { safe: true };
+    return { safe: true, addresses: addrs.map((a) => a.address) };
   } catch (err: any) {
     return { safe: false, error: `DNS resolution failed for ${host}: ${String(err?.message || err).slice(0, 100)}` };
   }
@@ -142,7 +144,7 @@ export async function isUrlSafe(urlStr: string): Promise<{ safe: boolean; error?
 // R116.2 — SSRF-safe redirect follower. `redirect: "follow"` lets a public URL
 // 30x into an internal target after the pre-fetch SSRF guard already cleared
 // it. This helper re-runs `isUrlSafe` on every Location header (max 5 hops)
-// and returns the final Response, or throws if any hop is unsafe.
+// and pins each connection to that hop's validated answers.
 export async function safeFetchFollowRedirects(
   startUrl: string,
   init: RequestInit,
@@ -150,15 +152,33 @@ export async function safeFetchFollowRedirects(
 ): Promise<Response> {
   let currentUrl = startUrl;
   for (let i = 0; i <= maxRedirects; i++) {
-    const resp = await fetch(currentUrl, { ...init, redirect: "manual" });
+    const checked = await isUrlSafe(currentUrl);
+    if (!checked.safe || !checked.addresses?.length) throw new Error(`Unsafe fetch URL: ${checked.error ?? "no validated addresses"}`);
+    const addresses = checked.addresses.map((address) => ({ address, family: _netIsIP(address) }));
+    const dispatcher = new Agent({
+      connect: {
+        lookup: (_hostname: string, options: any, callback: any) => {
+          if (options?.all) return callback(null, addresses);
+          const selected = addresses.find((item) => item.family === options?.family) ?? addresses[0];
+          callback(null, selected.address, selected.family);
+        },
+      },
+    });
+    let resp: Response;
+    try {
+      resp = await fetch(currentUrl, { ...init, redirect: "manual", dispatcher } as RequestInit);
+    } finally {
+      // Graceful close waits for the response body, which remains owned by the
+      // caller. Do not await here: it would deadlock before the caller can read.
+      void dispatcher.close().catch((err) => logSilentCatchAsync("safe-fetch dispatcher close", err));
+    }
     if (resp.status < 300 || resp.status >= 400 || !resp.headers.get("location")) {
       return resp;
     }
+    await resp.body?.cancel();
     if (i === maxRedirects) throw new Error(`Too many redirects (>${maxRedirects})`);
     const loc = resp.headers.get("location")!;
     const nextUrl = new URL(loc, currentUrl).toString();
-    const hopCheck = await isUrlSafe(nextUrl);
-    if (!hopCheck.safe) throw new Error(`Unsafe redirect to ${nextUrl}: ${hopCheck.error}`);
     currentUrl = nextUrl;
   }
   throw new Error("Redirect loop terminated unexpectedly");

@@ -33,7 +33,22 @@ export function readableBusinessReportSections(sections: ReportSection[],
     if (/^About This/.test(section.heading)) body = body.replace(/^Order:[^\n]*\n?/gm, "");
     const paragraphs = body.replace(/\*\*|`/g, "").split(/\n+/).map(p => p.trim()).filter(Boolean);
     if (!paragraphs.length) continue;
-    result.push({ title: section.heading, highlight: paragraphs[0], paragraphs: paragraphs.slice(1) });
+    if (!paragraphs.some(p => /^[-*•]\s+/.test(p))) {
+      result.push({ title: section.heading, highlight: paragraphs[0], paragraphs: paragraphs.slice(1) });
+      continue;
+    }
+    // Preserve interleaved advice/assumptions and list order; evidence above is
+    // never rewritten. Empty run titles avoid invented subsection headings.
+    const highlight = /^[-*•]\s+/.test(paragraphs[0]) ? undefined : paragraphs.shift();
+    const runs: NonNullable<PdfSection["subsections"]> = [];
+    for (const paragraph of paragraphs) {
+      const bullet = paragraph.match(/^[-*•]\s+(.+)$/);
+      const key = bullet ? "bullets" : "paragraphs";
+      let run = runs.at(-1);
+      if (!run?.[key]) { run = { title: "", [key]: [] }; runs.push(run); }
+      run[key]!.push(bullet ? bullet[1] : paragraph);
+    }
+    result.push({ title: section.heading, highlight, subsections: runs });
   }
   if (evidence.length) result.push({ title: "Supporting Source Quotations",
     content: "Retained evidence excerpts, separated from the recommendations for easier reading. Citation IDs refer to the source register.",
@@ -47,9 +62,9 @@ export function plainReadableBusinessReportSections(sections: ReportSection[],
   return readableBusinessReportSections(sections, kind).map(section => ({
     heading: section.title,
     body: [
-      section.content, section.highlight, ...(section.paragraphs ?? []), ...(section.bullets ?? []),
+      section.content, section.highlight, ...(section.paragraphs ?? []), ...(section.bullets ?? []).map(b => `- ${b}`),
       ...(section.subsections ?? []).flatMap(sub => [
-        sub.title, sub.content, ...(sub.paragraphs ?? []), ...(sub.bullets ?? []),
+        sub.title, sub.content, ...(sub.paragraphs ?? []), ...(sub.bullets ?? []).map(b => `- ${b}`),
       ]),
     ].filter(Boolean).join("\n\n"),
   }));

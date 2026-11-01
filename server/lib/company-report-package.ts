@@ -1,9 +1,15 @@
 import { sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { db } from "../db";
-import { deferJob, renewJobLease, type AgentJob } from "../job-queue";
+import { renewJobLease, type AgentJob } from "../job-queue";
 import { advancePackage, REPORT_KINDS, type PackageKind, type PackageState } from "./company-report-package-core";
 import { createPackageTeaser, combinePackageTeasers, PACKAGE_REPORT_NAMES } from "./company-report-teasers";
 import { COMPANY_REPORT_PACKAGE_FILE_PREFIX } from "./private-business-pilot-files";
+import { confirmedPackageDraft, packageSectionDrafter, PACKAGE_MODEL_SEATS, packageWindowOpen } from "./company-report-production";
+import { assertReportAudioUrl } from "./business-report-audio";
+import { compilationValidationFailure, compilationCorrectionStopReason } from "./company-compilation-checks";
+import { hasCompilationCorrectionApproval } from "./company-compilation-correction-policy";
+import { hasTargetedRepairApproval, TARGETED_COMPILATION_REPAIR_GRANT } from "./company-compilation-targeted-repair";
 
 export const PACKAGE_JOB_KIND = "company_report_package";
 const rows = (result: any) => result.rows || result;
@@ -38,13 +44,15 @@ export async function advanceCompanyReportPackage(job: AgentJob) {
   let leaseLost = false, renewing = false;
   const live = async () => {
     if (leaseLost || process.env.REPORT_EVIDENCE_HANDOFFS_DISABLED === "1") throw new Error("Package stopped or lease lost");
+    if (state.phase !== "blocked" && !packageWindowOpen(job.payload.processingWindowStartedAt || new Date(job.createdAt).toISOString()))
+      throw new Error("Package processing window expired");
     const [row] = rows(await db.execute(sql`SELECT id FROM agent_jobs WHERE id=${job.id} AND tenant_id=${tenantId}
       AND kind=${PACKAGE_JOB_KIND} AND status='running' AND attempts=${job.attempts} AND lease_until>NOW()`));
     if (!row) { leaseLost = true; throw new Error("Package lease lost"); }
   };
   const checkpoint = async () => {
     await live();
-    const updated = rows(await db.execute(sql`UPDATE agent_jobs SET payload=${JSON.stringify({ ...job.payload, state })}::jsonb
+    const updated = rows(await db.execute(sql`UPDATE agent_jobs SET payload=jsonb_set(payload,'{state}',${JSON.stringify(state)}::jsonb)
       WHERE id=${job.id} AND tenant_id=${tenantId} AND kind=${PACKAGE_JOB_KIND}
       AND status='running' AND attempts=${job.attempts} AND lease_until>NOW() RETURNING id`));
     if (!updated.length) throw new Error("Package checkpoint lease lost");
@@ -71,13 +79,74 @@ export async function advanceCompanyReportPackage(job: AgentJob) {
     return value;
   };
   try {
-    if (Date.now() - new Date(job.createdAt).getTime() > 24 * 60 * 60_000) {
+    const processingStart = Date.parse(job.payload.processingWindowStartedAt || new Date(job.createdAt).toISOString());
+    if (!Number.isFinite(processingStart) || Date.now() - processingStart > 24 * 60 * 60_000) {
       state.phase = "blocked"; state.error = "Package exceeded its 24-hour processing window; retained work needs owner review.";
       await checkpoint(); return { phase: state.phase };
     }
+    if (job.payload.productionVersion === 3) {
+      if (state.phase !== "blocked" && state.phase !== "done") {
+        if (state.research?.complete !== true) {
+          state.phase = "researching";
+          await checkpoint();
+          if (!state.intake.website) throw new Error("A public company website is needed: enter the website in the company form.");
+          const { researchCompanyPackage } = await import("./company-report-research");
+          const evidence = await import("./business-report-evidence");
+          const browser = await import("../camofox-tool"), audit = await import("../audit-engine");
+          const { companyResearchBrowserLanes } = await import("./company-research-browser");
+          state.research = await researchCompanyPackage(state.intake, tenantId, job.id, {
+            collect: evidence.collectBusinessReportEvidence, live,
+            fetch: url => audit.safeFetchText(url, { timeoutMs: 6000, maxBytes: 300_000, maxRedirects: 2 }),
+            browse: params => browser.executeCamofoxAction(params),
+            browserLanes: companyResearchBrowserLanes(params => browser.executeCamofoxAction(params)), prior: state.research,
+            checkpoint: async value => { state.research = value; await checkpoint(); },
+          });
+          if (state.research.complete) state.phase = "drafting";
+          await checkpoint();
+        } else {
+          const { advanceCompanyCompilation } = await import("./company-package-v3");
+          const { requestCompanyCompilation } = await import("./company-compilation-runtime");
+          const { acceptCompilation } = await import("./company-compilation-content");
+          const { publishCompanyCompilation } = await import("./company-package-publication");
+          const { publishCompanyTeaserPack } = await import("./company-package-teaser-publication");
+          await advanceCompanyCompilation(state, {
+            parallel: true,
+            checkpoint,
+            request: (op, drafts) => requestCompanyCompilation(job, state, op, drafts, live),
+            accept: (op, raw) => acceptCompilation(state, op, raw),
+            correct: hasCompilationCorrectionApproval(job.payload)
+              ? (op, drafts, original, check) => requestCompanyCompilation(job, state, op, drafts, live, undefined, { original, check })
+              : undefined,
+            targetedRepair: hasTargetedRepairApproval(job) ? {
+              operation: TARGETED_COMPILATION_REPAIR_GRANT.operation,
+              request: (op, drafts, original, check) => requestCompanyCompilation(job, state, op, drafts, live,
+                undefined, { original, check, targetedRepair: true }),
+            } : undefined,
+            publish: (kind, text) => publishCompanyCompilation(job, state, kind, text, {
+              live, checkpoint, storeFile: (key, bytes) => storeFile(tenantId, job.id, key, bytes),
+              packageFile: key => packageFile(tenantId, job.id, key),
+            }),
+            publishTeaser: () => publishCompanyTeaserPack(job, state, {
+              live, checkpoint, storeFile: (key, bytes) => storeFile(tenantId, job.id, key, bytes),
+              packageFile: key => packageFile(tenantId, job.id, key),
+            }),
+          });
+        }
+      }
+    } else {
+    if (job.payload.productionVersion === 2 && state.research?.complete === true)
+      await (await import("./company-report-final-review")).reviewCompletePackage(job, state, live);
     await advancePackage(state, {
+      researchOnly: job.payload.researchOnly === true,
       checkpoint,
       research: async () => {
+        if (!state.intake.website) {
+          const domain = state.intake.contactEmail?.split("@")[1]?.toLowerCase();
+          if (!domain || /^(?:gmail|googlemail|yahoo|ymail|hotmail|outlook|live|aol|icloud|me|msn|protonmail|proton)\./.test(domain))
+            throw new Error("A public company website is needed: this contact email does not identify a unique business website.");
+          state.intake.website = `https://${domain}/`;
+          await checkpoint();
+        }
         const { researchCompanyPackage } = await import("./company-report-research");
         // Inject only the live lease check; production adapters remain server-owned.
         const research = await import("./business-report-evidence");
@@ -86,6 +155,9 @@ export async function advanceCompanyReportPackage(job: AgentJob) {
           collect: research.collectBusinessReportEvidence, live,
           fetch: url => audit.safeFetchText(url, { timeoutMs: 6000, maxBytes: 300_000, maxRedirects: 2 }),
           browse: params => browser.executeCamofoxAction(params),
+          prior: state.research,
+           backfillOnly: job.payload.researchOnly === true,
+          checkpoint: async value => { state.research = value; await checkpoint(); },
         });
       },
       recover: async kind => {
@@ -94,10 +166,26 @@ export async function advanceCompanyReportPackage(job: AgentJob) {
           AND payload->'input'->>'reportOnly'='true' ORDER BY id DESC LIMIT 1`));
         return prior?.id ?? null;
       },
+      canResumeDraft: async kind => {
+        if (job.payload.productionVersion !== 2) return false;
+        await live();
+        const [current] = rows(await db.execute(sql`SELECT payload FROM agent_jobs WHERE id=${job.id}
+          AND tenant_id=${tenantId} AND kind=${PACKAGE_JOB_KIND} AND status='running'
+          AND attempts=${job.attempts} AND lease_until>NOW()`));
+        if (!current) return false;
+        const claims = Object.keys(current.payload.packageSpend || {}).filter(key => key.startsWith(`draft:${kind}:`));
+        // Every paid dispatch must have a committed complete answer, or it is
+        // uncertain and cannot be replayed. Unclaimed remaining sections are safe.
+        return claims.every(key => !!confirmedPackageDraft(key.slice(6).split(":recovery:")[0],
+          PACKAGE_MODEL_SEATS[kind].model, current.payload.packageDrafts || {}));
+      },
       draft: async (kind, sharedEvidence) => {
         await live();
+        const modern = job.payload.productionVersion === 2;
         const params = { intake: state.intake, tenantId, customerEmail: "", orderId: orderId(kind),
-          sharedEvidence, reportOnly: true };
+          sharedEvidence, reportOnly: true,
+          ...(modern ? { sectionDrafter: packageSectionDrafter(job, kind, live), draftModelId: PACKAGE_MODEL_SEATS[kind].model,
+            paidJuryBatch: `company-package:${job.id}`, operatorJobId: `company-package:${job.id}` } : {}) };
         const result = kind === "readiness"
           ? await (await import("../audit-fulfillment")).fulfillReadinessAudit(params)
           : await (await import("../executive-report-fulfillment")).fulfillExecutiveReport({
@@ -112,7 +200,10 @@ export async function advanceCompanyReportPackage(job: AgentJob) {
         if (value.status !== "succeeded") return { status: "pending" };
         const fulfillment = value.payload.fulfillment;
         if (!fulfillment?.success || !fulfillment.fileName || !Array.isArray(value.payload.state?.approvedSections)) return { status: "error" };
-        return { status: "done", filename: fulfillment.fileName, sections: value.payload.state.approvedSections };
+        const audioUrl = fulfillment.audio?.viewUrl;
+        if (job.payload.productionVersion === 2 && !audioUrl) return { status: "error" };
+        if (audioUrl) assertReportAudioUrl(audioUrl);
+        return { status: "done", filename: fulfillment.fileName, sections: value.payload.state.approvedSections, audioUrl };
       },
       assemble: async (kind, review) => {
         await live();
@@ -122,7 +213,7 @@ export async function advanceCompanyReportPackage(job: AgentJob) {
         await storeFile(tenantId, job.id, `${kind}-full`, Buffer.from(source.data, "base64"));
         if (!state.files.some(file => file.key === `${kind}-full`)) {
           state.files.push({ key: `${kind}-full`, label: `${PACKAGE_REPORT_NAMES[kind]} — Complete report (private)`,
-            filename: `${kind}-full.pdf`, category: "full" });
+            filename: `${kind}-full.pdf`, category: "full", ...(review.audioUrl ? { audioUrl: review.audioUrl } : {}) });
           await checkpoint();
         }
         const c = state.research!.coverage;
@@ -132,7 +223,7 @@ export async function advanceCompanyReportPackage(job: AgentJob) {
         await storeFile(tenantId, job.id, `${kind}-teaser`, teaser);
         return (["full", "teaser"] as const).map(category => ({ key: `${kind}-${category}`,
           label: `${PACKAGE_REPORT_NAMES[kind]} — ${category === "full" ? "Complete report (private)" : "One-page teaser"}`,
-          filename: `${kind}-${category}.pdf`, category }));
+          filename: `${kind}-${category}.pdf`, category, ...(category === "full" && review.audioUrl ? { audioUrl: review.audioUrl } : {}) }));
       },
       combine: async () => {
         await live();
@@ -145,15 +236,63 @@ export async function advanceCompanyReportPackage(job: AgentJob) {
         });
       },
     });
+    }
     if (state.phase === "done" || state.phase === "blocked") return { phase: state.phase };
-    if (!await deferJob(job.id, job.attempts, tenantId, { ...job.payload, state }, 30_000)) throw new Error("Package defer lease lost");
+    // A child may reserve spend at ANY instant. Never select then replace the
+    // entire payload: that race would erase a newly committed paid claim.
+    const deferred = rows(await db.execute(sql`UPDATE agent_jobs
+      SET status='pending',payload=jsonb_set(payload,'{state}',${JSON.stringify(state)}::jsonb),
+        next_run_at=NOW()+INTERVAL '30 seconds',lease_until=NULL,error=NULL
+      WHERE id=${job.id} AND tenant_id=${tenantId} AND kind=${PACKAGE_JOB_KIND}
+        AND status='running' AND attempts=${job.attempts} AND lease_until>NOW() RETURNING id`));
+    if (deferred.length !== 1) throw new Error("Package defer lease lost");
     return { deferred: true };
-  } catch {
+  } catch (error) {
     if (leaseLost) throw new Error("Package lost lease; no further dispatch allowed");
     state.phase = "blocked";
-    state.error = "Package interrupted. Retained research and completed reports are preserved; inspect server diagnostics before another generation.";
+    const message = error instanceof Error ? error.message : "";
+    const truncated = (error as any)?.code === "COMPILATION_TRUNCATED";
+    const compilationInvalid = ["COMPILATION_FORMAT_INVALID", "COMPILATION_CONTENT_INVALID"].includes((error as any)?.code);
+    const compilationCheck = compilationInvalid ? compilationValidationFailure(error) : undefined;
+    const corrections = Object.values((state as any).compilation?.slots ?? {}) as any[];
+    const correctionStopped = corrections.some(slot => slot.phase !== "complete" && slot.correction);
+    const targetedStopped = corrections.some(slot => slot.phase !== "complete" && slot.targetedRepair);
+    const publicationFailures: Record<string, string> = {
+      COMPANY_AUDIO_ASSEMBLY_FAILED: "Joining or validating the saved Fish audio",
+      COMPANY_AUDIO_UPLOAD_FAILED: "Uploading or verifying the completed Fish MP3",
+      COMPANY_PDF_RENDER_FAILED: "Rendering the PDF and embedding its audio link",
+      COMPANY_PDF_DELIVERY_FAILED: "Delivering or verifying the PDF",
+      COMPANY_TEASER_DELIVERY_FAILED: "Delivering or verifying the three-page customer teaser",
+    };
+    const publicationCode = typeof (error as any)?.code === "string" ? (error as any).code : "";
+    const publicationFailure = Object.hasOwn(publicationFailures, publicationCode)
+      ? publicationFailures[publicationCode] : undefined;
+    const failureCode = truncated ? "output_limit" : /lease|authority|stopped/i.test(message) ? "authority" :
+      /window|24.hour|deadline|timeout/i.test(message) ? "deadline" :
+      /checkpoint|database|connection|storage|PDF bytes/i.test(message) ? "storage" :
+      compilationInvalid || /final review|context|binding|identity|limit/i.test(message) ? "validation" : "unclassified";
+    const correlationId = randomUUID();
+    state.error = publicationFailure
+      ? `${publicationFailure} failed (reference ${correlationId}). Saved reports and purchased audio segments are preserved; continuation reuses them.`
+      : targetedStopped
+      ? `The separately approved additional correction did not complete acceptance (reference ${correlationId}). ${compilationCheck ? `${compilationCheck.label} ` : ""}${compilationCorrectionStopReason(corrections.map(slot => ({ phase: slot.phase, correction: slot.targetedRepair })))} All original and corrective receipts remain saved. No further automatic paid call is authorized.`
+      : correctionStopped
+      ? `The one permitted corrective attempt did not complete acceptance (reference ${correlationId}). ${compilationCheck ? `${compilationCheck.label} ` : ""}${compilationCorrectionStopReason(corrections)} Original responses, correction receipts and spend reservations are preserved. No further automatic paid call will be made for this step.`
+      : truncated
+      ? "A model response reached its output token limit and is incomplete. Saved research and completed compilations are preserved. Use the explicit replacement control if available; ordinary Continue will not repeat this paid call."
+      : compilationInvalid
+      ? `The saved model response did not pass its ${(error as any).code === "COMPILATION_FORMAT_INVALID" ? "JSON format" : "evidence/content"} checks (reference ${correlationId}). ${compilationCheck ? `${compilationCheck.label} ` : ""}Research, completed reports and the response are preserved. It will not be automatically repeated.`
+      : (error as any)?.code === "COMPANY_RESEARCH_TIMEOUT"
+      ? message
+      : error instanceof Error && /^(?:Website exceeds the (?:5,000-page|500-sitemap) safety limit|A public company website is needed:)/.test(error.message)
+      ? error.message
+      : error instanceof Error && error.message === "Package final review requires corrections; approved individual reports retained"
+        ? error.message : `Package stopped (${failureCode}; reference ${correlationId}). Saved research and completed reports are preserved.`;
     await checkpoint();
-    console.error(`[company-package] job=${job.id} blocked; no automatic duplicate synthesis`);
+    console.error("[company-package] blocked", { jobId: job.id, failureCode, correlationId,
+      validationCheck: compilationCheck?.check,
+      errorCode: typeof (error as any)?.code === "string" && /^[A-Z0-9_]{1,40}$/.test((error as any).code)
+        ? (error as any).code : undefined });
     return { phase: "blocked" };
   } finally { clearInterval(heartbeat); }
 }

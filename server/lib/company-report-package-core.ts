@@ -5,23 +5,25 @@ export const isPackageFileKey = (key: string): boolean => key === key.trim() &&
 export type PackageKind = typeof REPORT_KINDS[number];
 export type PackageIntake = {
   company: string; website: string; principalName?: string; industry?: string;
-  crm?: string; notes?: string; intakeText?: string;
+  crm?: string; notes?: string; intakeText?: string; contactEmail?: string;
 };
-export type PackageFile = { key: string; label: string; filename: string; category: "full" | "teaser" };
-export type Coverage = { discovered: number; reviewed: number; failed: number; capped: boolean };
+export type PackageFile = { key: string; label: string; filename: string; category: "full" | "teaser"; audioUrl?: string; pdfUrl?: string };
+export type Coverage = { discovered: number; reviewed: number; failed: number; capped: boolean; pending?: number };
 export type PackageState = {
   intake: PackageIntake; phase: "new" | "researching" | "drafting" | "reviewing" | "done" | "blocked";
-  research?: { evidence: ReportEvidence; coverage: Coverage; map?: unknown };
+  research?: { evidence: ReportEvidence; coverage: Coverage; map?: unknown; complete?: boolean };
   reports: Partial<Record<PackageKind, { status: "starting" | "pending" | "done" | "error"; jobId?: number; error?: string }>>;
   files: PackageFile[]; error?: string; emailSummary?: string;
 };
 export interface PackagePorts {
+  researchOnly?: boolean;
   checkpoint(state: PackageState): Promise<void>;
   research(): Promise<NonNullable<PackageState["research"]>>;
   draft(kind: PackageKind, evidence: ReportEvidence): Promise<number>;
   recover(kind: PackageKind): Promise<number | null>;
-  review(id: number, kind: PackageKind): Promise<{ status: string; sections?: ReportSection[]; filename?: string }>;
-  assemble(kind: PackageKind, review: { sections?: ReportSection[]; filename?: string }): Promise<PackageFile[]>;
+  canResumeDraft?(kind: PackageKind): Promise<boolean>;
+  review(id: number, kind: PackageKind): Promise<{ status: string; sections?: ReportSection[]; filename?: string; audioUrl?: string }>;
+  assemble(kind: PackageKind, review: { sections?: ReportSection[]; filename?: string; audioUrl?: string }): Promise<PackageFile[]>;
   combine(): Promise<void>;
 }
 export const initialPackage = (intake: PackageIntake): PackageState =>
@@ -30,14 +32,16 @@ export const initialPackage = (intake: PackageIntake): PackageState =>
 /** Durable checkpoints precede every spend-bearing dispatch. No blind replay. */
 export async function advancePackage(state: PackageState, ports: PackagePorts) {
   if (state.phase === "done" || state.phase === "blocked") return;
-  if (!state.research) {
-    if (state.phase === "researching") {
+  if (!state.research || state.research.complete === false) {
+    if (!state.research && state.phase === "researching") {
       state.phase = "blocked"; state.error = "Research was interrupted before its snapshot committed. Owner recovery required.";
       return ports.checkpoint(state);
     }
     state.phase = "researching"; await ports.checkpoint(state);
     state.research = await ports.research();
-    state.phase = "drafting"; return ports.checkpoint(state);
+    state.phase = state.research.complete === false ? "researching" : ports.researchOnly ? "blocked" : "drafting";
+    if (state.phase === "blocked") state.error = "Saved factual research refreshed without model calls. Review the remaining budget and resume explicitly.";
+    return ports.checkpoint(state);
   }
   for (const kind of REPORT_KINDS) {
     let report = state.reports[kind];
@@ -47,18 +51,23 @@ export async function advancePackage(state: PackageState, ports: PackagePorts) {
       try {
         report.jobId = await ports.draft(kind, state.research.evidence);
         report.status = "pending";
-      } catch {
+      } catch (error) {
         // Check for an accepted child before declaring the draft unconfirmed.
         const recovered = await ports.recover(kind);
         if (recovered) { report.jobId = recovered; report.status = "pending"; }
-        else { report.status = "error"; report.error = "Draft interrupted without a confirmed review receipt. No automatic duplicate dispatch."; }
+        else { report.status = "error"; report.error = error instanceof Error && /^Package drafting (?:rate-limited|unavailable|uncertain|incomplete|budget-limited)$/.test(error.message)
+          ? error.message : "Draft failed before report review. Research retained; no automatic duplicate dispatch."; }
       }
       return ports.checkpoint(state);
     }
     if (report.status === "starting") {
       const recovered = await ports.recover(kind);
       if (recovered) { report.jobId = recovered; report.status = "pending"; return ports.checkpoint(state); }
-      state.phase = "blocked"; state.error = `Interrupted ${kind} draft has no confirmed child receipt; no automatic duplicate dispatch.`;
+      if (await ports.canResumeDraft?.(kind)) {
+        report.jobId = await ports.draft(kind, state.research.evidence);
+        report.status = "pending"; return ports.checkpoint(state);
+      }
+      report.status = "error"; report.error = `Interrupted ${kind} draft has no confirmed child receipt; no automatic duplicate dispatch.`;
       return ports.checkpoint(state);
     }
   }
@@ -78,11 +87,15 @@ export async function advancePackage(state: PackageState, ports: PackagePorts) {
     state.files.push(...files.filter(file => !state.files.some(prior => prior.key === file.key)));
     report.status = "done"; await ports.checkpoint(state);
   }
+  // Keep the parent alive while any independently accepted child is working.
+  // Blocking it here would revoke that child's otherwise valid spending grant.
+  if (waiting) return ports.checkpoint(state);
   if (failed) {
-    state.phase = "blocked"; state.error = "Package incomplete: one or more report reviews need owner attention. Available reports remain downloadable.";
+    state.phase = "blocked"; state.error = Object.values(state.reports).some(report => report.status === "error" && !report.jobId)
+      ? "Report drafting failed before review. Saved research is retained; see each report's failure details."
+      : "Package incomplete: one or more report reviews need owner attention. Available reports remain downloadable.";
     return ports.checkpoint(state);
   }
-  if (waiting) return ports.checkpoint(state);
   await ports.combine();
   state.phase = "done";
   state.emailSummary = `${state.intake.company}: we reviewed your public website and prepared three short previews covering AI readiness, business growth and income opportunities. The previews highlight supported findings and practical next steps, with research limits disclosed. The complete three-report package is $497 total. Reply if you would like the full reports. No invoice or payment is required to review these previews.`;

@@ -288,6 +288,13 @@ FILES=(
 PASS=0
 FAIL=0
 
+mapfile -t REPORT_PACKAGE_FILES < tests/report-package-release-files.txt
+for report_file in "${REPORT_PACKAGE_FILES[@]}"; do
+  if [[ " ${FILES[*]} " != *" $report_file "* ]]; then
+    FILES+=("$report_file")
+  fi
+done
+
 for f in "${FILES[@]}"; do
   echo "=== $f ==="
   if timeout 60 node --import tsx --test "$f"; then

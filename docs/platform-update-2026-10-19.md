@@ -4,7 +4,7 @@ This reconciles the preceding 72 hours of work with the website and repositories
 It is not a deployment authorization or whole-platform security certification.
 Development counts come from release-facts.json: 428 registered tools, 386 public
 documented tools, 18 personas, 68 skills, 146 capabilities, 195 declared/276 live
-development tables, 887 indexes, 86 curated models and 41 governance rules.
+development tables, 887 indexes, 87 curated models and 41 governance rules.
 
 | Capability | Access and implemented behavior | Important boundary |
 |---|---|---|

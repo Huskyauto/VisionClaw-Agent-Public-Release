@@ -7,6 +7,23 @@ import { juryEvidencePrompt } from "./jury-evidence";
 import { parseReportVote } from "./report-vote-contract";
 import { reportBallotHasEvidence, type ReportJuryBinding } from "./jury-package";
 import { _parseVote } from "./jury-triage";
+import { hashReportBytes } from "./business-report-evidence";
+
+/** Stored audits factor source excerpts out. Restore only the exact snapshot
+ * already bound by the original executed receipt; never issue a new receipt. */
+export function restoreReportBallotSnapshot(result: ProposerResult, snapshot: string, binding: ReportJuryBinding): ProposerResult {
+  if (hashReportBytes(snapshot) !== binding.reportSha256) throw new Error("Retained snapshot bytes changed");
+  return { ...result, evidence: result.evidence && { ...result.evidence,
+    receipts: result.evidence.receipts.map(receipt => {
+      if (receipt.sha256 !== binding.reportSha256 || receipt.reportInspection?.reportSha256 !== binding.reportSha256 ||
+          receipt.reportInspection.inputDigest !== binding.inputDigest || receipt.reportInspection.jobId !== binding.jobId ||
+          receipt.reportInspection.tenantId !== binding.tenantId ||
+          receipt.excerpt !== undefined && receipt.excerpt !== snapshot)
+        throw new Error("Retained ballot snapshot receipt changed");
+      return { ...receipt, excerpt: snapshot };
+    }),
+  } };
+}
 
 export function validReportBallot(result: ProposerResult, binding: ReportJuryBinding): boolean {
   if (!result.ok || !result.answer || /length|max_tokens|incomplete|content_filter/i.test(result.finishReason || "")) return false;

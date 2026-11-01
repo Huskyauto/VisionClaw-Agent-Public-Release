@@ -97,6 +97,7 @@ test("CheaperInference catalog is owner-only and excluded from unscoped automati
   const globals = {
     storage: { getProviderKeys: async () => [{ provider: "cheaperinference", enabled: true }] },
     hasOpenferenceKey: () => false, cheaperInferenceReady: () => true,
+    mammouthReady: () => false,
     INTEGRATION_ENV: {}, SUBSCRIPTION_BASE_URLS: {}, MODEL_REGISTRY,
     RETIRED_MODEL_IDS: new Set(), isSyntheticEvaluationModel: () => false,
     isOwnerOnlyFinalDecisionModel,
@@ -115,6 +116,7 @@ test("CheaperInference catalog is owner-only and excluded from unscoped automati
 
 test("tier routing keeps free first, then owner CheaperInference; free-only and foreign scopes fail closed", async () => {
   let freeHealthy = true;
+  let cooldown = false;
   let discount = 60;
   let minimumDiscount = 40;
   let openferenceAvailable = false;
@@ -133,12 +135,19 @@ test("tier routing keeps free first, then owner CheaperInference; free-only and 
       (!!healthyOpenferenceModel && p === `openference:model:${healthyOpenferenceModel}`),
     mapReplitToOpenAI: (id: string) => id, hasIntegrationFallback: () => false,
     cheaperAutomaticAllowed: (tenant: number) => tenant === 1,
+    replitCooldownActive: async () => cooldown,
     cheaperMinimumDiscount: () => minimumDiscount,
     CHEAPER_INFERENCE_MODEL_ID, CHEAPER_INFERENCE_UPSTREAM_MODEL: "gpt-5.6-luna",
     getCheaperCatalog: async () => [{ id: "gpt-5.6-luna", endpoint: "/v1/chat/completions", discount }],
     meteredLlmEnabled: () => false,
   });
   assert.equal(await tier("balanced", 1), "gpt-5.4");
+  cooldown = true;
+  assert.equal(await tier("balanced", 1), CHEAPER_INFERENCE_MODEL_ID,
+    "a persisted Replit cooldown must advance routing even before in-memory health changes");
+  await assert.rejects(tier("balanced", 1, { allowMeteredFallback: false }));
+  await assert.rejects(tier("balanced", 1, { freeTierOnly: true }));
+  cooldown = false;
   freeHealthy = false;
   assert.equal(await tier("balanced", 1), CHEAPER_INFERENCE_MODEL_ID);
   await assert.rejects(tier("balanced", 2));
@@ -227,8 +236,18 @@ test("requests pin the upstream model and reject malformed or excessive output b
     ...base, reasoning: { mode: "pro" },
   }));
   assert.throws(() => guardCheaperInferenceRequest({
-    ...base, messages: [{ role: "user", content: "x".repeat(192 * 1024) }],
+    ...base, messages: [{ role: "user", content: "x".repeat(512 * 1024) }],
   }));
+});
+
+test("ordinary full chat context fits while oversized UTF-8 requests remain bounded", () => {
+  const base = { model: "gpt-5.4", max_completion_tokens: 128 };
+  assert.doesNotThrow(() => guardCheaperInferenceRequest({
+    ...base, messages: [{ role: "system", content: "s".repeat(376_367) }],
+  }, "gpt-5.4"));
+  assert.throws(() => guardCheaperInferenceRequest({
+    ...base, messages: [{ role: "system", content: "界".repeat(180_000) }],
+  }, "gpt-5.4"), /limit/);
 });
 
 test("streaming cannot opt out of usage, and multiple completions cannot multiply the output bound", () => {

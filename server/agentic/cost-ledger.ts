@@ -78,6 +78,9 @@ const MODEL_COST_PER_1K: Record<string, { in: number; out: number }> = {
   // $3/M in $15/M out verified 2026-07-27. Without this entry the unknown-model
   // fallback ledgers metered Kimi K3 usage at $0.
   "moonshotai/kimi-k3": { in: 0.003, out: 0.015 },
+  // OpenRouter catalog verified 2026-10-24; USD per 1K tokens.
+  "moonshotai/kimi-k3.1-pro": { in: 0.002, out: 0.010 },
+  "mistralai/mistral-large-4-0": { in: 0.00136, out: 0.00418 },
   "meta/muse-spark-1.3": { in: 0.00125, out: 0.00425 },
   "meta/muse-spark-1.1": { in: 0.00125, out: 0.00425 },
   "moonshotai/kimi-k2.6": { in: 0.00095, out: 0.004 },
@@ -125,6 +128,8 @@ const MODEL_COST_PER_1K: Record<string, { in: number; out: number }> = {
 //   Gemini cached ≈ 25%. Unknown families fall back to a conservative 50% read.
 function cacheFactors(model: string): { read: number; write: number } {
   const m = (model || "").toLowerCase();
+  if (m === "moonshotai/kimi-k3.1-pro") return { read: 0.20 / 2, write: 1.0 };
+  if (m === "mistralai/mistral-large-4-0") return { read: 0.14 / 1.36, write: 1.0 };
   if (m === "grok-4.7") return { read: 0.25, write: 1.0 };
   if (m === "gpt-6-luna" || m === "gpt-6-sol" || m === "gpt-6-astra" || m === "gpt-6-astra:flex") {
     return { read: 0.1, write: 1.25 };

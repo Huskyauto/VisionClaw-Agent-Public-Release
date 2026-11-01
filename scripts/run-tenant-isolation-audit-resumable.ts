@@ -12,12 +12,14 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tryAcquireHeavyWorkLane } from "../server/lib/heavy-work-lane";
+import { setTimeout as delay } from "node:timers/promises";
 
-// A larger bounded slice reduces restart overhead and the window in which a
-// harmless code/config change can invalidate a checkpoint, while retaining a
-// hard cap and exit-7 resume semantics.
-const sliceChunks = boundedInt(process.env.AUDIT_SLICE_CHUNKS, 20, 1, 20);
-const maxSlices = boundedInt(process.env.AUDIT_MAX_SLICES, 4, 1, 32);
+// The flat-rate source probe took ~75 seconds. Twenty such chunks can exceed
+// the existing 20-minute process deadline; eight leave room for bounded retries.
+// 48 × 8 admits 384 chunks for the present 325-chunk corpus. This is capacity,
+// not proof of completed coverage or an availability guarantee.
+const sliceChunks = boundedInt(process.env.AUDIT_SLICE_CHUNKS, 8, 1, 20);
+const maxSlices = boundedInt(process.env.AUDIT_MAX_SLICES, 48, 1, 64);
 
 function boundedInt(raw: string | undefined, fallback: number, min: number, max: number): number {
   const n = Number(raw);
@@ -54,7 +56,7 @@ function runSlice(): Promise<number> {
     });
     child.once("close", (code) => {
       clearTimeout(deadline);
-      done(timedOut ? 5 : code ?? 3);
+      done(timedOut ? 8 : code ?? 3);
     });
   });
 }
@@ -63,6 +65,7 @@ export async function runAuditSlices(deps: {
   acquire?: typeof tryAcquireHeavyWorkLane;
   slice?: () => Promise<number>;
   limit?: number;
+  recover?: (outage: number) => Promise<void>;
 } = {}): Promise<number> {
   let release: (() => Promise<void>) | null = null;
   try {
@@ -77,16 +80,29 @@ export async function runAuditSlices(deps: {
   }
   try {
     const limit = deps.limit ?? maxSlices;
+    let outages = 0;
     for (let slice = 1; slice <= limit; slice++) {
       console.log(`[tenant-audit-resumable] starting bounded slice ${slice}/${limit} (${sliceChunks} chunks max)`);
       const code = await (deps.slice ?? runSlice)();
       console.log(`[tenant-audit-resumable] slice ${slice}/${limit} exited ${code}`);
+      if (code === 8) {
+        outages++;
+        if (slice === limit) return 8;
+        await release(); release = null;
+        const ms = Math.min(3600_000, 300_000 * 2 ** Math.min(4, outages - 1));
+        console.warn(`[tenant-audit-resumable] provider recovery in ${ms / 60_000} minutes; saved units retained`);
+        await (deps.recover ? deps.recover(outages) : delay(ms));
+        release = await (deps.acquire ?? tryAcquireHeavyWorkLane)("tenant isolation audit recovery");
+        if (!release) return 7;
+        continue;
+      }
       if (code !== 7) return code;
+      outages = 0;
     }
     console.error(`[tenant-audit-resumable] slice cap reached (${limit}); checkpoint remains for the next run`);
     return 7;
   } finally {
-    await release();
+    if (release) await release();
   }
 }
 

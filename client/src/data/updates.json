@@ -1,5 +1,20 @@
 [
   {
+    "version": "R137.1+sec",
+    "date": "October 31, 2026",
+    "title": "Owner preparation, bounded recovery and evidence-aware release updates",
+    "type": "security",
+    "highlights": [
+      { "icon": "BookOpen", "text": "AI Stack Decision Review preparation: eight substantive owner-package documents cover a $350 pilot hypothesis, illustrative report, intake, evidence method, manual fulfillment/support, economics, launch drafts and templates. The price is a hypothesis; customer-specific files remain manual work. No checkout, booking, customer store, outbound campaign or public launch." },
+      { "icon": "FileText", "text": "Full company-package continuation and review remain development work. The latest recorded run is blocked, and final approved PDFs, narrated audio and verified delivery are not established. Retained drafts and reservations are not finished customer outcomes." },
+      { "icon": "MessageSquare", "text": "Chat cancellation now distinguishes a real browser disconnect from normal request completion; interrupted turns reconcile saved conversation state without blind resend advice. Focused development journey evidence passed, but provider identity and production behavior are not certified." },
+      { "icon": "RefreshCw", "text": "Quota recovery records provider Retry-After cooldowns and bounds local admission waits. Existing owner-authorized fallback rules remain; direct calls can still fail, cooldown is not a quota increase, and provider uptime is not guaranteed." },
+      { "icon": "ShieldCheck", "text": "Three HIGH review findings were fixed: API-key activity checks now enforce disabled-tenant authorization, cached identity activity checks enforce the same boundary, and app-side DNS pinning is revalidated on every redirect hop. Four focused offline regressions pass. The wider tenant audit remains DEGRADED and incomplete; this is not a whole-app security certification." },
+      { "icon": "Mail", "text": "Gmail reconnect navigation now permits the intended Google redirect from the narrowly scoped reconnect form. A synthetic PIN/302 browser check followed the redirect; no real credentials or consent were used. Revoked or expired grants still require owner reauthorization, and publication is required." },
+      { "icon": "CheckCircle2", "text": "October 19 production checks verified five guarded business pilots and selected saved-history/UI journeys. This is focused evidence, not whole-platform certification; later workspace changes are not presumed published." }
+    ]
+  },
+  {
     "version": "R137+sec",
     "date": "October 19, 2026",
     "title": "Business pilots, company report packages and evidence-first operations",

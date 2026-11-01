@@ -3,7 +3,9 @@ export const CHEAPER_INFERENCE_MODEL_ID = "cheaperinference/gpt-5.6-luna";
 export const CHEAPER_INFERENCE_UPSTREAM_MODEL = "gpt-5.6-luna";
 export const CHEAPER_INFERENCE_BASE_URL = "https://api.cheaperinference.com/v1";
 export const CHEAPER_INFERENCE_MAX_OUTPUT = 8192;
-export const CHEAPER_INFERENCE_MAX_REQUEST_BYTES = 192 * 1024;
+// The real chat prompt can exceed 376 KB before tools. Preserve safety/context
+// rather than rejecting every full turn; monetary and output caps remain separate.
+export const CHEAPER_INFERENCE_MAX_REQUEST_BYTES = 512 * 1024;
 
 export function cheaperInferenceReady(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.CHEAPER_INFERENCE_ENABLED !== "0" && !!env.CHEAPER_INFERENCE_API_KEY?.trim();
@@ -56,7 +58,7 @@ export function guardCheaperInferenceRequest(params: Record<string, any>, upstre
     ...(rest.stream === true ? { stream_options: { ...rest.stream_options, include_usage: true } } : {}),
   };
   if (Buffer.byteLength(JSON.stringify(payload), "utf8") > CHEAPER_INFERENCE_MAX_REQUEST_BYTES) {
-    throw new Error("CheaperInference request exceeds the 192 KiB limit");
+    throw new Error("CheaperInference request exceeds the 512 KiB limit");
   }
   return payload;
 }

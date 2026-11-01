@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { SeoHead } from "@/components/seo-head";
-import { SOURCE_UPDATE_SUMMARY, DEVELOPMENT_PLATFORM_SUMMARY } from "@/components/prepublication-notice";
+import { CURRENT_SOURCE_RELEASE, SOURCE_UPDATE_SUMMARY, DEVELOPMENT_PLATFORM_SUMMARY } from "@/components/prepublication-notice";
 import { RecentPlatformUpdates } from "@/components/recent-platform-updates";
 import releaseFacts from "../../../docs/release-facts.json";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -124,8 +124,72 @@ function TypewriterHero() {
 }
 
 const CURRENT_TRUST_SUBTITLE: Record<string, string> = {
-  subtitle: `${SOURCE_UPDATE_SUMMARY} Recent development hardening covers tenant/file ownership, Drive ancestry and verified bytes, recovery tool rosters, anonymous-chat isolation and verifier diagnostics. Deterministic artifact receipts remain required before consequential code apply; production readiness is not implied.`,
+  subtitle: `${SOURCE_UPDATE_SUMMARY} Three HIGH review findings were fixed: disabled-tenant authorization for API-key and cached-identity activity checks, plus per-hop app-side DNS pinning. Four focused offline regressions pass. The wider tenant audit remains degraded and incomplete; this is not whole-app security certification.`,
 };
+
+function CurrentReleaseEvidence() {
+  return (
+    <section
+      aria-labelledby="current-release-evidence-title"
+      className="border-y border-border/60 bg-muted/20 px-5 py-12 sm:px-6"
+      data-testid="section-current-release-evidence"
+    >
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <Badge variant="secondary" className="mb-3">{CURRENT_SOURCE_RELEASE}</Badge>
+            <h2 id="current-release-evidence-title" className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              What changed—and what is still unproven
+            </h2>
+          </div>
+          <p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
+            {SOURCE_UPDATE_SUMMARY} Evidence below separates owner preparation, development verification and focused production checks.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="border-primary/20 bg-card/80">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Briefcase className="h-4 w-4 text-primary" />
+                Business evidence
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                <strong className="text-foreground">AI Stack Decision Review:</strong> an owner-only preparation package with eight substantive documents—from the $350 pilot hypothesis and illustrative report to intake, evidence method, manual fulfillment/support, economics, launch drafts and templates. $350 is a hypothesis; customer-specific PDF, Markdown and CSV work remains manual. There is no checkout, booking flow or public product launch.
+              </p>
+              <p>
+                <strong className="text-foreground">Company reports:</strong> full-package continuation and review remain in development. The latest recorded run is blocked; final approved reports, narrated audio and verified delivery are still acceptance requirements, not completed customer outcomes.
+              </p>
+              <p>
+                <strong className="text-foreground">Focused production evidence:</strong> five guarded business pilots were verified on October 19. That evidence does not certify the wider platform.
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-border bg-card/80">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                Technical evidence & limits
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                <strong className="text-foreground">Chat and quota recovery:</strong> disconnect handling distinguishes a true browser abort from normal request completion, and interrupted turns reconcile saved conversation state without blind resend advice. Provider cooldowns bound admission; they are not quota increases or an uptime guarantee. Development checks passed, but served-provider identity and production behavior are not established.
+              </p>
+              <p>
+                <strong className="text-foreground">Gmail reconnect:</strong> a scoped form-navigation policy fixes the intended Google redirect. A synthetic PIN/302 browser check followed it without real credentials or consent; expired/revoked access still needs owner reauthorization, and publication is required.
+              </p>
+              <p>
+                <strong className="text-foreground">Audit status:</strong> three HIGH review findings were fixed: disabled-tenant authorization for API-key and cached-identity activity checks, and per-hop app-side DNS pinning. Four focused offline regressions pass. The wider tenant audit remains degraded and incomplete; this is not whole-app security certification.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 const CAPABILITY_SECTIONS = [
   {
@@ -2053,6 +2117,7 @@ export default function LandingPage() {
       {viewMode === "business" ? (
         <>
           <BusinessHero navigate={navigate} />
+          <CurrentReleaseEvidence />
           <RecentPlatformUpdates />
 
           <div className="relative py-16 px-6 bg-gradient-to-b from-primary/[0.04] to-transparent dark:from-primary/[0.08] border-t border-border/50" data-testid="section-mission-biz">
@@ -2234,6 +2299,7 @@ export default function LandingPage() {
         </div>
       </div>
 
+      <CurrentReleaseEvidence />
       <RecentPlatformUpdates technical />
       <CommandCenterStats stats={stats} />
 

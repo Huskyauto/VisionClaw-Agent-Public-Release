@@ -11,6 +11,7 @@ import { runBackupToGoogleDrive, runMemoryBackupToGoogleDrive } from "./backup";
 import type { HeartbeatTask, Persona } from "@shared/schema";
 import { db } from "./db";
 import { ADMIN_TENANT_ID } from "./tenant-utils";
+import { assertHealthAuditOwner } from "./lib/health-audit-authority";
 import { assertTenantContext } from "./storage-helpers/tenant-context";
 import { sql } from "drizzle-orm";
 import { buildAgentSystemPrompt, buildTaskContext } from "./heartbeat-context";
@@ -1791,6 +1792,7 @@ async function executeTaskInner(task: HeartbeatTask, start: number, persona: Per
   if (task.type === "health_audit") {
     const haStart = Date.now();
     try {
+      assertHealthAuditOwner(task.tenantId);
       const { runFullAudit } = await import("./health-audit");
       const report = await runFullAudit({ apply: true });
       const highCount = report.totals?.high ?? report.findings.filter((f: any) => f.severity === "high").length;

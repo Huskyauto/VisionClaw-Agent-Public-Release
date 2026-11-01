@@ -1,5 +1,7 @@
 import express from "express";
 import { isSafeUploadsHttpPath } from "./lib/uploads-http-path";
+import { watchRequestDisconnect } from "./lib/request-disconnect";
+import { resolveChatModelInfo } from "./lib/chat-model-identity";
 import { getRecencyTier } from "./lib/recency-tier";
 import type { Express, Request, Response } from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
@@ -3714,8 +3716,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         globalKeepalive = null;
       }
     };
-    req.once("close", abortPreparationOnDisconnect);
-    req.once("aborted", abortPreparationOnDisconnect);
+    watchRequestDisconnect(req, abortPreparationOnDisconnect);
     res.once("close", abortPreparationOnDisconnect);
     res.once("error", abortPreparationOnDisconnect);
     try { res.flushHeaders(); } catch (_silentErr) { logSilentCatch("server/routes.ts", _silentErr); }
@@ -4012,7 +4013,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const finalSystemPrompt = (intakeInstruction ? `${systemPrompt}\n\n${intakeInstruction}` : systemPrompt)
       + pageContextBlock + (directExecutionActive ? `\n\n${renderDirectExecutionPreference(true)}` : "");
 
-    const registeredModel = MODEL_REGISTRY.find((m) => m.id === model);
+    const registeredModel = await resolveChatModelInfo(
+      model,
+      MODEL_REGISTRY,
+      tenantId === ADMIN_TENANT_ID && isPlatformAdmin(req) ? async () => {
+        const catalog = await runWithPreparationDeadline(
+          () => getAvailableModelsForTenant(tenantId, true),
+          { label: "owner model catalog", timeoutMs: MODEL_CLIENT_INIT_TIMEOUT_MS, parentSignal: streamAbortController.signal },
+        );
+        return catalog;
+      } : undefined,
+    );
     if (!registeredModel) {
       // Headers already flushed (early SSE open) → emit an SSE error instead of a
       // JSON 400, then end the stream cleanly.
@@ -4426,8 +4437,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     // R87 — FIRST_COMPLETED-style teardown: when EITHER side closes, abort the
     // upstream stream + perform full cleanup so we don't keep burning provider
     // tokens (or holding pending tool confirmations) on a connection nobody is
-    // reading. Both req.on('close') and res.on('close'/'error') route through
-    // the same teardown to avoid asymmetric cleanup.
+    // reading. Premature request termination and response close/error route
+    // through the same teardown; normal request-body completion does not.
     let clientDisconnected = false;
     const onClientGone = (reasonTag: string) => {
       if (clientDisconnected) return;
@@ -4449,8 +4460,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     (req as any)._clientDisconnected = () => clientDisconnected;
     res.on("close", () => onClientGone("res:close"));
     res.on("error", () => onClientGone("res:error"));
-    req.on("close", () => onClientGone("req:close"));
-    req.on("aborted", () => onClientGone("req:aborted"));
+    watchRequestDisconnect(req, () => onClientGone("req:premature-close"));
 
     if (intakeInstruction) {
       const priorMsgCount = allMessages.length - 1;
@@ -4677,6 +4687,7 @@ ${buildFelixProtocol()}`
       let paidStreamFailure = false;
       const stopPaidStream = (timer: ReturnType<typeof setInterval>) => {
         paidStreamFailure = true;
+        streamAborted = true;
         clearInterval(timer);
         const message = "\n\nThe selected paid model did not complete. I did not retry or switch providers. Completion and any charge remain uncertain; its budget reservation is retained. Any completed tool results are preserved.";
         fullResponse += message;
@@ -6076,7 +6087,7 @@ ${buildFelixProtocol()}`
       // exits on disconnect, so cleanedFullResponse may be truncated. Mark
       // the partial as aborted via a [stream-aborted] suffix so it's clear in
       // the DB, and skip the broadcast/title/hooks pipeline below.
-      const __wasAborted = (req as any)._clientDisconnected?.() === true || streamAborted;
+      const __wasAborted = (req as any)._clientDisconnected?.() === true || streamAborted || paidStreamFailure;
       const __persistContent = __wasAborted
         ? `${routeMeta}${toolMeta}${cleanedFullResponse}\n\n${paidStreamFailure ? "[paid-stream-aborted: completion and charge uncertain; no retry or substitution]" : "[stream-aborted: client disconnected before completion]"}`
         : `${routeMeta}${toolMeta}${cleanedFullResponse}`;
@@ -6085,6 +6096,16 @@ ${buildFelixProtocol()}`
       if (Array.isArray(collectedCitations) && collectedCitations.length > 0 && (__asstMsg as any)?.id) {
         try { await storage.attachCitations((__asstMsg as any).id, collectedCitations, tenantId); }
         catch (citErr: any) { console.warn(`[citations] persist failed: ${citErr.message}`); }
+      }
+      // Preserve the interrupted message and tool receipts, but never run
+      // success-only broadcasts, title generation, learning or sent hooks.
+      if (__wasAborted) {
+        if (globalKeepalive) clearInterval(globalKeepalive);
+        if (!res.writableEnded && !res.destroyed) {
+          res.write(`data: ${JSON.stringify({ done: true, interrupted: true })}\n\n`);
+          res.end();
+        }
+        return;
       }
       // R94 SECURITY — skip broadcast when stream was aborted (client is gone
       // and other watchers shouldn't see truncated content as a normal reply).

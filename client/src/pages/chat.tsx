@@ -2208,13 +2208,13 @@ export default function ChatPage() {
           }
         }, STALE_TIMEOUT_MS);
         staleCriticalTimer = setTimeout(() => {
-          setAgentActivity((prev) => prev ? { ...prev, tone: "critical", detail: "No activity for 2+ minutes — connection may have dropped. Consider resending." } : prev);
-          toast({ description: "This is taking unusually long. If nothing appears soon, the connection may have dropped — try resending.", variant: "destructive" });
+          setAgentActivity((prev) => prev ? { ...prev, tone: "critical", detail: "No activity for 2+ minutes. Check saved results before repeating this task." } : prev);
+          toast({ description: "This is taking unusually long. Work may still be running; check saved results before repeating the request.", variant: "destructive" });
           setToolCalls((prev) => [...prev, {
             id: `stale_critical_${Date.now()}`,
             name: "⚠️ Extended Wait",
             input: { elapsed: "2+ minutes without new data" },
-            output: { status: "If the agent doesn't respond soon, try stopping and resending your message." },
+            output: { status: "Check this conversation and task or delivery status first. Repeating a request can duplicate completed actions." },
             done: true,
           }]);
         }, STALE_CRITICAL_MS);
@@ -2519,7 +2519,9 @@ export default function ChatPage() {
                 id: `err_${Date.now()}`,
                 name: "❌ System Error",
                 input: { error: errMsg },
-                output: { status: "The system encountered an issue. Your message may need to be resent." },
+                output: { status: data.type === "provider_error"
+                  ? "Completion and any charge are uncertain. Do not automatically resend; completed tool results are preserved."
+                  : "The system encountered an issue. Your message may need to be resent." },
                 done: true,
               }]);
               toast({ description: errMsg, variant: "destructive" });
@@ -2632,7 +2634,7 @@ export default function ChatPage() {
       if (err?.name !== "AbortError") {
         hadError = true;
         const errorDetail = err?.message?.includes("Failed to fetch")
-          ? "Connection lost — please check your internet and try again."
+          ? "Connection interrupted. Work may already have completed; check saved results before resending."
           : err?.message?.includes("Failed to send")
           ? "The server couldn't process your message. Please try again."
           : err?.message || "Something went wrong. Please try again.";
@@ -2641,7 +2643,7 @@ export default function ChatPage() {
           id: `err_${Date.now()}`,
           name: "❌ Connection Error",
           input: { error: errorDetail },
-          output: { status: "Your message may not have been processed. Try resending." },
+          output: { status: "Completion is uncertain. Refreshing saved conversation results without repeating your request." },
           done: true,
         }]);
       }
@@ -2659,7 +2661,7 @@ export default function ChatPage() {
           await new Promise(r => setTimeout(r, 1500));
           await queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
           await queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
-          toast({ description: "Response recovered — scroll down to see the result.", variant: "default" });
+          toast({ description: "Conversation refreshed. Check saved messages and delivery status for the result.", variant: "default" });
         } catch {}
         try {
           const delResp = await authFetch(`/api/conversations/${conversationId}/pending-deliveries`);
@@ -2674,7 +2676,7 @@ export default function ChatPage() {
         } catch {}
       } else if (!hadError && !receivedMeaningfulData) {
         hadError = true;
-        const streamEndMsg = "The response stream ended without producing output. This usually means the agent timed out or the connection dropped during orchestration. Try sending your message again.";
+        const streamEndMsg = "The response stream ended without visible output. Completion is uncertain; check saved messages and task or delivery status before repeating this request.";
         toast({ description: streamEndMsg, variant: "destructive" });
         setToolCalls((prev) => [...prev, {
           id: `err_stream_${Date.now()}`,
@@ -2685,6 +2687,13 @@ export default function ChatPage() {
         }]);
       }
 
+      if (hadError) {
+        // Read-only reconciliation, never replay a POST or a consequential tool.
+        await Promise.allSettled([
+          queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/conversations"] }),
+        ]);
+      }
       if (!hadError) {
         setToolCalls([]);
         setStreamingContent("");

@@ -298,6 +298,9 @@ export async function fulfillExecutiveReport(params: {
   reportOnly?: boolean;
   /** Server-owned immutable research, never populated from a request body. */
   sharedEvidence?: import("./lib/business-report-evidence").ReportEvidence;
+  /** Server-only producer with durable, package-bound reservations. */
+  sectionDrafter?: (heading: string, brief: string, evidence: string) => Promise<string>;
+  draftModelId?: string;
 }): Promise<FulfillmentResult> {
   // Fail-closed tenant resolution — same contract as fulfillReadinessAudit.
   if (!Number.isInteger(params.tenantId) || (params.tenantId as number) <= 0) {
@@ -320,7 +323,7 @@ export async function fulfillExecutiveReport(params: {
   const isOpportunities = intake.focus === "opportunities";
   const reportLabel = isOpportunities ? "Money-Making Opportunities Report" : "Executive Opportunity Report";
 
-  const modelId = await getModelForTierAsync("powerful", tenantId, { freeTierOnly: true });
+  const modelId = params.draftModelId ?? await getModelForTierAsync("powerful", tenantId, { freeTierOnly: true });
   const plan = sectionPlan(intake);
   console.log(`[exec-report] Order ${params.orderId} — using model ${modelId} for ${plan.length} sections`);
 
@@ -332,7 +335,7 @@ export async function fulfillExecutiveReport(params: {
   }
   let sourceSnapshot = params.sharedEvidence ?? await collectBusinessReportEvidence(intake as Record<string, unknown>,
     { allowPaidExtraction: !params.paidJuryBatch });
-  if (params.paidJuryBatch) {
+  if (params.paidJuryBatch && !params.sharedEvidence) {
     const { classifyReportResearch } = await import("./lib/report-research-preparation");
     sourceSnapshot = await classifyReportResearch(sourceSnapshot);
   }
@@ -346,7 +349,8 @@ export async function fulfillExecutiveReport(params: {
       const i = nextIdx++;
       if (i >= plan.length) return;
       const s = plan[i];
-      const body = await generateSection(modelId, tenantId, intake, evidence, s, !!params.paidJuryBatch || !!params.sharedEvidence);
+      const body = params.sectionDrafter ? await params.sectionDrafter(s.heading, s.brief, evidence)
+        : await generateSection(modelId, tenantId, intake, evidence, s, !!params.paidJuryBatch || !!params.sharedEvidence);
       let finalBody = body;
       if (!params.paidJuryBatch && !params.sharedEvidence && body && body.length >= 200 && !body.startsWith("(")) {
         try {
@@ -365,14 +369,17 @@ export async function fulfillExecutiveReport(params: {
       sections[i] = { heading: s.heading, body: finalBody };
     }
   }
-  await Promise.all(Array.from({ length: Math.min(SECTION_CONCURRENCY, plan.length) }, () => sectionWorker()));
+  const generated = await Promise.allSettled(Array.from({ length: Math.min(SECTION_CONCURRENCY, plan.length) }, () => sectionWorker()));
+  const rejected = generated.find(result => result.status === "rejected");
+  if (rejected?.status === "rejected") throw rejected.reason;
 
   // Fail-closed quality gate: one retry pass, then refuse + incident capture.
   let failed = findFailedSectionIndices(sections.map((s) => s?.body));
   if (failed.length > 0) {
     console.warn(`[exec-report] Order ${params.orderId} — retrying ${failed.length} failed section(s): ${failed.map((i) => plan[i].heading).join(", ")}`);
     for (const i of failed) {
-      const body = await generateSection(modelId, tenantId, intake, evidence, plan[i], !!params.paidJuryBatch || !!params.sharedEvidence);
+      const body = params.sectionDrafter ? await params.sectionDrafter(plan[i].heading, plan[i].brief, evidence)
+        : await generateSection(modelId, tenantId, intake, evidence, plan[i], !!params.paidJuryBatch || !!params.sharedEvidence);
       if (!isFailedSectionBody(body)) sections[i] = { heading: plan[i].heading, body };
     }
     failed = findFailedSectionIndices(sections.map((s) => s?.body));

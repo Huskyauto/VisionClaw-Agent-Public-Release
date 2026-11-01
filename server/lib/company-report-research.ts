@@ -12,7 +12,7 @@ export function packagePageUrl(raw: string, base: string): string | null {
     if (!["http:", "https:"].includes(u.protocol) || u.origin !== root.origin ||
         u.username || u.password || u.search ||
         /(?:^|\/)(?:logout|login|signout|signin|admin|account|delete|remove|unsubscribe|checkout|cart)(?:\/|$)/i.test(u.pathname) ||
-        /\.(?:pdf|jpe?g|png|gif|svg|mp4|zip|css|js|xml|ico|woff2?)$/i.test(u.pathname)) return null;
+        /\.(?:pdf|jpe?g|png|gif|svg|mp4|zip|css|js|xml|kml|kmz|ico|woff2?)$/i.test(u.pathname)) return null;
     u.hash = ""; return u.href;
   } catch { return null; }
 }
@@ -41,8 +41,15 @@ type Dependencies = {
   fetch(url: string): Promise<{ ok: true; text: string; finalUrl?: string } | { ok: false; text?: string; finalUrl?: string }>;
   browse(params: any): Promise<any>;
   live(): Promise<void>;
+  prior?: any;
+  backfillOnly?: boolean;
+  browserLanes?: import("./company-report-research-batch").ResearchBrowserLane[];
+  checkpoint?(value: import("./company-report-research-batch").ResearchBatch): Promise<void>;
 };
 export async function researchCompanyPackage(intake: PackageIntake, tenantId: number, runId: number, deps?: Dependencies) {
+  if (deps?.checkpoint || deps?.prior) {
+    return (await import("./company-report-research-batch")).researchCompanyPackageBatch(intake, tenantId, runId, deps);
+  }
   const production: Dependencies = deps ?? {
     collect: (await import("./business-report-evidence")).collectBusinessReportEvidence,
     fetch: url => import("../audit-engine").then(m => m.safeFetchText(url, { timeoutMs: 6000, maxBytes: 300_000, maxRedirects: 2 })),

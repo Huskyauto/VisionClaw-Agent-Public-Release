@@ -4111,6 +4111,17 @@ export const insertWebDomainUsageEventSchema = createInsertSchema(webDomainUsage
 export type WebDomainUsageEvent = typeof webDomainUsageEvents.$inferSelect;
 export type InsertWebDomainUsageEvent = z.infer<typeof insertWebDomainUsageEventSchema>;
 
+// Platform-global account state: no customer data, caller identifiers or credentials.
+// All tenants/workflows sharing the Replit account must honor the same cooldown.
+export const aiTransportCooldowns = pgTable("ai_transport_cooldowns", {
+  transport: text("transport").primaryKey(),
+  cooldownUntil: timestamp("cooldown_until", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export const insertAiTransportCooldownSchema = createInsertSchema(aiTransportCooldowns);
+export type AiTransportCooldown = typeof aiTransportCooldowns.$inferSelect;
+export type InsertAiTransportCooldown = z.infer<typeof insertAiTransportCooldownSchema>;
+
 /** Latest provider-directed cooldown for one tenant and public hostname. */
 export const webDomainCooldowns = pgTable("web_domain_cooldowns", {
   id: serial("id").primaryKey(),

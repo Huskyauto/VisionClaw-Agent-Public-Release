@@ -18,6 +18,7 @@ import { buildTenantAuditSchemaIndex } from "../../scripts/lib/tenant-audit-sche
 import { writeTenantAuditReportFiles } from "../../scripts/lib/tenant-audit-report-writer";
 
 const source = readFileSync("scripts/tenant-isolation-audit.ts", "utf8");
+const completionSource = readFileSync("scripts/lib/tenant-audit-completion.ts", "utf8");
 const checkpointSource = readFileSync("scripts/lib/tenant-audit-checkpoint.ts", "utf8");
 
 test("tenant-isolation audit model calls are abortable and bounded", () => {
@@ -27,8 +28,8 @@ test("tenant-isolation audit model calls are abortable and bounded", () => {
   assert.match(source, /AUDIT_OPERATION_TIMEOUT_MS/);
   assert.match(source, /withAuditDeadline\(/);
   assert.match(
-    source,
-    /chat\.completions\.create\(\s*params,\s*\{\s*signal\s*\}\s*\)/s,
+    completionSource,
+    /\{\s*signal:\s*controller\.signal,\s*maxRetries:\s*0,\s*timeout:\s*timeoutMs/s,
   );
   assert.match(source, /controller\.abort\(\)/);
   assert.match(source, /timed out after/);
@@ -39,13 +40,13 @@ test("tenant-isolation audit model calls are abortable and bounded", () => {
   );
   assert.match(
     source,
-    /if\s*\(precision\.degraded\)[\s\S]*?process\.exit\(5\)/,
+    /if\s*\(precision\.degraded\)[\s\S]*?process\.exit\(providerRecoveryNeeded \? 8 : 5\)/,
     "an incomplete precision pass must be degraded, never green",
   );
   assert.match(
     source,
-    /Math\.min\(2,\s*Math\.max\(0,\s*Math\.floor\(Number\(process\.env\.AUDIT_PARSE_RETRY_MAX\)\)\)\)/,
-    "parse retries must have a small hard ceiling",
+    /runAuditFallback\(/,
+    "invalid output must advance the bounded multi-provider ladder",
   );
   assert.match(
     source,

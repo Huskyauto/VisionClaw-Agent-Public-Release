@@ -86,6 +86,7 @@ const MAIN_AGENT_ONLY_SKILLS = new Set<string>([
   "release-cutting",
   "replit-md-maintenance",
   "revenue-program-builder", // main-agent-only offer-to-fulfillment runbook
+  "product-package-engineering", // main-agent engineering runbook; does not expose package/spend authority to customer personas
   "schema-migration",
   "security-hardening",
   "silent-failure-hunter",

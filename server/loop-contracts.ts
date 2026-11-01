@@ -293,20 +293,20 @@ export const LOOP_CONTRACTS: LoopContract[] = [
     name: "Tenant Isolation Audit Nightly",
     source: "scripts/tenant-isolation-audit.ts",
     workflow: "Tenant Isolation Audit Nightly",
-    trigger: "Nightly cron (single-shot scheduled run).",
+    trigger: "Production VM UTC-daily durable tenant-1 job; minute freshness checks and persistent incomplete/stalled notices. Workspace workflow is manual, not a nightly timer.",
     objective:
       "Hold many server query/route/middleware sites in one flagship-model context and verify the app-level tenant_id WHERE-clause invariant across all of them at once.",
     check:
       "Code is fed to the model as DATA (prompt-injection safe); a green (exit 0) run is emitted ONLY on FULL chunk coverage — any failed/unparseable chunk forces DEGRADED (exit 5), never a silent 'all clear'.",
     feedback:
-      "Writes a report; optional remediation (ships OFF) jury-votes AUTO-tier findings into the repo-surgeon pipeline; HARD-tier findings are never auto-queued.",
+      "Scheduled runs persist checkpoint, exact-request precision cache, report and progress in the tenant-1 tenant_isolation_audit job payload; inspect /operator and owner security notifications, not just workspace report files. Quiet mail is not coverage. Source changes invalidate saved coverage. Scheduled runs forbid metered fallback and auto-remediation; manual remediation remains separately gated. Runbook: docs/tenant-audit-scheduling-repair.md.",
     stop: [
       "All chunks audited with full coverage and no HIGH/CRITICAL findings → exit 0.",
       "Nothing in scope to audit → exit 2.",
     ],
     escalate: [
-      "HIGH/CRITICAL findings → owner email (exit 4).",
-      "DEGRADED coverage (a chunk failed to run/parse) → owner email (exit 5).",
+      "HIGH/CRITICAL findings → persistent owner notice (exit 4); manual runs may also attempt email.",
+      "Missing/stalled/incomplete coverage → persistent owner security notice; degraded run exits 5, never green. Provider acceptance is not verified inbox delivery.",
       "HARD-tier (schema/auth/payments/safety) findings → owner in-chat sign-off via pending-approval file, never auto-fixed.",
     ],
     authority: "read-only",
@@ -314,9 +314,9 @@ export const LOOP_CONTRACTS: LoopContract[] = [
     verifier: "independent",
     spend: "capped",
     readiness: {
-      killSwitch: "AUDIT_DRY_RUN",
+      killSwitch: "TENANT_AUDIT_SCHEDULE_ENABLED=0 (restart); operator cancellation fences job writes. AUDIT_DRY_RUN suppresses email only.",
       attemptCap: "maxAttempts",
-      runLog: "tenant-isolation-audit-report.md",
+      runLog: "tenant-1 tenant_isolation_audit agent_jobs payload.auditReport; local tenant-isolation-audit-report.md is diagnostic, not scheduled-run truth",
       reportOnlyFirst:
         "Read-only by design; remediation ships OFF and HARD-tier findings are never auto-queued.",
     },

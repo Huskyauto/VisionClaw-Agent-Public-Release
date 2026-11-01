@@ -6,6 +6,42 @@ import {
 } from "../../server/lib/harness-bench-core";
 
 describe("harness-bench core", () => {
+  it("matches task multisets regardless of order and refuses altered repetition weights", () => {
+    const run = (taskId: string, harnessId: string) => ({
+      taskId, harnessId, modelId: "fixed-model", completionScore: 1,
+      process: { toolUse: 1, stateConsistency: 1, robustness: 1 },
+      securityScore: 1,
+    });
+    for (const [baseline, candidate, expected] of [
+      [["a", "b"], ["b", "a"], true],
+      [["a", "b"], ["c", "d"], false],
+      [["a", "b"], ["a", "a", "b"], false],
+      [["a", "a", "b"], ["a", "b", "a"], true],
+    ] as const) {
+      const report = buildHarnessBenchReport([
+        ...baseline.map(taskId => run(taskId, "baseline")),
+        ...candidate.map(taskId => run(taskId, "candidate")),
+      ]);
+      assert.equal(report.taskSetsMatched, expected);
+      assert.equal(report.comparable, expected);
+      assert.ok(report.configurations.every(config => config.eligibleForComparison === expected));
+    }
+  });
+
+  it("refuses comparison when a configuration omits a task despite perfect recorded coverage", () => {
+    const run = (taskId: string, harnessId: string) => ({
+      taskId, harnessId, modelId: "fixed-model", completionScore: 1,
+      process: { toolUse: 1, stateConsistency: 1, robustness: 1 },
+      securityScore: 1,
+    });
+    const report = buildHarnessBenchReport([
+      run("a", "baseline"), run("b", "baseline"), run("a", "candidate"),
+    ]);
+    assert.equal(report.coverage, 1);
+    assert.equal(report.comparable, false);
+    assert.ok(report.configurations.every(config => !config.eligibleForComparison));
+  });
+
   it("keeps security separate and prevents completion from masking a security failure", () => {
     const score = scoreHarnessBenchRun({
       taskId: "safe-tool-use",

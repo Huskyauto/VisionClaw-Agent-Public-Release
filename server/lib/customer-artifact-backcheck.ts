@@ -17,7 +17,9 @@ export interface ArtifactBackcheck {
   checkedTextRequirements: number;
   checkedLinkRequirements: number;
 }
-export const BACKCHECK_LIMITS = { bytes: 10 * 1024 * 1024, pages: 80, workers: 2, deadlineMs: 10_000 } as const;
+// Complete company reports include source appendices and can exceed 80 pages.
+// Keep the byte, text, deadline, worker-count and per-worker memory caps intact.
+export const BACKCHECK_LIMITS = { bytes: 10 * 1024 * 1024, pages: 200, workers: 2, deadlineMs: 10_000 } as const;
 const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const normalize = (text: string) => text.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 
@@ -55,7 +57,7 @@ const {parentPort,workerData}=require("node:worker_threads");
   const bytes=Buffer.from(workerData.bytes);
   const doc=await PDFDocument.load(bytes,{throwOnInvalidObject:true});
   const count=doc.getPageCount();
-  if(count<1||count>80) throw Error("pdf_page_limit");
+  if(count<1||count>workerData.maxPages) throw Error("pdf_page_limit");
   const links=[];
   for(const [index,page] of doc.getPages().entries()){
     const crop=page.getCropBox(),annots=page.node.lookupMaybe(PDFName.of("Annots"),PDFArray);
@@ -87,7 +89,8 @@ const {parentPort,workerData}=require("node:worker_threads");
     parentPort.postMessage({ok:true,pages:count,text:text.text,
       pageTexts:text.pages.map(p=>({page:p.num,text:p.text})),links});
   }finally{await parser.destroy();}
-})().catch(()=>parentPort.postMessage({ok:false,error:"pdf_inspection_failed"}));
+})().catch(error=>parentPort.postMessage({ok:false,
+  error:error?.message==="pdf_page_limit"?"pdf_page_limit":"pdf_inspection_failed"}));
 `;
 interface PdfInspection {
   ok: boolean; error?: string; pages: number; text: string;
@@ -101,11 +104,12 @@ async function inspectPdf(bytes: Buffer): Promise<PdfInspection> {
   let worker: Worker | undefined;
   let timer: NodeJS.Timeout | undefined;
   try {
-    worker = new Worker(PDF_WORKER, { eval: true, execArgv: [], env: {}, workerData: { bytes },
+    worker = new Worker(PDF_WORKER, { eval: true, execArgv: [], env: {}, workerData: { bytes, maxPages: BACKCHECK_LIMITS.pages },
       resourceLimits: { maxOldGenerationSizeMb: 128, maxYoungGenerationSizeMb: 16, stackSizeMb: 4 } });
     return await new Promise<PdfInspection>((resolve, reject) => {
       timer = setTimeout(() => reject(new Error("backcheck_deadline")), BACKCHECK_LIMITS.deadlineMs);
-      worker!.once("message", (result: PdfInspection) => result.ok ? resolve(result) : reject(new Error("pdf_inspection_failed")));
+      worker!.once("message", (result: PdfInspection) => result.ok ? resolve(result) :
+        reject(new Error(result.error === "pdf_page_limit" ? "pdf_page_limit" : "pdf_inspection_failed")));
       worker!.once("error", () => reject(new Error("pdf_inspection_failed")));
       worker!.once("exit", () => reject(new Error("pdf_inspection_incomplete")));
     });
@@ -178,7 +182,7 @@ export async function backcheckCustomerArtifact(input: { bytes: Buffer; fileName
       }
     } catch (error) {
       const reason = error instanceof Error ? error.message : "";
-      result.failures.push(["backcheck_capacity", "backcheck_deadline"].includes(reason) ? reason : "pdf_inspection_failed");
+      result.failures.push(["backcheck_capacity", "backcheck_deadline", "pdf_page_limit"].includes(reason) ? reason : "pdf_inspection_failed");
       return result;
     }
   } else if (textFormat) {

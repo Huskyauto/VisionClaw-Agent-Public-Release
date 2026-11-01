@@ -5,6 +5,33 @@ import { executeBoundedReportSeat, ownerJuryMeteredOverrideAllowed } from "../..
 import { executeOwnerJuryApiCall } from "../../server/lib/owner-jury-api-route";
 import { getClientForModel } from "../../server/providers";
 
+test("full compilations can use a bounded 16,384-token Argon response without provider retries or fallback", async () => {
+  const previous = process.env.OWNER_JURY_DIRECT_API_ENABLED;
+  process.env.OWNER_JURY_DIRECT_API_ENABLED = "1";
+  let calls = 0;
+  const client = guardReportArgonClient({ chat: { completions: { create: async (params: any, options: any) => {
+    calls++;
+    assert.equal(params.max_tokens, 16384);
+    assert.equal(options.maxRetries, 0);
+    assert.deepEqual(params.provider, { allow_fallbacks: false, require_parameters: true });
+    return { model: REPORT_ARGON_MODEL, choices: [{ finish_reason: "stop" }] };
+  } } } } as any, 1);
+  const params = { model: REPORT_ARGON_MODEL, max_completion_tokens: 16384,
+    messages: [{ role: "system", content: "Compile" }, { role: "user", content: "Evidence" }] };
+  const budget = { estimate: () => 1, ceiling: () => ({ spent: 0, ceiling: 2 }), reserve: () => {} };
+  try {
+    await executeOwnerJuryApiCall(1, "openrouter", REPORT_ARGON_MODEL, "Evidence", budget, async () => {
+      for (const limit of [16385, 0, -1, "16384", NaN, 8192])
+        await assert.rejects((client.chat.completions.create as any)({ ...params, max_completion_tokens: limit }), /grant/);
+      await client.chat.completions.create(params);
+    }, "bounded-report");
+    assert.equal(calls, 1);
+  } finally {
+    if (previous === undefined) delete process.env.OWNER_JURY_DIRECT_API_ENABLED;
+    else process.env.OWNER_JURY_DIRECT_API_ENABLED = previous;
+  }
+});
+
 test("Argon is bounded-report only; closed transport enforces exact model, output, no retries/fallbacks and expired grants", async () => {
   const previous = process.env.OWNER_JURY_DIRECT_API_ENABLED;
   process.env.OWNER_JURY_DIRECT_API_ENABLED = "1";

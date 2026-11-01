@@ -10,6 +10,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { MAMMOUTH_MODELS } from "./lib/mammouth-catalog";
 
 export interface ModelInfo {
   id: string;
@@ -37,6 +38,11 @@ export interface ModelInfo {
 export const REFLECTION_BEAM_PATTERN = /^reflection(?:ai|-ai)?\/beam(?:[-.:][a-z0-9][a-z0-9_.:-]*)?$/i;
 
 export function getCatalogModelPricing(entry: ModelInfo | undefined): ModelInfo["catalogPricing"] {
+  if (entry?.provider === "mammouth") {
+    const model = MAMMOUTH_MODELS.find(model => model.id === entry.id);
+    return model ? { inputUsdPerToken: model.inputPerMillion / 1e6,
+      outputUsdPerToken: model.outputPerMillion / 1e6 } : undefined;
+  }
   if (!entry || !REFLECTION_BEAM_PATTERN.test(entry.id) || entry.provider !== "openrouter") return undefined;
   const pricing = entry.catalogPricing;
   if (!pricing || ![pricing.inputUsdPerToken, pricing.outputUsdPerToken].every(
@@ -77,6 +83,7 @@ export const MODEL_REGISTRY: ModelInfo[] = [
   { id: "claude-opus-5-5", label: "Claude Opus 5.5 (direct API)", provider: "anthropic", tier: "powerful", description: "Income-jury hard-request escalation selected before inference; owner-funded direct API, $4/M input, $20/M output. Not a subscription or global default.", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "unknown" },
   { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", provider: "anthropic", tier: "fast", description: "Low-cost primary option for routine LLM work: summaries, extraction, classification, tool use and vision. 1M context; $0.10/M input, $0.50/M output up to 100K prompt tokens; $0.50/$2.50 above 100K. Existing subscription and paid-spend controls apply.", capabilities: ["vision", "code", "tools"], costClass: "cheap", trainingRegime: "unknown" },
   { id: "claude-haiku-4-5", label: "Claude Haiku 4.5", provider: "anthropic", tier: "fast", description: "Previous Haiku generation — prefer Haiku 5.5 for new routine LLM work; retained for compatibility", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "distilled" },
+  { id: "minimax/minimax-m3.1-flash:free", label: "MiniMax M3.1 Flash (Promotional Free)", provider: "openrouter", tier: "powerful", description: "Released October 19, 2026; 1M context, vision, coding and tools. OpenRouter promotional free endpoint; rate limits and availability apply. MiniMax direct list prices: $0.15/M input, $0.60/M output, $0.015/M cached input. Selectable, not a default or jury promotion; quality not independently benchmarked.", capabilities: ["vision", "code", "tools"], costClass: "free", trainingRegime: "unknown" },
   { id: "minimax/minimax-m3", label: "MiniMax M3", provider: "openrouter", tier: "powerful", description: "MiniMax multimodal flagship — retired from the flat-rate catalog; alternate-provider compatibility only", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
   { id: "xiaomi/mimo-v2.5-pro", label: "MiMo V2.5 Pro", provider: "openrouter", tier: "reasoning", description: "Xiaomi long-horizon reasoning and coding flagship — retired from the flat-rate catalog; alternate-provider compatibility only", capabilities: ["code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
   { id: "qwen/qwen3.6-plus", label: "Qwen 3.6 Plus", provider: "openrouter", tier: "powerful", description: "Alibaba Qwen high-end — retired from the flat-rate catalog; alternate-provider compatibility only", capabilities: ["code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
@@ -166,10 +173,19 @@ export const MODEL_REGISTRY: ModelInfo[] = [
   // FRONTIER_RESERVE in server/moa.ts). Priced like a flagship; keep out of
   // high-volume lanes.
   { id: "moonshotai/kimi-k3", label: "Kimi K3", provider: "openrouter", tier: "powerful", description: "Moonshot flagship (Jul 2026) — 1M ctx, frontier-class reasoning — $3/M in $15/M out. RESERVE proposer only, not standing-jury", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
+  // Owner-requested high-end options; exact OpenRouter IDs verified 2026-10-24.
+  // Keep subscription aliases, standing jury and automatic defaults unchanged.
+  { id: "moonshotai/kimi-k3.1-pro", label: "Kimi K3.1 Pro", provider: "openrouter", tier: "powerful", description: "Moonshot agentic reasoning and coding flagship — 1M context, vision, tools and structured outputs; $2/M input, $10/M output, $0.20/M cached input. Selectable high-end option, not an automatic default or standing-jury promotion; independent quality comparison pending.", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
+  { id: "mistralai/mistral-large-4-0", label: "Mistral Large 4", provider: "openrouter", tier: "powerful", description: "Mistral Large 4 public preview — 1M context, multimodal reasoning, coding, tools and structured outputs; $1.36/M input, $4.18/M output, $0.14/M cached input. Selectable high-end option, not an automatic default or standing-jury promotion; independent quality comparison pending.", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "unknown" },
 
   { id: "inclusionai/ling-2.6-1t:free", label: "Ling-2.6-1T (Free)", provider: "openrouter", tier: "powerful", description: "Ant Group/InclusionAI 1T MoE — non-reasoning execution-first design, 262K ctx, optimized for useful-intelligence-per-token (skips chain-of-thought narration), strong agent/tool-call workloads — FREE", capabilities: ["code", "tools"], costClass: "free", trainingRegime: "distilled" },
   { id: "inclusionai/ling-2.6-flash", label: "Ling-2.6 Flash", provider: "openrouter", tier: "fast", description: "InclusionAI flash variant — 262K ctx, ultra-cheap ($0.08/M in, $0.24/M out), execution-first non-reasoning, ideal for high-volume agent loops", capabilities: ["code", "tools"], costClass: "cheap", trainingRegime: "distilled" },
   { id: "meta-llama/llama-4-maverick", label: "Llama 4 Maverick", provider: "openrouter", tier: "powerful", description: "Meta open-source flagship — vision + tools, Apache 2.0", capabilities: ["vision", "code", "tools"], costClass: "cheap", trainingRegime: "base" },
+  ...MAMMOUTH_MODELS.map(model => ({
+    id: model.id, label: model.label, provider: "mammouth", tier: model.tier,
+    description: `Owner-selected Mammouth API credits, not unlimited subscription usage. Upper-bound rates: $${model.inputPerMillion}/M input, $${model.outputPerMillion}/M output. No automatic routing or jury replacement.`,
+    capabilities: ["code", "tools"] as ("code" | "tools")[], costClass: "paid" as const,
+  })),
   // Standard (non-contributor) 1.3 verified in OpenRouter's catalog 2026-10-07.
   { id: "meta/muse-spark-1.3", label: "Muse Spark 1.3", provider: "openrouter", tier: "powerful", description: "Meta Muse Spark 1.3 — 1M ctx, $1.25/M in $4.25/M out. Metered model option; NOT in the standing jury or $0 tier routing", capabilities: ["code", "tools"], costClass: "paid", trainingRegime: "unknown" },
   // Retain 1.1 for saved conversations; new selections can use 1.3 above.
@@ -253,6 +269,8 @@ export function getMultimodalModelsForTier(tier: "fast" | "balanced" | "powerful
 }
 
 export const MODEL_MAX_OUTPUT: Record<string, number> = {
+  "mammouth/glm-5.3-flash": 8192,
+  "mammouth/mistral-large-4": 8192,
   "claude-sonnet-4-5": 16384,
   "claude-opus-4-5": 16384,
   "claude-sonnet-4-6": 65536,
@@ -284,6 +302,7 @@ export const MODEL_MAX_OUTPUT: Record<string, number> = {
   "openference/glm-5.2": 128000,
   "openference/ox-alpha": 131072,
   "minimax/minimax-m3": 32768,
+  "minimax/minimax-m3.1-flash:free": 32768,
   "qwen/qwen3.6-plus": 32768,
   "mistralai/mistral-large": 32768,
   "moonshotai/kimi-k2.7-code": 32768,
@@ -324,6 +343,8 @@ export const MODEL_MAX_OUTPUT: Record<string, number> = {
   "nvidia/nemotron-3-ultra-550b-a55b:free": 32768,
   "moonshotai/kimi-k2.6": 32768,
   "moonshotai/kimi-k3": 32768,
+  "moonshotai/kimi-k3.1-pro": 32768,
+  "mistralai/mistral-large-4-0": 32768,
   "meta-llama/llama-4-maverick": 16384,
   "meta/muse-spark-1.1": 32768,
   "meta/muse-spark-1.3": 32768,
@@ -338,6 +359,7 @@ export const MODEL_MAX_OUTPUT: Record<string, number> = {
 
 export function isOwnerOnlyFinalDecisionModel(modelId: string): boolean {
   return (
+    modelId.startsWith("mammouth/") ||
     modelId.startsWith("cheaperinference/") ||
     modelId === "gpt-6-astra" ||
     modelId === "claude-fable-5-1" ||

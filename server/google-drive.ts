@@ -4,6 +4,7 @@ import { db } from "./db";
 import { providerKeys } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { encryptApiKey, decryptApiKey } from "./crypto";
+import { driveArtifactPropertyValue } from "./lib/drive-artifact-property";
 import { driveErrorMessage as errorMessage, type DriveFileSummary, type DrivePermission } from "./google-drive-types";
 import { UPLOADS_DIR, isPathWithin, resolveUploadsChild } from "./uploads-path";
 
@@ -1064,7 +1065,7 @@ export async function uploadToDrive(params: {
       name: params.fileName,
       parents: [subfolder.id],
       description: params.description || `Uploaded by ${VISIONCLAW_FOLDER_NAME} on ${new Date().toISOString().split("T")[0]}`,
-      ...(params.durableArtifactKey ? { appProperties: { visionclawArtifactKey: params.durableArtifactKey } } : {}),
+      ...(params.durableArtifactKey ? { appProperties: { visionclawArtifactKey: driveArtifactPropertyValue(params.durableArtifactKey) } } : {}),
     };
 
     const boundary = "visionclaw_boundary_" + Date.now();
@@ -1207,9 +1208,7 @@ export async function uploadToDrive(params: {
 async function findDriveFileByDurableArtifactKey(key: string): Promise<{ fileId: string; viewUrl?: string; downloadUrl?: string; folderId?: string } | null> {
   // Bare artifact row IDs are recycled/collide across historical runs. Every
   // new key binds its namespace and artifact content before Drive can reuse it.
-  if (!/^(?:delivery|artifact):[A-Za-z0-9:_-]{8,180}$/.test(key)) {
-    throw new Error("Invalid durable artifact recovery key");
-  }
+  key = driveArtifactPropertyValue(key);
   const token = await getAccessToken();
   const query = `appProperties has { key='visionclawArtifactKey' and value='${key}' } and trashed = false`;
   const url = `${DRIVE_API}/drive/v3/files?${new URLSearchParams({

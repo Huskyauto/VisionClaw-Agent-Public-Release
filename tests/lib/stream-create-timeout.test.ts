@@ -8,6 +8,24 @@ import {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe("createCompletionWithTimeout", () => {
+  it("bounds cancellation even when the provider ignores the abort signal", async () => {
+    const ac = new AbortController();
+    let started = false;
+    const result = createCompletionWithTimeout(
+      () => { started = true; return new Promise<never>(() => {}); },
+      ac.signal,
+      300,
+      "ignores-cancellation",
+    );
+    await Promise.resolve();
+    assert.equal(started, true, "cancel a dispatched provider, not just preflight");
+    ac.abort();
+    const outcome = await Promise.race([
+      result.then(() => "resolved", error => error.name),
+      sleep(50).then(() => "still-waiting"),
+    ]);
+    assert.equal(outcome, "AbortError");
+  });
   it("returns the stream when create resolves before the timeout", async () => {
     const ac = new AbortController();
     const result = await createCompletionWithTimeout(

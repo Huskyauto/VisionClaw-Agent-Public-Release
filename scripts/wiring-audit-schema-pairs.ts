@@ -82,6 +82,9 @@ export const SCHEMA_PAIRS: SchemaPair[] = [
       // LLM toggle in the tool schema; the engine default is upload=true unless
       // opts.uploadToDrive === false, which the handler never sets).
       "uploadToDrive",
+      // Fulfillment-owned layout choice for long paid advisory reports; the
+      // generic create_styled_report handler does not accept this switch.
+      "readableBody",
     ],
   },
 ];

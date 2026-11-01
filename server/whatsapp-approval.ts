@@ -132,7 +132,7 @@ export async function loadApprovalPhone(tenantId?: number): Promise<void> {
       if (rows?.[0]?.whatsapp_approval_phone) {
         const phone = rows[0].whatsapp_approval_phone.replace(/\D/g, "");
         tenantApprovalPhones.set(phoneKey(tenantId), `${phone}@s.whatsapp.net`);
-        console.log(`[wa-approval:t${tenantId}] Loaded approval phone: +${phone}`);
+        console.log(`[wa-approval:t${tenantId}] Approval phone configured`);
       }
     } else {
       await db.execute(sql`ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS whatsapp_approval_phone text DEFAULT NULL`).catch(() => {});
@@ -141,7 +141,7 @@ export async function loadApprovalPhone(tenantId?: number): Promise<void> {
       if (rows?.[0]?.whatsapp_approval_phone) {
         const phone = rows[0].whatsapp_approval_phone.replace(/\D/g, "");
         tenantApprovalPhones.set(phoneKey(), `${phone}@s.whatsapp.net`);
-        console.log(`[wa-approval] Loaded admin approval phone: +${phone}`);
+        console.log(`[wa-approval] Admin approval phone configured`);
       }
     }
   } catch (err: any) {
@@ -160,7 +160,7 @@ export async function loadAllApprovalPhones(): Promise<void> {
       if (row.whatsapp_approval_phone) {
         const phone = row.whatsapp_approval_phone.replace(/\D/g, "");
         tenantApprovalPhones.set(phoneKey(row.id), `${phone}@s.whatsapp.net`);
-        console.log(`[wa-approval:t${row.id}] Loaded tenant approval phone: +${phone}`);
+        console.log(`[wa-approval:t${row.id}] Tenant approval phone configured`);
       }
     }
   } catch (err: any) {
@@ -178,10 +178,10 @@ export async function setApprovalPhone(phone: string | null, tenantId?: number):
     tenantApprovalPhones.set(key, `${cleaned}@s.whatsapp.net`);
     if (tenantId != null) {
       await db.execute(sql`UPDATE tenants SET whatsapp_approval_phone = ${cleaned} WHERE id = ${tenantId}`);
-      console.log(`[wa-approval:t${tenantId}] Set approval phone: +${cleaned}`);
+      console.log(`[wa-approval:t${tenantId}] Approval phone updated`);
     } else {
       await db.execute(sql`UPDATE agent_settings SET whatsapp_approval_phone = ${cleaned}`);
-      console.log(`[wa-approval] Set admin approval phone: +${cleaned}`);
+      console.log(`[wa-approval] Admin approval phone updated`);
     }
   } else {
     tenantApprovalPhones.set(key, null);
@@ -276,7 +276,7 @@ export async function sendApprovalRequest(
 
   try {
     await sendWhatsAppMessage(targetJid, message, tenantId);
-    console.log(`[wa-approval${tenantId != null ? `:t${tenantId}` : ""}] Sent approval request ${shortId} for ${toolName} to ${isSelf ? "self" : targetJid}`);
+    console.log(`[wa-approval${tenantId != null ? `:t${tenantId}` : ""}] Sent approval request ${shortId} for ${toolName}; recipient omitted`);
     return true;
   } catch (err: any) {
     console.error(`[wa-approval${tenantId != null ? `:t${tenantId}` : ""}] Failed to send approval:`, err.message);

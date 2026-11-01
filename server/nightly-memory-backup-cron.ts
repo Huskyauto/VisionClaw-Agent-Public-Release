@@ -17,11 +17,12 @@ import { logSilentCatch } from "./lib/silent-catch";
 import { promisify } from "node:util";
 import { sendEmail, getPrimaryInboxId, isEmailConfigured } from "./email";
 import { resolveOwnerEmail } from "./lib/owner-email";
+import { memoryBackupCommand } from "./lib/memory-backup-runner";
+import { isProductionRuntime } from "./lib/runtime-env";
 
 const execFileAsync = promisify(execFile);
 
 const OWNER_EMAIL = resolveOwnerEmail();
-const SCRIPT_PATH = "scripts/nightly-memory-backup.ts";
 const RUN_TIMEOUT_MS = 2 * 60 * 1000;
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const FIRST_RUN_DELAY_MS = 90 * 1000;
@@ -90,9 +91,10 @@ async function runOnce(): Promise<void> {
     let exitCode = 0;
     let thrownMessage: string | undefined;
     try {
+      const runner = memoryBackupCommand({ production: isProductionRuntime() });
       const r = await execFileAsync(
-        "npx",
-        ["tsx", SCRIPT_PATH],
+        runner.command,
+        runner.args,
         { timeout: RUN_TIMEOUT_MS, maxBuffer: 8 * 1024 * 1024 },
       );
       stdout = r.stdout || "";

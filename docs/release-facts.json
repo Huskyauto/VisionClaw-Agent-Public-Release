@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "releaseDate": "2026-10-19",
+  "releaseDate": "2026-10-31",
   "evidenceEnvironment": "development",
   "metrics": {
     "registeredTools": 428,
@@ -9,12 +9,12 @@
     "dbSeededSkills": 63,
     "totalSkills": 68,
     "activeCapabilities": 146,
-    "declaredTables": 195,
-    "liveTables": 276,
+    "declaredTables": 196,
+    "liveTables": 277,
     "governanceRules": 41,
-    "platformIndexes": 887,
+    "platformIndexes": 888,
     "nonPrimaryKeyIndexes": 617,
     "aiProviders": 6,
-    "coreRegistryModels": 86
+    "coreRegistryModels": 91
   }
 }

@@ -1,6 +1,8 @@
 import type { MoAOptions, MoAResult, ProposerCallSpec, ProposerResult } from "../moa";
 import type { BusinessReportReviewInput } from "./business-report-review";
 import { assertReportJuryApproval, reservePaidReportJury } from "./business-report-paid-budget";
+import { validReportBallot, restoreReportBallotSnapshot } from "./report-ballot-runner";
+import type { ReportJuryBinding } from "./jury-package";
 
 /** Three model families; Gemini uses OpenRouter transport. NOT independent web research. */
 export const REPORT_PAID_SEATS: ProposerCallSpec[] = [
@@ -16,6 +18,7 @@ export async function runPaidReportJury(
     reserve: typeof reservePaidReportJury;
     audit: (result: MoAResult) => Promise<void>;
   },
+  recovery?: { binding: ReportJuryBinding; snapshot: string; retained: ProposerResult[]; allowedModels: string[] },
 ): Promise<MoAResult> {
   assertReportJuryApproval(input);
   if (options.tenantId !== input.tenantId || options.invokedVia !== "business-report-evidence-review" ||
@@ -25,10 +28,30 @@ export async function runPaidReportJury(
   const { juryEvidencePrompt } = await import("./jury-evidence");
   const started = Date.now();
   const proposers = await Promise.all(REPORT_PAID_SEATS.map(async (spec: ProposerCallSpec) => {
+    const kept = recovery?.retained.find(value => value.modelId === spec.modelId);
+    if (kept) {
+      const restored = restoreReportBallotSnapshot(kept, recovery!.snapshot, recovery!.binding);
+      if (!validReportBallot(restored, recovery!.binding)) throw new Error("Retained ballot recovery proof failed");
+      return restored;
+    }
+    if (recovery && !recovery.allowedModels.includes(spec.modelId)) throw new Error("Missing ballot lacks owner recovery authority");
     let evidence: Awaited<ReturnType<NonNullable<MoAOptions["collectProposerEvidence"]>>> | undefined;
     try {
       evidence = await options.collectProposerEvidence!(spec);
-      const result = await executeBoundedReportSeat(spec, options.question + juryEvidencePrompt(evidence, "report-json"),
+      const result = await executeBoundedReportSeat({ ...spec,
+        ...(!dependencies ? { checkpointResponse: async (response: unknown) => {
+          const { db } = await import("../db"), { sql } = await import("drizzle-orm");
+          const saved: any = await db.execute(sql`UPDATE agent_jobs SET payload=jsonb_set(payload,
+            '{paidSeatResponses}',COALESCE(payload->'paidSeatResponses','{}'::jsonb) ||
+              jsonb_build_object(${`${phaseKey}:${spec.modelId}`}::text,${JSON.stringify({
+                response, evidence, phaseKey, modelId: spec.modelId, receivedAt: new Date().toISOString(),
+              })}::jsonb))
+            WHERE id=${jobId} AND tenant_id=${input.tenantId} AND attempts=${attempt}
+            AND kind='business_report_review' AND status='running' AND lease_until>NOW()
+            AND payload->'state'->>'phase'='jury_started' RETURNING id`);
+          if (!(saved.rows || saved).length) throw new Error("Paid seat response checkpoint lost");
+        } } : {}),
+      }, options.question + juryEvidencePrompt(evidence, "report-json"),
         input.tenantId, amount => (dependencies?.reserve ?? reservePaidReportJury)(
           input, jobId, attempt, phaseKey, spec.modelId, amount));
       return { ...result, evidence };

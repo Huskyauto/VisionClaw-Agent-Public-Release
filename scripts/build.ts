@@ -175,6 +175,10 @@ async function buildAll() {
     "scripts/tool-forge-pass.ts",
     "scripts/sandbox-retention.ts",
     "scripts/plan-prewarm.ts",
+    // The nightly scheduler uses plain Node in production, not the tsx loader.
+    "scripts/nightly-memory-backup.ts",
+    // The tenant audit is top-level main() and must not need tsx in production.
+    "scripts/tenant-isolation-audit.ts",
   ];
   for (const entry of bwbChainEntries) {
     const base = entry.split("/").pop()!.replace(/\.ts$/, "");

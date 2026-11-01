@@ -226,6 +226,7 @@ jobs:
             mapfile -t INTEGRATION < <(npx --no-install tsx scripts/verify-public-test-manifest.ts --category integration)
             node --import tsx --test --test-force-exit "${DATABASE[@]}" "${INTEGRATION[@]}"
           else
+            bash scripts/test-report-package-release.sh
             node --import tsx --test --test-force-exit tests/security/*.test.ts tests/storage/*.test.ts tests/queue/*.test.ts tests/safety/*.test.ts tests/cost/*.test.ts tests/tools/*.test.ts tests/lib/*.test.ts tests/agentic/*.test.ts tests/integration/mission-golden-path.test.ts
           fi
 

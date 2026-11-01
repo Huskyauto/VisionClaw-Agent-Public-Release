@@ -431,6 +431,8 @@ const DEFAULT_PROPOSER_SYSTEM_PROMPT =
 // prompt + label + role. Backward-compat: callers can still pass just a model
 // id; we wrap it in a default spec.
 export interface ProposerCallSpec {
+  /** Internal durable report checkpoint; never populated from user arguments. */
+  checkpointResponse?: (response: unknown) => Promise<void>;
   modelId: string;
   providerLane?: ProviderLane;
   systemPrompt?: string;
@@ -637,12 +639,13 @@ export async function executeBoundedReportSeat(
     throw new Error("Paid report model/owner permission denied");
   }
   let amount = 0;
+  const outputTokens = spec.providerLane === "anthropic-api" ? 16384 : 4096;
   const budget = {
     ceiling: () => ({ spent: 0, ceiling: 2 }),
     // Google lists $4/$20 per million after the introductory $2/$10 rate.
     // Reserve at the higher rate; ordinary usage accounting remains separate.
     estimate: (model: string, input: number) => model === "google/gemini-4-argon"
-      ? (input * 4 + 4096 * 20) / 1_000_000 : estimateCostUsd(model, input, 4096),
+      ? (input * 4 + outputTokens * 20) / 1_000_000 : estimateCostUsd(model, input, outputTokens),
     reserve: (usd: number) => { amount = usd; },
   };
   const prompt = DEFAULT_PROPOSER_SYSTEM_PROMPT + question;
@@ -650,7 +653,7 @@ export async function executeBoundedReportSeat(
   await reserve(amount);
   return executeOwnerJuryApiCall(tenantId, spec.providerLane, spec.modelId, prompt,
     { ...budget, ceiling: () => ({ spent: 0, ceiling: amount }), reserve: () => {} },
-    () => (dependencies?.dispatch ?? callProposer)({ ...spec, maxTokens: 4096, timeoutMs: 120_000,
+    () => (dependencies?.dispatch ?? callProposer)({ ...spec, maxTokens: outputTokens, timeoutMs: 360_000,
       clientTimeoutMs: 6000, noRetry: true, beforeDispatch: () => {
         if (process.env.REPORT_EVIDENCE_HANDOFFS_DISABLED === "1" ||
             !hasOwnerJuryApiGrant(tenantId, spec.providerLane as "openai-api" | "anthropic-api" | "openrouter", spec.modelId)) {
@@ -717,6 +720,7 @@ export async function callProposer(specOrId: string | ProposerCallSpec, question
       `proposer ${modelId}${spec.label ? `[${spec.label}]` : ""}`,
       () => abort.abort(),
     );
+    await spec.checkpointResponse?.(resp);
     reportedModel = (await import("./lib/jury-evidence")).responseModelIdentity(resp);
     const answer = (resp?.choices?.[0]?.message?.content || "").trim();
     const usage = resp?.usage;

@@ -210,6 +210,9 @@ export async function fulfillReadinessAudit(params: {
   reportOnly?: boolean;
   /** Server-owned immutable package research; never accepted from HTTP. */
   sharedEvidence?: import("./lib/business-report-evidence").ReportEvidence;
+  /** Server-only package producer; never accepted from HTTP input. */
+  sectionDrafter?: (heading: string, brief: string, evidence: string) => Promise<string>;
+  draftModelId?: string;
 }): Promise<FulfillmentResult> {
   // Fail-closed tenant resolution (72h-review MEDIUM): no silent `|| 1`
   // fallback — a caller that omits tenantId gets an error, not owner-tenant
@@ -229,7 +232,7 @@ export async function fulfillReadinessAudit(params: {
 
   // Free-tier lane — same rationale as research reports: fixed-price sale,
   // don't bleed paid API spend on background generation.
-  const modelId = await getModelForTierAsync("powerful", tenantId, { freeTierOnly: true });
+  const modelId = params.draftModelId ?? await getModelForTierAsync("powerful", tenantId, { freeTierOnly: true });
   if (params.paidJuryBatch) {
     const { assertReportJuryApproval } = await import("./lib/business-report-paid-budget");
     assertReportJuryApproval({ tenantId, kind: "readiness", intake: intake as Record<string, unknown>,
@@ -237,7 +240,7 @@ export async function fulfillReadinessAudit(params: {
   }
   let evidence = params.sharedEvidence ?? await collectBusinessReportEvidence(intake as Record<string, unknown>,
     { allowPaidExtraction: !params.paidJuryBatch });
-  if (params.paidJuryBatch) {
+  if (params.paidJuryBatch && !params.sharedEvidence) {
     const { classifyReportResearch } = await import("./lib/report-research-preparation");
     evidence = await classifyReportResearch(evidence);
   }
@@ -256,7 +259,8 @@ export async function fulfillReadinessAudit(params: {
       const i = nextIdx++;
       if (i >= AUDIT_SECTION_PLAN.length) return;
       const s = AUDIT_SECTION_PLAN[i];
-      const body = await generateSection(modelId, tenantId, intake, s, sourceContext, !!params.paidJuryBatch || !!params.sharedEvidence);
+      const body = params.sectionDrafter ? await params.sectionDrafter(s.heading, s.brief, sourceContext)
+        : await generateSection(modelId, tenantId, intake, s, sourceContext, !!params.paidJuryBatch || !!params.sharedEvidence);
       let finalBody = body;
       if (!params.paidJuryBatch && !params.sharedEvidence && body && body.length >= 200 && !body.startsWith("(")) {
         try {
@@ -275,7 +279,9 @@ export async function fulfillReadinessAudit(params: {
       sections[i] = { heading: s.heading, body: finalBody };
     }
   }
-  await Promise.all(Array.from({ length: Math.min(SECTION_CONCURRENCY, AUDIT_SECTION_PLAN.length) }, () => sectionWorker()));
+  const generated = await Promise.allSettled(Array.from({ length: Math.min(SECTION_CONCURRENCY, AUDIT_SECTION_PLAN.length) }, () => sectionWorker()));
+  const rejected = generated.find(result => result.status === "rejected");
+  if (rejected?.status === "rejected") throw rejected.reason;
 
   // ── Self-healing quality gate (fail-closed) ───────────────────────────────
   // A section that failed generation carries a "(This section could not be
@@ -287,7 +293,8 @@ export async function fulfillReadinessAudit(params: {
   if (failed.length > 0) {
     console.warn(`[audit-fulfillment] Order ${params.orderId} — retrying ${failed.length} failed section(s): ${failed.map((i) => AUDIT_SECTION_PLAN[i].heading).join(", ")}`);
     for (const i of failed) {
-      const body = await generateSection(modelId, tenantId, intake, AUDIT_SECTION_PLAN[i], sourceContext, !!params.paidJuryBatch || !!params.sharedEvidence);
+      const body = params.sectionDrafter ? await params.sectionDrafter(AUDIT_SECTION_PLAN[i].heading, AUDIT_SECTION_PLAN[i].brief, sourceContext)
+        : await generateSection(modelId, tenantId, intake, AUDIT_SECTION_PLAN[i], sourceContext, !!params.paidJuryBatch || !!params.sharedEvidence);
       if (!isFailedSectionBody(body)) sections[i] = { heading: AUDIT_SECTION_PLAN[i].heading, body };
     }
     failed = findFailedSectionIndices(sections.map((s) => s?.body));

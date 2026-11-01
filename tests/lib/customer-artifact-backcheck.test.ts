@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PDFDocument, PDFName, PDFString, StandardFonts } from "pdf-lib";
-import { assertBackcheckIdentity, assertCompletedPackageIdentity, backcheckCustomerArtifact, retainedAcceptanceCriteria } from "../../server/lib/customer-artifact-backcheck";
+import { BACKCHECK_LIMITS, assertBackcheckIdentity, assertCompletedPackageIdentity, backcheckCustomerArtifact, retainedAcceptanceCriteria } from "../../server/lib/customer-artifact-backcheck";
 
 const audio = "https://drive.google.com/file/d/recording-one/view";
 async function pdf(text: string, link?: string, outside=false) {
@@ -21,6 +21,30 @@ test("valid report satisfies requirements and binds exact bytes",async()=>{
   assert.match(r.artifactSha256,/^[a-f0-9]{64}$/);assert.equal(r.coverage,"pdf_text_and_links");
   const changed=await backcheckCustomerArtifact({bytes:await pdf("Changed"),fileName:"report.pdf"});
   assert.notEqual(r.artifactSha256,changed.artifactSha256);
+});
+test("a complete 93-page company report is checked through its last page and audio link",async()=>{
+  const d=await PDFDocument.load(await pdf("LISTEN TO THE FULL REPORT",audio));
+  const font=await d.embedFont(StandardFonts.Helvetica);
+  for(let i=1;i<93;i++) d.addPage([612,792]);
+  d.getPage(92).drawText("End of company evidence appendix",{x:40,y:700,size:12,font});
+  const r=await backcheckCustomerArtifact({bytes:Buffer.from(await d.save()),fileName:"company.pdf",
+    criteria:{minimumPages:93,requiredText:["End of company evidence appendix"],expectedLinks:[audio]}});
+  assert.equal(r.passed,true,JSON.stringify(r));
+  assert.equal(r.pages,93);
+  assert.equal(r.coverage,"pdf_text_and_links");
+});
+test("the PDF page ceiling remains bounded and overflow has an explicit failure",async()=>{
+  const d=await PDFDocument.create();
+  for(let i=0;i<BACKCHECK_LIMITS.pages;i++) d.addPage([612,792]);
+  const atLimit=await backcheckCustomerArtifact({bytes:Buffer.from(await d.save()),fileName:"limit.pdf",
+    criteria:{minimumPages:BACKCHECK_LIMITS.pages}});
+  assert.equal(atLimit.passed,true,JSON.stringify(atLimit));
+  assert.equal(atLimit.pages,BACKCHECK_LIMITS.pages);
+  d.addPage([612,792]);
+  const over=await backcheckCustomerArtifact({bytes:Buffer.from(await d.save()),fileName:"over.pdf"});
+  assert.equal(over.passed,false);
+  assert.equal(over.coverage,"incomplete");
+  assert.deepEqual(over.failures,["pdf_page_limit"]);
 });
 test("PDF signature alone is not a valid report",async()=>{
   const r=await backcheckCustomerArtifact({bytes:Buffer.from("%PDF-1.7\n"+"fake ".repeat(300)),fileName:"report.pdf"});

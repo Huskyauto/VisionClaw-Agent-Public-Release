@@ -1,6 +1,7 @@
 import { MODEL_REGISTRY } from "./providers";
 import { estimateCostUsd } from "./agentic/cost-ledger";
 import { normalizeRetiredModelId } from "./lib/param-adaptation";
+import { MAMMOUTH_MODELS } from "./lib/mammouth-catalog";
 
 export interface ResourceEstimate {
   estimatedToolCalls: number;
@@ -32,6 +33,8 @@ interface StepCostEntry {
 }
 
 export const MODEL_COST_PER_MILLION: Record<string, { input: number; output: number }> = {
+  ...Object.fromEntries(MAMMOUTH_MODELS.map(model =>
+    [model.id, { input: model.inputPerMillion, output: model.outputPerMillion }])),
   "gpt-5.4": { input: 2.50, output: 15.00 },
   // Platform default since the Sol migration; keep this verified rate in lockstep
   // with cost-ledger and insights-engine.
@@ -82,6 +85,8 @@ export const MODEL_COST_PER_MILLION: Record<string, { input: number; output: num
   "google/gemma-4-31b-it": { input: 0.09, output: 0.34 },
   "moonshotai/kimi-k2.6": { input: 0.95, output: 4.00 },
   "moonshotai/kimi-k3": { input: 3.00, output: 15.00 },
+  "moonshotai/kimi-k3.1-pro": { input: 2, output: 10 },
+  "mistralai/mistral-large-4-0": { input: 1.36, output: 4.18 },
   "meta-llama/llama-4-maverick": { input: 0.20, output: 0.696 },
   "meta/muse-spark-1.1": { input: 1.25, output: 4.25 },
   "meta/muse-spark-1.3": { input: 1.25, output: 4.25 },

@@ -14,6 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { submitOperatorJobAction, type OperatorJobAction } from "@/lib/operator-job-action";
 import {
   Activity, RefreshCw, RotateCcw, Ban, ChevronRight, AlertTriangle,
   CheckCircle2, Clock, PlayCircle, XCircle, Inbox, Loader2,
@@ -112,30 +113,42 @@ function StatsCards({ stats, total }: { stats: JobStats["stats"]; total: number 
 
 function JobRow({ job }: { job: AgentJob }) {
   const [open, setOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState<{ action: OperatorJobAction; status: JobStatus; attempts: number } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const retry = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/admin/agent-jobs/${job.id}/retry`),
+    mutationFn: () => submitOperatorJobAction(job.id, "retry", apiRequest),
     onSuccess: () => {
+      setConfirmation(null);
+      setActionError(null);
       toast({ title: "Job re-queued", description: `Job #${job.id} reset to pending.` });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/agent-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/agent-jobs/stats"] });
     },
-    onError: (e: any) => toast({ title: "Retry failed", description: e?.message || "Unknown error", variant: "destructive" }),
+    onError: (e: any) => setActionError(e?.message || "Retry was not confirmed. Refresh the status before trying again."),
   });
 
   const cancel = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/admin/agent-jobs/${job.id}/cancel`),
+    mutationFn: () => submitOperatorJobAction(job.id, "cancel", apiRequest),
     onSuccess: () => {
-      toast({ title: "Job cancelled", description: `Job #${job.id} marked cancelled.` });
+      setConfirmation(null);
+      setActionError(null);
+      toast({ title: "Cancellation request acknowledged", description: "Check the refreshed job status to confirm it changed. In-flight requests are not aborted; work may continue until a handler checks cancellation. Charges already incurred are not reversed." });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/agent-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/agent-jobs/stats"] });
     },
-    onError: (e: any) => toast({ title: "Cancel failed", description: e?.message || "Unknown error", variant: "destructive" }),
+    onError: (e: any) => setActionError(e?.message || "Cancellation was not confirmed. Refresh the status before trying again."),
   });
 
   const canRetry = job.status === "failed" || job.status === "failed_terminal" || job.status === "cancelled";
   const canCancel = job.status === "pending" || job.status === "running";
+  const busy = retry.isPending || cancel.isPending;
+  const confirmationCurrent = confirmation?.status === job.status && confirmation?.attempts === job.attempts;
+  const askAction = (action: OperatorJobAction) => {
+    setActionError(null);
+    setConfirmation({ action, status: job.status, attempts: job.attempts });
+  };
 
   return (
     <>
@@ -168,8 +181,8 @@ function JobRow({ job }: { job: AgentJob }) {
               {canRetry && (
                 <Button
                   variant="ghost" size="sm"
-                  onClick={() => retry.mutate()}
-                  disabled={retry.isPending}
+                   onClick={() => askAction("retry")}
+                   disabled={busy}
                   aria-label={`Retry job ${job.id}`}
                   data-testid={`button-retry-${job.id}`}
                 >
@@ -180,8 +193,8 @@ function JobRow({ job }: { job: AgentJob }) {
               {canCancel && (
                 <Button
                   variant="ghost" size="sm"
-                  onClick={() => cancel.mutate()}
-                  disabled={cancel.isPending}
+                   onClick={() => askAction("cancel")}
+                   disabled={busy}
                   aria-label={`Cancel job ${job.id}`}
                   data-testid={`button-cancel-${job.id}`}
                 >
@@ -192,6 +205,35 @@ function JobRow({ job }: { job: AgentJob }) {
             </div>
           </TableCell>
         </TableRow>
+        {confirmation && (
+          <TableRow>
+            <TableCell colSpan={8} className="bg-muted/30 p-4">
+              <section className="space-y-2 text-sm" aria-label={`Confirm ${confirmation.action} for job ${job.id}`} data-testid={`job-action-confirmation-${job.id}`}>
+                <p className="font-medium">{confirmation.action === "retry" ? "Review before retrying" : "What cancellation means"} · Job #{job.id}</p>
+                {confirmation.action === "retry" ? <>
+                  <p>This resets the job's attempt counter and queues it again. It is not a new spending allowance or a guarantee that earlier paid work will be reused. Existing handler safeguards still apply.</p>
+                  {job.kind === "company_report_package" && <p className="font-medium">For a company package, use its saved-package recovery controls first. They show which work is retained and what additional work you are approving.</p>}
+                  <p>Check saved results, errors and any unresolved provider requests below before retrying.</p>
+                  <Button variant="outline" size="sm" onClick={() => setOpen(true)}>Show job details</Button>
+                </> : <p>This prevents normal automatic retries, but does not abort an in-flight provider request or reverse charges. Some handlers may continue; company packages stop at their next live check. Cancelling during narration can prevent an in-flight audio result from being saved. This is not a safe pause or a promise of resumability.</p>}
+                {!confirmationCurrent && <p role="alert">The job changed while you were reviewing. Dismiss this confirmation and review its current status.</p>}
+                {actionError && <p role="alert" className="text-destructive">{actionError}</p>}
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant={confirmation.action === "cancel" ? "destructive" : "default"} disabled={busy || !confirmationCurrent}
+                    onClick={() => {
+                      if (!confirmationCurrent || busy) return;
+                      setActionError(null);
+                      if (confirmation.action === "retry" && canRetry) retry.mutate();
+                      if (confirmation.action === "cancel" && canCancel) cancel.mutate();
+                    }} data-testid={`button-confirm-${confirmation.action}-${job.id}`}>
+                    {busy ? "Saving…" : confirmation.action === "retry" ? "Confirm retry" : "Confirm cancellation"}
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => { setConfirmation(null); setActionError(null); }}>Keep unchanged</Button>
+                </div>
+              </section>
+            </TableCell>
+          </TableRow>
+        )}
         {open && (
           <TableRow data-testid={`row-detail-${job.id}`}>
             <TableCell colSpan={8} className="bg-muted/30 p-4">

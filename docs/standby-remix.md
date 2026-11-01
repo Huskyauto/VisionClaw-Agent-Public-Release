@@ -11,7 +11,26 @@ This project guards **every configured shell workflow and the automatic developm
 
 ## Configure while dormant
 
+### Current preparation record — October 28, 2026
+
+- `docs/standby-secret-inventory.json` records the 56 configured secret **names** observed in the original project. It contains no secret values and is not a credential backup. Include the newly replaced Stripe live secret when configuring the remix.
+- The original remains running. No remix has been created, started, published, connected to production data, or populated with credentials by this preparation.
+- Three existing behavioral checks passed: a foreign project cannot execute the guarded startup command, push to the original repository, or run the automatic commit/push path. The fourth configuration check is stale: it pins old audit slice settings rather than just the startup guard. It failed on the current audit arguments; do not report the entire test suite as passing.
+- Current configured shell commands were separately inspected for the primary-only wrapper. The production command remains unguarded: **never publish the standby**.
+
 Replit does **not** copy Secrets, integrations, or a published deployment into a remix. A copied database may hold credentials encrypted under the original `SESSION_SECRET`; only the exact original secret can decrypt them. Add it to the *remix's Replit Secrets*, using the owner's saved secure copy, **never** to a file, chat, or a non-secret environment variable. Add other required provider credentials through Secrets and reattach any available OAuth integrations in the remix. Keep the application and jobs stopped during this work.
+
+Use the inventory to reconcile names inside the new project. Secret values cannot be extracted through the supported secret-management tools; they must be supplied from the owner's secure records or the provider's credential controls. Do not generate a new `SESSION_SECRET` when restoring encrypted database records. Preserve original signing keys for existing signed records, but independently review whether a replacement should retain each authority before activation. Replit-managed AI credentials and OAuth connections may require reattachment; a copied environment variable is not a working connection.
+
+### Data, files, and configuration checklist
+
+- **Database:** select the platform's database-copy option when available. Confirm which source database it copies; a workspace snapshot is not proof of current production data. Verify an independent destination database and expected data read-only. Never use the main application's database connection as the backup's database.
+- **Local files:** inspect `data/` and `uploads/` in the remix, including private runtime state and generated customer assets. Directory existence alone is not completeness proof. Do not export their contents into public documents or a public repository.
+- **App Storage:** the app uses Replit App Storage. Inventory the source bucket and required objects, then arrange a separate private recovery copy and permissions. Do not assume a remix copied bucket contents or grants access.
+- **External services:** review Railway services, mail providers, Google and Microsoft connections, Stripe, media providers, and AgentID. External service state and provider-hosted assets are not included in a source-code remix.
+- **Routing and environment:** inspect development and production overrides separately. Keep outbound jobs dormant; copied enabled flags, original callbacks, public domain, webhook URLs, repair endpoints, and GitHub targets are not replacement-ready settings.
+- **Recovery freshness:** a dated fork is a point-in-time snapshot, not continuous replication. Record the source database/file snapshot time in the private backup workspace after verification.
+- **Secure credential backup:** retain credentials in an owner-controlled password manager or another approved secure credential store. Never create a plaintext secrets archive, `.env` export, Drive document, or committed credential file.
 
 “API-ready” in a dormant copy means required credential names and connections are present and the copied code/configuration is intact. It does **not** mean live calls, token refresh, Stripe orders, email delivery, or webhook handling have been tested. Avoid testing by sending messages, charging cards, or activating scheduled jobs. The original's URL, OAuth callbacks, Stripe webhooks, Google/Drive paths, and repair-handoff target must be independently reviewed before any disaster activation.
 

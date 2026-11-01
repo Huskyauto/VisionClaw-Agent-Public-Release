@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { replitAdmissionFetch } from "./lib/replit-admission";
+import { replitCooldownActive } from "./lib/replit-admission-postgres";
 import fs from "fs";
 import path from "path";
 import { storage } from "./storage";
@@ -28,6 +30,8 @@ import { cheaperAutomaticAllowed, getCheaperCatalog, catalogUsageCost,
 export const COST_LEDGER_RECORDED = Symbol.for("visionclaw.cost-ledger-recorded");
 import { normalizeRetiredModelId, wrapClientWithParamAdaptation } from "./lib/param-adaptation";
 import { wrapProfundoTransientRetry } from "./lib/profundo-transient-retry";
+import { MAMMOUTH_BASE_URL, mammouthModel } from "./lib/mammouth-catalog";
+import { mammouthReady, assertMammouthAccess, mammouthRequest, mammouthUsageCost, runMammouthBudgeted } from "./lib/mammouth";
 // R94 SECURITY — static import (tsx/ESM does NOT define `require`; the previous
 // dynamic require() silently threw and made every cost lookup fall back to ADMIN).
 import { currentTenantId } from "./lib/tenant-context";
@@ -539,6 +543,9 @@ function wrapClientWithCostTracking(client: OpenAI, modelId: string, tenantId: n
 export const replitOpenai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  maxRetries: 0,
+  timeout: 60_000,
+  fetch: replitAdmissionFetch,
 });
 
 // Round 30 — cost telemetry instrumentation. ~30 sites across the codebase
@@ -583,6 +590,7 @@ export const replitOpenai = new OpenAI({
 }
 
 export const PROVIDER_CONFIG: Record<string, { name: string; baseUrl: string; description: string }> = {
+  mammouth: { name: "Mammouth API (credits)", baseUrl: MAMMOUTH_BASE_URL, description: "Owner-selected GLM 5.3 Flash and Mistral Large 4; metered API credits, not unlimited subscription calls" },
   cheaperinference: { name: "CheaperInference", baseUrl: CHEAPER_INFERENCE_BASE_URL, description: "Owner-selected Luna reasoning; metered wallet billing, not a flat-rate lane" },
   replit: { name: "Replit AI (Built-in)", baseUrl: "", description: "Built-in - GPT-5.4, GPT-5.1, no API key needed" },
   openai: { name: "OpenAI", baseUrl: "https://api.openai.com/v1", description: "GPT-5, GPT-5.4, GPT-6 Luna" },
@@ -600,10 +608,11 @@ export const PROVIDER_CONFIG: Record<string, { name: string; baseUrl: string; de
 // registry provider named by a model. MoA uses this to keep simultaneous jury
 // seats independently paced and health-scoped instead of letting the generic
 // fallback ladder collapse every vote onto one endpoint.
-export type ProviderLane = "replit" | "openference" | "profundo" | "standard-compute" | "claude-runner" | "anthropic-api" | "openai-api" | "zai" | "openrouter" | "xai";
+export type ProviderLane = "replit" | "openference" | "profundo" | "standard-compute" | "claude-runner" | "anthropic-api" | "openai-api" | "zai" | "openrouter" | "xai" | "mammouth";
 
 export function providerLaneCanServeModel(lane: ProviderLane, modelId: string): boolean {
   switch (lane) {
+    case "mammouth": return !!mammouthModel(modelId);
     case "replit":
       return modelId === "gpt-5.4";
     case "openai-api":
@@ -664,6 +673,7 @@ function getProfundoKey(): string | null {
 export function providerLaneLocallyReady(lane: ProviderLane): boolean {
   if (!isProviderHealthy(lane)) return false;
   switch (lane) {
+    case "mammouth": return mammouthReady();
     case "claude-runner": return isClaudeRunnerAvailable();
     case "profundo": return getProfundoKey() !== null;
     case "standard-compute": return standardComputeReady();
@@ -1162,6 +1172,9 @@ function getReplit(): OpenAI {
     clientCache.set("replit", new OpenAI({
       apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
       baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      maxRetries: 0,
+      timeout: 60_000,
+      fetch: replitAdmissionFetch,
     }));
   }
   return wrapClientWithParamAdaptation(clientCache.get("replit")!);
@@ -1549,6 +1562,8 @@ async function getPinnedProviderLane(
       console.info(`[providers] pinned Replit route: ${modelId} (Replit-managed billing)`);
       return { client: getReplit(), actualModelId: modelId };
     }
+    case "mammouth":
+      throw new Error("Mammouth must use the explicit verified owner-selection factory");
     case "xai": {
       if (!providerLaneCanServeModel(lane, modelId) || model?.provider !== "xai") {
         throw new Error(`[providers] pinned xAI lane cannot serve "${modelId}"`);
@@ -1656,6 +1671,43 @@ export async function getClientForModel(
       `[providers] ${modelId} is only available through its fixed synthetic evaluation runner`,
     );
   }
+  if (modelId.startsWith("mammouth/") || options?.providerLane === "mammouth") {
+    const selection = { ...options };
+    const checkAccess = () => {
+      assertMammouthAccess(tenantId, selection);
+      if (!isProviderHealthy("mammouth") || !mammouthModel(modelId)) {
+        throw new Error("Mammouth model or provider unavailable; no fallback");
+      }
+    };
+    checkAccess();
+    const actualModelId = mammouthModel(modelId)!.upstream;
+    const sdk = new OpenAI({ apiKey: process.env.MAMMOUTH_API_KEY!.trim(),
+      baseURL: MAMMOUTH_BASE_URL, maxRetries: 0, timeout: 60_000 });
+    const tracked = buildPatchedCreate(sdk.chat.completions.create.bind(sdk.chat.completions),
+      () => modelId, () => tenantId!, "llm.mammouth", undefined, (_label, usage) => {
+        const cost = mammouthUsageCost(modelId, usage);
+        return cost === undefined ? {} : { costUsd: cost };
+      });
+    // Never expose SDK raw HTTP, Responses, body/header/path overrides or retries.
+    const client = { chat: { completions: { create: async (params: any, requestOptions: any = {}) => {
+      checkAccess();
+      const { payload, maximumUsd } = mammouthRequest(modelId, params);
+      try {
+        return await runMammouthBudgeted(modelId, maximumUsd,
+          () => tracked(payload, { signal: requestOptions?.signal, maxRetries: 0, timeout: 60_000 }),
+          () => {
+            checkAccess();
+            if (requestOptions?.signal?.aborted) throw new Error("Mammouth request cancelled before dispatch");
+          });
+      } catch (error: any) {
+        if ([401, 403, 429].includes(error?.status) || error?.status >= 500) {
+          markProviderUnhealthyOnce("mammouth", new Error(`HTTP ${error.status}`), "Mammouth request failed");
+        }
+        throw error;
+      }
+    } } } } as unknown as OpenAI;
+    return { client, actualModelId };
+  }
   const explicitOwnerOnlyModel = isOwnerOnlyFinalDecisionModel(modelId);
   const explicitOwnerModelAuthorized =
     explicitOwnerOnlyModel &&
@@ -1720,7 +1772,14 @@ export async function getClientForModel(
         // SDK body/path/header overrides must not bypass the validated request.
         return await runCheaperBudgeted(tenantId!, cheaperRequestMaximum(payload, snapshot),
           () => create(payload, { signal: requestOptions?.signal, maxRetries: 0, timeout: 60_000 }),
-          usage => catalogUsageCost(usage, snapshot));
+          usage => catalogUsageCost(usage, snapshot), undefined, () => {
+            assertCheaperInferenceAccess(tenantId, options ?? {});
+            if (!isProviderHealthy("cheaperinference") ||
+                (currentTenantId() !== null && currentTenantId() !== tenantId) ||
+                (automatic && (!cheaperAutomaticAllowed(tenantId) || snapshot.discount < cheaperMinimumDiscount())) ||
+                requestOptions?.signal?.aborted)
+              throw new Error("CheaperInference operator, scope or deadline stopped dispatch after reservation");
+          });
       } catch (error: any) {
         if ([401, 403, 429].includes(error?.status) || error?.status >= 500) {
           markProviderUnhealthyOnce("cheaperinference", error, "CheaperInference request failed");
@@ -1809,7 +1868,8 @@ export async function getClientForModel(
     const replitKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     const replitBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
     if (mapped && !REPLIT_MODELFARM_UNSUPPORTED.has(modelId) && replitKey && replitKey.length > 5 && replitBaseUrl && replitBaseUrl.length > 5 &&
-        (!cheaperAutomaticAllowed(tenantId) || isProviderHealthy("replit"))) {
+        (!cheaperAutomaticAllowed(tenantId) ||
+          (isProviderHealthy("replit") && !(await replitCooldownActive())))) {
       const replitClient = getReplit();
       console.log(`[providers] Replit model ${modelId} → modelfarm integration (${mapped}, $0 cost)`);
       return { client: replitClient, actualModelId: mapped };
@@ -2220,6 +2280,8 @@ export async function getModelForTierAsync(
   options?: { freeTierOnly?: boolean; allowMeteredFallback?: boolean },
 ): Promise<string> {
   const freeTierOnly = options?.freeTierOnly ?? (process.env.BACKGROUND_FREE_TIER_ONLY === "true");
+  const replitReady = isProviderHealthy("replit") &&
+    (!cheaperAutomaticAllowed(tenantId) || !(await replitCooldownActive()));
   // Flat subscription lanes count as free for routing purposes, matching the
   // existing Openference behavior in the freeTierOnly branch below.
   const preferredProfundoByTier: Partial<Record<typeof tier, string>> = {
@@ -2348,7 +2410,7 @@ export async function getModelForTierAsync(
         logAutoRoute(tier, c.model, "replit→openai OAuth");
         return c.model;
       }
-      if (mapped && isProviderHealthy("replit") &&
+      if (mapped && replitReady &&
           process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
         logAutoRoute(tier, c.model, "replit modelfarm ($0 marginal)");
         return c.model;
@@ -2377,7 +2439,7 @@ export async function getModelForTierAsync(
 
   if (freeTierOnly) {
     for (const c of candidates) {
-      if (c.provider === "replit" && isProviderHealthy("replit") &&
+      if (c.provider === "replit" && replitReady &&
           process.env.AI_INTEGRATIONS_OPENAI_API_KEY && process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
         logAutoRoute(tier, c.model, "replit modelfarm (free-tier-only mode — no paid lane)");
         return c.model;
@@ -2487,6 +2549,7 @@ export async function getAvailableModelsForTenant(tenantId: number, isAdmin: boo
   const userKeyProviders = new Set(keys.filter((k) => k.enabled).map((k) => k.provider));
 
   const enabledProviders = new Set<string>();
+  if (tenantId === 1 && isAdmin && mammouthReady()) enabledProviders.add("mammouth");
   if (tenantId === 1 && isAdmin && cheaperInferenceReady()) enabledProviders.add("cheaperinference");
   if (hasOpenferenceKey()) enabledProviders.add("openference");
 
@@ -2515,7 +2578,7 @@ export async function getAvailableModelsForTenant(tenantId: number, isAdmin: boo
   const models = MODEL_REGISTRY.filter(
     (m) =>
       enabledProviders.has(m.provider) &&
-      (m.provider !== "cheaperinference" || (tenantId === 1 && isAdmin)) &&
+      (!["cheaperinference", "mammouth"].includes(m.provider) || (tenantId === 1 && isAdmin)) &&
       !RETIRED_MODEL_IDS.has(m.id) &&
       !isSyntheticEvaluationModel(m.id) &&
       (!isOwnerOnlyFinalDecisionModel(m.id) || isAdmin),

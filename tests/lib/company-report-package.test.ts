@@ -47,7 +47,7 @@ test("a failed first draft does not discard research or prevent the other two re
   assert.ok(state.research);
 });
 
-test("a blocked report blocks the package even while serialized siblings are waiting", async () => {
+test("a failed report does not revoke the parent while serialized siblings are waiting", async () => {
   const state = initialPackage({ company: "Fixture", website: "https://example.test" });
   state.phase = "reviewing";
   state.research = { evidence: { version: 1, sources: [], limitations: [], capturedAt: "2026-10-18" },
@@ -60,7 +60,7 @@ test("a blocked report blocks the package even while serialized siblings are wai
     review: async id => ({ status: id === 1 ? "error" : "pending" }),
     assemble: async () => [], combine: async () => { throw new Error("no incomplete assembly"); },
   });
-  assert.equal(state.phase, "blocked");
+   assert.equal(state.phase, "reviewing");
   assert.ok(state.research, "retained evidence survives the stop");
   assert.equal(state.reports.executive?.jobId, 2, "waiting sibling identity is retained");
 });

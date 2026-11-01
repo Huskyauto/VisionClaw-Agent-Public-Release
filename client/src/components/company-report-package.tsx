@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, CheckCircle2, Clipboard, Download, FileText, Loader2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,13 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
-import { authFetch } from "@/lib/queryClient";
+import { authFetch, getAuthIdentityVersion } from "@/lib/queryClient";
+import { PACKAGE_CONFIRMATION_ERROR, submitCompanyPackage } from "@/lib/company-package-submit";
+import { websiteFromBusinessEmail } from "@shared/company-report-intake";
 
 type PackageFile = {
   key: string;
   label: string;
   filename: string;
   category: "full" | "teaser";
+  audioUrl?: string;
+  pdfUrl?: string;
 };
 
 type Coverage = {
@@ -20,9 +24,29 @@ type Coverage = {
   reviewed: number;
   failed: number;
   capped: boolean;
+  pending?: number;
+  evidencePages?: number;
+  factsPending?: number;
 };
+type Recovery = { available: boolean; canRepairResearch: boolean; requiresPaidRetryApproval: boolean;
+  snapshot: string; reservedUsd: number; remainingUsd: number; reasons: string[] };
+type ReviewContinuation = { available: boolean; snapshot: string; childIds: number[];
+  reports: Array<{ kind: string; childId: number; eligible: boolean; reason?: string; compilerChars?: number }> };
+type Configuration = { ready: boolean; issues: string[]; notice: string; modelBudgetUsd: number;
+  models: Array<{ report: string; model: string; outputTokens: number }> };
 
 type ReportPackage = {
+  productionVersion?: number;
+  compilationProgress?: { authors: number; syntheses: number; delivered: number;
+    execution?: string;
+    evidenceReferenceRecovery?: Array<{ operation: string; status: string; note: string }>;
+    corrections?: Array<{ operation: string; phase: string; check: string; resolved?: boolean; notDispatched?: boolean }> };
+  automaticCorrectionsApproved?: boolean;
+  canResumeWithAutomaticCorrections?: boolean;
+  targetedRepair?: { available: boolean; phase?: string };
+  audioProgress?: Array<{ kind: string; stage?: string; savedChunks: number; totalChunks?: number }>;
+  compilationRecovery?: { available: boolean; snapshot: string; operation?: string };
+  repairPlan?: { available: boolean; snapshot: string; budgetUsd: number; maximumCompletionUsd: number | null; reasons: string[] };
   id: string;
   status: string;
   phase?: string | null;
@@ -33,10 +57,15 @@ type ReportPackage = {
   files: PackageFile[];
   coverage?: Coverage;
   emailSummary?: string;
+  canResume?: boolean;
+  recovery?: Recovery;
+  reviewContinuation?: ReviewContinuation;
+  reports?: Record<string, { status: string; error?: string }>;
 };
 
 type PackageFields = {
   company: string;
+  contactEmail: string;
   website: string;
   principalName: string;
   industry: string;
@@ -49,6 +78,7 @@ type SavedDraft = { requestId: string; fields: PackageFields };
 
 const EMPTY_FIELDS: PackageFields = {
   company: "",
+  contactEmail: "",
   website: "",
   principalName: "",
   industry: "",
@@ -104,21 +134,115 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
   const [draft] = useState(() => readDraft(draftStorageKey));
   const [fields, setFields] = useState<PackageFields>(draft.fields);
   const [requestId, setRequestId] = useState(draft.requestId);
-  const [enabled, setEnabled] = useState(() => {
-    try { return !!localStorage.getItem(activeStorageKey); } catch { return false; }
-  });
+  const [enabled, setEnabled] = useState(true);
+  const submitLock = useRef(false);
   const [acceptResearchCost, setAcceptResearchCost] = useState(false);
+  const [allowAutomaticCorrections, setAllowAutomaticCorrections] = useState(false);
   const [items, setItems] = useState<ReportPackage[]>([]);
   const [activeItem, setActiveItem] = useState<ReportPackage | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [packageError, setPackageError] = useState<string | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
+  const [pollingPaused, setPollingPaused] = useState(false);
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const [openedId, setOpenedId] = useState<string | null>(null);
+  const [configuration, setConfiguration] = useState<Configuration | null>(null);
+  const [configurationError, setConfigurationError] = useState<string | null>(null);
+  const [checkingConfiguration, setCheckingConfiguration] = useState(false);
+  const [confirmPaidRetry, setConfirmPaidRetry] = useState(false);
+  const [confirmedContinuation, setConfirmedContinuation] = useState<string | null>(null);
+  const [confirmedRepair, setConfirmedRepair] = useState<string | null>(null);
+  const [confirmedReplacement, setConfirmedReplacement] = useState<string | null>(null);
+  const replacementSubject = activeItem?.compilationRecovery?.available
+    ? `${activeItem.id}:${activeItem.compilationRecovery.snapshot}` : "";
+  const continuationSubject = activeItem?.reviewContinuation
+    ? `${activeItem.id}:${activeItem.reviewContinuation.snapshot}` : "";
   useEffect(() => { onModeChange?.(enabled); }, [enabled, onModeChange]);
+  useEffect(() => { setConfirmPaidRetry(false); }, [activeItem?.id, activeItem?.recovery?.snapshot]);
+  useEffect(() => { setAllowAutomaticCorrections(false); }, [activeItem?.id]);
+  useEffect(() => { setConfirmedReplacement(null); }, [replacementSubject]);
+  useEffect(() => { setConfirmedContinuation(null); }, [continuationSubject]);
+  async function checkConfiguration() {
+    setCheckingConfiguration(true); setConfigurationError(null);
+    try {
+      const response = await authFetch("/api/admin/company-report-packages/preflight");
+      if (!response.ok) throw new Error(await responseError(response));
+      setConfiguration(await response.json());
+    } catch (error) {
+      setConfiguration(null);
+      setConfigurationError(error instanceof Error ? error.message : "Configuration checks are unavailable.");
+    } finally { setCheckingConfiguration(false); }
+  }
+  useEffect(() => { if (enabled) void checkConfiguration(); }, [enabled]);
+  async function recoverPackage(researchOnly: boolean, replaceTruncated = false) {
+    if (!activeItem) return;
+    const manualReplacement = replaceTruncated && !!activeItem.compilationRecovery?.available &&
+      !!replacementSubject && confirmedReplacement === replacementSubject;
+    if (replaceTruncated && !manualReplacement) return;
+    const automaticCorrection = !manualReplacement && activeItem.canResumeWithAutomaticCorrections &&
+      (allowAutomaticCorrections || activeItem.automaticCorrectionsApproved);
+    if (activeItem.compilationRecovery?.available &&
+        (!manualReplacement && !automaticCorrection || researchOnly || !acceptResearchCost)) return;
+    setSubmitting(true); setPackageError(null);
+    try {
+      const response = await authFetch(`/api/admin/company-report-packages/${activeItem.id}/resume`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot: activeItem.compilationRecovery?.available
+          ? activeItem.compilationRecovery.snapshot : activeItem.recovery?.snapshot, researchOnly,
+          acceptResearchCost, confirmUncertainPaidRetry: confirmPaidRetry,
+          ...(allowAutomaticCorrections && !manualReplacement ? { allowAutomaticCorrections: true } : {}),
+          ...(manualReplacement
+            ? { replaceTruncatedCompilation: true } : {}) }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      const status = await authFetch(`/api/admin/company-report-packages/${activeItem.id}`);
+      if (!status.ok) throw new Error("Recovery was accepted, but status is unavailable. Refresh; do not submit a new package.");
+      setActiveItem(await status.json());
+      setConfirmPaidRetry(false);
+      setConfirmedReplacement(null);
+    } catch (error) { setPackageError(error instanceof Error ? error.message : "Recovery could not be confirmed."); }
+    finally { setSubmitting(false); }
+  }
+
+  async function continueReviewedReports() {
+    if (!activeItem?.reviewContinuation?.available || !continuationSubject ||
+        confirmedContinuation !== continuationSubject) return;
+    const target = { id: activeItem.id, snapshot: activeItem.reviewContinuation.snapshot };
+    setSubmitting(true); setPackageError(null);
+    try {
+      const response = await authFetch(`/api/admin/company-report-packages/${target.id}/continue-reviewed`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot: target.snapshot, acceptResearchCost: true }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      setConfirmedContinuation(null);
+      const status = await authFetch(`/api/admin/company-report-packages/${target.id}`);
+      if (!status.ok) throw new Error("Continuation was accepted, but status is unavailable. Refresh; do not start another package.");
+      setActiveItem(await status.json());
+    } catch (error) { setPackageError(error instanceof Error ? error.message : "Continuation could not be confirmed."); }
+    finally { setSubmitting(false); }
+  }
+
+  async function repairPackage() {
+    if (!activeItem?.repairPlan?.available || confirmedRepair !== activeItem.repairPlan.snapshot) return;
+    const target = { id: activeItem.id, ...activeItem.repairPlan };
+    setSubmitting(true); setPackageError(null);
+    try {
+      const response = await authFetch(`/api/admin/company-report-packages/${target.id}/repair`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot: target.snapshot, modelBudgetUsd: target.budgetUsd, confirmAdditionalPaidWork: true }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      setConfirmedRepair(null);
+      const status = await authFetch(`/api/admin/company-report-packages/${target.id}`);
+      if (!status.ok) throw new Error("Repair accepted; refresh its status rather than starting another package.");
+      setActiveItem(await status.json());
+    } catch (error) { setPackageError(error instanceof Error ? error.message : "Repair could not be confirmed."); }
+    finally { setSubmitting(false); }
+  }
 
   function persistDraft(nextFields: PackageFields, nextRequestId: string) {
     try {
@@ -136,6 +260,7 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
     setPackageError(null);
     setPollError(null);
     setActiveItem(null);
+    setPollingPaused(false);
     setOpenedId(null);
     persistDraft(nextFields, nextRequestId);
   }
@@ -164,9 +289,15 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
     setPollError(null);
     try {
       const response = await authFetch(`/api/admin/company-report-packages/${encodeURIComponent(id)}`);
+      if (response.status === 401 || response.status === 403) {
+        setPollingPaused(true);
+        setPollError("Sign-in required. Status checks are paused; the status below is last known, not live. Sign in again, then reopen this saved package. Do not create another package.");
+        return;
+      }
       if (!response.ok) throw new Error(await responseError(response));
       const item = (await response.json()) as ReportPackage;
       setActiveItem(item);
+      setPollingPaused(false);
       try { localStorage.setItem(activeStorageKey, item.id); } catch { /* optional resume */ }
     } catch (error) {
       setPackageError(error instanceof Error ? error.message : "Could not load this package.");
@@ -202,20 +333,30 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
   }, [tenantId]);
 
   useEffect(() => {
-    if (!activeItem?.id || !isInProgress(activeItem.status)) return;
+    if (!activeItem?.id || !isInProgress(activeItem.status) || pollingPaused) return;
     let attempts = 0;
     let failures = 0;
     let stopped = false;
     const timer = window.setInterval(async () => {
       if (stopped) return;
       attempts += 1;
-      if (attempts > 120) {
+      if (attempts > 17_280) {
         stopped = true;
-        setPollError("Progress polling stopped after 10 minutes. The package may still be running; refresh or open it again to check.");
+        window.clearInterval(timer);
+        setPollError("Automatic status checks reached the 24-hour limit. Refresh to view saved progress.");
+        setPollingPaused(true);
         return;
       }
       try {
         const response = await authFetch(`/api/admin/company-report-packages/${encodeURIComponent(activeItem.id)}`);
+        if (stopped) return;
+        if (response.status === 401 || response.status === 403) {
+          stopped = true;
+          window.clearInterval(timer);
+          setPollingPaused(true);
+          setPollError("Sign-in required. Status checks are paused; the status below is last known, not live. Sign in again, then reopen this saved package. Do not create another package.");
+          return;
+        }
         if (!response.ok) throw new Error(await responseError(response));
         const item = (await response.json()) as ReportPackage;
         failures = 0;
@@ -232,6 +373,7 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
           stopped = true;
           window.clearInterval(timer);
           setPollError(error instanceof Error ? error.message : "Could not check package progress.");
+          setPollingPaused(true);
         }
       }
     }, 5000);
@@ -241,19 +383,25 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
     };
     // refreshItems is intentionally not a dependency; polling follows the active id/status.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeItem?.id, activeItem?.status]);
+  }, [activeItem?.id, activeItem?.status, pollingPaused]);
 
   async function submitPackage() {
+    if (submitLock.current) return;
     setPackageError(null);
     setPollError(null);
     const company = fields.company.trim();
-    const website = fields.website.trim();
+    const enteredWebsite = fields.website.trim() || websiteFromBusinessEmail(fields.contactEmail) || "";
+    const website = enteredWebsite && !/^https?:\/\//i.test(enteredWebsite) ? `https://${enteredWebsite}` : enteredWebsite;
     if (!company) { setPackageError("Company name is required."); return; }
     if (company.length > 200) { setPackageError("Company name must be 200 characters or fewer."); return; }
-    let parsedUrl: URL;
+    let parsedUrl: URL | undefined;
     try {
-      parsedUrl = new URL(website);
-      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") throw new Error();
+      if (website) {
+        parsedUrl = new URL(website);
+        if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") throw new Error();
+      } else {
+        setPackageError("Enter a company website (example.com) or business email (name@example.com). Personal email needs a website."); return;
+      }
     } catch {
       setPackageError("Enter a complete website address beginning with http:// or https://.");
       return;
@@ -276,31 +424,39 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
       return;
     }
     const idempotencyKey = requestId;
+    submitLock.current = true;
     setSubmitting(true);
     try {
-      const response = await authFetch("/api/admin/company-report-packages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const identityVersion = getAuthIdentityVersion();
+      const response = await submitCompanyPackage(JSON.stringify({
           requestId: idempotencyKey,
           company,
-          website: parsedUrl.toString(),
+          contactEmail: fields.contactEmail.trim() || undefined,
+          website: parsedUrl?.toString() || "",
           principalName: fields.principalName.trim() || undefined,
           industry: fields.industry.trim() || undefined,
           crm: fields.crm.trim() || undefined,
           notes: fields.notes.trim() || undefined,
           intakeText: fields.intakeText || undefined,
           acceptResearchCost: true,
-        }),
+          allowAutomaticCorrections: true,
+          modelBudgetUsd: 150,
+        }), (url, init) => {
+          if (getAuthIdentityVersion() !== identityVersion)
+            throw new Error("Your sign-in changed. Review the company and approval before submitting again.");
+          return authFetch(url, init);
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || payload?.message || `${response.status} ${response.statusText}`);
+      if (!response.ok) throw new Error(payload?.error || payload?.message ||
+        ([502, 503, 504].includes(response.status)
+          ? PACKAGE_CONFIRMATION_ERROR
+          : `${response.status} ${response.statusText}`));
       if (!payload?.id) throw new Error("The server accepted the request but returned no package ID. Keep this request ID and check recent packages before trying again.");
       const accepted: ReportPackage = {
         id: payload.id,
         status: payload.status || "accepted",
         company,
-        website: parsedUrl.toString(),
+        website: parsedUrl?.toString() || "",
         createdAt: new Date().toISOString(),
         files: [],
       };
@@ -313,12 +469,15 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
       // Keep the exact request UUID and draft after ambiguous failures; retry is always manual.
       setPackageError(error instanceof Error ? error.message : "Could not start the package.");
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   }
 
   function prepareAnotherPackage() {
     const nextId = makeUuid();
+    const emptyFields = { ...EMPTY_FIELDS };
+    setFields(emptyFields);
     setRequestId(nextId);
     setActiveItem(null);
     setOpenedId(null);
@@ -326,7 +485,8 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
     setPollError(null);
     setCopyNotice(null);
     setAcceptResearchCost(false);
-    persistDraft(fields, nextId);
+    setPollingPaused(false);
+    persistDraft(emptyFields, nextId);
     try { localStorage.removeItem(activeStorageKey); } catch { /* optional resume */ }
   }
 
@@ -387,17 +547,18 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
     }
   }
 
-  const busy = submitting || isInProgress(activeItem?.status);
+  const busy = submitting || !pollingPaused && isInProgress(activeItem?.status);
   const fullFiles = activeItem?.files.filter((file) => file.category === "full") || [];
   const teaserFiles = activeItem?.files.filter((file) => file.category === "teaser") || [];
-  const canStart = !busy && !submitting && !activeItem && !!fields.company.trim() && !!fields.website.trim();
+  const canStart = configuration?.ready === true && !busy && !submitting && !activeItem && !!fields.company.trim() &&
+    (!!fields.website.trim() || !!websiteFromBusinessEmail(fields.contactEmail));
 
   return (
     <Card className="border-primary/25" data-testid="card-company-report-package">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Three-report package</CardTitle>
         <CardDescription>
-          One approved research run produces three complete private reports, three one-page teasers, and a combined three-page teaser PDF. Each full report includes one complete American-English MP3 narrated by Eric. Audio covers the report body only, not source excerpts, citation codes, or supporting appendices. Teasers have no audio and are for manual initial outreach; there is no independent quick-teaser research.
+          Enter the company name, website and any additional information, then submit once. Three independent AI authors each prepare all three categories; a fourth model synthesizes each category into its final report. You receive AI Readiness, Business Review and Revenue Opportunities PDFs, each with its own Fish Audio listening link, plus a three-page customer teaser offering the complete package for $497. Research and completed work are saved if you leave this page. Nothing is emailed automatically.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -410,14 +571,24 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
             aria-controls="company-report-package-fields"
             data-testid="checkbox-generate-report-package"
           />
-          <span>Generate all three reports together + one-page teasers</span>
+          <span>Generate all three reports together, with integrated audio</span>
         </label>
 
         {enabled && (
           <div id="company-report-package-fields" className="space-y-4">
+            <div className="space-y-2 rounded-md border p-3 text-sm" data-testid="package-preflight">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <strong>{checkingConfiguration ? "Checking report setup…" : configuration?.ready ? "Report configuration is ready" : "Report setup needs attention"}</strong>
+                <Button size="sm" variant="outline" disabled={checkingConfiguration} onClick={() => void checkConfiguration()}>Check setup</Button>
+              </div>
+              {configurationError && <p role="alert" className="text-destructive">{configurationError}</p>}
+              {configuration?.issues.map(issue => <p key={issue} role="alert" className="text-destructive">{issue}</p>)}
+              {configuration?.models.map(model => <p key={model.model} className="break-words text-muted-foreground">{model.report}: {model.model}</p>)}
+              <p className="text-xs text-muted-foreground">{configuration?.notice || "Setup checks do not call models or spend your report budget."}</p>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <Input
-                placeholder="Company name (required)"
+                placeholder="Company name — example: Example Home Services"
                 value={fields.company}
                 maxLength={200}
                 disabled={busy}
@@ -425,17 +596,29 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
                 aria-label="Package company name"
               />
               <Input
-                placeholder="Website URL (required)"
+                placeholder="Website, or use business email — example: example.com"
                 value={fields.website}
                 maxLength={300}
                 disabled={busy}
                 onChange={(event) => updateField("website", event.target.value)}
                 aria-label="Package website URL"
               />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
               <Input
-                placeholder="Principal name (optional)"
+                type="email"
+                placeholder="Business email — example: owner@example.com"
+                value={fields.contactEmail}
+                maxLength={254}
+                disabled={busy}
+                onChange={(event) => updateField("contactEmail", event.target.value)}
+                aria-label="Contact email (saved only; no automatic email)"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">Enter a website or business email. A business email domain supplies the starting website; personal email such as Gmail needs a website too. Nothing is emailed automatically.</p>
+            <details className="rounded-md border p-3">
+              <summary className="cursor-pointer text-sm font-medium">Additional information (optional)</summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Input
+                placeholder="Principal name — example: Jane Smith"
                 value={fields.principalName}
                 maxLength={120}
                 disabled={busy}
@@ -443,7 +626,7 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
                 aria-label="Package principal name"
               />
               <Input
-                placeholder="Industry (optional)"
+                placeholder="Industry — example: residential HVAC"
                 value={fields.industry}
                 maxLength={200}
                 disabled={busy}
@@ -494,6 +677,7 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
               <p className="text-xs text-muted-foreground">{new TextEncoder().encode(fields.intakeText).byteLength.toLocaleString()} / 20,000 bytes</p>
             </div>
 
+            </details>
             <div className="rounded-md border border-amber-300/70 bg-amber-50/60 p-3 dark:bg-amber-950/15">
               <label className="flex items-start gap-3 text-sm leading-5">
                 <input
@@ -505,14 +689,14 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
                   data-testid="checkbox-package-research-cost"
                 />
                 <span>
-                  I understand the three full reports are produced upfront, even if the prospect has not bought. Compiler reserves can be up to $5 per report / $15 per package; established browser, report, audio, and Drive work still applies. $497 is the total sale price for the three-report package, not a generation charge. No customer is charged automatically.
+                  I approve up to $150 in report-model reservations plus a separate $5 maximum narration allowance for this company. These are limits, not predicted charges. The workflow uses nine author compilations and three syntheses, with at most one corrective model call per original step for a confirmed invalid response, inside the same $150 cap. There are no extra juries, and uncertain calls are never repeated. No customer is charged or emailed automatically.
                 </span>
               </label>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <Button onClick={submitPackage} disabled={!canStart || !acceptResearchCost} data-testid="button-start-report-package">
-                {submitting || busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting…</> : "Start all-three research run"}
+                {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting…</> : activeItem && isInProgress(activeItem.status) ? pollingPaused ? "Status checks paused" : "Package running" : "Create three reports + audio"}
               </Button>
               {activeItem && !isInProgress(activeItem.status) && (
                 <Button variant="outline" onClick={prepareAnotherPackage} data-testid="button-new-report-package">
@@ -520,18 +704,19 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
                 </Button>
               )}
               {activeItem && (
-                <Button variant="ghost" onClick={() => void openPackage(activeItem.id)} disabled={busy} data-testid="button-refresh-report-package">
+                <Button variant="ghost" onClick={() => void openPackage(activeItem.id)} disabled={submitting} data-testid="button-refresh-report-package">
                   <RefreshCw className="mr-2 h-4 w-4" /> Check status
                 </Button>
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Public site discovery maps up to 500 URLs; rendered browser review covers up to 30 pages or 8 minutes. Any skipped pages are disclosed in the result. Research does not submit forms or make purchases. No email is sent automatically.
+              Website research uses up to three isolated browser workers at once and saves progress in batches of 10 page attempts, with up to two attempts per page. Available browser services share one page queue. Safety limits are 5,000 pages, 500 sitemap files and 24 hours; reaching a limit is incomplete research, never a claim of full coverage. No forms, purchases or automatic emails.
             </p>
 
             {packageError && <p role="alert" className="text-sm text-destructive" data-testid="text-package-error"><AlertCircle className="mr-1 inline h-4 w-4" />{packageError}</p>}
             {listError && <div role="alert" className="flex flex-wrap items-center gap-2 text-sm text-destructive"><span>Recent package list: {listError}</span><Button size="sm" variant="outline" onClick={() => void refreshItems()} disabled={loadingList}>Retry list</Button></div>}
             {pollError && <p role="status" className="text-sm text-amber-700 dark:text-amber-300">{pollError}</p>}
+            {pollingPaused && <a className="text-sm underline" href="/login">Sign in to restore status access</a>}
 
             {activeItem && (
               <section className="space-y-3 rounded-md border p-3" aria-label={`Package status for ${activeItem.company}`} data-testid="section-company-report-package-result">
@@ -541,12 +726,12 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
                     <p className="break-all text-xs text-muted-foreground">{activeItem.website}</p>
                     <p className="text-xs text-muted-foreground">Started {formatDate(activeItem.createdAt)}</p>
                   </div>
-                  <Badge variant="outline" className="capitalize">{activeItem.status.replaceAll("_", " ")}</Badge>
+                  <Badge variant="outline" className="capitalize">{pollingPaused ? `Last known: ${activeItem.status.replaceAll("_", " ")}` : activeItem.status.replaceAll("_", " ")}</Badge>
                 </div>
-                {isInProgress(activeItem.status) ? (
+                {pollingPaused ? <p role="status" className="text-sm text-muted-foreground">Live status is unavailable. The saved package may continue on the server; refresh after restoring access.</p> : isInProgress(activeItem.status) ? (
                   <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                    {activeItem.phase ? `Research phase: ${activeItem.phase.replaceAll("_", " ")}.` : "Researching and assembling the three full reports and their derived teasers."} Status checks run every five seconds; this page never starts a run on its own.
+                    {activeItem.phase ? `Current phase: ${activeItem.phase.replaceAll("_", " ")}.` : "Researching and assembling the three reports and their audio."} Status checks run every five seconds; this page never starts a run on its own.
                   </p>
                 ) : /^(done|complete|completed|succeeded|success)$/i.test(activeItem.status) ? (
                   <p className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" /> Package processing finished. Download only the files listed below.</p>
@@ -556,39 +741,168 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
                 {activeItem.error && !isInProgress(activeItem.status) && !/^(failed|error)$/i.test(activeItem.status) && (
                   <p className="text-sm text-amber-700 dark:text-amber-300">Server note: {activeItem.error}</p>
                 )}
+                {activeItem.reports && Object.entries(activeItem.reports).filter(([, report]) => report.error).map(([kind, report]) => (
+                  <p key={kind} className="text-sm text-destructive">{kind}: {report.error}</p>
+                ))}
+                {activeItem.compilationProgress && <div className="rounded-md border p-3 text-sm" data-testid="package-compilation-progress" role="status">
+                  Independent compilations: {activeItem.compilationProgress.authors}/9 · Final syntheses: {activeItem.compilationProgress.syntheses}/3 · Verified report/audio pairs: {activeItem.compilationProgress.delivered}/3.
+                  {activeItem.compilationProgress.execution && <p className="mt-1 text-xs text-muted-foreground">Unfinished authors run concurrently. Each final synthesis starts when its three matching author drafts are accepted.</p>}
+                  <p className="mt-1 text-xs text-muted-foreground">Each PDF becomes available only after its complete MP3 decodes, its listening link is embedded, and delivery is verified.</p>
+                </div>}
+                {!!activeItem.audioProgress?.length && <div className="space-y-1 rounded-md border p-3 text-sm" data-testid="package-fish-progress">
+                  <p className="font-medium">Fish Audio · s2-pro · Onyx</p>
+                  {activeItem.audioProgress.map(progress => <p key={progress.kind}>
+                    {progress.kind}: {progress.savedChunks}{progress.totalChunks ? `/${progress.totalChunks}` : ""} audio segments saved
+                    {progress.stage ? ` · ${progress.stage.replaceAll("_", " ")}` : ""}.
+                  </p>)}
+                </div>}
+                {activeItem.productionVersion === 3 && (activeItem.canResume || activeItem.canResumeWithAutomaticCorrections) && <div className="rounded-md border p-3 text-sm">
+                  <p>Saved work is preserved. Continue only the unfinished steps within the original allowances. Uncertain paid calls are never automatically repeated.</p>
+                  {!activeItem.automaticCorrectionsApproved && <label className="my-2 flex gap-2"><input type="checkbox"
+                    checked={allowAutomaticCorrections} onChange={event => setAllowAutomaticCorrections(event.target.checked)} />
+                    Allow one corrective model call per original report step for a confirmed invalid response, within the existing model allowance (no higher than $150). A failed correction stops; uncertain calls are never repeated.</label>}
+                  {activeItem.automaticCorrectionsApproved && !activeItem.targetedRepair?.available && <p>One corrective call per original report step is approved within the existing cap. Failed corrections stop.</p>}
+                  {activeItem.targetedRepair?.available && <p>One additional correction is separately approved for this exact saved dental draft. Continue reuses the saved research within the original $150 cap. This does not authorize further retries.</p>}
+                  <label className="my-2 flex gap-2"><input type="checkbox" checked={acceptResearchCost} onChange={event => setAcceptResearchCost(event.target.checked)} />Continue within the original $150 model and $5 narration allowances.</label>
+                  <Button variant="outline" disabled={submitting || !acceptResearchCost ||
+                    !activeItem.canResume && !allowAutomaticCorrections} onClick={() => void recoverPackage(false)}>Continue saved package</Button>
+                </div>}
+                {activeItem.targetedRepair?.phase && <div className="rounded-md border p-3 text-sm" role="status">
+                  Owner-approved additional correction: {activeItem.targetedRepair.phase === "claimed"
+                    ? "Claim saved; outcome not yet confirmed."
+                    : activeItem.targetedRepair.phase === "complete" ? activeItem.status === "done"
+                      ? "Accepted. Package processing and verified file delivery are complete."
+                      : "Accepted for this draft. See the current package status for remaining steps."
+                    : activeItem.status === "error" ? "Response saved but not accepted. No further automatic retry."
+                    : "Response saved; acceptance pending."}
+                </div>}
+                {!!activeItem.compilationProgress?.corrections?.length && <div className="rounded-md border p-3 text-sm">
+                  <p>Saved corrective attempts</p>
+                  {activeItem.compilationProgress.corrections.map(correction => <p key={correction.operation}>
+                    {correction.operation} — {correction.resolved ? "Resolved; this draft is accepted" :
+                      correction.notDispatched ? "Not sent; stopped before spending. Continue can reconcile this claim" :
+                      correction.phase === "claimed" ? "Claim recorded; outcome not yet confirmed" :
+                      correction.phase === "received" ? "Response saved; acceptance pending or blocked" : "Accepted"} ({correction.check})
+                  </p>)}
+                </div>}
+                {!!activeItem.compilationProgress?.evidenceReferenceRecovery?.length && <div className="rounded-md border p-3 text-sm" role="status">
+                  <p className="font-medium">Saved evidence recovery · no replacement model call</p>
+                  {activeItem.compilationProgress.evidenceReferenceRecovery.map(recovery => <p key={recovery.operation}>
+                    {recovery.operation}: {recovery.status === "applied" ? "Applied. " : "Available through Continue. "}{recovery.note}
+                  </p>)}
+                </div>}
+                {activeItem.productionVersion === 3 && activeItem.compilationRecovery?.available && <div className="space-y-2 rounded-md border p-3 text-sm" data-testid="package-truncated-replacement">
+                  <p>A model returned an incomplete report at its output limit. Research and completed compilations will be reused. Replace only this truncated response once, then continue the remaining steps. The original reservation and receipt stay recorded.</p>
+                  <p className="break-words">Stopped operation: {activeItem.compilationRecovery.operation}</p>
+                  <label className="flex gap-2"><input type="checkbox" checked={acceptResearchCost} onChange={event => setAcceptResearchCost(event.target.checked)} />Stay within the original $150 model and $5 narration allowances.</label>
+                  <label className="flex gap-2"><input type="checkbox" checked={confirmedReplacement === replacementSubject}
+                    onChange={event => setConfirmedReplacement(event.target.checked ? replacementSubject : null)} />I approve one additional paid request to replace this incomplete response. No uncertain call or completed report will be repeated.</label>
+                  <Button variant="outline" className="h-auto min-h-10 w-full whitespace-normal break-words px-3 py-2 text-left"
+                    disabled={submitting || !acceptResearchCost || confirmedReplacement !== replacementSubject}
+                    onClick={() => void recoverPackage(false, true)}>Replace incomplete response and continue</Button>
+                </div>}
+                {activeItem.recovery && <div className="space-y-2 rounded-md border p-3 text-sm" data-testid="package-recovery">
+                  <p>Model budget: ${activeItem.recovery.reservedUsd.toFixed(2)} reserved · ${activeItem.recovery.remainingUsd.toFixed(2)} remaining of ${(activeItem.recovery.reservedUsd + activeItem.recovery.remainingUsd).toFixed(2)}.</p>
+                  <p className="text-xs text-muted-foreground">Reservations are conservative limits, not verified provider charges. Earlier reservations are never erased by recovery.</p>
+                  {!isInProgress(activeItem.status) && activeItem.recovery.reasons.map(reason => <p key={reason}>{reason}</p>)}
+                  {activeItem.recovery.canRepairResearch && <>
+                    <p>Refresh factual excerpts from saved page captures. No model calls, new browser crawl, email or charge.</p>
+                    <Button variant="outline" disabled={submitting} onClick={() => void recoverPackage(true)}>Refresh saved research — no model calls</Button>
+                  </>}
+                  {activeItem.recovery.available && <>
+                    {activeItem.recovery.requiresPaidRetryApproval && <label className="flex items-start gap-2">
+                      <input type="checkbox" checked={confirmPaidRetry} onChange={event => setConfirmPaidRetry(event.target.checked)} className="mt-1" />
+                      <span>I approve another attempt for unconfirmed drafts. Earlier attempts may already have incurred charges; all reservations stay within this package's existing model ceiling.</span>
+                    </label>}
+                    <Button variant="outline" disabled={submitting || !acceptResearchCost || configuration?.ready !== true ||
+                      activeItem.recovery.requiresPaidRetryApproval && !confirmPaidRetry}
+                      onClick={() => void recoverPackage(false)}>Continue saved reports</Button>
+                    {!acceptResearchCost && <p className="text-muted-foreground">Select the report-cost approval above before continuing.</p>}
+                  </>}
+                </div>}
+                {activeItem.phase === "blocked" && activeItem.repairPlan?.available && <div className="space-y-2 rounded-md border p-3 text-sm">
+                  <p className="font-medium">Resume the complete package with retained paid work</p>
+                  <p>Preserves existing drafts and valid reviews, replaces only the confirmed truncated reviewer answer, and approves all content before PDF/audio production.</p>
+                  <p>Conservative completion envelope: ${activeItem.repairPlan.maximumCompletionUsd?.toFixed(2)} including historical reservations. Maximum model allowance: ${activeItem.repairPlan.budgetUsd}. This is not an actual-charge total.</p>
+                  <label className="flex items-start gap-2"><input type="checkbox" disabled={submitting}
+                    checked={confirmedRepair === activeItem.repairPlan.snapshot}
+                    onChange={e => setConfirmedRepair(e.target.checked ? activeItem.repairPlan!.snapshot : null)} />
+                    I approve this saved package's bounded additional paid work.</label>
+                  <Button onClick={repairPackage} disabled={submitting || confirmedRepair !== activeItem.repairPlan.snapshot}
+                    data-testid="button-repair-complete-package">Resume complete package</Button>
+                </div>}
+                {activeItem.phase === "blocked" && activeItem.reviewContinuation && !activeItem.repairPlan?.available && <div
+                  className="space-y-2 rounded-md border p-3 text-sm" data-testid="saved-review-continuation">
+                  <p className="font-medium">Saved paid reviews</p>
+                  {activeItem.reviewContinuation.reports.map(report => <p key={report.childId}>
+                    {report.kind}: {report.eligible ? "All three reviews verified; ready to compile without repeating them." : report.reason}
+                  </p>)}
+                  {activeItem.reviewContinuation.available && <>
+                    <p>Continue only the verified reports listed above. Other reports stay blocked. Compilation and later review may use the remaining model allowance; this package's existing ceiling and all earlier reservations stay unchanged. This does not guarantee the remaining allowance will finish the package.</p>
+                    <label className="flex items-start gap-2">
+                      <input type="checkbox" className="mt-1" checked={confirmedContinuation === continuationSubject}
+                        onChange={event => setConfirmedContinuation(event.target.checked ? continuationSubject : null)} />
+                      <span>I approve continuing these verified reports within the remaining allowance, without repeating their saved initial reviews.</span>
+                    </label>
+                    <Button type="button" variant="outline" disabled={submitting || configuration?.ready !== true ||
+                      confirmedContinuation !== continuationSubject} onClick={() => void continueReviewedReports()}>
+                      Continue {activeItem.reviewContinuation.childIds.length} verified reports
+                    </Button>
+                  </>}
+                </div>}
                 {activeItem.coverage && (
                   <div className="rounded bg-muted/50 p-3 text-sm">
                     <h4 className="font-medium">Website review coverage</h4>
                     <p className="mt-1 text-muted-foreground">
                       {activeItem.coverage.reviewed} of {activeItem.coverage.discovered} discovered URLs reviewed
                       {activeItem.coverage.failed > 0 ? ` · ${activeItem.coverage.failed} failed` : ""}
-                      {activeItem.coverage.capped ? " · Partial coverage: discovered pages or sitemap branches remain unreviewed" : ""}.
+                      {` · ${activeItem.coverage.pending ?? Math.max(0, activeItem.coverage.discovered - activeItem.coverage.reviewed - activeItem.coverage.failed)} pending`}
+                      {activeItem.coverage.capped ? " · Coverage incomplete: pending pages, failures or discovery limits" : ""}.
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">Coverage is partial when URLs were skipped or failed; this is not a claim that the entire website was examined.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Every discovered eligible URL is processed before drafting. Unreachable, excluded or undiscoverable pages are not claimed as reviewed.</p>
+                    {activeItem.coverage.evidencePages !== undefined && <p className="mt-1 text-xs text-muted-foreground">
+                      {activeItem.coverage.evidencePages} pages contributed usable factual excerpts
+                      {activeItem.coverage.factsPending ? ` · ${activeItem.coverage.factsPending} fact projections pending` : ""}.
+                      Navigation, footer and review text are kept out of company facts.
+                    </p>}
                   </div>
                 )}
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <h4 className="text-sm font-semibold">Private full reports</h4>
                     {fullFiles.length ? fullFiles.map((file) => (
-                      <div key={file.key} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2">
-                        <span className="min-w-0 flex-1 text-sm">{file.label}</span>
-                        <Button size="sm" variant="outline" onClick={() => void downloadFile(file)} disabled={downloadingKey !== null}>
-                          {downloadingKey === file.key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                          Download
-                        </Button>
+                      <div key={file.key} className="min-w-0 space-y-3 rounded border p-3">
+                        <span className="block break-words text-sm font-medium">{file.label}</span>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                          {file.pdfUrl && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]{10,200}\/view(?:\?usp=(?:sharing|drive_link))?$/.test(file.pdfUrl) && (
+                            <a className="text-sm font-medium underline" href={file.pdfUrl} target="_blank" rel="noopener noreferrer">Open PDF on Drive</a>
+                          )}
+                          {file.audioUrl && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]{10,200}\/view(?:\?usp=(?:sharing|drive_link))?$/.test(file.audioUrl) && (
+                            <a className="text-sm font-medium underline" href={file.audioUrl} target="_blank" rel="noopener noreferrer">American-English MP3</a>
+                          )}
+                          <Button className="shrink-0" size="sm" variant="outline" onClick={() => void downloadFile(file)} disabled={downloadingKey !== null}>
+                            {downloadingKey === file.key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                            Download
+                          </Button>
+                        </div>
                       </div>
                     )) : <p className="text-sm text-muted-foreground">No full-report downloads are available yet.</p>}
                   </div>
                   <div className="space-y-2">
-                    <h4 className="text-sm font-semibold">One-page outreach teasers</h4>
+                    <h4 className="text-sm font-semibold">Customer outreach teasers</h4>
+                    <p className="text-xs text-muted-foreground">Includes a three-page preview with one page per report and the $497 full-package offer. Full reports stay separate.</p>
                     {teaserFiles.length ? teaserFiles.map((file) => (
-                      <div key={file.key} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2">
-                        <span className="min-w-0 flex-1 text-sm">{file.label}</span>
-                        <Button size="sm" variant="outline" onClick={() => void downloadFile(file)} disabled={downloadingKey !== null}>
-                          {downloadingKey === file.key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                          Download
-                        </Button>
+                      <div key={file.key} className="min-w-0 space-y-3 rounded border p-3">
+                        <span className="block break-words text-sm font-medium">{file.label}</span>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                          {file.pdfUrl && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]{10,200}\/view(?:\?usp=(?:sharing|drive_link))?$/.test(file.pdfUrl) && (
+                            <a className="text-sm font-medium underline" href={file.pdfUrl} target="_blank" rel="noopener noreferrer">Open teaser on Drive</a>
+                          )}
+                          <Button className="shrink-0" size="sm" variant="outline" onClick={() => void downloadFile(file)} disabled={downloadingKey !== null}>
+                            {downloadingKey === file.key ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                            Download
+                          </Button>
+                        </div>
                       </div>
                     )) : <p className="text-sm text-muted-foreground">No teaser downloads are available yet.</p>}
                   </div>
@@ -629,7 +943,7 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
                     <li key={item.id} className="flex flex-wrap items-center gap-2 rounded border p-2">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{item.company}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(item.createdAt)} · {item.status.replaceAll("_", " ")}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(item.createdAt)} · {pollingPaused ? "Last known: " : ""}{(activeItem && String(activeItem.id) === String(item.id) ? activeItem.status : item.status).replaceAll("_", " ")}</p>
                       </div>
                       <Button size="sm" variant="outline" disabled={openedId === item.id && !!activeItem} onClick={() => void openPackage(item.id)}>
                         Open results

@@ -39,6 +39,18 @@ test("catalog separates chat/vision from media and rejects malformed billing met
   assert.throws(() => parseCheaperCatalog({ data: [{ ...entry, pricing: {} }] }));
 });
 
+test("expanded 520-model catalog is admitted without relaxing price, identity or finite-size checks", () => {
+  const entries = Array.from({ length: 520 }, (_, i) => ({
+    id: `fixture-${i}`, type: "text", endpoint: "/v1/chat/completions",
+    context_length: 8192, pricing: { input_per_million: "1", output_per_million: "2" },
+  }));
+  assert.equal(parseCheaperCatalog({ data: entries }).length, 520);
+  assert.throws(() => parseCheaperCatalog({ data: Array.from({ length: 1001 },
+    (_,i) => ({ ...entries[0], id: `fixture-${i}` })) }), /shape/);
+  assert.throws(() => parseCheaperCatalog({ data: [...entries, entries[0]] }), /identity/);
+  assert.throws(() => parseCheaperCatalog({ data: entries.map((e,i) => i === 519 ? { ...e, pricing: {} } : e) }), /pricing/);
+});
+
 test("known decision-only catalog entries cannot disable or enter chat routing", () => {
   const chat = { id: "fixture", type: "text", endpoint: "/v1/chat/completions",
     context_length: 8192, pricing: { input_per_million: "1", output_per_million: "2" } };
@@ -48,6 +60,22 @@ test("known decision-only catalog entries cannot disable or enter chat routing",
   assert.throws(() => parseCheaperCatalog({ data: [chat, { ...decision, type: "unknown" }] }));
   assert.throws(() => parseCheaperCatalog({ data: [chat, { ...decision, id: chat.id }] }));
   assert.throws(() => parseCheaperCatalog({ data: [chat, { ...chat, id: "broken", pricing: {} }] }));
+});
+
+test("observed discovery-only modalities remain endpoint-bound and never become inference routes", () => {
+  const chat = { id: "fixture", type: "text", endpoint: "/v1/chat/completions",
+    context_length: 8192, pricing: { input_per_million: "1", output_per_million: "2" } };
+  const extra = [
+    { id: "embed", type: "embedding", endpoint: "/v1/embeddings" },
+    { id: "speech", type: "speech", endpoint: "/v1/audio/speech" },
+    { id: "transcribe", type: "transcription", endpoint: "/v1/audio/transcriptions" },
+    { id: "realtime", type: "realtime", endpoint: "/v1/realtime" },
+    { id: "edit", type: "image", endpoint: "/v1/images/edits" },
+  ];
+  assert.deepEqual(parseCheaperCatalog({ data: [chat, ...extra] }).map(m => m.id), ["fixture"]);
+  for (const entry of extra) assert.throws(() => parseCheaperCatalog({ data: [chat,
+    { ...entry, endpoint: "/v1/unreviewed" }] }));
+  assert.throws(() => parseCheaperCatalog({ data: [chat, { id: "unknown", type: "new-mode", endpoint: "/v1/new" }] }));
 });
 
 test("reserve precedes dispatch; buffered usage settles once and missing usage retains its hold", async () => {
@@ -91,4 +119,18 @@ test("failed admission prevents spend; foreign tenants never reach admission", a
   for (const tenant of [1, 2]) await assert.rejects(runCheaperBudgeted(tenant, 0.25,
     async () => { dispatched = true; }, () => 0, deps));
   assert.equal(dispatched, false);
+});
+
+test("operator stop during reservation prevents dispatch and retains the conservative hold", async () => {
+  let stopped = false, dispatched = false, settled = false;
+  const deps = {
+    reserve: async () => { stopped = true; return { id: 1, attemptKey: "fixture" }; },
+    settle: async () => { settled = true; },
+  };
+  await assert.rejects(() => runCheaperBudgeted(1, 0.25,
+    async () => { dispatched = true; return { usage: { cost: 0.01 } }; },
+    usage => usage.cost, deps, () => { if (stopped) throw Error("operator stopped before dispatch"); }),
+  /operator stopped/);
+  assert.equal(dispatched, false);
+  assert.equal(settled, false);
 });

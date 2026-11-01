@@ -51,6 +51,7 @@ interface ProviderConfig {
 }
 
 const PROVIDER_LINKS: Record<string, string> = {
+  mammouth: "https://mammouth.ai/app/account/settings/api",
   openai: "https://platform.openai.com/api-keys",
   anthropic: "https://console.anthropic.com/settings/keys",
   xai: "https://console.x.ai/",

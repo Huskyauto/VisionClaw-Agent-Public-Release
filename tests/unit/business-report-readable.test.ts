@@ -15,6 +15,22 @@ test("each full report gets its own practical reading directions", () => {
 });
 import { buildStyledHtml } from "../../server/pdf-create";
 
+test("bullet-led reports render real lists in order and keep complete evidence in the same PDF", () => {
+  const input = [{ heading: "Priorities", body: "Our recommendation: Start with a measured pilot.\n- Owner: Service manager [S1].\n- Cost assumption: $500; verify before approval.\nPlanning assumption (not a forecast): Two hours per week.\n• Success: Track completed bookings.\nSource excerpt: Exact source words stay intact." }];
+  const sections = readableBusinessReportSections(input, "readiness");
+  const html = buildStyledHtml({ title: "Fixture", sections, includePlatformBranding: false, readableBody: true });
+  assert.match(html, /<li><strong>Owner:<\/strong> Service manager \[S1\]\.<\/li>/);
+  assert.match(html, /<li><strong>Cost assumption:<\/strong> \$500; verify before approval\.<\/li>/);
+  assert.ok(html.indexOf("Service manager") < html.indexOf("Two hours per week"));
+  assert.ok(html.indexOf("Two hours per week") < html.indexOf("Track completed bookings"));
+  assert.match(html, /Supporting Source Quotations/);
+  assert.match(html, /Exact source words stay intact\./);
+  assert.doesNotMatch(html, /class="sub-title"><\/div>/);
+  const plain = plainReadableBusinessReportSections(input, "readiness");
+  assert.match(JSON.stringify(plain), /- Owner: Service manager \[S1\]\./);
+  assert.match(JSON.stringify(plain.at(-1)), /Exact source words stay intact\./);
+});
+
 test("readable full reports opt into larger text without changing other PDFs", () => {
   const options = { title: "Report", sections: [{ title: "Action plan", content: "Assign an owner." }],
     tenantId: 1, includePlatformBranding: false };

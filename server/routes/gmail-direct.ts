@@ -236,6 +236,12 @@ export function registerGmailDirectRoutes(app: Express): void {
   };
 
   app.get("/api/admin/gmail-direct/start", (_req: Request, res: Response) => {
+    // Browsers also apply form-action to a POST's redirect destination. The
+    // app-wide self-only policy otherwise silently blocks the Google consent
+    // navigation after a correct PIN. Scope this exception to this static form;
+    // keep PIN submission same-origin and every other page's policy unchanged.
+    res.setHeader("Content-Security-Policy",
+      "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://accounts.google.com; base-uri 'none'; frame-ancestors 'none'");
     res.type("html").send(`<!doctype html><html><head><meta charset="utf-8"><title>Connect owner Gmail</title>
 <style>body{font-family:system-ui,sans-serif;max-width:520px;margin:60px auto;padding:0 24px;color:#222}input,button{font:inherit;padding:10px 12px;margin-top:8px}input{width:100%;box-sizing:border-box}button{cursor:pointer}</style>
 </head><body><h1>Connect owner Gmail</h1><p>Enter the admin PIN to start Google authorization. The PIN is sent only in the secure form body and is not placed in the URL.</p>

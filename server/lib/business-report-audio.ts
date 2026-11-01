@@ -51,7 +51,7 @@ export function assertReportAudioUrl(url: unknown): asserts url is string {
   if (typeof url !== "string" || !DRIVE_VIEW.test(url)) throw new Error("Verified Google Drive MP3 view link required");
 }
 
-export async function addReportAudioLinkPage(pdfBytes: Uint8Array, viewUrl: string): Promise<Uint8Array> {
+export async function addReportAudioLinkPage(pdfBytes: Uint8Array, viewUrl: string, narrator: "Eric" | "Fish Onyx" = "Eric"): Promise<Uint8Array> {
   assertReportAudioUrl(viewUrl);
   const pdf = await PDFDocument.load(pdfBytes, { updateMetadata: false });
   if (!pdf.getPageCount()) throw new Error("Report PDF has no pages");
@@ -61,7 +61,7 @@ export async function addReportAudioLinkPage(pdfBytes: Uint8Array, viewUrl: stri
   page.drawText("Listen to this report", { x: 48, y: 694, size: 24, font: bold, color: rgb(.08, .12, .25) });
   const lines = [
     "Your full report is also available as an MP3 audio recording.",
-    "American English narration by Eric.",
+    narrator === "Eric" ? "American English narration by Eric." : "AI-generated American-English narration (Fish Audio, Onyx).",
     "Report findings, recommendations, action plan and limitations.",
     "Written source quotations and citation codes are not read aloud.",
     "",

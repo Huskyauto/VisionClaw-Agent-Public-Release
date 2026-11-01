@@ -131,6 +131,8 @@ function main(): void {
   if (!report.comparable) {
     const reason = report.securityFailed
       ? "a configuration failed a structural security check"
+      : !report.taskSetsMatched
+      ? "configurations have different task IDs or repetition counts"
       : "at least one configuration lacks sufficient coverage";
     console.error(`[harness-bench] NOT COMPARABLE — ${reason}.`);
     process.exit(3);

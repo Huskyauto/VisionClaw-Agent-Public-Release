@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { logSilentCatch } from "./silent-catch";
 import { isReviewBearingPublicText } from "./report-customer-feedback";
+import { hypothesisBackup, HYPOTHESIS_OMISSION_WARNING, type HypothesisPlan } from "./report-hypothesis-backup";
 
 export type EvidenceSource = {
   id: string; title: string; url?: string; text: string;
@@ -14,6 +15,9 @@ export type CompiledBlock = { type: "fact" | "recommendation" | "assumption"; te
 export type CompiledReport = {
   sections: { heading: string; blocks: CompiledBlock[] }[];
   unknowns: string[];
+  hypothesisPlans?: HypothesisPlan[];
+  /** A fixed caution only, never a provider-authored assurance. */
+  hypothesisPlanWarning?: typeof HYPOTHESIS_OMISSION_WARNING;
 };
 export const hashReportBytes = (text: string): string => createHash("sha256").update(text).digest("hex");
 /** Only server-computed metadata uses this wire representation. Untrusted
@@ -57,8 +61,32 @@ export function renderReportEvidence(evidence: ReportEvidence): string {
   return JSON.stringify(evidence);
 }
 
+/** Fact-preserving review projection, not a new drafting identity.
+ * Keep every source excerpt/provenance field. Summarize large indexes of
+ * EXCLUDED, non-evidence URLs; their exact lists remain in private evidence. */
+export function compactReportEvidence(evidence: ReportEvidence): ReportEvidence {
+  const prefixes = ["Review-bearing prose excluded from company facts: ",
+    "No safely separated browser-confirmed company content: "];
+  const exclusions = new Map<string, Set<string>>();
+  const limitations: string[] = [];
+  for (const line of evidence.limitations) {
+    const prefix = prefixes.find(value => line.startsWith(value) && /^https?:\/\/\S+$/.test(line.slice(value.length)));
+    if (!prefix) { limitations.push(line); continue; }
+    const urls = exclusions.get(prefix) ?? new Set<string>();
+    urls.add(line.slice(prefix.length)); exclusions.set(prefix, urls);
+  }
+  for (const [prefix, urls] of exclusions) {
+    limitations.push(urls.size < 10 ? prefix + [...urls].join("\n") :
+      `${prefix}${urls.size} distinct page URLs. Exact excluded-page URL list retained in private evidence, not supplied in this bounded review. Counts across exclusion reasons may overlap.`);
+  }
+  return { ...evidence, limitations, sources: evidence.sources.map(source =>
+    source.kind === "public" && source.url && source.title === `Rendered browser page: ${source.url}`
+      ? { ...source, title: "Rendered browser page" } : { ...source }) };
+}
+
 export function validateCompiledReport(
   input: unknown, headings: string[], evidence: ReportEvidence, customerFacing = false,
+  profile: "standard" | "compilation" = "standard",
 ): { compiled: CompiledReport; sections: ReportSection[] } {
   const report = input as CompiledReport;
   if (!report || !Array.isArray(report.sections) || report.sections.length !== headings.length ||
@@ -67,13 +95,29 @@ export function validateCompiledReport(
     throw new Error("Invalid complete report section/unknowns contract");
   }
   const sources = new Map(evidence.sources.map(source => [source.id, source]));
+  // Link presence is not destination retrieval. Only this compilation profile
+  // may discuss an exact link already present in public captures or measured
+  // website evidence. Measured outgoing links are not destination retrievals.
+  // Customer-supplied text must never establish this public-link evidence.
+  const linkedUrls = profile === "compilation" ? new Set(evidence.sources
+    .filter(source => source.kind === "public" || source.kind === "measurement")
+    .flatMap(source => source.text.match(/https?:\/\/[^\s<>"'`)]+/g) || [])) : new Set<string>();
+  const knownUrls = new Set([...evidence.sources.flatMap(source => source.url ? [source.url] : []), ...linkedUrls]);
+  // Prefer the exact retained identity (URLs can legitimately end in punctuation).
+  // Otherwise resolve prose punctuation ONLY to an already known identity. Never
+  // normalize hosts, paths, query strings, or guess an unretained destination.
+  const citationUrl = (token: string): string => {
+    let candidate = token;
+    while (!knownUrls.has(candidate) && /[.,;:!?]$/.test(candidate)) candidate = candidate.slice(0, -1);
+    return knownUrls.has(candidate) ? candidate : token;
+  };
   const sections = report.sections.map((section, index) => {
     if (section.heading !== headings[index] || !Array.isArray(section.blocks) ||
         section.blocks.length < 1 || section.blocks.length > 24) throw new Error("Invalid report section order or blocks");
     const body = section.blocks.map(block => {
       if (!block || !["fact", "recommendation", "assumption"].includes(block.type) ||
           typeof block.text !== "string" || block.text.trim().length < 10 || block.text.length > 3000 ||
-          !Array.isArray(block.sourceIds) || block.sourceIds.length > 8 ||
+          !Array.isArray(block.sourceIds) || block.sourceIds.length > (profile === "compilation" ? 30 : 8) ||
           block.sourceIds.some(id => typeof id !== "string" || !sources.has(id))) {
         throw new Error("Invalid block or unknown citation");
       }
@@ -86,26 +130,47 @@ export function validateCompiledReport(
           throw new Error("Factual quotation must occur verbatim in its exact retrieved source");
         }
       }
-      for (const url of block.text.match(/https?:\/\/[^\s<>"'`)]+/g) || []) {
+      const unverifiedLinks = new Set<string>();
+      for (const token of block.text.match(/https?:\/\/[^\s<>"'`)]+/g) || []) {
+        const url = citationUrl(token);
         // A published outgoing link inside an exact quote proves link presence,
         // not that its destination/profile was fetched or independently verified.
-        // Non-quotation URLs still require their own retrieved source record.
-        if (block.type !== "fact" && !evidence.sources.some(source => source.url === url)) {
-          throw new Error("Unretrieved citation URL");
+        // Advisory compilation URLs may also be exact retained outgoing links,
+        // always labeled as unverified destinations below.
+        if (!evidence.sources.some(source => source.url === url)) {
+          if (block.type !== "fact" && !linkedUrls.has(url)) throw new Error("Unretrieved citation URL");
+          if (profile === "compilation") unverifiedLinks.add(url);
         }
       }
       const customer = block.type === "fact" && sources.get(block.sourceIds[0])?.kind === "customer";
-      const label = customerFacing ? (block.type === "fact"
+      const researchLimitation = profile === "compilation" && block.type === "fact" &&
+        /^L_\d+$/.test(block.sourceIds[0] || "") &&
+        sources.get(block.sourceIds[0])?.title === "Research scope limitation (not a company finding)";
+      const label = researchLimitation ? "Research limitation (not a company finding)" : customerFacing ? (block.type === "fact"
         ? customer ? "Unverified supplied context" : "Source excerpt"
         : block.type === "recommendation" ? "Our recommendation" : "Planning assumption (not a forecast)") : block.type === "fact"
         ? customer ? "Customer-supplied statement (not independently verified)" : "Observed source quotation"
         : block.type === "recommendation" ? "Recommendation (not a verified outcome)" : "Assumption / illustrative estimate (validate before acting)";
-      return `${label}: ${block.text.trim()}${block.sourceIds.length ? ` [${block.sourceIds.join(", ")}]` : ""}`;
+      return `${label}: ${block.text.trim()}${block.sourceIds.length ? ` [${block.sourceIds.join(", ")}]` : ""}` +
+        [...unverifiedLinks].map(url => `\nLinked URL only (destination content not verified): ${url}`).join("");
     }).join("\n\n");
     if (body.length < 150) throw new Error("Compiled report section is too short");
     return { heading: section.heading, body };
   });
-  return { compiled: report, sections };
+  // Optional advisory quality must not reject a valid paid report or trigger
+  // another correction. Historical reports without the field are unchanged.
+  if (report.hypothesisPlans === undefined) return { compiled: report, sections };
+  const backup = hypothesisBackup(report.hypothesisPlans, evidence.sources);
+  const warning = backup.omitted || report.hypothesisPlanWarning === HYPOTHESIS_OMISSION_WARNING;
+  const compiled = { ...report, hypothesisPlans: backup.plans };
+  delete compiled.hypothesisPlanWarning;
+  if (warning) compiled.hypothesisPlanWarning = HYPOTHESIS_OMISSION_WARNING;
+  if (backup.section) {
+    if (warning && !backup.section.body.includes(HYPOTHESIS_OMISSION_WARNING))
+      backup.section.body += `\n\n${HYPOTHESIS_OMISSION_WARNING}`;
+    sections.push(backup.section);
+  }
+  return { compiled, sections };
 }
 
 export function reportEvidenceAppendices(evidence: ReportEvidence, unknowns: string[], review: {
@@ -172,8 +237,10 @@ export async function collectBusinessReportEvidence(
   try {
     const audit = await runAudit(context.website);
     add("Measured website technical checks", (options.retainMeasuredScore
-      ? `AI readiness score: ${audit.overallScore}/100; grade: ${audit.grade}\n` : "") + audit.checks.map(check =>
-      `${check.label}: ${check.status.toUpperCase()} — ${check.detail}`
+      ? `AI readiness score: ${audit.overallScore}/100; grade: ${audit.grade}\nAutomated website-signal baseline, not certification; unverified checks require follow-up.\n` : "") + audit.checks.map(check =>
+      check.id === "llms_txt"
+        ? "llms.txt availability: NOT ESTABLISHED — The automated probe alone does not prove presence or absence. Use separately retrieved readable llms.txt contents when available; otherwise verify before calling it a defect."
+        : `${check.label}: ${check.status.toUpperCase()} — ${check.detail}`
     ).join("\n"), "measurement", audit.finalUrl);
     if (audit.agentJourney) {
       add("Read-only agent customer journey scope (not a live assistant or transaction test)",

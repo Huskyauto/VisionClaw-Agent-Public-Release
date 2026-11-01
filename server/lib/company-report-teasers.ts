@@ -73,6 +73,7 @@ export function structuredTeaserSelections(kind: PackageKind, sections: ReportSe
 export async function createPackageTeaser(input: {
   kind: PackageKind; company: string; principalName?: string;
   sections: ReportSection[]; coverage: string; capturedAt: string; evidence?: ReportEvidence;
+  previewRows?: Array<{ heading: string; text: string }>;
 }): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const regular = await doc.embedFont(StandardFonts.Helvetica);
@@ -112,22 +113,23 @@ export async function createPackageTeaser(input: {
     if (score && Number(score[1]) <= 100) draw(`Measured AI-readiness score: ${score[1]}/100 | Grade ${score[2]}`, 12, true);
   }
   draw("Selected excerpts from your complete researched report", 10, true);
-  for (const row of structuredTeaserSelections(input.kind, input.sections)) {
+  for (const row of input.previewRows ?? structuredTeaserSelections(input.kind, input.sections)) {
     draw(row.heading, 11, true); draw(row.text);
   }
   draw("In the full three-report package", 11, true);
   draw("Detailed website/AI readiness analysis, business and customer-service improvements, income opportunities, implementation priorities, evidence, assumptions and a practical action plan.");
   draw(`Research coverage: ${input.coverage}`, 9);
-  page.drawRectangle({ x: 40, y: 50, width: 532, height: 100, color: rgb(.94, .96, .99) });
+  page.drawRectangle({ x: 40, y: 40, width: 532, height: 110, color: rgb(.94, .96, .99) });
   const footer = [
     "Want all three complete reports? $497 total. Reply to request the full package.",
+    "Make checks payable to Robert Washburn.",
     "Robert Washburn | VisionClaw | [Your Company] | agenticcorporation.net",
     "huskyauto@gmail.com | [YOUR-PHONE]",
     "16675 W Orchard Valley Dr., [Your City, ST] 60031",
     "Independent public-source advisory preview. No forecast or guaranteed outcome.",
   ];
   footer.forEach((line, i) => page.drawText(line, { x: 50, y: 132 - i * 16,
-    size: i === 0 ? 10 : 8.5, font: i === 0 ? bold : regular, color: rgb(.12, .17, .24) }));
+    size: i <= 1 ? 10 : 8.5, font: i <= 1 ? bold : regular, color: rgb(.12, .17, .24) }));
   return doc.save();
 }
 export async function combinePackageTeasers(pdfs: Uint8Array[]) {

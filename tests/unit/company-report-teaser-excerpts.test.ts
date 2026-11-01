@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { teaserSelections, structuredTeaserSelections } from "../../server/lib/company-report-teasers";
+import { teaserSelections, structuredTeaserSelections, createPackageTeaser, combinePackageTeasers } from "../../server/lib/company-report-teasers";
+import { PDFDocument, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 import { isPackageFileKey } from "../../server/lib/company-report-package-core";
 
 test("private package keys admit bounded teaser revisions without broadening file access", () => {
@@ -38,4 +39,23 @@ test("structured teasers do not repeat a section under overlapping headings", ()
   assert.equal(rows.length, 5);
   assert.equal(new Set(rows.map(row => row.text)).size, rows.length);
   assert.match(rows.find(row => /Website & sales/.test(row.heading))!.text, /Measure booked/);
+});
+
+test("every teaser page includes the exact check payee beside the package offer", async () => {
+  const pages: Uint8Array[] = [];
+  for (const kind of ["readiness", "executive", "opportunities"] as const) {
+    const bytes = await createPackageTeaser({ kind, company: "Example Services",
+      capturedAt: "2026-10-21", coverage: "Public-source review",
+      sections: [{ heading: "Executive Summary", body: "Our recommendation: Verify existing services before a pilot." }] });
+    const pdf = await PDFDocument.load(bytes);
+    assert.equal(pdf.getPageCount(), 1);
+    const operators = pdf.context.enumerateIndirectObjects()
+      .filter((entry): entry is [typeof entry[0], PDFRawStream] => entry[1] instanceof PDFRawStream)
+      .map(([, stream]) => Buffer.from(decodePDFRawStream(stream).decode()).toString("latin1"))
+      .join("\n").toUpperCase();
+    for (const text of ["$497 total", "Make checks payable to Robert Washburn."])
+      assert.ok(operators.includes(Buffer.from(text).toString("hex").toUpperCase()), `${kind}: ${text}`);
+    pages.push(bytes);
+  }
+  assert.equal((await PDFDocument.load(await combinePackageTeasers(pages))).getPageCount(), 3);
 });
