@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { RunConfirmationPanel } from "@/components/run-confirmation";
+import type { ComponentProps } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +57,7 @@ interface RunDetail {
   executedStepCount: number;
   steps: ReplayStep[];
   pendingSteps: PendingStep[];
+  confirmation?: ComponentProps<typeof RunConfirmationPanel>["confirmation"];
 }
 
 interface RecoveryManifest {
@@ -157,7 +160,10 @@ function StepCard({ step }: { step: ReplayStep }) {
 }
 
 export default function WorkflowReplayPage() {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(() => {
+    const id = Number(new URLSearchParams(window.location.search).get("run"));
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  });
   const [selectedRecoveryId, setSelectedRecoveryId] = useState<number | null>(null);
 
   const { data: list, isLoading: listLoading } = useQuery<{ runs: RunSummary[] }>({
@@ -169,7 +175,7 @@ export default function WorkflowReplayPage() {
     },
   });
 
-  const { data: detail, isLoading: detailLoading } = useQuery<RunDetail>({
+  const { data: detail, isLoading: detailLoading, isError: detailError, refetch: reloadDetail } = useQuery<RunDetail>({
     queryKey: ["/api/agent-insights/runs", selectedId],
     enabled: selectedId != null,
     queryFn: async () => {
@@ -314,8 +320,18 @@ export default function WorkflowReplayPage() {
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
             )}
-            {detail && !detailLoading && (
+            {detailError && selectedId != null && (
+              <Card role="alert" data-testid="run-confirmation-load-error">
+                <CardContent className="p-5 space-y-3">
+                  <p className="font-medium">Run details could not be loaded.</p>
+                  <p className="text-sm text-muted-foreground">This run is not confirmed. Your session may have expired, or the run may no longer be available.</p>
+                  <Button variant="outline" className="min-h-11" onClick={() => void reloadDetail()}>Try again</Button>
+                </CardContent>
+              </Card>
+            )}
+            {detail && detail.id === selectedId && !detailLoading && !detailError && (
               <>
+                <RunConfirmationPanel confirmation={detail.confirmation} />
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base flex items-center gap-2">

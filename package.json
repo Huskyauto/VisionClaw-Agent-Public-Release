@@ -1,6 +1,6 @@
 {
   "name": "visionclaw-agent",
-  "version": "137.1.0-sec",
+  "version": "137.2.0-sec",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -13,6 +13,7 @@
     "check": "NODE_OPTIONS=--max-old-space-size=4096 tsc",
     "db:push": "drizzle-kit push",
     "publish:preflight": "npm run check && npx tsc -p tsconfig.publish-preflight.json && npx tsx scripts/publish-preflight.ts",
+    "release:check": "tsx scripts/targeted-release-check.ts",
     "bwb:oversight-report": "npx tsx scripts/bwb-oversight-shadow-report.ts",
     "capability:evidence-report": "npx tsx scripts/capability-evidence-shadow-report.ts",
     "eval:union-alpha": "npx tsx scripts/evaluate-union-alpha.ts",

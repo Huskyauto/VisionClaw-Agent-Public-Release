@@ -7,6 +7,7 @@ import { fileStorage } from "@shared/schema";
 import { uploadAndShare } from "./google-drive";
 import fetch from "node-fetch";
 import { UPLOADS_DIR, isPathWithin, resolveUploadsChild } from "./uploads-path";
+import { readTenantPdfInput, uniquePdfOutputName } from "./lib/pdf-input-ownership";
 
 // Durable PDF writes never infer owner authority from missing customer scope.
 function requirePdfTenant(tenantId: number | undefined | null, caller: string): number {
@@ -69,23 +70,6 @@ function safePath(filePath: string): string {
   const resolved = path.resolve(WORKSPACE_ROOT, filePath);
   if (!isPathWithin(WORKSPACE_ROOT, resolved)) throw new Error("Path escapes workspace");
   return resolved;
-}
-
-function resolveUploadPath(filePath: string): string {
-  if (filePath.startsWith("/uploads/") || filePath.startsWith("uploads/")) {
-    return resolveUploadsChild(filePath.replace(/^\/?uploads\//, ""));
-  }
-  if (path.isAbsolute(filePath)) {
-    if (isPathWithin(UPLOADS_DIR, filePath) || isPathWithin(WORKSPACE_ROOT, filePath)) {
-      return path.resolve(filePath);
-    }
-    throw new Error("Path escapes allowed PDF roots");
-  }
-  const inUploads = resolveUploadsChild(filePath);
-  if (fs.existsSync(inUploads)) return inUploads;
-  const direct = path.resolve(WORKSPACE_ROOT, filePath);
-  if (isPathWithin(WORKSPACE_ROOT, direct)) return direct;
-  return inUploads;
 }
 
 interface FieldDef {
@@ -231,6 +215,9 @@ function sanitizeForPdf(text: string): string {
 
 export async function createPdf(params: CreatePdfParams): Promise<{ success: boolean; path?: string; url?: string; pages?: number; fields?: number; error?: string }> {
   try {
+    const tenantId = requirePdfTenant(params.tenantId, "createPdf");
+    const headerImageBytes = params.headerImage
+      ? await readTenantPdfInput(params.headerImage.path, tenantId) : undefined;
     ensureOutputDir();
     const doc = await PDFDocument.create();
     const size = PAGE_SIZES[params.pageSize || "letter"];
@@ -253,9 +240,9 @@ export async function createPdf(params: CreatePdfParams): Promise<{ success: boo
 
     if (params.headerImage) {
       try {
-        const imgPath = resolveUploadPath(params.headerImage.path);
-        if (fs.existsSync(imgPath)) {
-          const imgBytes = fs.readFileSync(imgPath);
+        const imgPath = params.headerImage.path;
+        if (headerImageBytes) {
+          const imgBytes = headerImageBytes;
           const ext = path.extname(imgPath).toLowerCase();
           let image;
           if (ext === ".png") {
@@ -424,7 +411,7 @@ export async function createPdf(params: CreatePdfParams): Promise<{ success: boo
       return { success: false, error: "Generated PDF requires a trusted tenant ID for durable storage" };
     }
     const filename = params.outputPath || `pdf_${Date.now()}.pdf`;
-    const outputPath = resolveUploadsChild(path.basename(filename));
+    const outputPath = resolveUploadsChild(uniquePdfOutputName(filename, tenantId));
     const pdfBytes = await doc.save();
     fs.writeFileSync(outputPath, pdfBytes);
     const baseName = path.basename(outputPath);
@@ -485,11 +472,8 @@ export async function createPdf(params: CreatePdfParams): Promise<{ success: boo
 export async function fillPdf(params: FillPdfParams): Promise<{ success: boolean; path?: string; url?: string; filledFields?: string[]; error?: string }> {
   try {
     const tenantId = requirePdfTenant(params.tenantId, "fillPdf");
+    const pdfBytes = await readTenantPdfInput(params.inputPath, tenantId);
     ensureOutputDir();
-    const inputPath = resolveUploadPath(params.inputPath);
-    if (!fs.existsSync(inputPath)) throw new Error(`File not found: ${params.inputPath}`);
-
-    const pdfBytes = fs.readFileSync(inputPath);
     const doc = await PDFDocument.load(pdfBytes);
     const form = doc.getForm();
     const filledFields: string[] = [];
@@ -523,7 +507,7 @@ export async function fillPdf(params: FillPdfParams): Promise<{ success: boolean
     }
 
     const filename = params.outputPath || params.inputPath.replace(".pdf", "_filled.pdf");
-    const outputPath = resolveUploadsChild(path.basename(filename));
+    const outputPath = resolveUploadsChild(uniquePdfOutputName(filename, tenantId));
     const savedBytes = await doc.save();
     fs.writeFileSync(outputPath, savedBytes);
     const baseName = path.basename(outputPath);
@@ -544,11 +528,8 @@ export async function fillPdf(params: FillPdfParams): Promise<{ success: boolean
 export async function editPdf(params: EditPdfParams): Promise<{ success: boolean; path?: string; url?: string; pages?: number; fieldsAdded?: number; error?: string }> {
   try {
     const tenantId = requirePdfTenant(params.tenantId, "editPdf");
+    const pdfBytes = await readTenantPdfInput(params.inputPath, tenantId);
     ensureOutputDir();
-    const inputPath = resolveUploadPath(params.inputPath);
-    if (!fs.existsSync(inputPath)) throw new Error(`File not found: ${params.inputPath}`);
-
-    const pdfBytes = fs.readFileSync(inputPath);
     const doc = await PDFDocument.load(pdfBytes);
     const font = await doc.embedFont(StandardFonts.Helvetica);
 
@@ -617,7 +598,7 @@ export async function editPdf(params: EditPdfParams): Promise<{ success: boolean
     }
 
     const filename = params.outputPath || params.inputPath.replace(".pdf", "_edited.pdf");
-    const outputPath = resolveUploadsChild(path.basename(filename));
+    const outputPath = resolveUploadsChild(uniquePdfOutputName(filename, tenantId));
     const savedBytes = await doc.save();
     fs.writeFileSync(outputPath, savedBytes);
     const baseName = path.basename(outputPath);
@@ -636,12 +617,9 @@ export async function editPdf(params: EditPdfParams): Promise<{ success: boolean
   }
 }
 
-export async function listPdfFields(inputPath: string): Promise<{ success: boolean; fields?: { name: string; type: string; value?: string }[]; error?: string }> {
+export async function listPdfFields(inputPath: string, tenantId: number | undefined): Promise<{ success: boolean; fields?: { name: string; type: string; value?: string }[]; error?: string }> {
   try {
-    const resolved = resolveUploadPath(inputPath);
-    if (!fs.existsSync(resolved)) throw new Error(`File not found: ${inputPath}`);
-
-    const pdfBytes = fs.readFileSync(resolved);
+    const pdfBytes = await readTenantPdfInput(inputPath, requirePdfTenant(tenantId, "listPdfFields"));
     const doc = await PDFDocument.load(pdfBytes);
     const form = doc.getForm();
     const allFields = form.getFields();
@@ -721,7 +699,7 @@ export async function htmlToPdfAndUpload(html: string, title: string, folderLabe
   console.log(`[pdf] Browserless PDF generated: ${pdfBuffer.length} bytes`);
 
   const slug = title.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-  const filename = `${slug}-${Date.now()}.pdf`;
+  const filename = uniquePdfOutputName(`${slug}.pdf`, trustedTenantId);
   const filePath = path.join(OUTPUT_DIR, filename);
 
   ensureOutputDir();
@@ -1026,7 +1004,7 @@ export async function generateStyledPdf(opts: StyledPdfOptions): Promise<{
     }
 
     const slug = (opts.fileName || opts.title).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-    const filename = `${slug}.pdf`;
+    const filename = uniquePdfOutputName(`${slug}.pdf`, requirePdfTenant(opts.tenantId, "generateStyledPdf"));
     const filePath = path.join(OUTPUT_DIR, filename);
 
     ensureOutputDir();

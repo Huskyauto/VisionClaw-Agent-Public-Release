@@ -40,6 +40,7 @@ import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { fetchBwbPhotos, parseExtraPhotosEnv } from "./lib/bwb-photo-fetch";
 import { summarizeScenesTiming } from "./lib/bwb-narration-timing";
+import { assertCompleteDriveTranscripts, weeklySourceKey, weeklyVideoId } from "./lib/bwb-weekly-coverage";
 import { extractWeeklyTranscripts } from "./lib/youtube-transcript";
 import { discoverWeeklyShorts } from "./lib/youtube-discover";
 import { autoPinWindowYmd, discoverWeeklyDriveClips, extractWeeklyDriveTranscripts, type DiscoveredDriveClip } from "./lib/drive-discover";
@@ -129,9 +130,9 @@ async function loadConfig(): Promise<WeeklyConfig> {
   let driveClips: DiscoveredDriveClip[] | undefined;
 
   // AUTONOMOUS DISCOVERY: when no URLs were supplied (the autonomous weekly run),
-  // auto-enumerate this week's short-form dailies. The ~5-min weekly recap /
-  // long-form productions are excluded (duration ceiling + title guard) so
-  // there's no feedback loop. Set NO_AUTO_DISCOVER=1 to force manual-URL-only.
+  // auto-enumerate ALL this week's dailies, regardless of length. Finished
+  // productions are excluded by name so there's no feedback loop.
+  // Set NO_AUTO_DISCOVER=1 to force manual-URL-only.
   if (urls.length > 0) {
     source = "youtube"; // manual URLs imply the YouTube/URL transcript path
   } else if (!process.env.NO_AUTO_DISCOVER) {
@@ -148,7 +149,7 @@ async function loadConfig(): Promise<WeeklyConfig> {
       driveClips = await discoverWeeklyDriveClips({ allowUndated: false });
       if (driveClips.length === 0) {
         fail(
-          "Drive auto-discovery found no DATED short-form dailies in the window. " +
+          "Drive auto-discovery found no DATED daily videos in the window. " +
             "Either this week's clips weren't uploaded, or they're missing a date in the filename " +
             '("YYYY-MM-DD morning.mp4" / "YYYY-MM-DD evening.mp4"). ' +
             "Check BWB_DRIVE_FOLDER_ID / the folder contents, pin the week with BWB_WEEK_START + BWB_WEEK_END, " +
@@ -158,7 +159,7 @@ async function loadConfig(): Promise<WeeklyConfig> {
       // PARTIAL WEEKS ARE OK (Bob 2026-05-31): a missing day — "I was sick and
       // couldn't walk" — must NOT stop the recap. As long as the week range had
       // at least one DATED clip (checked above), build with whatever's available
-      // and target ~5 min. We only warn on thin coverage for the run log; we do
+      // and review EVERY available daily upload. We only warn on thin coverage; we do
       // NOT fail. Stale-footage protection still comes from allowUndated:false +
       // the Sun–Sat range, not from a day-count gate.
       const distinctDays = new Set(driveClips.map((c) => c.clipDate).filter(Boolean));
@@ -249,7 +250,7 @@ async function planScript(
   transcripts: { title: string; transcript: string; clipDate?: string | null; slot?: string | null }[],
   extraPhotos: { name: string; hint?: string; localPath: string }[] = [],
 ): Promise<VideoScript> {
-  const targetScenes = Math.max(12, Math.min(22, Math.round(cfg.targetMinutes * 4)));
+  const targetScenes = Math.max(12, Math.round(cfg.targetMinutes * 4), transcripts.length * 2 + 1);
   // Label each clip with its date + time-of-day slot (the transcripts arrive
   // already sorted oldest→newest, morning before evening) so the model narrates
   // the week chronologically and clearly hears BOTH daily talks per day.
@@ -289,17 +290,19 @@ async function planScript(
     : "";
 
   const prompt = `You are the director/editor for the YouTube channel "Built With Bob".
-Below are transcripts of Bob's daily morning selfie clips from one week (${cfg.weekLabel}).
+Below are transcripts of ALL Bob's selected daily clips from one week (${cfg.weekLabel}).
 Synthesize them into ONE cohesive weekly recap video — find the throughline / the story of
 Bob's week, the lessons, the wins and struggles, and what it means for the viewer.
 
-Produce a SINGLE narrated video script of about ${cfg.targetMinutes} minutes, structured as
-EXACTLY ${targetScenes} scenes total (treat them as ~4-5 chapters of ~4-5 scenes each, but
-output ONE flat scenes array).
+Produce a SINGLE narrated video script. About ${cfg.targetMinutes} minutes and ${targetScenes}
+scenes are starting estimates, NOT limits. Review EVERY supplied clip in full and represent
+the meaningful updates from each in chronological order. Add scenes and let the recap run
+longer whenever needed; never omit a day, update, or clip to meet a time or scene target.
+Avoid repetitive filler. Group scenes naturally into chapters but output ONE flat scenes array.
 
 Scene 1 is Bob's on-camera intro over his real photo and its narration is FIXED — the
 pipeline overrides it with Bob's locked opener, so just emit a short placeholder for scene 1
-(no imagePrompt). Scenes 2 through ${targetScenes} are the ACTUAL weekly recap: review Bob's
+(no imagePrompt). Scenes 2 onward are the ACTUAL weekly recap: review Bob's
 week from the clip transcripts above — the daily walks, the bike rides, the wins, the
 struggles, and the lessons — and build the story from THAT. Every scene 2+ needs FINAL spoken
 narration AND a cinematic imagePrompt.
@@ -724,12 +727,24 @@ async function main() {
     log: (m) => console.log(`[build-bwb-weekly] checkpoint ${m}`),
   });
 
-  await setBwbPhase(`Transcribing ${sourceCount} clip(s)`);
+  const driveSourceKey = cfg.source === "drive" ? weeklySourceKey(cfg.driveClips ?? []) : "";
+  await setBwbPhase(`Transcribing all ${sourceCount} clip(s)`);
   // STAGE: transcription — checkpointed as a whole. On a clean retry every clip
   // is reused; only a run that never reached a successful transcription set
   // re-downloads + re-transcribes.
   const { transcripts } = await ck.stage<{ transcripts: any[] }>(
-    { stage: "transcription" },
+    {
+      stage: "transcription",
+      unitKey: driveSourceKey,
+      verify: cfg.source === "drive" ? (r) => {
+        try {
+          assertCompleteDriveTranscripts(cfg.driveClips ?? [], r.transcripts);
+          return true;
+        } catch {
+          return false; // An incomplete cache is stale, never permission to omit clips.
+        }
+      } : undefined,
+    },
     async () => {
       const { transcripts, failures } =
         cfg.source === "drive"
@@ -738,10 +753,11 @@ async function main() {
       if (transcripts.length === 0) {
         fail(`No transcripts extracted. Failures:\n${failures.map((f) => `  - ${f.url}: ${f.error}`).join("\n")}`);
       }
-      // Minimum-success guard: a heavily-degraded run shouldn't silently make a weak
-      // weekly video. Default floor is min(2, #clips); override with MIN_CLIPS or ALLOW_PARTIAL=1.
+      // Drive requires every selected upload. The legacy partial-success
+      // controls below apply only to the alternate YouTube source.
+      if (cfg.source === "drive") assertCompleteDriveTranscripts(cfg.driveClips ?? [], transcripts);
       const minClips = Number(process.env.MIN_CLIPS) || Math.min(2, sourceCount);
-      if (transcripts.length < minClips && !process.env.ALLOW_PARTIAL) {
+      if (cfg.source !== "drive" && transcripts.length < minClips && !process.env.ALLOW_PARTIAL) {
         fail(
           `Only ${transcripts.length}/${sourceCount} clip(s) transcribed (need >= ${minClips}). ` +
             `Failures:\n${failures.map((f) => `  - ${f.url}: ${f.error}`).join("\n")}\n` +
@@ -756,6 +772,8 @@ async function main() {
       return { transcripts };
     },
   ).then((r) => r.result);
+  // Validate again after cache reuse, before any synthesis or render work.
+  if (cfg.source === "drive") assertCompleteDriveTranscripts(cfg.driveClips ?? [], transcripts);
 
   // Attach each transcript's clip date + time-of-day slot (for drive clips,
   // transcript.videoId === clip.fileId) and order them chronologically
@@ -833,12 +851,13 @@ async function main() {
   const script = await ck.stage<VideoScript>(
     {
       stage: "planning",
-      unitKey: planUnitKey,
+      unitKey: [driveSourceKey, planUnitKey].filter(Boolean).join(":"),
       artifactPathOf: (s) => path.join("data/youtube/scripts", `${s.videoId}.json`),
       verify: (_s, p) => !!p && existsSyncEIO(p),
     },
     async () => {
       const s = await planScript(cfg, planTranscripts, extraPhotos);
+      s.videoId = weeklyVideoId(s.videoId, driveSourceKey);
       console.log(`[build-bwb-weekly] script: "${s.title}" — ${s.scenes.length} scenes`);
       const out = path.join("data/youtube/scripts", `${s.videoId}.json`);
       fs.mkdirSync(path.dirname(out), { recursive: true });

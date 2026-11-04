@@ -1581,14 +1581,17 @@ Return your output as JSON: {"content": "your full output text here", "keyFindin
 }
 
 
-export function getActivePlan(planId: string): OrchestrationPlan | undefined {
-  return activePlans.get(planId);
+export function getActivePlan(planId: string, tenantId: number): OrchestrationPlan | undefined {
+  if (!Number.isSafeInteger(tenantId) || tenantId <= 0) return undefined;
+  const plan = activePlans.get(planId);
+  return plan?.tenantId === tenantId ? plan : undefined;
 }
 
-export function getActivePlansForConversation(conversationId: number): OrchestrationPlan[] {
+export function getActivePlansForConversation(conversationId: number, tenantId: number): OrchestrationPlan[] {
+  if (!Number.isSafeInteger(tenantId) || tenantId <= 0) return [];
   const plans: OrchestrationPlan[] = [];
   for (const plan of activePlans.values()) {
-    if (plan.conversationId === conversationId) plans.push(plan);
+    if (plan.conversationId === conversationId && plan.tenantId === tenantId) plans.push(plan);
   }
   return plans;
 }

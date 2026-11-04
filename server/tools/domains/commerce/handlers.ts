@@ -104,12 +104,20 @@ async function createPaymentLinkHandler(
       missionId = mission.id;
     }
 
-    if (row.stripe_payment_link_url) {
-      return { sku, paymentLinkUrl: row.stripe_payment_link_url, reused: true, note: "Existing payment link reused (idempotent)." };
-    }
-
     const { getUncachableStripeClient, withLedgerIdempotency } = await import("../../../stripeClient");
     const stripe = await getUncachableStripeClient();
+    const { missionLinkMetadata } = await import("../../../lib/mission-stripe-association");
+    const missionMetadata = missionLinkMetadata(sku, missionId);
+
+    if (row.stripe_payment_link_url) {
+      if (missionId !== null) {
+        if (!row.stripe_payment_link_id)
+          return { error: `Existing mission link for '${sku}' has no stored Stripe ID; repair its catalog reference before reuse` };
+        await stripe.paymentLinks.update(row.stripe_payment_link_id, missionMetadata,
+          withLedgerIdempotency({ idempotencyKey: `vc-commerce-paylink-mission-v2-${gate.tenantId}-${row.stripe_payment_link_id}-${missionId}` }));
+      }
+      return { sku, paymentLinkUrl: row.stripe_payment_link_url, reused: true, note: "Existing payment link reused; mission metadata synchronized when linked." };
+    }
 
     let stripeProductId: string = row.stripe_product_id;
     if (!stripeProductId) {
@@ -135,11 +143,8 @@ async function createPaymentLinkHandler(
 
     const link = await stripe.paymentLinks.create({
       line_items: [{ price: stripePriceId, quantity: 1 }],
-      metadata: {
-        bundle_sku: sku,
-        ...(missionId ? { mission_id: String(missionId) } : {}),
-      },
-    }, withLedgerIdempotency({ idempotencyKey: `vc-commerce-paylink-${sku}` }));
+      ...missionMetadata,
+    }, withLedgerIdempotency({ idempotencyKey: `vc-commerce-paylink-v2-${gate.tenantId}-${sku}-${missionId ?? 0}` }));
     await saveStripeRefs(gate.tenantId, sku, { paymentLinkId: link.id, paymentLinkUrl: link.url });
 
     return {

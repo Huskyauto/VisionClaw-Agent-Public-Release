@@ -17,22 +17,19 @@ const facts = JSON.parse(fs.readFileSync("docs/release-facts.json", "utf8")) as 
 const source = fs.readFileSync("client/src/pages/landing.tsx", "utf8");
 
 test("landing current-state claims use release-fact semantics, not release labels", () => {
-  const { registeredTools, activePersonas, declaredTables, liveTables, platformIndexes } = facts.metrics;
-
-  assert.match(
-    source,
-    new RegExp(
-      `Platform Online — ${activePersonas} Agents, ${registeredTools} Tools, ${declaredTables} Declared / ${liveTables} Live Tables, ${platformIndexes} Platform Indexes`,
-    ),
-  );
-  assert.match(source, new RegExp(`Connected tools", v: "${registeredTools}"`));
-  assert.match(source, new RegExp(`Database tables", v: "${declaredTables} declared / ${liveTables} live tables"`));
-  assert.match(source, new RegExp(`const tools = useCountUp\\(${registeredTools}`));
+  const summary = fs.readFileSync("client/src/components/prepublication-notice.tsx", "utf8");
+  assert.match(source, /Platform source — \{SOURCE_UPDATE_SUMMARY\} \{DEVELOPMENT_PLATFORM_SUMMARY\}/);
+  for (const field of ["registeredTools", "activePersonas", "declaredTables", "liveTables", "platformIndexes"]) {
+    assert.ok(summary.includes(`facts.metrics.${field}`), `shared summary must use ${field}`);
+  }
+  assert.match(source, /l: "Registered tools", v: releaseFacts\.metrics\.registeredTools/);
+  assert.match(source, /l: "Declared tables", v: releaseFacts\.metrics\.declaredTables/);
+  assert.match(source, /const tools = useCountUp\(releaseFacts\.metrics\.registeredTools/);
   assert.doesNotMatch(source, /R125\+155\+sec12/);
 });
 
 test("release facts retain the distinction between registry and public documentation", () => {
-  assert.equal(facts.metrics.registeredTools, 425);
+  assert.equal(facts.metrics.registeredTools, 428);
   assert.equal(facts.metrics.publicDocumentedTools, 386);
   assert.ok(facts.metrics.registeredTools > facts.metrics.publicDocumentedTools);
 });

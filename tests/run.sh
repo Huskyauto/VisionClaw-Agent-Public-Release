@@ -27,6 +27,12 @@ if ! timeout 60 npx tsx scripts/preflight-domain-boundaries.ts; then
 fi
 
 FILES=(
+  "tests/lib/harness-ab-sample.test.ts"
+  "tests/lib/structured-prompt-profile.test.ts"
+  "tests/lib/run-confirmation.test.ts"
+  "tests/lib/plan-run-confirmation.test.ts"
+  "tests/lib/project-confirmation.test.ts"
+  "tests/lib/harness-bench-core.test.ts"
   "tests/customer-revenue-launchpad-seed.test.ts"
   "tests/fable-5-seed.test.ts"
   "tests/revenue-idea-catalog.test.ts"

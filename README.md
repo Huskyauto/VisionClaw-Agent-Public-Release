@@ -1,6 +1,26 @@
 # VisionClaw Agent
 
-## Current source release — R137.1+sec (October 31, 2026)
+## Current source release — R137.2+sec (November 4, 2026)
+
+- **Webhook continuity:** supported issue/PR events retain tenant-bound conversation
+  context through persistent, bounded bindings. Publication must reconcile the new
+  binding column; event deduplication and concurrent-turn serialization are not claimed.
+- **Read-only run confirmation:** sidebar and Replay assessments inspect saved
+  workflow evidence. They do not replay actions, rerun jobs or certify business outcomes.
+- **Harness diagnosis and trials:** recurring failures inform proposals under
+  existing activation gates; optional schema compaction remains a development trial,
+  not measured live savings or automatic model promotion.
+- **Complete daily upload coverage:** weekly recap preparation includes every
+  selected daily upload, including longer recordings, with source-bound cache identities.
+- **PDF and payment safeguards:** tenant-owned inputs protect PDF editing,
+  inspection and header images; mission payment association preserves exact metadata,
+  parent/session scope and refund identity without relaxing existing approval gates.
+- **Coding documentation:** verified code guides descriptive conventions, never
+  overrides security, tenant isolation or current owner authority. Agents report
+  encountered inconsistencies instead of rewriting unrelated working code.
+- **Scoped readiness:** source-bound regression, type, surface, domain and build
+  checks are distinct from a complete tenant audit or permission to publish.
+  See the [November source reconciliation](docs/platform-update-2026-11-04.md).
 
 **428 registered tools · 386 publicly documented tools · 18 personas · 68 platform
 skills · 146 active capabilities · 196 declared / 277 live development tables ·
@@ -73,7 +93,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **The app runs with just one LLM key and a Postgres database.** Everything else — email, payments, voice, Drive — is optional and appears automatically when you add the key.
 
-**Latest source update — R137+sec (October 19, 2026): Business pilots, company report packages and evidence-first operations.** Owner-only health/re-scan, release, governance and cost/routing pilots; read-only website readiness; sourced company reports with required audio; private alert logs; receipt-backed delivery checks, outcome-first briefings and video packaging. Private report packages are excluded from generic tenant file access. [Feature/access matrix](docs/platform-update-2026-10-19.md). Forks need their own credentials, entitlements and configuration. Focused live pilot verification is not universal certification; GitHub synchronization is not website publication.
+**Earlier source update — R137+sec (October 19, 2026): Business pilots, company report packages and evidence-first operations.** Owner-only health/re-scan, release, governance and cost/routing pilots; read-only website readiness; sourced company reports with required audio; private alert logs; receipt-backed delivery checks, outcome-first briefings and video packaging. Private report packages are excluded from generic tenant file access. [Feature/access matrix](docs/platform-update-2026-10-19.md). Forks need their own credentials, entitlements and configuration. Focused live pilot verification is not universal certification; GitHub synchronization is not website publication.
 
 Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **428 total registered tools · 386 public documented tools · 68 total skills · 146 active capabilities · 18 personas · 196 declared / 277 live development tables · 41 governance rules · 888 platform indexes · 91 curated AI models · 6 AI providers · 6 deployment targets.** These are an October 31 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
@@ -349,7 +369,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | Frontend Pages | 40+ |
 | API Endpoints | 300+ |
 | Database Tables | 196 declared / 277 live development |
-| Platform Indexes | 887 (617 non-PK) |
+| Platform Indexes | 888 (617 non-PK) |
 
 ---
 

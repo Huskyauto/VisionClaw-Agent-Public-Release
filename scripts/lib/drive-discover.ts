@@ -2,11 +2,11 @@
  * Built With Bob — weekly clip discovery from Bob's Google Drive folder.
  *
  * Bob drops his daily selfie Shorts into a single Drive folder every day. This
- * module enumerates that folder and keeps only the recent SHORT-FORM dailies:
+ * module enumerates that folder and keeps the selected week's daily uploads:
  *   - windowed by the date ENCODED IN THE FILENAME (Bob sometimes bulk-uploads,
  *     so Drive's modifiedTime is unreliable; we fall back to modifiedTime only
  *     when no date is parseable from the name),
- *   - a duration ceiling + a title guard drop the weekly long-form productions
+ *   - a title guard drops the finished weekly productions, never daily-clip length,
  *     so the synthesizer never eats its own output (no feedback loop),
  *   - near-duplicate names ("Copy of …", numeric prefixes) are de-duped.
  * It then downloads each clip, extracts the audio, and transcribes it via
@@ -25,7 +25,7 @@ import { pipeline } from "node:stream/promises";
 import { driveJson, driveRequest } from "../../server/google-drive";
 import { transcribeWords } from "../../server/video-editor";
 import { sanitizeSpawnEnv } from "../../server/safety/spawn-env-guard";
-import { getFfmpegPath, getFfprobePath } from "../../server/lib/ffmpeg-paths";
+import { getFfmpegPath } from "../../server/lib/ffmpeg-paths";
 import type { YouTubeTranscript } from "./youtube-transcript";
 
 /** Drive file IDs are URL-safe base64-ish; reject anything else (path/URL-injection guard). */
@@ -67,8 +67,6 @@ export interface DriveDiscoverOptions {
    * explicit weekStart/weekEnd range is supplied. YYYY-MM-DD.
    */
   anchorDate?: string;
-  /** Duration ceiling in seconds — known-longer clips are treated as the weekly long-form and excluded (default 120). */
-  maxDurationSec?: number;
   /** Regex that, when it matches a filename, excludes the file (default: weekly-production names). */
   excludeTitlePattern?: RegExp;
   /**
@@ -266,7 +264,6 @@ export function autoPinWindowYmd(args: { anchorRaw?: string; now?: Date } = {}):
 /** Discover this week's short-form dailies from the Drive folder. Newest-first. */
 export async function discoverWeeklyDriveClips(opts: DriveDiscoverOptions = {}): Promise<DiscoveredDriveClip[]> {
   const folderId = opts.folderId || process.env.BWB_DRIVE_FOLDER_ID || BWB_DRIVE_FOLDER_ID;
-  const maxDurationSec = (opts.maxDurationSec ?? Number(process.env.BWB_MAX_SHORT_SEC)) || 120;
   const exclude = opts.excludeTitlePattern ?? DEFAULT_EXCLUDE;
 
   const q = `'${folderId}' in parents and trashed=false`;
@@ -339,7 +336,6 @@ export async function discoverWeeklyDriveClips(opts: DriveDiscoverOptions = {}):
     if (t < cutoff || t > upperBound) continue;
     const durMs = Number(f.videoMediaMetadata?.durationMillis || 0);
     const durSec = durMs ? Math.round(durMs / 1000) : 0;
-    if (durSec > 0 && durSec > maxDurationSec) continue; // known long-form → skip
     picked.push({
       fileId: f.id,
       name: f.name,
@@ -382,34 +378,6 @@ function extractAudio(videoPath: string, outPath: string): boolean {
   return (r.status ?? 1) === 0 && fs.existsSync(outPath);
 }
 
-/**
- * Actual media duration in seconds via ffprobe. Returns NaN when the probe
- * FAILS (non-zero exit, missing binary, unparseable output) so callers can
- * fail-closed instead of mistaking "unknown" for "short". A silent 0 here
- * would disable the long-form exclusion guard whenever ffprobe is broken.
- */
-function probeDurationSec(videoPath: string): number {
-  const r = spawnSync(
-    getFfprobePath(),
-    ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", videoPath],
-    { encoding: "utf8", timeout: 30_000, env: sanitizeSpawnEnv(process.env) },
-  );
-  if ((r.status ?? 1) !== 0) {
-    // Surface WHY the probe failed so a future run isn't a mystery ("duration
-    // probe failed" with no reason). Common causes: spawn error (binary not
-    // found / EIO), non-zero exit (corrupt download), or ETIMEDOUT under load.
-    const reason = r.error
-      ? `spawn ${(r.error as any)?.code || r.error.message}`
-      : r.signal
-        ? `killed by ${r.signal}`
-        : `exit ${r.status}`;
-    console.warn(`[drive-transcript]   ffprobe duration probe failed (${reason})${String(r.stderr || "").trim() ? ` — ${String(r.stderr).trim().slice(0, 200)}` : ""}`);
-    return NaN;
-  }
-  const v = parseFloat(String(r.stdout || "").trim());
-  return Number.isFinite(v) && v > 0 ? v : NaN;
-}
-
 async function downloadDriveFile(fileId: string, destPath: string): Promise<void> {
   if (!SAFE_DRIVE_ID.test(fileId)) {
     throw new Error(`refusing to download Drive file with unexpected id format: "${fileId.slice(0, 40)}"`);
@@ -436,7 +404,6 @@ export async function extractWeeklyDriveTranscripts(
   const failures: { url: string; error: string }[] = [];
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "bwb-drive-"));
   try {
-    const maxShortSec = Number(process.env.BWB_MAX_SHORT_SEC) || 120;
     for (const c of clips) {
       try {
         if (!SAFE_DRIVE_ID.test(c.fileId)) throw new Error(`unexpected Drive fileId format: "${String(c.fileId).slice(0, 40)}"`);
@@ -445,26 +412,9 @@ export async function extractWeeklyDriveTranscripts(
         await downloadDriveFile(c.fileId, videoPath);
         const mb = (fs.statSync(videoPath).size / 1048576).toFixed(1);
         console.log(`[drive-transcript]   downloaded ${mb}MB → extracting audio…`);
-        // Fail-closed long-form guard: Drive often omits videoMediaMetadata for
-        // freshly uploaded clips, so discovery's metadata duration filter can't
-        // see them. Probe the ACTUAL duration now that the file is on disk and
-        // skip anything over the short ceiling so the weekly long-form can't
-        // re-enter synthesis (feedback loop).
-        const probed = probeDurationSec(videoPath);
-        if (!Number.isFinite(probed)) {
-          // Fail-closed: if we cannot verify the clip is short-form (ffprobe
-          // broken/unavailable) we skip it rather than risk re-admitting
-          // long-form into weekly synthesis. Recorded so the run surfaces it.
-          console.warn(`[drive-transcript]   ⊘ skipping "${c.name}" — could not probe duration (ffprobe failed); skipping to keep the long-form guard fail-closed`);
-          failures.push({ url: c.name, error: "duration probe failed (ffprobe) — skipped fail-closed" });
-          try { fs.rmSync(videoPath, { force: true }); } catch { /* best effort */ }
-          continue;
-        }
-        if (probed > maxShortSec) {
-          console.warn(`[drive-transcript]   ⊘ skipping "${c.name}" — ${Math.round(probed)}s exceeds ${maxShortSec}s short ceiling (likely long-form)`);
-          try { fs.rmSync(videoPath, { force: true }); } catch { /* best effort */ }
-          continue;
-        }
+        // Every selected daily clip is reviewed, regardless of duration or
+        // missing metadata. Finished recaps are excluded by discovery's title
+        // guard, not by guessing that a longer daily update is a recap.
         // Extract audio so we don't ship a 150MB video to Scribe.
         const audioPath = path.join(workDir, `${c.fileId}.m4a`);
         const haveAudio = extractAudio(videoPath, audioPath);

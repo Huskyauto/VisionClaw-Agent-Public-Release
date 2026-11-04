@@ -194,7 +194,7 @@ export const fillPdfDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "fill_pdf",
-    description: "Fill in form fields of an existing fillable PDF. Set values for text fields, check/uncheck checkboxes, and select dropdown options. Optionally flatten the form (make it non-editable). Use for completing forms, applications, or any fillable PDF.",
+    description: "Fill a PDF uploaded or generated for the current customer. Other customers' files and arbitrary workspace paths are refused. Use list_pdf_fields first; output is a new uniquely named PDF. Supports text, checkbox, dropdown and flattening.",
     parameters: {
       type: "object",
       properties: {
@@ -307,7 +307,7 @@ export const editPdfDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "edit_pdf",
-    description: "Edit an existing PDF — add text, add fillable form fields, add blank pages, or remove pages. The output remains editable. Use for modifying, annotating, or extending existing PDFs.",
+    description: "Edit a PDF uploaded or generated for the current customer. Arbitrary workspace paths and other customers' files are refused. Add text, form fields, or pages; output is a new uniquely named editable PDF.",
     parameters: {
       type: "object",
       properties: {
@@ -358,7 +358,7 @@ export const listPdfFieldsDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "list_pdf_fields",
-    description: "Use BEFORE filling a PDF form so you know exactly which field names exist and what type (text/checkbox/dropdown) each accepts. Required first step in the PDF-fill workflow — guessing field names usually fails. Returns field name, type, and current value for every fillable field.",
+    description: "Inspect fields of a PDF uploaded or generated for the current customer; other customers' files and arbitrary workspace paths are refused. Use BEFORE fill_pdf to get exact field names, types and current values.",
     parameters: {
       type: "object",
       properties: {

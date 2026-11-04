@@ -748,6 +748,7 @@ async function main() {
       log(`--- harness adaptation: scanned ${hr.scanned} failures across ${hr.modelsConsidered} model(s); applied ${hr.applied}${dryRun ? " (dry run)" : ""} ---`);
       for (const r of hr.results) {
         log(`  harness ${r.status.padEnd(12)} ${r.modelId}${r.weakness ? ` (${r.weakness})` : ""}: ${r.detail}`);
+        if (r.diagnosis) log(`    diagnosis=${r.diagnosis.mode} reason=${r.diagnosis.reason} states=${JSON.stringify(r.diagnosis.states)}`);
       }
       const hErr = hr.results.filter((r) => r.status === "error");
       if (hErr.length) harnessFatal = true;

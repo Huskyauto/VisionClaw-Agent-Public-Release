@@ -4,6 +4,7 @@ import { useQuery, useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, MessageSquare, Settings, Zap, Trash2, Bot, Brain, Users, Heart, BookOpen, Search, X, CreditCard, BarChart3, Download, Loader2, Home, LogOut, LogIn, Mail, Inbox, FolderOpen, Library, Phone, KeyRound, CalendarClock, ChevronDown, Wrench, Shield, FlaskConical, Lightbulb, Radio, Rocket, Send, Activity, Key, Network, ArrowLeftRight, PenTool, ShoppingBag, Store, Package, TrendingUp, FileCode, FileCheck, Github, ShieldCheck, DollarSign, Clapperboard, Layers, Sparkles, Skull, Archive, Gauge, FileText, Target, ClipboardCheck } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
+import { SidebarConfirmation } from "@/components/sidebar-confirmation";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton,
@@ -285,6 +286,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="overflow-y-auto">
+        {tenant && <SidebarConfirmation key={`${tenant.id}:${token ?? ""}`} />}
         {isLoading ? (
           <div className="p-3 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (

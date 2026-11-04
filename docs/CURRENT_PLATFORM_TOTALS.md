@@ -10,7 +10,7 @@
 > is the filtered public index and intentionally excludes trusted-persona-only
 > tools. These are different valid metrics, not competing totals.
 
-**Release evidence date:** 2026-10-31. **Evidence environment: development.**
+**Release evidence date:** 2026-11-04. **Evidence environment: development.**
 This snapshot describes the measured source and evidence database, not proof
 of production publication, production schema parity, or live feature readiness.
 Database-derived values are a

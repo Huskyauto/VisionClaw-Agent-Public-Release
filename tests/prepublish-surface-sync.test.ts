@@ -5,7 +5,7 @@ import { CURRENT_SOURCE_RELEASE } from "../client/src/components/prepublication-
 
 test("Release surfaces preserve evidence boundaries without hardcoded publication status", () => {
   const facts = JSON.parse(readFileSync("docs/release-facts.json", "utf8"));
-  assert.equal(facts.releaseDate, "2026-10-19");
+  assert.equal(facts.releaseDate, JSON.parse(readFileSync("docs/release-facts-input.json", "utf8")).releaseDate);
   assert.equal(facts.evidenceEnvironment, "development");
   for (const file of ["README.md", "README.md"]) {
     const source = readFileSync(file, "utf8");

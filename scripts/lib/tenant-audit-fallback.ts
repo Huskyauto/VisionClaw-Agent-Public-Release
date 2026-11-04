@@ -55,12 +55,22 @@ export async function runAuditFallback<T>(ports: {
   }
   throw new AuditProvidersExhausted();
 }
+export class AuditResponseError extends Error {
+  constructor(readonly code: "shape" | "refused" | "truncated" | "unfinished" | "empty" | "oversized") {
+    super(`Audit response rejected: ${code}`);
+  }
+}
 export function completeAuditText(response: any): string {
   const choices = response?.choices;
-  if (!Array.isArray(choices) || choices.length !== 1 || choices[0]?.finish_reason !== "stop" ||
-      choices[0]?.message?.refusal || typeof choices[0]?.message?.content !== "string" ||
-      !choices[0].message.content.trim() || Buffer.byteLength(choices[0].message.content) > 512 * 1024)
-    throw new Error("Incomplete, refused, truncated or oversized audit response");
+  if (!Array.isArray(choices) || choices.length !== 1 || !choices[0]?.message)
+    throw new AuditResponseError("shape");
+  if (choices[0].message.refusal || choices[0].finish_reason === "content_filter")
+    throw new AuditResponseError("refused");
+  if (choices[0].finish_reason === "length") throw new AuditResponseError("truncated");
+  if (choices[0].finish_reason !== "stop") throw new AuditResponseError("unfinished");
+  if (typeof choices[0].message.content !== "string") throw new AuditResponseError("shape");
+  if (!choices[0].message.content.trim()) throw new AuditResponseError("empty");
+  if (Buffer.byteLength(choices[0].message.content) > 512 * 1024) throw new AuditResponseError("oversized");
   return choices[0].message.content;
 }
 

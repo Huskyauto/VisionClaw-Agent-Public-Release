@@ -71,10 +71,10 @@ test("completion validation rejects truncated JSON even when its contents happen
     ({ choices: [{ finish_reason, message }] });
   assert.equal(completeAuditText(response("stop")), '{"findings":[]}');
   for (const reason of ["length", "content_filter", "tool_calls", ""]) {
-    assert.throws(() => completeAuditText(response(reason)), /Incomplete/);
+    assert.throws(() => completeAuditText(response(reason)), /Audit response rejected/);
   }
   assert.throws(() => completeAuditText(response("stop", { refusal: "No", content: '{"findings":[]}' })), /refused/);
-  assert.throws(() => completeAuditText(response("stop", { content: "" })), /Incomplete/);
+  assert.throws(() => completeAuditText(response("stop", { content: "" })), /empty/);
 });
 
 test("file-labelled smaller units preserve every original numbered source line and context overlap", () => {

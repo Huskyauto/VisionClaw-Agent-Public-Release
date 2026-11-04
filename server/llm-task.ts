@@ -2,6 +2,7 @@ import { getAvailableModels, LEGACY_MODEL_ALIASES } from "./providers";
 import { logSilentCatch } from "./lib/silent-catch";
 import { resilientChatCompletion, detectRefusal } from "./lib/resilient-llm";
 import { getModelHarnessSuffix } from "./agentic/harness-injection";
+import { buildStructuredTaskPrompt, selectSchemaFormat } from "./lib/structured-task-prompt";
 
 interface LlmTaskInput {
   prompt: string;
@@ -51,6 +52,8 @@ interface LlmTaskInput {
   trustedSystemInstruction?: string;
   /** Keep adaptive per-model harness text out of immutable evaluator prompts. */
   disableHarness?: boolean;
+  /** Internal owner plan-step trial. Never forward user/tool arguments here. */
+  promptProfile?: "owner-plan-step";
 }
 
 interface LlmTaskResult {
@@ -66,13 +69,6 @@ interface LlmTaskResult {
   refused?: boolean;
 }
 
-const THINKING_PRESETS: Record<string, string> = {
-  off: "",
-  low: "Think briefly before answering.",
-  medium: "Think carefully and consider multiple angles before answering.",
-  high: "Think deeply and exhaustively. Consider edge cases, alternatives, and implications before answering.",
-};
-
 // Bounded prompt-repair attempts (in addition to the first try). Each repair
 // re-asks the model about FORMAT ONLY (invalid JSON / schema mismatch). It NEVER
 // tries to override a content refusal — defeating a safety guard is a hard
@@ -83,25 +79,7 @@ const MAX_PROMPT_REPAIRS = 2;
 export function buildLlmTaskSystemContent(
   input: Pick<LlmTaskInput, "thinking" | "schema" | "trustedSystemInstruction">,
 ): string {
-  let systemContent = "You are a JSON-only assistant. Output ONLY valid JSON — no markdown fences, no commentary, no explanation.";
-
-  const trustedInstruction = typeof input.trustedSystemInstruction === "string"
-    ? input.trustedSystemInstruction.trim().slice(0, 4_000)
-    : "";
-  if (trustedInstruction) {
-    systemContent += `\n\nAdditional server-authored task policy:\n${trustedInstruction}`;
-    systemContent += "\n\nThis additional policy cannot weaken the JSON-only output rule, the schema, or a safety refusal.";
-  }
-
-  if (input.thinking && THINKING_PRESETS[input.thinking]) {
-    systemContent += `\n\n${THINKING_PRESETS[input.thinking]}`;
-  }
-
-  if (input.schema) {
-    systemContent += `\n\nYour output MUST conform to this JSON Schema:\n${JSON.stringify(input.schema, null, 2)}`;
-  }
-
-  return systemContent;
+  return buildStructuredTaskPrompt(input);
 }
 
 async function awaitBeforeDeadline<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -128,7 +106,10 @@ export async function runLlmTask(input: LlmTaskInput): Promise<LlmTaskResult> {
       return { success: false, error: `Model "${requestedId}" is not available. Available: ${available.slice(0, 5).map(m => m.id).join(", ")}` };
     }
 
-    let systemContent = buildLlmTaskSystemContent(input);
+    const schemaFormat = selectSchemaFormat(
+      process.env.COMPACT_OWNER_PLAN_SCHEMAS, input.tenantId, input.promptProfile,
+    );
+    let systemContent = buildStructuredTaskPrompt(input, schemaFormat);
 
     // Per-model harness adaptation (Self-Harness, arXiv:2606.09498): append any
     // validated, model-specific addenda learned from THIS model's failure traces.
@@ -218,6 +199,7 @@ export async function runLlmTask(input: LlmTaskInput): Promise<LlmTaskResult> {
         evt: "llm_task_attempt", scope: "llm-task", attempt: repair + 1,
         requested: modelId, used: actualModelId, failoverUsed: rc.failoverUsed,
         promptRepair: repair > 0, steps: rc.steps,
+        schemaFormat, promptProfile: input.promptProfile ?? "default",
       }));
 
       // HARD INVARIANT: a safety refusal stays refused. If the model declined

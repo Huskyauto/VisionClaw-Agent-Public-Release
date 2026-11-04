@@ -75,7 +75,9 @@ test("every progress update predicate requires job and tenant", () => {
 
 test("the tool creates the live row + threads env BEFORE spawning", () => {
   const tools = read("server/tools.ts");
-  assert.match(tools, /const bwbJobCreated = await createBwbJob\(\{ jobId: bwbJobId, tenantId: adminTenant/);
+  assert.match(tools, /let bwbJobCreated = false/);
+  assert.match(tools, /await claimBwbLaunchJob\(\{[\s\S]*?tenantId: adminTenant/);
+  assert.match(tools, /bwbJobCreated = await createBwbJob\(\{ jobId: bwbJobId, tenantId: adminTenant/);
   assert.match(tools, /if \(!bwbJobCreated\)[\s\S]*?return \{[\s\S]*?error:/);
   assert.match(tools, /env\.BWB_JOB_ID = bwbJobId/);
   assert.match(tools, /env\.BWB_TENANT_ID = String\(adminTenant\)/);

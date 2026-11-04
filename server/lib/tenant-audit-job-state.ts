@@ -4,6 +4,14 @@ export type AuditStateField = "auditCheckpoint" | "auditReport" | "auditPrecisio
 export interface AuditJobIdentity { id: number; attempt: number }
 export class TenantAuditStop extends Error {}
 export class TenantAuditLeaseLost extends TenantAuditStop {}
+/** The handler already performed its fenced running → pending transition.
+ * Completing that old claim would manufacture a lease-loss warning. */
+export function isTenantAuditContinuation(kind: string, result: unknown): boolean {
+  if (kind !== "tenant_isolation_audit" || !result || typeof result !== "object") return false;
+  const outcome = result as { continued?: unknown; status?: unknown };
+  return outcome.continued === true &&
+    (outcome.status === "incomplete" || outcome.status === "provider_backoff");
+}
 export function auditJobIdentity(env: NodeJS.ProcessEnv = process.env): AuditJobIdentity | null {
   if (env.TENANT_AUDIT_JOB_ID === undefined && env.TENANT_AUDIT_JOB_ATTEMPT === undefined) return null;
   const id = Number(env.TENANT_AUDIT_JOB_ID), attempt = Number(env.TENANT_AUDIT_JOB_ATTEMPT);

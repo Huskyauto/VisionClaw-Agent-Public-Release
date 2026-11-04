@@ -6,6 +6,30 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { compareMirrorContract } from "../../scripts/lib/public-mirror-contract";
 
+test("mirror normalizes mission-link idempotency prefixes without relaxing the SKU verifier", () => {
+  const script = readFileSync("scripts/build-public-mirror.sh", "utf8");
+  const rule = script.match(/-e '(s\/vc-commerce-paylink-mission-v2\/vc-commerce-paylink-mission-v2\/g)'/);
+  assert.ok(rule, "missing targeted mission-link scrub");
+  assert.ok(script.includes('SCRUB_RE="${SCRUB_RE}|vc-commerce-paylink-mission-v2"'),
+    "scrub candidate filter must select the prefix");
+  const result = spawnSync("sed", ["-e", rule[1]], {
+    input: "vc-commerce-paylink-mission-v2-1-pl_123-5\nvc-commerce-paylink-v2-1-demo-5\nsample-unrelated-product-497",
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout,
+    "vc-commerce-paylink-mission-v2-1-pl_123-5\nvc-commerce-paylink-v2-1-demo-5\nsample-unrelated-product-497");
+  // The builder and this regression also enter the public export. Rewrite their
+  // bare prefix references as well, not only generated keys with a final dash.
+  const exported = spawnSync("sed", ["-e", rule[1]], { input: script, encoding: "utf8" });
+  assert.equal(exported.status, 0);
+  const [, sourcePrefix, publicPrefix] = rule[1].split("/");
+  if (sourcePrefix !== publicPrefix) assert.ok(!exported.stdout.includes(sourcePrefix));
+  else assert.equal(exported.stdout, script); // already-sanitized public builder
+  assert.ok(script.includes("check_regex_except 'vc-[a-z0-9][a-z0-9_-]{2,}'"),
+    "the generic fail-closed SKU verifier must remain enabled");
+});
+
 test("public mirror contract: missing upstream export fails closed", () => {
   const result = compareMirrorContract(
     `export interface CatalogProduct { sku: string; }\nexport function lookupProduct(sku: string): CatalogProduct | null { return null; }`,

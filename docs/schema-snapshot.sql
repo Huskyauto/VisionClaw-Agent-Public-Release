@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0bYohEtKsHEgGm6c1MXm9vp5dTx2uCo4lJNnIDjTJwVbPYi72pHI5iGUgvU4aJg
+\restrict zwRh0Z9wJmcsyYfDlwX3wl7OV3cNZx0nuykNcA14q4XYeNWbc2h1S36Yywljs50
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -10943,7 +10943,8 @@ CREATE TABLE public.webhook_triggers (
     enabled boolean DEFAULT true,
     last_triggered timestamp with time zone,
     trigger_count integer DEFAULT 0,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    thread_conversations jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -22596,5 +22597,5 @@ ALTER TABLE public.skill_optimization_versions ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0bYohEtKsHEgGm6c1MXm9vp5dTx2uCo4lJNnIDjTJwVbPYi72pHI5iGUgvU4aJg
+\unrestrict zwRh0Z9wJmcsyYfDlwX3wl7OV3cNZx0nuykNcA14q4XYeNWbc2h1S36Yywljs50
 

@@ -19,6 +19,7 @@ import type { Express, Request, Response } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { capForReplay as cap, isStepResultEntry } from "../lib/replay-sanitize";
+import { assessPlanRun } from "../lib/plan-run-confirmation";
 
 interface Deps {
   authMiddleware: any;
@@ -349,6 +350,9 @@ export function registerAgentInsightsRoutes(app: Express, deps: Deps) {
         updatedAt: row.updated_at,
         plannedStepCount: plannedSteps.length,
         executedStepCount: steps.length,
+        confirmation: assessPlanRun({
+          id: row.id, tenantId, status: row.status, steps: plannedSteps, log,
+        }),
         steps,
         pendingSteps,
       });

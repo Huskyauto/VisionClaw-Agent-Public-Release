@@ -1366,7 +1366,14 @@ export class WebhookHandlers {
   static async recordMissionEvidence(kind: 'payment' | 'refund', obj: any): Promise<void> {
     const { missionIdFromStripeMetadata, refundEvidenceItems, STRIPE_EVIDENCE_STAGES, addEvidence, getMission } =
       await import('./lib/revenue-missions');
-    const missionId = missionIdFromStripeMetadata(obj?.metadata);
+    const { resolveStripeMissionId } = await import('./lib/mission-stripe-association');
+    let associationClient: Awaited<ReturnType<typeof import('./stripeClient').getUncachableStripeClient>> | undefined;
+    const stripeForAssociation = async () => associationClient ??= await (await import('./stripeClient')).getUncachableStripeClient();
+    const missionId = await resolveStripeMissionId(kind, obj, {
+      parse: missionIdFromStripeMetadata,
+      retrieveIntent: async id => (await stripeForAssociation()).paymentIntents.retrieve(id, {}, { timeout: 10_000, maxNetworkRetries: 0 }),
+      listSessions: async id => (await stripeForAssociation()).checkout.sessions.list({ payment_intent: id, limit: 2 }, { timeout: 10_000, maxNetworkRetries: 0 }),
+    });
     if (missionId == null) return;
     const { ownerTenantId } = await import('./agentic/autonomous-budget');
     const tenantId = ownerTenantId();

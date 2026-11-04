@@ -3,7 +3,7 @@
 # For External Reviewers
 
 > **Read this before reviewing.** This document is regenerated from the live
-> source tree at every public-mirror build (last regenerated **2026-11-01**), so
+> source tree at every public-mirror build (last regenerated **2026-11-04**), so
 > the facts below are current for THIS snapshot. Reviews that cite older
 > snapshots or third-party summaries of this repo will contain stale findings.
 
@@ -17,7 +17,7 @@ grade against the totals doc.
 
 ## 2. Facts as of this snapshot (auto-computed)
 
-| Claim reviewers often get wrong | Current reality (2026-11-01) |
+| Claim reviewers often get wrong | Current reality (2026-11-04) |
 | :--- | :--- |
 | "`server/tools.ts` is a 20,000+ line monolith" | **9,756 lines.** An active strangler-fig split is migrating tools into `server/tools/domains/` (**92 domain packages, 269 modules** so far). The 20k figure is historical. |
 | "`server/routes.ts` is monolithic" | **7,664 lines**, with **92 extracted route modules** in `server/routes/`. Extraction is ongoing by design (strangler-fig, one domain per session, revert-don't-limp). |

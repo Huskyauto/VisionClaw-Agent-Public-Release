@@ -3,6 +3,7 @@ import { build as viteBuild } from "vite";
 import { rm, readFile, mkdir, copyFile } from "fs/promises";
 import { execSync } from "child_process";
 import { stageTypeScriptStandardLibraries } from "./package-typescript-libs";
+import { buildDataPolicy } from "./lib/build-data-policy";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -31,12 +32,16 @@ const allowlist = [
 ];
 
 async function buildAll() {
+  const dataPolicy = buildDataPolicy(
+    process.argv.includes("--release-check"),
+    process.env.REPLIT_DEPLOYMENT === "1" || process.env.SKIP_DEV_DATA_SYNC === "1",
+  );
   // Skip dev-data sync during deployment builds — it reads from a DB that may
   // be slow/unreachable from the build runner and isn't needed when shipping
   // the production bundle. Only run during local builds where DATABASE_URL
   // points at the dev DB.
-  if (process.env.REPLIT_DEPLOYMENT === "1" || process.env.SKIP_DEV_DATA_SYNC === "1") {
-    console.log("[build] skipping dev-data sync (deployment build)");
+  if (!dataPolicy.syncDevData) {
+    console.log("[build] skipping dev-data sync (deployment or release check)");
   } else {
     console.log("syncing dev data for production...");
     try {
@@ -46,7 +51,9 @@ async function buildAll() {
     }
   }
 
-  const snapshotExists = await readFile("dist/dev-data-snapshot.json", "utf-8").catch(() => null);
+  const snapshotExists = dataPolicy.preserveDevSnapshot
+    ? await readFile("dist/dev-data-snapshot.json", "utf-8").catch(() => null)
+    : null;
 
   await rm("dist", { recursive: true, force: true });
 

@@ -22,3 +22,4 @@ attached_assets/*
 !attached_assets/Vision_Claw_Logo_Final-01_1776037691274.png
 data/private-alert-logs/
 /generated-artifacts/
+/project-assets/bwb-retrospective-delivery/

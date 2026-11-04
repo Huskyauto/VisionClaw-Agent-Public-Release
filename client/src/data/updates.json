@@ -1,5 +1,20 @@
 [
   {
+    "version": "R137.2+sec",
+    "date": "November 4, 2026",
+    "title": "Webhook continuity, run confirmation and scoped recovery safeguards",
+    "type": "security",
+    "highlights": [
+      { "icon": "MessageSquare", "text": "Webhook issue/PR follow-ups retain tenant-bound conversation context with persistent, bounded bindings. Invalid, disabled or reassigned context is refused. Publication must reconcile the new binding column; this does not add event deduplication or serialize concurrent model turns." },
+      { "icon": "CheckCircle2", "text": "Read-only run confirmation checks saved tenant-scoped workflow evidence and links to the matching Replay run. It does not replay actions, rerun jobs or prove customer outcomes; missing evidence and unsupported journeys remain unverified." },
+      { "icon": "RefreshCw", "text": "Harness diagnosis prioritizes recurring failures before proposing changes under existing activation gates. Optional schema-whitespace compaction stays a development trial; synthetic comparisons do not prove live savings or authorize automatic promotion." },
+      { "icon": "FileText", "text": "Weekly recap preparation reviews every selected daily upload, including longer recordings. Source-bound transcription and planning identities prevent reuse of an incomplete earlier selection. Recap length does not justify omitting selected material." },
+      { "icon": "ShieldCheck", "text": "Focused source corrections require tenant-owned PDF inputs, including inspection and header images, and preserve mission payment association with exact metadata and refund identity. Original owner, stage and payment guards remain. These checks are not certification of every live journey." },
+      { "icon": "BookOpen", "text": "Coding documentation now distinguishes stale implementation conventions from binding security, tenant, payment, approval and owner requirements. Agents report encountered discrepancies and avoid unrelated rewrites. Research references are not advertised as installed capabilities." },
+      { "icon": "ShieldCheck", "text": "Targeted release checks bind regression, type, surface, domain and build evidence to the reviewed source. Audit provider diagnostics distinguish failure causes without relaxing acceptance. These source checks are not production proof. The full tenant audit remains incomplete; a scoped pass is not whole-platform security clearance or publication approval." }
+    ]
+  },
+  {
     "version": "R137.1+sec",
     "date": "October 31, 2026",
     "title": "Owner preparation, bounded recovery and evidence-aware release updates",

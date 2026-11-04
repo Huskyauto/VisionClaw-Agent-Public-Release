@@ -1,7 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { auditJobIdentity, auditJobState, continueAuditJob, deferAuditCapacity, recordAuditFailure, backoffAuditJob } from "../../server/lib/tenant-audit-job-state";
+import { readFileSync } from "node:fs";
+import { auditJobIdentity, auditJobState, continueAuditJob, deferAuditCapacity, recordAuditFailure, backoffAuditJob, isTenantAuditContinuation } from "../../server/lib/tenant-audit-job-state";
+
+test("only successfully rescheduled audit outcomes skip normal queue completion", () => {
+  for (const status of ["incomplete", "provider_backoff"])
+    assert.equal(isTenantAuditContinuation("tenant_isolation_audit", { status, continued: true }), true);
+  for (const result of [null, {}, { status: "complete", continued: true },
+    { status: "incomplete", continued: false }, { status: "incomplete" }])
+    assert.equal(isTenantAuditContinuation("tenant_isolation_audit", result), false);
+  assert.equal(isTenantAuditContinuation("other", { status: "incomplete", continued: true }), false);
+});
+
+test("worker handles audit continuation and lost authority before ordinary completion and failure", () => {
+  const worker = readFileSync("server/job-worker.ts", "utf8");
+  const continuation = worker.indexOf("if (isTenantAuditContinuation(job.kind, handlerResult))");
+  const completion = worker.indexOf("const completed = await completeJob(job.id");
+  assert.ok(continuation > 0 && continuation < completion);
+  assert.match(worker.slice(continuation, completion), /return;/);
+  const catchStart = worker.indexOf("if (err instanceof TenantAuditLeaseLost)");
+  assert.ok(catchStart > 0 && catchStart < worker.indexOf("if (err instanceof TenantAuditStop)"));
+  assert.match(worker.slice(catchStart, worker.indexOf("if (err instanceof TenantAuditStop)")), /return;/);
+});
 
 test("standalone runs do not acquire scheduled job authority", async () => {
   assert.equal(auditJobIdentity({}), null);

@@ -583,6 +583,7 @@ async function runStep(
         maxTokens: 4096,
         // R64.C — bill plan-step LLM calls to the plan's owning tenant.
         tenantId: plan.tenant_id,
+        promptProfile: "owner-plan-step",
       }),
       ({ attempt, nextAttempt, error }) => appendExecutionLog(plan.id, plan.tenant_id, {
         type: "step.transient_retry",

@@ -12,6 +12,16 @@ where we're going (so you can decide whether to fork, contribute, or wait).
 
 ---
 
+## R137.2+sec — November 4, 2026 source reconciliation
+
+Webhook follow-ups preserve tenant-bound context; read-only run confirmation links
+saved evidence to Replay without repeating actions. Harness diagnosis and optional
+schema compaction retain their existing activation and evidence boundaries.
+Weekly recap preparation covers every selected daily upload. PDF ownership,
+mission payment association and coding-documentation safeguards are included.
+These are source changes, not whole-platform certification or automatic publication.
+See [scope and remaining verification](docs/platform-update-2026-11-04.md).
+
 ## R137+sec — October 19, 2026
 
 Dated development snapshot: 428 total registered tools, 386 publicly documented
@@ -101,7 +111,7 @@ evidence required before deferred ideas become active work.
 
 ## Current platform totals
 
-**428 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 146 active capabilities · 196 declared / 277 live development tables · 888 platform indexes · 41 governance rules · 91 curated AI models in the core registry plus daily OpenRouter catalog discovery.** ([authoritative release facts](docs/release-facts.json), October 31 development snapshot). R137.1+sec reconciles source and documentation through October 31; app publication and production readiness remain separate.
+**428 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 146 active capabilities · 196 declared / 277 live development tables · 888 platform indexes · 41 governance rules · 91 curated AI models in the core registry plus daily OpenRouter catalog discovery.** ([authoritative release facts](docs/release-facts.json), November 4 development snapshot). R137.2+sec reconciles source and documentation through November 4; app publication and production readiness remain separate.
 
 Machine-readable source: [docs/release-facts.json](docs/release-facts.json).
 

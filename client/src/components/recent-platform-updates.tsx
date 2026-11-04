@@ -4,6 +4,36 @@ import { CURRENT_SOURCE_RELEASE } from "./prepublication-notice";
 
 const updates = [
   {
+    title: "Webhook follow-ups stay with the right conversation",
+    business: "Supported issue and pull-request follow-ups keep their tenant-bound conversation instead of starting over. Disabled, reassigned or invalid bindings are refused rather than mixed into another conversation.",
+    technical: "Persistent trigger/configuration/repository/item bindings use row-locked allocation and bounded capacity. Generic events keep separate trigger context. A new binding column needs publication schema reconciliation; rollback preserves stored bindings. No event deduplication or concurrent-turn serialization claim.",
+  },
+  {
+    title: "Read-only run confirmation",
+    business: "Confirmation in the sidebar checks saved workflow evidence and links to the matching Replay run. It does not replay actions, rerun jobs or turn a successful tool call into proof of a business outcome.",
+    technical: "Tenant-scoped bounded history/detail reads, identity-bound assessment, visible retrieval errors and source-bound offline acceptance receipts. Unsupported journeys and missing outcome evidence remain unverified; confirmation grants no release approval.",
+  },
+  {
+    title: "Harness diagnosis and bounded prompt trials",
+    business: "Harness diagnosis prioritizes recurring failures before proposing improvements. Optional prompt compaction is a development trial, not proven savings or automatic model promotion.",
+    technical: "Training-only recurrence priorities retain existing independent activation gates. Schema-whitespace compaction is opt-in for internal owner plan steps; missing evidence restores the baseline. Synthetic model comparisons do not establish live task gains.",
+  },
+  {
+    title: "Every selected daily upload gets reviewed",
+    business: "Weekly recap preparation includes every selected daily upload, including longer recordings. Source material is not discarded just to keep the recap short.",
+    technical: "Drive discovery and transcription remove the short-clip duration ceiling. Transcription and planning identities bind the complete selected source set, including cached results; finished recaps and out-of-window filenames remain excluded.",
+  },
+  {
+    title: "PDF ownership and payment evidence safeguards",
+    business: "PDF editing and inspection require files owned by the requesting account. Mission payment evidence remains tied to the correct mission and refund identity. Focused checks are not certification of every payment or customer journey.",
+    technical: "Tenant-owned stored bytes guard PDF fill/edit/inspection and header images; output names are generated. Mission payment links bind PaymentIntent metadata, validate cached linkage and use bounded exact-parent/session recovery without relaxing owner, stage or refund-ID gates.",
+  },
+  {
+    title: "Safer coding documentation and scoped release checks",
+    business: "Coding agents verify documentation against working code without treating legacy bugs as permission to ignore security or owner decisions. Release checks report exactly what they tested; the broader tenant audit remains incomplete.",
+    technical: "Aligned engineering instructions preserve tenant, payment, approval and budget boundaries, report encountered discrepancies and avoid unrelated rewrites. Source-bound targeted regressions, type/surface/domain/build checks and independent review are distinct from whole-repository clearance or publication approval.",
+  },
+  {
     title: "Business health and saved re-scans",
     business: "The owner-only manual workbench turns supplied operating totals into five indicators, saved baselines and period comparisons. Missing information stays Unknown; it does not invent a business health score.",
     technical: "Tenant-scoped private history, bounded inputs and dependency-safe deletion. Semantic request IDs prevent duplicate saves and reject conflicting reuse. Felix and Forge use the same guarded owner-invoked business_pilot contract.",
@@ -124,7 +154,7 @@ export function RecentPlatformUpdates({ technical = false }: { technical?: boole
         <span className="rounded bg-cyan-600 text-white px-2 py-1 text-xs font-semibold">{CURRENT_SOURCE_RELEASE}</span>
       </div>
       <p className="text-sm text-muted-foreground mb-6">
-        Source updates through October 19. Counts remain the dated development snapshot.
+        Source updates through November 4. Counts remain the dated development snapshot.
         Integration access, account allowances and feature flags still apply.
         These notes describe the source, not a guarantee that every option is enabled on this deployment.
       </p>

@@ -11,13 +11,15 @@ const updates = JSON.parse(read("client/src/data/updates.json"));
 const release = /CURRENT_SOURCE_RELEASE = "([^"]+)"/.exec(notice)?.[1];
 
 test("current release agrees across shared summary, dashboard data and both READMEs", () => {
-  assert.equal(release, "R137+sec");
+  assert.equal(release, "R137.2+sec");
   assert.equal(updates[0].version, release);
-  assert.equal(updates[0].date, "October 19, 2026");
+  assert.equal(updates[0].date, "November 4, 2026");
   const readmes = isPrivateSource ? ["README.md", "README.md"] : ["README.md"];
   for (const file of [...readmes, "ROADMAP.md"]) {
     assert.ok(read(file).slice(0, 18000).includes(release!));
+    assert.doesNotMatch(read(file), /Latest source update[^\n]*R137\+sec/);
   }
+  assert.match(read("ROADMAP.md"), /November 4 development snapshot\)\. R137\.2\+sec/);
   assert.match(sidebar, /badge-updates-new[\s\S]{0,160}\{CURRENT_SOURCE_RELEASE\}/);
   assert.match(read("client/src/components/home-release-updates.tsx"), /updatesData/);
   assert.match(read("client/src/components/seo-head.tsx"), /CURRENT_PLATFORM_DESCRIPTION/);
@@ -36,11 +38,31 @@ test("last-72-hour features reach both landing views and the shared dashboard re
     "Website readiness", "Company report", "Alert logs", "Outcome-first", "Video packaging"]) {
     assert.ok(current.includes(term), `missing current feature: ${term}`);
   }
-  assert.match(current, /October 19/);
+  assert.match(current, /November 4/);
   assert.match(current, /owner-only/i);
   assert.match(JSON.stringify(updates[0]), /production/i);
   assert.match(JSON.stringify(updates[0]), /not certification/i);
   assert.match(read("client/src/pages/home.tsx"), /HOME_RELEASES\.slice/);
+});
+
+test("November source changes reach landing, dashboard, SEO and repository summaries without overstating readiness", () => {
+  const current = read("client/src/components/recent-platform-updates.tsx");
+  const latest = JSON.stringify(updates[0]);
+  for (const term of ["Webhook", "confirmation", "harness", "daily upload", "PDF", "payment", "documentation"]) {
+    assert.ok(current.toLowerCase().includes(term.toLowerCase()), `landing missing ${term}`);
+    assert.ok(latest.toLowerCase().includes(term.toLowerCase()), `release feed missing ${term}`);
+  }
+  assert.match(notice, /November 4, 2026/);
+  assert.match(notice, /audit remains degraded and incomplete/);
+  assert.match(latest, /not certification/i);
+  assert.match(latest, /does not replay/i);
+  for (const file of isPrivateSource ? ["README.md", "README.md"] : ["README.md"]) {
+    const top = read(file).split("The dated snapshot")[0];
+    for (const term of ["webhook", "confirmation", "harness", "daily upload", "PDF", "payment", "documentation"]) {
+      assert.ok(top.toLowerCase().includes(term.toLowerCase()), `${file} missing ${term}`);
+    }
+  }
+  assert.ok(read("client/index.html").includes(release!));
 });
 
 test("navigation retains owner gating and existing routes instead of phantom tools", () => {

@@ -39,9 +39,9 @@ test("static HTML metadata uses current release facts and explicit tool semantic
   ];
 
   for (const description of descriptions) {
-    assert.match(description, new RegExp(`${c.registeredTools} total registered tools`, "i"));
+    assert.match(description, new RegExp(`${c.registeredTools} (?:total )?registered tools`, "i"));
     assert.match(description, new RegExp(`${c.publicDocumentedTools} publicly documented tools`, "i"));
-    assert.match(description, new RegExp(`${c.declaredTables} declared / ${c.liveTables} live tables`, "i"));
+    assert.match(description, new RegExp(`${c.declaredTables} declared / ${c.liveTables} live (?:development )?tables`, "i"));
     assert.match(description, new RegExp(`${c.platformIndexes} platform indexes`, "i"));
     assert.doesNotMatch(description, /R125\+155|delivery retr/i);
   }

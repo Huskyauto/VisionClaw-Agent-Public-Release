@@ -1,4 +1,4 @@
-import { AUDIT_ROUTE_TIMEOUT_MS, completeAuditText, type AuditRoute } from "./tenant-audit-fallback";
+import { AUDIT_ROUTE_TIMEOUT_MS, AuditResponseError, completeAuditText, type AuditRoute } from "./tenant-audit-fallback";
 
 type ResolveOptions = { providerLane?: Exclude<AuditRoute["providerLane"], "cheaperinference">; forbidMeteredFallback?: true };
 type Resolved = { client: { chat: { completions: { create(body: any, options: any): Promise<any> } } }; actualModelId: string };
@@ -63,6 +63,12 @@ export function parseAuditObject(raw: string): unknown {
 
 /** Never print raw provider errors: they may contain request bodies or credentials. */
 export function auditFailureSummary(error: unknown): string {
+  if (error instanceof AuditRouteRefused) return "response refused";
+  if (error instanceof AuditResponseError) return {
+    shape: "response invalid shape", refused: "response refused",
+    truncated: "response truncated (output limit)", unfinished: "response unfinished",
+    empty: "response empty", oversized: "response oversized",
+  }[error.code];
   const e = error as { status?: unknown; message?: unknown };
   if (Number.isInteger(e?.status) && Number(e.status) >= 100 && Number(e.status) <= 599) return `HTTP ${e.status}`;
   const message = typeof e?.message === "string" ? e.message : "";
@@ -89,7 +95,9 @@ export function auditHealthKey(route: AuditRoute): string { return `${route.prov
 export function auditProviderFailure(health: AuditProviderHealth, route: AuditRoute, error: unknown, now = Date.now()): AuditProviderHealth {
   const key = auditHealthKey(route);
   const failures = Math.min(12, (health[key]?.failures ?? 0) + 1);
-  const ms = error instanceof AuditRouteRefused ? 3600_000 : Math.min(3600_000, 300_000 * 2 ** Math.min(4, failures - 1));
+  const refused = error instanceof AuditRouteRefused ||
+    (error instanceof AuditResponseError && error.code === "refused");
+  const ms = refused ? 3600_000 : Math.min(3600_000, 300_000 * 2 ** Math.min(4, failures - 1));
   return { ...health, [key]: { failures, until: now + ms } };
 }
 export async function auditRouteConfigured(route: AuditRoute): Promise<boolean> {

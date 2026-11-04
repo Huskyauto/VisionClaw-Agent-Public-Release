@@ -230,10 +230,10 @@ async function editPdfHandler(
 
 async function listPdfFieldsHandler(
   params: Record<string, any>,
-  _ctx: ToolContext,
+  ctx: ToolContext,
 ): Promise<ToolResult> {
   const { listPdfFields } = await import("../../../pdf-create");
-  return listPdfFields(params.inputPath);
+  return listPdfFields(params.inputPath, ctx.tenantId);
 }
 
 /** Registered by ./index.ts at import time. */

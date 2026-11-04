@@ -11,6 +11,7 @@
 //   1. enqueueJob("my_kind", {...}) at the call site
 //   2. registerJobHandler("my_kind", async (job) => {...}) in HANDLERS below
 import { reportDiagnostic } from "./lib/safe-diagnostic";
+import { isTenantAuditContinuation, TenantAuditLeaseLost } from "./lib/tenant-audit-job-state";
 import {
   claimDueJobs,
   completeJob,
@@ -216,6 +217,10 @@ async function runOneJob(job: AgentJob): Promise<void> {
               () => handler(job),
             )
           : await handler(job);
+      if (isTenantAuditContinuation(job.kind, handlerResult)) {
+        console.log(`[job-worker] Job #${job.id} (${job.kind}) rescheduled with retained progress`);
+        return;
+      }
       // Pass job.attempts for lease fencing — if our lease expired and the
       // job was reclaimed on attempts+1, our completeJob write will no-op.
       const completed = await completeJob(job.id, job.attempts, job.tenantId, handlerResult ?? null);
@@ -223,6 +228,11 @@ async function runOneJob(job: AgentJob): Promise<void> {
         console.warn(`[job-worker] Job #${job.id} (${job.kind}) completion fenced; live lease no longer owned`);
       }
     } catch (err: unknown) {
+      if (err instanceof TenantAuditLeaseLost) {
+        // An old claim must neither complete nor fail the replacement claim.
+        console.warn(`[job-worker] Job #${job.id} (${job.kind}) lease lost; stopping old claim`);
+        return;
+      }
       if (err instanceof TenantAuditStop) {
         await failJob(job.id, job.attempts, err.message, job.tenantId, { stopRetry: true, failureClass: "unknown" });
         return;

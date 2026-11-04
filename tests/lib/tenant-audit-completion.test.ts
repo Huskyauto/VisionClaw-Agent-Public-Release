@@ -1,8 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { invokeAuditRoute, parseAuditObject, AuditRouteRefused, auditProviderFailure,
-  auditHealthKey, readAuditProviderHealth } from "../../scripts/lib/tenant-audit-completion";
-import { auditRoutes } from "../../scripts/lib/tenant-audit-fallback";
+  auditHealthKey, readAuditProviderHealth, auditFailureSummary } from "../../scripts/lib/tenant-audit-completion";
+import { auditRoutes, completeAuditText, AuditResponseError } from "../../scripts/lib/tenant-audit-fallback";
+
+test("audit response diagnostics distinguish truncation, refusal, empty and invalid shape without exposing content", () => {
+  const cases: [any, string][] = [
+    [{ choices: [{ finish_reason: "length", message: { content: "private source" } }] }, "response truncated (output limit)"],
+    [{ choices: [{ finish_reason: "stop", message: { refusal: "private reason", content: "" } }] }, "response refused"],
+    [{ choices: [{ finish_reason: "content_filter", message: { content: "" } }] }, "response refused"],
+    [{ choices: [{ finish_reason: "stop", message: { content: "" } }] }, "response empty"],
+    [{ choices: [] }, "response invalid shape"],
+    [{ choices: [{ finish_reason: "tool_calls", message: { content: "private" } }] }, "response unfinished"],
+  ];
+  for (const [response, expected] of cases) {
+    assert.throws(() => completeAuditText(response), error => {
+      assert.equal(auditFailureSummary(error), expected);
+      return true;
+    });
+  }
+});
 
 test("completed JSON can be fenced or surrounded by prose without accepting malformed content", () => {
   assert.deepEqual(parseAuditObject('```json\n{"findings":[]}\n```'), { findings: [] });
@@ -56,6 +73,8 @@ test("refusal gives an audit-only one-hour cooldown without changing global prov
   assert.throws(() => readAuditProviderHealth({ bad: { until: NaN, failures: 1 } }));
   assert.throws(() => readAuditProviderHealth([]));
   assert.throws(() => readAuditProviderHealth({ bad: { until: 0, failures: 0 } }));
+  const structured = auditProviderFailure({}, route, new AuditResponseError("refused"), now);
+  assert.equal(structured[auditHealthKey(route)].until, now + 3600_000);
 });
 
 test("ordinary provider failures back off per route, up to an hour", () => {
