@@ -30,10 +30,10 @@ checkout. Fresh checkouts verify committed facts with `verify-counts.ts`.
 | **Skills (DB seeded)** | **63** | `SELECT count(*) FROM skills` |
 | **Skills (total incl. .agents/skills/)** | **68** | DB count + 5 platform agent skills not yet seeded |
 | **Capabilities (active)** | **146** | `SELECT count(*) FROM capabilities WHERE is_active=true` |
-| **Database tables (declared)** | **196** | Published core-schema baseline plus explicitly tracked new split-model declarations |
-| **Database tables (live in `public` schema)** | **277** | `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'` |
+| **Database tables (declared)** | **197** | Published core-schema baseline plus explicitly tracked new split-model declarations |
+| **Database tables (live in `public` schema)** | **278** | `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'` |
 | **Governance rules** | **41** | `SELECT count(*) FROM governance_rules` |
-| **Platform indexes (release aggregate)** | **888** | Live `pg_indexes` count minus versioned auth/session infrastructure exclusions |
+| **Platform indexes (release aggregate)** | **889** | Live `pg_indexes` count minus versioned auth/session infrastructure exclusions |
 | **Non-PK indexes (evidence database)** | **617** | `SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'` |
 | **AI providers** | **6** | OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity |
 | **AI models (core registry)** | **91 curated** | `MODEL_REGISTRY.length` in `server/model-registry.ts` |

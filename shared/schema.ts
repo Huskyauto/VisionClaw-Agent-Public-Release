@@ -92,6 +92,17 @@ export const insertBrowserWorkbenchLibrarySchema = createInsertSchema(browserWor
 export type InsertBrowserWorkbenchLibrary = z.infer<typeof insertBrowserWorkbenchLibrarySchema>;
 export type BrowserWorkbenchLibrary = typeof browserWorkbenchLibraries.$inferSelect;
 
+// Owner-only engineering notebook. Tenant key is also the lookup index.
+export const engineeringReferenceLibraries = pgTable("engineering_reference_libraries", {
+  tenantId: integer("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+  version: integer("version").notNull().default(0),
+  notes: jsonb("notes").notNull().default(sql`'[]'::jsonb`),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export const insertEngineeringReferenceLibrarySchema = createInsertSchema(engineeringReferenceLibraries).omit({ updatedAt: true });
+export type InsertEngineeringReferenceLibrary = z.infer<typeof insertEngineeringReferenceLibrarySchema>;
+export type EngineeringReferenceLibraryRow = typeof engineeringReferenceLibraries.$inferSelect;
+
 export const personas = pgTable("personas", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),

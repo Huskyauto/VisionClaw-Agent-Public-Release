@@ -9,10 +9,10 @@
     "dbSeededSkills": 63,
     "totalSkills": 68,
     "activeCapabilities": 146,
-    "declaredTables": 196,
-    "liveTables": 277,
+    "declaredTables": 197,
+    "liveTables": 278,
     "governanceRules": 41,
-    "platformIndexes": 888,
+    "platformIndexes": 889,
     "nonPrimaryKeyIndexes": 617,
     "aiProviders": 6,
     "coreRegistryModels": 91

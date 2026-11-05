@@ -2,6 +2,14 @@
 
 ## Current source release — R137.2+sec (November 4, 2026)
 
+- **Engineering Q&A:** owner-only sidebar reference with 19 original project
+  comparisons drawn from 18 selected interview answers, searchable evidence,
+  category/verdict filters and source links. Private owner notes support
+  create/edit/delete with tenant-scoped persistence, stale-write protection and
+  draft retention on errors. Notes are literal reference text, not agent
+  instructions or tool authority. This is a selected-source review, not a review
+  of all 542 answers or whole-platform certification.
+  [Scope, evidence and verification](docs/engineering-reference-review.md).
 - **Webhook continuity:** supported issue/PR events retain tenant-bound conversation
   context through persistent, bounded bindings. Publication must reconcile the new
   binding column; event deduplication and concurrent-turn serialization are not claimed.
@@ -23,8 +31,8 @@
   See the [November source reconciliation](docs/platform-update-2026-11-04.md).
 
 **428 registered tools · 386 publicly documented tools · 18 personas · 68 platform
-skills · 146 active capabilities · 196 declared / 277 live development tables ·
-888 platform indexes · 91 curated models · 41 governance rules.**
+skills · 146 active capabilities · 197 declared / 278 live development tables ·
+889 platform indexes · 91 curated models · 41 governance rules.**
 These are dated development measurements, not production telemetry.
 
 Recent source additions include an eight-document **AI Stack Decision Review**
@@ -95,7 +103,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **Earlier source update — R137+sec (October 19, 2026): Business pilots, company report packages and evidence-first operations.** Owner-only health/re-scan, release, governance and cost/routing pilots; read-only website readiness; sourced company reports with required audio; private alert logs; receipt-backed delivery checks, outcome-first briefings and video packaging. Private report packages are excluded from generic tenant file access. [Feature/access matrix](docs/platform-update-2026-10-19.md). Forks need their own credentials, entitlements and configuration. Focused live pilot verification is not universal certification; GitHub synchronization is not website publication.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **428 total registered tools · 386 public documented tools · 68 total skills · 146 active capabilities · 18 personas · 196 declared / 277 live development tables · 41 governance rules · 888 platform indexes · 91 curated AI models · 6 AI providers · 6 deployment targets.** These are an October 31 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **428 total registered tools · 386 public documented tools · 68 total skills · 146 active capabilities · 18 personas · 197 declared / 278 live development tables · 41 governance rules · 889 platform indexes · 91 curated AI models · 6 AI providers · 6 deployment targets.** These are a November 4 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 ### October 9–14 source updates
 
@@ -368,8 +376,8 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | Skills | 68 total (63 DB-seeded skills + 5 platform agent skills) |
 | Frontend Pages | 40+ |
 | API Endpoints | 300+ |
-| Database Tables | 196 declared / 277 live development |
-| Platform Indexes | 888 (617 non-PK) |
+| Database Tables | 197 declared / 278 live development |
+| Platform Indexes | 889 (617 non-PK) |
 
 ---
 

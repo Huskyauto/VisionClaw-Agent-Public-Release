@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zwRh0Z9wJmcsyYfDlwX3wl7OV3cNZx0nuykNcA14q4XYeNWbc2h1S36Yywljs50
+\restrict lGVRm5E0A8tofkdL0ZhmjKc0Kugczh97oOV865w6BmHr6KmrDJRoIQ1g1h1OaA2
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -4060,6 +4060,18 @@ CREATE SEQUENCE public.email_verification_codes_id_seq
 --
 
 ALTER SEQUENCE public.email_verification_codes_id_seq OWNED BY public.email_verification_codes.id;
+
+
+--
+-- Name: engineering_reference_libraries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.engineering_reference_libraries (
+    tenant_id integer NOT NULL,
+    version integer DEFAULT 0 NOT NULL,
+    notes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
 
 
 --
@@ -14629,6 +14641,14 @@ ALTER TABLE ONLY public.email_verification_codes
 
 
 --
+-- Name: engineering_reference_libraries engineering_reference_libraries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.engineering_reference_libraries
+    ADD CONSTRAINT engineering_reference_libraries_pkey PRIMARY KEY (tenant_id);
+
+
+--
 -- Name: episode_playbooks episode_playbooks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -21404,6 +21424,14 @@ ALTER TABLE ONLY public.derived_api_recipes
 
 
 --
+-- Name: engineering_reference_libraries engineering_reference_libraries_tenant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.engineering_reference_libraries
+    ADD CONSTRAINT engineering_reference_libraries_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+
+--
 -- Name: eval_runs eval_runs_harness_manifest_tenant_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -22597,5 +22625,5 @@ ALTER TABLE public.skill_optimization_versions ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zwRh0Z9wJmcsyYfDlwX3wl7OV3cNZx0nuykNcA14q4XYeNWbc2h1S36Yywljs50
+\unrestrict lGVRm5E0A8tofkdL0ZhmjKc0Kugczh97oOV865w6BmHr6KmrDJRoIQ1g1h1OaA2
 

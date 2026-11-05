@@ -568,6 +568,7 @@ export function AppSidebar() {
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          {isPlatformAdmin && <NavLink path="/admin/engineering-reference" icon={BookOpen} label="Engineering Q&A" badge="NEW" touchFriendly />}
         </SidebarMenu>
 
         <NavSection title="Workspace" icon={Library} defaultOpen={["/memory", "/knowledge", "/documents", "/files", "/vault"].some(p => location === p)}>

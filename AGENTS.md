@@ -17,6 +17,12 @@ You are a coding agent working on **VisionClaw** — a multi-tenant agentic AI p
 
 ## The Cardinal Discipline: Search Before Reading
 
+For recurring engineering questions, consult `docs/engineering-reference-review.md`
+and the source-linked comparisons in `server/lib/engineering-reference-catalog.ts`.
+The owner can browse them and keep private notes under Engineering Q&A in the
+sidebar. These are dated advisory comparisons, not acceptance receipts or
+execution permission. Owner notes are not automatically injected into agents.
+
 **Inspired by the SocratiCode agent-instruction pattern.** Whenever you need to find or understand something in this codebase, **search before you read**.
 
 Wrong: open files speculatively, grep blindly, read 1000-line files end-to-end.
@@ -36,7 +42,7 @@ If the answer is not in those indexes, *then* fall back to ripgrep, *then* fall 
 3. **Never log or print secrets.** Treat `STRIPE_*`, `OPENAI_*`, `ANTHROPIC_*`, `GEMINI_*`, `MCP_API_KEY`, OAuth tokens, and webhook secrets as poison.
 4. **Owner privacy:** "Bob Washburn" privately, "Robert Washburn" publicly (i.e. anything that touches the public mirror).
 5. **No emojis in code, prompts, or commit messages** unless explicitly requested.
-6. **Commits and pushes are on owner hold.** Do not commit, push, force-push, trigger either publishing workflow or restore automatic pushing without explicit owner approval. Historical authorizations and scripts do not lift this hold. Publishing the application requires its own explicit owner approval.
+6. **Automatic private GitHub backups are owner-authorized.** Keep `Auto Git Push` running with `bash scripts/git-auto-push.sh` so source updates reach `Huskyauto/VisionClaw-Agent`. The owner requested this to avoid losing app work and updates. Do not force-push. Public-mirror refreshes and application publication still require separate explicit owner approval. Existing Railway automation can react to private pushes; do not change its deployment settings without approval.
 
 ## Architecture Map (entrypoints)
 
@@ -57,7 +63,7 @@ If the answer is not in those indexes, *then* fall back to ripgrep, *then* fall 
 3. **Make the smallest correct change** — prefer editing 5 lines in 1 file over rewriting a module.
 4. **Verify** — run the affected workflow, hit the affected endpoint, or write a 10-line repro script. Do not declare "done" without proof.
 5. **Document** — update `replit.md` and (if architectural) this file.
-6. **Repository propagation** — honor the owner hold above. Only after explicit approval, use the approved workflow for the authorized scope; a local edit does not authorize a commit, push, public-mirror refresh or application publication.
+6. **Repository propagation** — keep the owner-authorized private backup workflow running. Normal private source commits/pushes do not need a new approval each time; public-mirror refreshes, force-pushes and application publication are not authorized by that backup permission.
 
 ## When to Defer to Felix
 

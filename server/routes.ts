@@ -44,6 +44,8 @@ import { resolveToolCallIndex, SYNTHETIC_TOOL_CALL_ID_PREFIX } from "./lib/tool-
 import { isManagedSkillSecurityError } from "./lib/managed-skill-safety";
 import { registerHumanAiSynergyRoutes } from "./routes/human-ai-synergy";
 import { registerCommercialResearchFrontierRoutes } from "./routes/commercial-research-frontier";
+import { registerEngineeringReferenceRoutes } from "./routes/engineering-reference";
+import { engineeringReferenceStore } from "./lib/engineering-reference-store";
 import { registerInstinctOwnerRecoveryRoutes } from "./routes/instinct-owner-recovery";
 import { registerOwnerAlertRoutes } from "./routes/owner-alert-logs";
 import { streamWithProgressDeadline } from "./lib/stream-progress-deadline";
@@ -2555,6 +2557,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.use("/api", authMiddleware);
   registerOwnerAlertRoutes(app, { authMiddleware, requirePlatformAdmin });
+  registerEngineeringReferenceRoutes(app, {
+    authMiddleware, requirePlatformAdmin, getTenantFromRequest, store: engineeringReferenceStore,
+  });
 
   app.use("/api", async (req: Request, _res: Response, next: Function) => {
     if (!getTenantFromRequest(req)) {

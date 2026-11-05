@@ -6,6 +6,29 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { compareMirrorContract } from "../../scripts/lib/public-mirror-contract";
 
+test("public mirror excludes generated artifacts from the copied tree", () => {
+  const script = readFileSync("scripts/build-public-mirror.sh", "utf8");
+  const block = script.match(/EXCLUDES=\(([\s\S]*?)\n\)/)?.[1];
+  assert.ok(block, "missing copy exclusions");
+  const exclusions = [...block.matchAll(/--exclude='([^']+)'/g)].map(
+    (match) => `--exclude=${match[1]}`,
+  );
+  const root = mkdtempSync(join(tmpdir(), "mirror-artifact-exclusion-"));
+  try {
+    mkdirSync(join(root, "generated-artifacts"));
+    writeFileSync(join(root, "generated-artifacts", "private-video.mp4"), "private fixture");
+    writeFileSync(join(root, "source.ts"), "export {};");
+    const archive = spawnSync("tar", ["cf", "-", ...exclusions, "."], { cwd: root });
+    assert.equal(archive.status, 0);
+    const listing = spawnSync("tar", ["tf", "-"], { input: archive.stdout, encoding: "utf8" });
+    assert.equal(listing.status, 0);
+    assert.ok(listing.stdout.includes("./source.ts"));
+    assert.ok(!listing.stdout.includes("generated-artifacts"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("mirror normalizes mission-link idempotency prefixes without relaxing the SKU verifier", () => {
   const script = readFileSync("scripts/build-public-mirror.sh", "utf8");
   const rule = script.match(/-e '(s\/vc-commerce-paylink-mission-v2\/vc-commerce-paylink-mission-v2\/g)'/);
