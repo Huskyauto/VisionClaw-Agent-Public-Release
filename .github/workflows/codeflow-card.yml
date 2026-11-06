@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 0
       # SHA pinned to v1 (b44ab39f, 2026-05-03). Re-vet before bumping.
-      - uses: braedonsaunders/codeflow/card@b44ab39f646dba95b90db16eef37c84c9d2113ac
+      - uses: braedonsaunders/codeflow/card@b70af01cfd1a1cec4b02075b124fdd1ec8cc33be
         with:
           style: compact
           theme: auto
