@@ -1,5 +1,11 @@
 # VisionClaw Agent
 
+**Maintenance review — November 6, 2026:** corrected the Settings model-selector
+crash and Memory link markup, applied compatible security dependency updates,
+and hardened private OAuth setup output. Browser checks, TypeScript, publishing
+preflight and production build passed. Dependency advisories and incomplete
+audit coverage remain; these checks are not a whole-platform security clearance.
+
 ## Current source release — R137.2+sec (November 4, 2026)
 
 - **Engineering Q&A:** owner-only sidebar reference with 19 original project
@@ -411,7 +417,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
         ┌────────────┐   ┌────────────┐   ┌────────────┐
         │ PostgreSQL │   │ Google     │   │ 6 AI       │
         │ + pgvector │   │ Drive      │   │ providers  │
-        │ D196/L277  │   │ storage    │   │ 91 curated │
+        │ D197/L278  │   │ storage    │   │ 91 curated │
         └────────────┘   └────────────┘   └────────────┘
 ```
 

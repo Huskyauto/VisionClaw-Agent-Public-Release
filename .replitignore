@@ -6,6 +6,8 @@ public-mirror/
 # Preserve them locally; none are application runtime dependencies.
 .local/state/replit/
 .local/aldon-assessment/
+.local/private-oauth/
+.local/testing-agent/
 
 # Regenerable package download caches; installed tools/dependencies stay intact.
 .cache/uv/

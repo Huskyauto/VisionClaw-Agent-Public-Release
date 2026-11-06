@@ -6,7 +6,7 @@
  *
  * Reads a Google OAuth "Desktop app" client_secret JSON, runs a one-shot
  * loopback OAuth flow, exchanges the auth code for a refresh token, and
- * prints the three env values the VisionClaw agent needs.
+ * saves a private local credential handoff without printing its values.
  *
  * Requires: `npm install -g googleapis open` (or run in a folder with them).
  */
@@ -15,6 +15,7 @@ import http from "node:http";
 import { URL } from "node:url";
 import { google } from "googleapis";
 import open from "open";
+import { savePrivateOAuthCredentials } from "./lib/private-oauth-output.mjs";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/youtube.upload",
@@ -70,7 +71,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { "content-type": "text/html" });
     res.end(`<!doctype html><html><body style="font-family:system-ui;padding:40px;text-align:center">
       <h2>Done. You can close this tab.</h2>
-      <p>Refresh token captured. Check your terminal.</p>
+      <p>Credentials captured. Check the terminal for the private handoff location.</p>
     </body></html>`);
     server.close();
 
@@ -80,15 +81,17 @@ const server = http.createServer(async (req, res) => {
       process.exit(1);
     }
 
-    console.log("\n========== COPY THESE THREE LINES ==========\n");
-    console.log(`YOUTUBE_CLIENT_ID=${cfg.client_id}`);
-    console.log(`YOUTUBE_CLIENT_SECRET=${cfg.client_secret}`);
-    console.log(`YOUTUBE_REFRESH_TOKEN=${tokens.refresh_token}`);
-    console.log("\n============================================\n");
-    console.log("Paste all three lines back into the VisionClaw chat. Done.");
+    const output = savePrivateOAuthCredentials({
+      YOUTUBE_CLIENT_ID: cfg.client_id,
+      YOUTUBE_CLIENT_SECRET: cfg.client_secret,
+      YOUTUBE_REFRESH_TOKEN: tokens.refresh_token,
+    });
+    console.log(`Credentials saved to private local file: ${output}`);
+    console.log("Use the secure Secrets fields to configure these values, then delete the handoff file.");
+    console.log("Never paste credential values into chat, logs, GitHub, or shared files.");
     process.exit(0);
   } catch (e) {
-    console.error("Token exchange failed:", e?.message || e);
+    console.error("OAuth setup failed; credential values and provider error details were withheld.");
     server.close();
     process.exit(1);
   }

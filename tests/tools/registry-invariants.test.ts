@@ -217,6 +217,14 @@ test("package is acyclic w.r.t. server/: ALL modules (incl. domains/**) import o
     for (const m of src.matchAll(importRe)) {
       const spec = m[1];
       if (spec.startsWith("node:")) continue; // stdlib only
+      // safe-fetch pins validated DNS addresses at socket connection time.
+      // Its explicit npm transport dependency is not an edge into server/.
+      // Keep this exception exact; no other tool module gets npm imports.
+      if (spec === "undici" && rel === "server/tools/lib/safe-fetch.ts") {
+        const manifest = JSON.parse(fs.readFileSync("package.json", "utf8"));
+        assert.ok(manifest.dependencies?.undici, "Pinned transport must be an explicit runtime dependency");
+        continue;
+      }
       assert.ok(
         spec.startsWith("./") || spec.startsWith("../"),
         `${rel} imports "${spec}" — only node: stdlib and relative in-package imports allowed (acyclicity invariant, plan.md S2)`,

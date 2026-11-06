@@ -681,10 +681,8 @@ function UnifiedMemoryPanel() {
                       </p>
                     )}
                     {it.link && (
-                      <Link href={it.link}>
-                        <a className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-1" data-testid={`link-open-${it.source}-${it.id}`}>
-                          Open <ExternalLink className="w-3 h-3" />
-                        </a>
+                      <Link href={it.link} className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline mt-1" data-testid={`link-open-${it.source}-${it.id}`}>
+                        Open <ExternalLink className="w-3 h-3" />
                       </Link>
                     )}
                   </div>

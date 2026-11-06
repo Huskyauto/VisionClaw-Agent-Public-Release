@@ -503,6 +503,7 @@
         "tests/security/webhook-trigger-capability.test.ts",
         "tests/security/workspace-verifier-boundary.test.ts",
         "tests/security/workspace-verifier.test.ts",
+        "tests/security/youtube-oauth-private-output.test.ts",
         "tests/security/youtube-owner-seed-isolation.test.ts",
         "tests/storage/conversation-idor.test.ts",
         "tests/storage/project-compass-tenant-isolation.test.ts",

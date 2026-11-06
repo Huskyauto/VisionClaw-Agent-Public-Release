@@ -1,16 +1,16 @@
 # Tenant-Isolation Audit Report
 
-_Generated 2026-11-05T02:52:35.125Z by `scripts/tenant-isolation-audit.ts` using `claude-sonnet-5` pinned to `profundo`._
+_Generated 2026-11-06T08:51:43.468Z by `scripts/tenant-isolation-audit.ts` using `claude-sonnet-5` pinned to `profundo`._
 
 **READ-ONLY audit** — findings below are surfaced for human review. No code was changed.
 
-> ⚠️ **DEGRADED RUN — INCOMPLETE COVERAGE.** 765 file(s) were NOT audited this run (chunk cap in effect). Findings below are PARTIAL — do not read "few findings" as "all clear."
+> ⚠️ **DEGRADED RUN — INCOMPLETE COVERAGE.** 384 file(s) were NOT audited this run (chunk cap in effect). Findings below are PARTIAL — do not read "few findings" as "all clear."
 
-- Coverage: **81/846** file(s) audited · chunks 32/327 OK (0 failed, 295 pending)
-- Findings: **77** (CRITICAL 5 · HIGH 58 · MEDIUM 8 · LOW 6)
-- Severe dispositions: **63 kept** · 0 precision false-positive · 0 allowlist false-positive · 0 deferred real risk
+- Coverage: **462/846** file(s) audited · chunks 154/327 OK (0 failed, 173 pending)
+- Findings: **293** (CRITICAL 7 · HIGH 255 · MEDIUM 24 · LOW 7)
+- Severe dispositions: **262 kept** · 0 precision false-positive · 0 allowlist false-positive · 0 deferred real risk
 
-### CRITICAL (5)
+### CRITICAL (7)
 
 - **server/agent-activity.ts:122** — UPDATE against tenant-scoped table agentActivity constrains only by activity id and does not include tenant_id. Any caller able to supply another tenant's activityId could modify that row across tenants.
   - _Fix:_ Require tenantId in completeActivity and update with a tenant-scoped predicate, e.g. .where(and(eq(agentActivity.id, activityId), eq(agentActivity.tenantId, tenantId))).
@@ -22,8 +22,12 @@ _Generated 2026-11-05T02:52:35.125Z by `scripts/tenant-isolation-audit.ts` using
   - _Fix:_ Pass a validated tenantId into the storage method and enforce tenant_id filtering for the memory query; create separate, explicitly authorized per-tenant backups for administrative system-wide backups.
 - **server/business-tools.ts:55** — tenantGuard trusts params.tenant_id based only on a truthiness check. Because all tenant-scoped operations derive their tenant scope from this request/tool-controlled value, a caller could supply another tenant's ID and access or modify that tenant's data.
   - _Fix:_ Derive the tenant ID exclusively from authenticated server-side request context or session state, and reject or ignore any caller-supplied tenant_id unless it is verified to match that context.
+- **server/job-queue.ts:500** — cancelJob updates agent_jobs using only the supplied job id and status. A caller who obtains another tenant's job id can cancel that job because no tenant ownership predicate is applied.
+  - _Fix:_ Accept the caller tenantId and add AND tenant_id = <caller tenant> to the UPDATE; reserve any cross-tenant cancellation for an explicitly authorized platform-admin path.
+- **server/job-queue.ts:558** — listJobs allows tenantId to be omitted and then selects jobs from all tenants, exposing cross-tenant job payloads and results without an explicit ALL_TENANTS authorization scope.
+  - _Fix:_ Require a tenant scope and always add tenant_id filtering for tenant-facing callers; model all-tenant access as a separate authorized scope.
 
-### HIGH (58)
+### HIGH (255)
 
 - **server/agent-activity.ts:61** — SELECT from tenant-scoped table personas filters only by persona id and does not constrain tenant_id. A personaId collision or cross-tenant reference could expose another tenant's persona emoji/catchphrase via the cache.
   - _Fix:_ Change getPersonality to require tenantId and query with both persona id and tenant id, e.g. .where(and(eq(personas.id, personaId), eq(personas.tenantId, tenantId))). Also key the cache by tenantId+personaId to avoid cross-tenant mixing.
@@ -141,8 +145,402 @@ _Generated 2026-11-05T02:52:35.125Z by `scripts/tenant-isolation-audit.ts` using
   - _Fix:_ Before dispatching the render, query the projects table with both projectId and input.tenantId, reject missing or foreign projects, and propagate the verified tenant/project context to the renderer. Apply the same ownership validation to the projectId passed to startVideoJob at line 756.
 - **server/business-tools.ts:96** — The INSERT into tenant-scoped invoice_items does not provide tenant_id. The row is created only with invoice_id, so it violates the requirement that every tenant-scoped insert explicitly set the caller's tenant.
   - _Fix:_ Add tenant_id to the invoice_items INSERT column list and VALUES using the validated tenant ID; also ensure any invoice_items reads or writes constrain tenant_id directly or through a tenant-verified invoice.
+- **server/ceo-orchestrator.ts:661** — The SELECT from the `personas` table has no tenant constraint. If `personas` is tenant-scoped, this reads persona records across all tenants.
+  - _Fix:_ Add a tenant filter using the caller/orchestration tenant, for example `.where(eq(personasTable.tenantId, plan.tenantId))`, or explicitly confirm that `personas` is a genuinely global table.
+- **server/ceo-orchestrator.ts:1599** — getAllActivePlans() returns active orchestration plans for every tenant without requiring or applying a tenant filter, exposing tenant-scoped plan data across tenant boundaries to any caller of this exported function.
+  - _Fix:_ Require a validated tenantId parameter and return only plans whose plan.tenantId matches it; if cross-tenant listing is intended for administrators, enforce an explicit privileged authorization check before returning the aggregate.
+- **server/channel-routing.ts:17** — The channel_routes table is used to store persona routing but has no tenant_id column, making routes global and preventing application-level tenant isolation.
+  - _Fix:_ Add a NOT NULL tenant_id column, include it in the uniqueness constraint, and require tenant context in every route operation.
+- **server/channel-routing.ts:30** — The channel route SELECT joins personas using only persona_id and filters only enabled/channel state; it has no tenant_id constraint, so callers can read routes and persona data across tenants.
+  - _Fix:_ Accept the caller's tenantId and constrain both channel_routes and personas to that tenant, for example with tenant_id predicates on each table.
+- **server/channel-routing.ts:48** — setChannelRoute accepts a foreign personaId without verifying that the persona belongs to the caller's tenant, and its DELETE/UPSERT operations have no tenant constraint.
+  - _Fix:_ Require tenantId, verify the persona exists with WHERE id = personaId AND tenant_id = tenantId, then scope the DELETE and UPSERT by tenant_id.
+- **server/channel-routing.ts:63** — getPersonaForChannel selects a persona by channel without any tenant constraint, allowing one tenant's routing configuration to be returned to another tenant.
+  - _Fix:_ Require tenantId and add tenant_id = tenantId to the channel_routes query.
+- **server/channel-routing.ts:71** — removeChannelRoute deletes by channel only, so a caller can delete another tenant's channel route.
+  - _Fix:_ Require tenantId and delete with both tenant_id = tenantId and channel = channel.
+- **server/chat-engine.ts:1182** — getToolsReferenceForPersona is called with only persona.id and no tenant identifier or demonstrated ownership check. If this helper reads tenant-scoped persona/tool-reference data, a persona ID could retrieve data outside the caller's tenant.
+  - _Fix:_ Pass the caller tenantId to getToolsReferenceForPersona and ensure its underlying SELECT includes a tenant_id predicate, or first verify that the persona belongs to the caller's tenant before querying.
+- **server/chat-engine.ts:1645** — buildMemorySection defaults tenantId to 1, and later passes this value to tenant-scoped proactiveContextLoad. If the caller omits or fails to derive the tenant ID, the memory retrieval can run against tenant 1 rather than the caller's verified tenant.
+  - _Fix:_ Make tenantId required (remove the default), reject undefined or invalid tenant IDs before any retrieval, and ensure proactiveContextLoad applies an explicit tenant_id filter derived from authenticated tenant context.
+- **server/chat-engine.ts:2063** — The safety-guard path loads a persona with storage.getPersona(conv.personaId) without passing or enforcing the caller's tenant scope. If persona records are tenant-scoped, a conversation-owned persona ID can cause an unscoped cross-tenant read.
+  - _Fix:_ Use a tenant-scoped persona lookup such as storage.getPersona(conv.personaId, tenantIdForScope), and ensure its SQL includes WHERE tenant_id = tenantIdForScope; explicitly handle globally shared personas only if they are intentionally global.
+- **server/chat-engine.ts:2063** — Reads a persona by personaId without supplying or enforcing the caller's tenant scope. If personas are tenant-scoped, a conversation referencing a foreign or manipulated persona ID can cause cross-tenant data access.
+  - _Fix:_ Change getPersona to require tenantId and constrain the lookup with tenant_id = tenantId; call it with tenantIdForScope and reject personas not owned by that tenant.
+- **server/chat-engine.ts:2117** — Reads a persona by personaId without supplying or enforcing the caller's tenant scope. This repeats an unscoped tenant-scoped lookup during the intent-gate path.
+  - _Fix:_ Use a tenant-scoped getPersona(personaId, tenantIdForScope) implementation whose query includes tenant_id = tenantIdForScope, and fail closed if the persona is not owned by the tenant.
+- **server/chat-engine.ts:2641** — getConversationProjectContext is called with conversationId and conv but no caller tenant identifier or visible tenant-ownership check. If this helper resolves the conversation's project or project context by the foreign conversation/project ID, it can read another tenant's project data.
+  - _Fix:_ Pass tenantIdForScope to getConversationProjectContext and ensure every conversation/project lookup inside the helper includes tenant_id = tenantIdForScope; reject the request when the referenced conversation or project is not owned by that tenant.
+- **server/chat-engine.ts:4443** — The conversation-linked stuck-detection operation is invoked with only conversationId and no caller tenantId. If it reads or writes a tenant-scoped diagnostics/table record, the underlying query cannot enforce tenant isolation through the required tenant_id filter.
+  - _Fix:_ Pass tenantId to recordToolCallForStuckDetection and ensure every underlying SELECT/INSERT/UPDATE/DELETE against conversation-linked diagnostics data includes tenant_id = tenantId. Also scope postDiagnosticReport data by tenant.
+- **server/chat-engine/project-context.ts:159** — The SELECT from tenant-scoped project_files is constrained only by project_id and omits tenant_id. A project_id-based check is not sufficient under the stated isolation invariant.
+  - _Fix:_ Add an explicit tenant predicate, e.g. WHERE project_id = ${projectId} AND tenant_id = ${tenantId}.
+- **server/chat-engine/project-context.ts:171** — The SELECT from tenant-scoped project_notes is constrained only by project_id and omits tenant_id.
+  - _Fix:_ Add AND tenant_id = ${tenantId} to the WHERE clause.
+- **server/cmmc-assessments.ts:156** — getCmmcAccessByToken selects from the tenant-scoped invitation and assessment tables without constraining either table to the caller's tenant. The tenant-id equality in the join only verifies that the two records share a tenant; it does not enforce ownership by the requesting tenant.
+  - _Fix:_ Require a trusted tenantId for token access and add tenant_id predicates to the invitation and assessment WHERE/join conditions. If bearer-token access is intentionally tenant-independent, document and enforce that authorization boundary separately rather than relying solely on the token hash.
+- **server/cmmc-assessments.ts:76** — createCmmcAssessment accepts customerId as a foreign identifier and inserts it into a tenant-scoped assessment without verifying that the referenced customer belongs to params.tenantId. A caller can associate an assessment with another tenant's customer record.
+  - _Fix:_ Before inserting, query the customer table with both customerId and tenantId, reject missing or cross-tenant customers, and only then persist the validated customerId.
+- **server/cmmc-report.ts:712** — The report export insert trusts params.assessment.id and params.snapshot.id without verifying that both referenced records belong to params.tenantId. A caller or upstream path supplying cross-tenant assessment/snapshot objects could cause another tenant's assessment data to be rendered and persisted under the current tenant.
+  - _Fix:_ Before generating or inserting the export, query each referenced record with its ID AND tenant_id = params.tenantId, verify the snapshot belongs to the assessment, and use only the verified rows. Alternatively reject unless the supplied objects' tenant ownership and relationship are explicitly validated.
+- **server/commitment-drafter.ts:234** — The fail-closed invalid-tenant branch updates commitments using only `id`, without a `tenant_id` predicate. This violates the tenant-isolation invariant and could mutate a row outside the intended tenant if the claimed row ID is incorrect or reused.
+  - _Fix:_ Add an explicit validated tenant predicate to the revert update, or avoid issuing the update when `tenantId` is invalid. For example, require `WHERE id = ${row.id} AND tenant_id = ${tenantId} AND draft_status = 'draft_pending'` after validating the tenant, otherwise leave the row untouched and alert for remediation.
+- **server/commitments.ts:139** — scanAndEscalate selects from the tenant-scoped commitments table without a tenant_id predicate, allowing the scheduler to read commitments across tenants.
+  - _Fix:_ Run escalation scans separately within an authenticated tenant context and add WHERE tenant_id = <tenantId>, or otherwise implement an explicitly authorized platform-admin path with a documented isolation control.
+- **server/context-budget.ts:40** — Reads personas through storage.getPersonas() without supplying tenantId or otherwise constraining the query to the caller's tenant, potentially including other tenants' personas in the audit.
+  - _Fix:_ Change the storage call to getPersonas(tenantId) and ensure its underlying SELECT includes WHERE tenant_id = tenantId.
+- **server/context-budget.ts:106** — The skills SELECT filters only enabled skills and has no tenant_id constraint, so it can aggregate skill names and prompt lengths across tenants.
+  - _Fix:_ Add WHERE tenant_id = ${tenantId} AND enabled = true, or use the equivalent Drizzle tenant filter.
+- **server/context-budget.ts:143** — The governance_rules SELECT has no tenant_id constraint and can count rules belonging to all tenants.
+  - _Fix:_ Add WHERE tenant_id = ${tenantId} unless governance_rules is explicitly a global table; if global, enforce that classification in the schema and access layer.
+- **server/crews-engine.ts:224** — createCrew accepts managerPersonaId and stores it without verifying that the referenced persona belongs to params.tenantId, allowing a crew to reference another tenant's persona.
+  - _Fix:_ Before inserting, query the personas table with both id = managerPersonaId and tenant_id = params.tenantId, and reject the request if no owned persona is found.
+- **server/crews-engine.ts:329** — addCrewAgent accepts personaId and inserts it without verifying that the referenced persona belongs to params.tenantId, allowing cross-tenant persona associations.
+  - _Fix:_ Validate personaId with a tenant-constrained lookup (id and tenant_id) before inserting, or reject/null the value when it is not owned by the caller's tenant.
+- **server/crews-engine.ts:395** — addCrewTask accepts agentId and stores it without verifying that the referenced crew agent belongs to params.tenantId (and the target crew), allowing a task to reference another tenant's agent.
+  - _Fix:_ Perform a tenant-constrained lookup for the agent using id = agentId and tenant_id = params.tenantId, also ensuring it belongs to params.crewId, before inserting.
+- **server/crews-engine.ts:277** — updateCrew accepts managerPersonaId and updates the crew without verifying that the referenced persona belongs to tenantId, allowing cross-tenant persona associations.
+  - _Fix:_ Validate managerPersonaId with a lookup constrained by both persona id and tenant_id before updating, and reject IDs not owned by tenantId.
+- **server/cross-critique.ts:231** — The caller-supplied personaId is inserted into the tenant-scoped agent_knowledge row without verifying that the referenced persona belongs to tenantId. A caller could associate a cross-tenant persona ID with this tenant's critique record.
+  - _Fix:_ Before inserting, query the persona row with both its ID and tenantId (for example, WHERE id = input.personaId AND tenant_id = tenantId), reject the request if it is absent, and only then persist persona_id.
+- **server/data-protection.ts:150** — The purge job selects soft-deleted conversations from all tenants without a tenant_id predicate. This cross-tenant scan also supplies rows to backup and purge operations.
+  - _Fix:_ Run the purge separately within an explicitly authorized tenant context and add WHERE tenant_id = <tenantId>, or otherwise use a tightly scoped system-maintenance path that enumerates and validates tenants before processing each row.
+- **server/data-protection.ts:360** — The query reads project_notes using only project_id and has no tenant_id constraint. A project-id/FK anomaly could cause notes belonging to another tenant to be included in the tenant backup.
+  - _Fix:_ Add AND tenant_id = ${tenantId} to the query, and verify that the project belongs to that tenant before reading its notes.
+- **server/data-protection.ts:371** — The query reads project_files using only project_id and has no tenant_id constraint. This can include another tenant's files in the backup if project relationships are inconsistent or IDs are mis-associated.
+  - _Fix:_ Add AND tenant_id = ${tenantId} to the query, and validate the project ownership before reading its files.
+- **server/debate-engine.ts:126** — Retrieves personas via storage.getPersonas() without passing tenantId, so the underlying SELECT may return personas belonging to other tenants and expose them through debate participants and prompts.
+  - _Fix:_ Change the call to storage.getPersonas(tenantId) and ensure its query constrains the personas table with WHERE tenant_id = tenantId.
+- **server/deep-interview.ts:338** — The INSERT into tenant-scoped project_notes does not explicitly set tenant_id. Tenant isolation relies only on the joined project, while the tenant_id column is required and has no default.
+  - _Fix:_ Include tenant_id in the INSERT column list and select ${state.tenantId} as the value, while retaining the tenant ownership check on the conversation/project join.
+- **server/delegation-events.ts:44** — subscribeToDelegation subscribes to all events for a caller-supplied conversationId without requiring or validating the caller's tenant ownership of that conversation. A tenant that knows another tenant's conversation ID can receive its delegation events.
+  - _Fix:_ Require tenantId in this API and verify the conversation belongs to that tenant before subscribing; additionally filter every emitted event by an exact tenantId match.
+- **server/delegation-events.ts:59** — getRecentEvents reads events for a caller-supplied conversationId without verifying that the conversation belongs to the caller's tenant. Its optional filter is fail-open: events with no tenantId are returned, and tenantId values of 0 are not enforced.
+  - _Fix:_ Require tenantId and validate conversation ownership before reading. Enforce an exact match (event.tenantId === tenantId), reject or quarantine events lacking tenantId, and avoid truthiness checks for tenant IDs.
+- **server/delivery-funnel.ts:61** — recordDeliveryEngagement inserts into tenant-scoped table delivery_engagement using rec.deliveryId and rec.tenantId without first verifying that the referenced delivery_logs row belongs to the same tenant. A caller can supply an arbitrary deliveryId, creating cross-tenant engagement records or corrupting tenant metrics.
+  - _Fix:_ Before inserting, look up the delivery_logs row with WHERE id = <deliveryId> AND tenant_id = <tenantId> (or equivalent Drizzle filters). Only insert when ownership is confirmed; otherwise set deliveryId to null or reject the write.
+- **server/delivery-pipeline.ts:1207** — deliverDigitalProduct forwards req.missionId into withMissionCostAttribution without any tenant ownership check on the referenced mission row. A caller supplying another tenant's missionId could cause reads/writes against that foreign record downstream.
+  - _Fix:_ Before calling withMissionCostAttribution, load the mission by id with a tenant-scoped query (e.g. WHERE id = req.missionId AND tenant_id = req.tenantId) and reject if not found.
+- **server/dfy-intake.ts:52** — The SELECT on tenant-scoped dfyIntakeForms filters only by token and has no tenant_id constraint. A token-authenticated caller can read a form without an application-level tenant ownership check, violating tenant isolation.
+  - _Fix:_ Require the caller tenant ID and add it to the predicate, for example where(and(eq(dfyIntakeForms.tenantId, tenantId), eq(dfyIntakeForms.token, token))). Ensure public-token flows establish and validate the associated tenant before reading the form.
+- **server/doc-collections.ts:138** — The correlated COUNT subqueries read tenant-scoped doc_chunks using only collection_id and omit a tenant_id constraint. This violates the tenant-isolation invariant and could count rows from another tenant if inconsistent or cross-tenant collection references exist.
+  - _Fix:_ Add a tenant predicate to each doc_chunks subquery, for example `WHERE collection_id = c.id AND tenant_id = ${tenantId}`.
+- **server/doc-collections.ts:166** — The DELETE from doc_chunks is constrained by doc_path and collection_id but not tenant_id. A tenant-scoped write must explicitly include the caller's tenant constraint.
+  - _Fix:_ Add `AND tenant_id = ${tenantId}` to the DELETE predicate, and retain the collection ownership check.
+- **server/doc-collections.ts:294** — The UPDATE of doc_chunks sets the embedding using only the chunk id and omits tenant_id from the write predicate. The tenant constraint on the preceding SELECT is not sufficient for the subsequent write under the stated invariant.
+  - _Fix:_ Update with `WHERE id = ${row.id} AND tenant_id = ${tenantId}`.
+- **server/doc-collections.ts:331** — The search query joins the tenant-scoped doc_collections table but constrains only dc.tenant_id. The joined collection row is not independently restricted to the caller's tenant, and the caller-supplied collection name is therefore not verified against a tenant-owned collection.
+  - _Fix:_ Add `AND c.tenant_id = ${tenantId}` to the WHERE clause, or otherwise enforce tenant ownership on the joined collection.
+- **server/doc-collections.ts:428** — getDocument joins the tenant-scoped doc_collections table but only constrains dc.tenant_id. The collection_name foreign input is not checked against a collection owned by the caller's tenant.
+  - _Fix:_ Add `AND c.tenant_id = ${tenantId}` to both getDocument query variants.
+- **server/doc-collections.ts:459** — The correlated COUNT subqueries read tenant-scoped doc_chunks using only collection_id and omit tenant_id. The status response can therefore include cross-tenant chunk counts if rows are inconsistently associated.
+  - _Fix:_ Add `AND tenant_id = ${tenantId}` to every doc_chunks subquery in getCollectionStatus.
+- **server/doc-create.ts:235** — The tenantId passed to uploadAndShare is optional and is forwarded directly from opts without enforcing that it is present or validated for ownership. Since uploadAndShare persists generated artifacts, this can result in a tenant-scoped insert without an explicit, trusted tenant_id.
+  - _Fix:_ Make tenantId required in DocxOptions, reject missing values before upload, and ensure the value comes from authenticated tenant context and is validated by uploadAndShare before any tenant-scoped insert.
+- **server/doc-create.ts:384** — The tenantId passed to uploadAndShare is optional and is forwarded directly from opts without enforcing that it is present or validated for ownership. Since uploadAndShare persists generated artifacts, this can result in a tenant-scoped insert without an explicit, trusted tenant_id.
+  - _Fix:_ Make tenantId required in XlsxOptions, reject missing values before upload, and ensure the value comes from authenticated tenant context and is validated by uploadAndShare before any tenant-scoped insert.
+- **server/doc-heading-tree.ts:91** — saveHeadingTree accepts collectionId as an external foreign identifier and writes/deletes doc_heading_trees rows without first verifying that the referenced collection belongs to opts.tenantId. A caller with a valid tenant context could associate heading-tree data with another tenant's collection ID or mutate an existing same-tenant tree for an unowned collection reference.
+  - _Fix:_ Before deleting or inserting/upserting the heading tree, query doc_collections with WHERE id = opts.collectionId AND tenant_id = opts.tenantId and reject the operation if no row exists. Apply the same ownership validation to every caller-facing path that supplies collectionId.
+- **server/dormant-deprecation.ts:169** — The SELECT against the tenant-scoped messages table counts user messages across all tenants without a tenant_id constraint, allowing cross-tenant activity to influence the traffic gate.
+  - _Fix:_ Pass the caller tenantId into getTrafficSnapshot and add a tenant_id = tenantId predicate; for scheduled processing, run the calculation separately for each authorized tenant.
+- **server/dormant-deprecation.ts:179** — The SELECT against the tenant-scoped tool_performance table counts distinct tools across all tenants without a tenant_id constraint, mixing tenant activity and affecting deprecation decisions across tenants.
+  - _Fix:_ Scope the query with tenant_id = tenantId and perform the traffic calculation independently per tenant.
+- **server/dormant-deprecation.ts:204** — The SELECT DISTINCT query against tool_performance retrieves tools ever invoked by every tenant without filtering by tenant_id, so one tenant's history can affect another tenant's deprecation candidates.
+  - _Fix:_ Require a tenantId parameter and add WHERE tenant_id = tenantId, or execute this query separately within each tenant context.
+- **server/dormant-deprecation.ts:214** — The SELECT DISTINCT query against tool_performance retrieves active tools across all tenants without a tenant_id constraint, causing cross-tenant activity to suppress or alter dormant-tool detection.
+  - _Fix:_ Add a tenant_id = tenantId predicate and maintain/apply deprecation state per tenant.
+- **server/email.ts:407** — The SELECT against tenant-scoped inbox_messages is constrained only by message_id and has no tenant_id predicate. A message identifier collision or caller-controlled lookup could read another tenant's message metadata.
+  - _Fix:_ Resolve and validate the owning tenant first, then add tenant_id = <validated tenant> to the WHERE clause; enforce uniqueness on (tenant_id, message_id) if message IDs are only tenant-scoped.
+- **server/email.ts:453** — The backfill query selects rows from tenant-scoped inbox_messages without any tenant_id constraint, processing messages across all tenants in an unscoped query.
+  - _Fix:_ Run the backfill per validated tenant and add tenant_id = <tenantId> to the WHERE clause, or otherwise explicitly scope each operation to an authorized tenant.
+- **server/email.ts:466** — The UPDATE against tenant-scoped inbox_messages filters only by id and does not constrain tenant_id, allowing a row from another tenant to be updated if the id is misresolved or collides.
+  - _Fix:_ Include tenant_id = <validated tenantId> in the UPDATE predicate and carry the owning tenant through from the scoped SELECT.
+- **server/email.ts:508** — For outbound messages, tenantId is taken directly from the external message address pattern (username+t<id>) without verifying that the parsed tenant exists and owns the corresponding AgentMail address. This untrusted derived value is then used as the tenant_id for insertion.
+  - _Fix:_ Treat the parsed ID only as a candidate; load the tenant and verify its configured agentmail_email/inbox identity matches the message before assigning tenantId, otherwise reject the message.
+- **server/email.ts:532** — For inbound messages, tenantId is derived directly from the recipient address pattern without validating that the parsed tenant exists and owns that address. The derived value is subsequently inserted as tenant_id.
+  - _Fix:_ Validate the candidate against the tenants table, requiring an exact match to the tenant's configured agentmail_email or approved virtual address before inserting; reject unknown or mismatched recipients.
+- **server/email.ts:579** — The tenant-scoped inbox_messages INSERT uses tenantId derived from untrusted message addresses. In the pattern-matching paths, that value is not ownership-validated before insertion, enabling cross-tenant attribution or insertion under an arbitrary tenant ID.
+  - _Fix:_ Insert only after resolving the tenant through a validated ownership lookup; reject any message whose address does not map to an existing tenant-owned inbox.
+- **server/embeddings.ts:259** — A vector literal derived from the caller's search query is interpolated through sql.raw() inside a tenant-scoped query. This bypasses parameter binding and creates an injection/isolation risk if the embedding validation is weakened or bypassed.
+  - _Fix:_ Replace sql.raw(`'${vec}'::vector`) with a parameterized Drizzle expression such as sql`${vec}::vector`, keeping the vector value bound as a query parameter.
+- **server/embeddings.ts:269** — A request-derived vector literal is interpolated through sql.raw() in the ORDER BY expression, bypassing parameter binding and creating an injection/isolation risk.
+  - _Fix:_ Use a parameterized SQL expression for the vector value, such as sql`${vec}::vector`, rather than sql.raw with string interpolation.
+- **server/embeddings.ts:585** — A vector derived from the caller's query is inserted into SQL using sql.raw(), bypassing parameter binding in the tenant-scoped knowledge search.
+  - _Fix:_ Bind the vector as a SQL parameter and cast it, for example sql`${vec}::vector`, instead of constructing sql.raw(`'${vec}'::vector`).
+- **server/embeddings.ts:591** — The caller-derived vector is interpolated through sql.raw() in the knowledge-search ORDER BY clause, creating an injection/isolation risk if validation changes or is bypassed.
+  - _Fix:_ Replace the raw interpolation with a parameterized vector expression, such as sql`${vec}::vector`.
+- **server/embeddings.ts:809** — When storeEmbeddingVec is called for memory_entries without options.tenantId, it performs an UPDATE by id only, allowing a caller with a foreign memory id to modify another tenant's row.
+  - _Fix:_ Make tenantId mandatory for memory_entries and always add AND tenant_id = ${tenantId}; reject calls that omit or fail to validate the tenant id.
+- **server/embeddings.ts:814** — backfillMissingKnowledgeEmbeddings selects agent_knowledge rows across all tenants without a tenant_id predicate, reading tenant-scoped title and content without caller-tenant isolation.
+  - _Fix:_ Run the backfill separately for an explicitly authorized tenant and add WHERE tenant_id = ${tenantId}, or use a privileged, explicitly documented tenant-wide maintenance path with equivalent authorization and isolation controls.
+- **server/embeddings.ts:845** — backfillEmbeddingVecs selects memory_entries rows across all tenants without a tenant_id predicate, reading tenant-scoped embedding data without tenant isolation.
+  - _Fix:_ Require an authorized tenantId for the backfill and constrain the SELECT with WHERE tenant_id = ${tenantId}.
+- **server/embeddings.ts:855** — backfillEmbeddingVecs updates memory_entries by id only, without tenant_id. A row id obtained by the unrestricted query can cause a cross-tenant write.
+  - _Fix:_ Add AND tenant_id = ${tenantId} to the UPDATE and carry an explicitly authorized tenantId through the backfill.
+- **server/embeddings.ts:861** — backfillEmbeddingVecs selects agent_knowledge rows across all tenants without a tenant_id predicate, reading tenant-scoped embedding data without tenant isolation.
+  - _Fix:_ Require an authorized tenantId for the backfill and constrain the SELECT with WHERE tenant_id = ${tenantId}.
+- **server/embeddings.ts:872** — backfillEmbeddingVecs updates agent_knowledge by id only, without tenant_id, allowing a cross-tenant write when processing rows selected without tenant isolation.
+  - _Fix:_ Add AND tenant_id = ${tenantId} to the UPDATE and use a tenant-scoped SELECT for the backfill.
+- **server/event-bus.ts:174** — The subscription queries join the tenant-scoped personas table only on p.id, without constraining p.tenant_id to the caller tenant. A subscription can therefore expose a persona belonging to another tenant, especially because persona_id is not ownership-validated on insert.
+  - _Fix:_ Add an ownership predicate to both subscription joins, such as `AND p.tenant_id = ${tenantId}`, and validate that the referenced persona belongs to the tenant before creating the subscription.
+- **server/event-bus.ts:188** — The wildcard subscription query joins the tenant-scoped personas table only on p.id and does not constrain p.tenant_id, allowing cross-tenant persona data to be read through a tenant's subscription.
+  - _Fix:_ Constrain the join with `p.tenant_id = ${tenantId}` and ensure the subscription's persona_id was validated against the same tenant.
+- **server/event-bus.ts:306** — getEventSubscriptions reads from the tenant-scoped personas table through a join on persona_id without a persona tenant constraint, so a cross-tenant persona can be returned for a tenant-scoped subscription.
+  - _Fix:_ Add `AND p.tenant_id = ${tenantId}` to the join or otherwise verify persona ownership before returning the joined row.
+- **server/event-bus.ts:321** — createEventSubscription inserts caller-supplied personaId without first verifying that the referenced persona belongs to tenantId. This permits cross-tenant foreign-key associations and subsequent disclosure of the other tenant's persona data.
+  - _Fix:_ Before inserting, select the persona with both `id = ${params.personaId}` and `tenant_id = ${tenantId}`; reject the request if no owned persona is found. Also enforce the tenant predicate on all persona joins.
+- **server/evidence-docket.ts:646** — The SELECT from tenant-scoped `deliverableContracts` filters only by `id` and omits `tenant_id`. Contract IDs are derived from tenant-scoped verification rows, but the referenced contracts are not independently verified as belonging to the caller's tenant, allowing cross-tenant contract data to be returned if IDs are inconsistent or manipulated.
+  - _Fix:_ Add an explicit tenant predicate: `.where(and(eq(deliverableContracts.tenantId, tenantId), inArray(deliverableContracts.id, contractIds)))`; also ensure the schema exposes `tenantId` for this table.
+- **server/felix-brain.ts:23** — The boot-time SELECT reads tenant-scoped agent_runs rows for every tenant without a tenant_id filter. This violates tenant isolation and loads cross-tenant run state, goals, and identifiers into application memory.
+  - _Fix:_ Constrain the query with tenant_id = the authenticated/caller tenant. If boot rehydration must process all tenants, perform an explicitly authorized per-tenant rehydration loop and apply a tenant_id predicate to each query.
+- **server/firecrawl.ts:260** — The UPDATE of the tenant-scoped scrapedPages table is constrained only by scrapedPages.id, without a tenant_id predicate. Although the ID was initially selected with a tenant filter, every tenant-scoped write must independently enforce tenant isolation.
+  - _Fix:_ Add eq(scrapedPages.tenantId, tenantId) to the UPDATE WHERE clause, e.g. where(and(eq(scrapedPages.id, existing[0].id), eq(scrapedPages.tenantId, tenantId))).
+- **server/firecrawl.ts:393** — The crawl path updates scrapedPages using only the row ID and omits the tenant_id predicate. The preceding lookup is not sufficient to enforce isolation on the write itself.
+  - _Fix:_ Add eq(scrapedPages.tenantId, tenantId) to the UPDATE WHERE clause, e.g. where(and(eq(scrapedPages.id, existing[0].id), eq(scrapedPages.tenantId, tenantId))).
+- **server/glasses-gateway.ts:157** — The SELECT against the tenant-scoped apiKeys table is filtered only by keyHash and isRevoked; it has no tenant_id constraint, allowing authentication lookup across tenant rows without an application-level tenant filter.
+  - _Fix:_ Constrain the lookup by the authenticated tenant context before querying, or use a separately global credential-index table that maps the API key hash to its tenant and then perform tenant-scoped apiKeys access.
+- **server/glasses-gateway.ts:173** — The UPDATE against the tenant-scoped apiKeys table updates lastUsedAt using only apiKeys.id and does not constrain tenant_id.
+  - _Fix:_ Add a tenant predicate, such as and(eq(apiKeys.id, key.id), eq(apiKeys.tenantId, key.tenantId)), to the UPDATE condition.
+- **server/google-drive.ts:497** — makeFileShareable accepts an arbitrary Drive fileId and performs reads plus permission-changing writes without receiving or validating a caller tenant or proving that the file belongs to that tenant. A caller with access to this function could make another tenant's Drive file public or alter its permissions.
+  - _Fix:_ Require tenantId in the function signature and call authorizeTenantDriveFile(fileId, tenantId) or an equivalent tenant-ownership check before every Drive read/write; alternatively make this helper private and only invoke it from a path that has already completed the tenant authorization.
+- **server/google-drive.ts:897** — The project SELECT is constrained only by caller-supplied projectId and reads a tenant-scoped project before checking its tenantId. This allows cross-tenant row access and violates the required tenant-scoped WHERE predicate.
+  - _Fix:_ Add the caller tenant constraint to the query, e.g. .where(and(eq(projects.id, projectId), eq(projects.tenantId, tenantId))), and treat no matching row as not found or unauthorized.
+- **server/google-drive.ts:910** — The project UPDATE is constrained only by projectId and does not include tenantId in its WHERE clause. A caller with a foreign projectId could update another tenant's Drive-folder fields if this function is reached with that ID.
+  - _Fix:_ Update with both identifiers, e.g. .where(and(eq(projects.id, projectId), eq(projects.tenantId, tenantId))), and verify exactly one row was updated.
+- **server/google-drive.ts:897** — The SELECT against the tenant-scoped projects table filters only by project ID, not by tenantId. Although ownership is checked after reading the row, tenant isolation requires the database query itself to constrain the result to the caller's tenant.
+  - _Fix:_ Add the tenant predicate to the query, e.g. .where(and(eq(projects.id, projectId), eq(projects.tenantId, tenantId))). Treat no result as not found or unauthorized.
+- **server/google-drive.ts:910** — The UPDATE against the tenant-scoped projects table filters only by project ID and can update without a tenant_id constraint. Every tenant-scoped write must enforce tenant ownership in its WHERE clause.
+  - _Fix:_ Use an ownership-constrained update such as .where(and(eq(projects.id, projectId), eq(projects.tenantId, tenantId))) and verify that a row was affected.
+- **server/google-drive.ts:1249** — The tenant-scoped file_storage table is queried only by filename, without a tenant_id predicate. This reads metadata (filename, tenant_id, and size) for every tenant sharing that basename, violating the required application-level tenant isolation.
+  - _Fix:_ Constrain the query with WHERE filename = ${filename} AND tenant_id = ${tenantId}. If collision detection across tenants is required, implement it through a separately authorized, non-tenant data structure rather than reading other tenants' file_storage rows.
+- **server/google-drive.ts:1754** — The INSERT into tenant-scoped project_files does not set tenant_id. Although project ownership is checked beforehand, the row is inserted without an explicit tenant binding, violating tenant isolation and potentially causing failure when tenant_id is NOT NULL.
+  - _Fix:_ Include tenant_id in the INSERT column list and pass the validated resolvedTenantId value in VALUES. Keep the existing assertProjectInTenant check and fail closed if no validated tenant is available.
+- **server/google-workspace.ts:2298** — INSERT into tenant-scoped presenter_slide_images does not set tenant_id and relies only on session_id, so the image record is not explicitly associated with the caller's tenant.
+  - _Fix:_ Include tenant_id in the INSERT and bind it to the authenticated tenantId; also verify that sessionId belongs to that tenant before inserting.
+- **server/google-workspace.ts:2304** — Thumbnail INSERT into tenant-scoped presenter_slide_images does not set tenant_id and relies only on session_id, violating explicit tenant assignment for writes.
+  - _Fix:_ Include tenant_id in the INSERT using the validated tenantId, and verify ownership of sessionId before writing.
+- **server/google-workspace.ts:2318** — UPDATE of tenant-scoped presenter_sessions is filtered only by id and has no tenant_id constraint, allowing a session identifier from another tenant to be modified.
+  - _Fix:_ Add AND tenant_id = ${tenantId} to the WHERE clause and validate that sessionId belongs to the caller's tenant before updating.
+- **server/health-audit.ts:314** — The code_proposals SELECT scans stale proposals across all tenants without constraining the query by tenant_id, exposing cross-tenant proposal metadata to the audit result.
+  - _Fix:_ Pass the caller's tenantId into archiveStaleProposals and add `AND tenant_id = ${tenantId}` to the WHERE clause; invoke the audit separately within an authorized tenant context.
+- **server/health-audit.ts:333** — The code_proposals UPDATE archives rows selected by unscoped IDs and can modify proposals belonging to any tenant.
+  - _Fix:_ Add `AND tenant_id = ${tenantId}` to the UPDATE WHERE clause and ensure the tenantId is authorized and used consistently with the preceding SELECT.
+- **server/health-audit.ts:346** — The heartbeat_tasks SELECT scans task records across all tenants without a tenant_id constraint, allowing cross-tenant task metadata to enter the audit report.
+  - _Fix:_ Pass the caller's tenantId into the function and add `AND tenant_id = ${tenantId}` to the heartbeat_tasks WHERE clause.
+- **server/health-audit.ts:368** — The heartbeat_tasks UPDATE disables tasks by unscoped IDs and can modify heartbeat tasks belonging to any tenant.
+  - _Fix:_ Add `AND tenant_id = ${tenantId}` to the UPDATE WHERE clause and validate that the IDs belong to that tenant before disabling them.
+- **server/heartbeat-context.ts:136** — getProviderKeys() reads provider keys without passing tenantId. If provider keys are tenant-scoped, this can read another tenant's provider configuration and expose cross-tenant provider state.
+  - _Fix:_ Pass tenantId to getProviderKeys(tenantId) and ensure its underlying query applies WHERE tenant_id = tenantId.
+- **server/heartbeat-context.ts:163** — getSettings() reads settings without a tenant constraint, allowing a heartbeat task to load another tenant's settings.
+  - _Fix:_ Pass tenantId to getSettings(tenantId) and enforce the tenant_id predicate in the underlying query.
+- **server/heartbeat-context.ts:168** — The fallback getActivePersona() lookup is unscoped. It can return a persona belonging to another tenant when no persona was supplied.
+  - _Fix:_ Pass tenantId to getActivePersona(tenantId) and constrain the persona query by tenant_id.
+- **server/heartbeat-context.ts:182** — getPersonas() loads all personas without tenantId, leaking other tenants' persona names, roles, and active status into the task context.
+  - _Fix:_ Replace with getPersonas(tenantId) and ensure the underlying SELECT includes WHERE tenant_id = tenantId.
+- **server/heartbeat-schedules.ts:60** — The SELECT from tenant-scoped research_schedules is not constrained by tenant_id. It reads every tenant's enabled, due schedule and then processes each schedule, violating application-level tenant isolation.
+  - _Fix:_ Scope the query with an authorized tenant_id predicate, or explicitly enumerate authorized tenant IDs and add tenant_id = <authorized tenant> to each schedule query before processing.
+- **server/heartbeat-seed.ts:29** — getHeartbeatTasks is called with ALL_TENANTS, causing a read of tenant-scoped heartbeat task rows without a caller-tenant SQL constraint. The subsequent JavaScript checks also allow tasks belonging to other tenants to affect whether ADMIN-tenant system tasks are seeded.
+  - _Fix:_ Query heartbeat tasks with an explicit ADMIN_TENANT_ID tenant filter, and perform all seed/reconciliation checks only over that tenant-scoped result.
+- **server/heartbeat-startup.ts:81** — The UPDATE of tenant-scoped heartbeat_tasks is constrained only by id and omits tenant_id, allowing a task ID to be updated without an application-level tenant filter.
+  - _Fix:_ Use a tenant-scoped Drizzle update or add `AND tenant_id = ${t.tenantId}` to the SQL predicate; preferably call the existing tenant-aware storage method.
+- **server/heartbeat-startup.ts:85** — The UPDATE of tenant-scoped heartbeat_tasks is constrained only by id and omits tenant_id, allowing a task ID to be updated without an application-level tenant filter.
+  - _Fix:_ Use a tenant-scoped Drizzle update or add `AND tenant_id = ${t.tenantId}` to the SQL predicate; preferably call the existing tenant-aware storage method.
+- **server/heartbeat-task-scheduler-storage.ts:11** — SELECT reads from the tenant-scoped heartbeat_tasks table without any tenant_id predicate, allowing the scheduler operation to retrieve tasks belonging to all tenants.
+  - _Fix:_ Execute the query within an explicitly selected tenant context and add a tenant_id = <validated tenantId> condition to the WHERE clause; if cross-tenant scheduling is required, iterate over authorized tenant IDs rather than issuing one unscoped query.
+- **server/heartbeat-task-scheduler-storage.ts:43** — UPDATE modifies heartbeat_tasks using only the caller-provided task id and task state predicates, with no tenant_id constraint or ownership verification. A task id from another tenant could be claimed and updated.
+  - _Fix:_ Require a validated tenantId and add tenant_id = <tenantId> to the UPDATE predicate, or first verify ownership of each task id within that tenant before updating it.
+- **server/heartbeat.ts:263** — The SELECT against tenant-scoped event_log retrieves pending events across all tenants without any tenant_id constraint. This violates application-level tenant isolation and allows the worker to read cross-tenant event data in one unscoped query.
+  - _Fix:_ Process events within an explicit tenant context: enumerate authorized tenant IDs and add a tenant_id predicate to the SELECT (for example, WHERE status = 'pending' AND tenant_id = <tenantId>), or otherwise constrain the query to an explicitly authorized tenant set.
+- **server/heartbeat.ts:554** — The heartbeat log insert does not explicitly provide tenantId, allowing a tenant-scoped row to be inserted without tenant ownership context (or causing a NOT NULL failure).
+  - _Fix:_ Pass the task tenant explicitly, e.g. tenantId: taskTenantId(task), and ensure createHeartbeatLog persists it.
+- **server/heartbeat.ts:842** — The handler loads task.personaId without constraining the lookup to the task's tenant or first verifying persona ownership. A tenant-controlled foreign ID can therefore resolve a persona from another tenant.
+  - _Fix:_ Use a tenant-scoped persona lookup such as getPersona(task.personaId, assertTenantContext(task.tenantId, ...)), or query with both persona ID and tenant_id.
+- **server/heartbeat.ts:868** — The handler loads task.personaId without constraining the lookup to the task's tenant or first verifying persona ownership. A tenant-controlled foreign ID can therefore resolve a persona from another tenant.
+  - _Fix:_ Use a tenant-scoped persona lookup such as getPersona(task.personaId, trackerTenantId), or query with both persona ID and tenant_id.
+- **server/heartbeat.ts:720** — The maintenance heartbeat log insert omits tenantId even though the log is associated with a tenant-scoped heartbeat task.
+  - _Fix:_ Include tenantId: taskTenantId(task) in the createHeartbeatLog payload and enforce the tenant filter in the storage implementation.
+- **server/heartbeat.ts:915** — The timeout heartbeat log insert omits tenantId, so the tenant-scoped log is created without explicit tenant ownership context.
+  - _Fix:_ Include tenantId: taskTenantId(task) in the createHeartbeatLog payload and ensure the insert persists it.
+- **server/heartbeat.ts:765** — Failures for tasks from any tenant are reported using the fixed ADMIN_TENANT_ID rather than the task's tenant. This writes tenant-derived failure data into the administrator tenant and can cause cross-tenant data exposure or misattribution.
+  - _Fix:_ Use the validated task tenant (assertTenantContext(task.tenantId, ...)) when capturing the incident, and ensure captureIncident applies tenant_id filtering.
+- **server/heartbeat.ts:842** — getPersona(task.personaId) reads a tenant-scoped persona by foreign ID without supplying or verifying the task's tenant ownership.
+  - _Fix:_ Use a tenant-scoped lookup such as getPersona(task.personaId, assertTenantContext(task.tenantId, ...)), with a query constrained by both persona ID and tenant_id.
+- **server/heartbeat.ts:868** — getPersona(task.personaId) reads a tenant-scoped persona by foreign ID without a tenant constraint or ownership check.
+  - _Fix:_ Query the persona with both persona_id and the validated task tenant_id, and reject the task if the persona does not belong to that tenant.
+- **server/heartbeat.ts:985** — createHeartbeatLog inserts a heartbeat log without explicitly supplying tenantId; the same omission occurs in the paired error log at line 998 and all other heartbeat-log calls in this unit.
+  - _Fix:_ Pass the task's validated tenant ID explicitly, e.g. tenantId: taskTenantId(task), to every createHeartbeatLog call and ensure the storage insert writes it.
+- **server/heartbeat.ts:1015** — runCommitmentDrafter is invoked without the current task's tenantId, so its tenant-scoped reads or writes cannot be constrained to the task tenant.
+  - _Fix:_ Change the drafter API to accept tenantId and invoke it with the validated task tenant; enforce tenant_id filters in all queries performed by the drafter.
+- **server/heartbeat.ts:1021** — createHeartbeatLog inserts a tenant-scoped heartbeat log without tenantId; the paired error-path insert at line 1033 has the same issue.
+  - _Fix:_ Include tenantId: taskTenantId(task) in both createHeartbeatLog payloads and enforce the tenant filter in the storage layer.
+- **server/heartbeat.ts:1069** — createHeartbeatLog inserts a tenant-scoped heartbeat log without tenantId; the paired error-path insert at line 1081 has the same issue.
+  - _Fix:_ Include the validated task tenant explicitly in both log insert payloads, e.g. tenantId: taskTenantId(task).
+- **server/heartbeat.ts:1112** — createHeartbeatLog inserts a tenant-scoped heartbeat log without tenantId; the paired error-path insert at line 1125 has the same issue.
+  - _Fix:_ Include the validated task tenant explicitly in both log insert payloads, e.g. tenantId: taskTenantId(task).
+- **server/heartbeat.ts:1156** — createHeartbeatLog inserts a tenant-scoped heartbeat log without tenantId; the paired error-path insert at line 1169 has the same issue.
+  - _Fix:_ Include the validated task tenant explicitly in both log insert payloads, e.g. tenantId: taskTenantId(task).
+- **server/heartbeat.ts:1213** — createHeartbeatLog inserts a tenant-scoped heartbeat log without tenantId; the paired error-path insert at line 1225 has the same issue.
+  - _Fix:_ Include the validated task tenant explicitly in both log insert payloads, e.g. tenantId: taskTenantId(task).
+- **server/heartbeat.ts:1290** — createHeartbeatLog inserts a tenant-scoped heartbeat log without tenantId; the paired error-path insert at line 1303 has the same issue.
+  - _Fix:_ Include the validated task tenant explicitly in both log insert payloads, e.g. tenantId: taskTenantId(task).
+- **server/heartbeat.ts:1385** — createHeartbeatLog inserts a tenant-scoped heartbeat log without tenantId; the paired error-path insert at line 1398 has the same issue.
+  - _Fix:_ Include the validated task tenant explicitly in both log insert payloads, e.g. tenantId: taskTenantId(task).
+- **server/heartbeat.ts:1590** — The SELECT from heartbeat_logs is not constrained by tenant_id; it retrieves the most recent successful Dream Memory Consolidation run across all tenants.
+  - _Fix:_ Add a tenant predicate, such as WHERE tenant_id = ${tenantId}, to the heartbeat_logs query.
+- **server/heartbeat.ts:1644** — Memory hygiene invokes archiveExpiredMemories(), archiveStaleMemories(), and pruneHeartbeatLogs() without passing the caller task's tenant ID. These operations can update or delete tenant-scoped memories and heartbeat logs across tenants.
+  - _Fix:_ Make each storage method require tenantId and constrain its UPDATE/DELETE statements with tenant_id = tenantId; pass the current tenantId at these call sites.
+- **server/heartbeat.ts:1290** — The createHeartbeatLog calls in this unit (including lines 1290, 1303, 1385, 1398, 1439, 1452, 1482, 1497, 1519, 1529, 1563, 1573, 1617, 1630, 1650, 1662, 1696, 1708, 1768, and 1781) do not explicitly set tenantId when inserting tenant-scoped heartbeat logs.
+  - _Fix:_ Include tenantId explicitly in every createHeartbeatLog payload, sourced from the authenticated/task tenant, and ensure the underlying INSERT writes that value.
+- **server/heartbeat.ts:1662** — The heartbeat log creation call does not provide an explicit tenantId. If heartbeat_logs is tenant-scoped, this INSERT can create a row without tenant ownership.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and enforce tenantId as a required field in createHeartbeatLog.
+- **server/heartbeat.ts:1708** — The error-path heartbeat log creation call omits tenantId for a tenant-scoped INSERT.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and require it in createHeartbeatLog.
+- **server/heartbeat.ts:1768** — The code-health heartbeat log creation call omits tenantId for a tenant-scoped INSERT.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and require it in createHeartbeatLog.
+- **server/heartbeat.ts:1781** — The code-health error-path heartbeat log creation call omits tenantId for a tenant-scoped INSERT.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and require it in createHeartbeatLog.
+- **server/heartbeat.ts:1821** — The health-audit heartbeat log creation call omits tenantId for a tenant-scoped INSERT.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and require it in createHeartbeatLog.
+- **server/heartbeat.ts:1834** — The health-audit error-path heartbeat log creation call omits tenantId for a tenant-scoped INSERT.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and require it in createHeartbeatLog.
+- **server/heartbeat.ts:1870** — The self-improvement heartbeat log creation call omits tenantId for a tenant-scoped INSERT.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and require it in createHeartbeatLog.
+- **server/heartbeat.ts:1883** — The self-improvement error-path heartbeat log creation call omits tenantId for a tenant-scoped INSERT.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and require it in createHeartbeatLog.
+- **server/heartbeat.ts:1904** — The self-initiative heartbeat log creation call omits tenantId for a tenant-scoped INSERT.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and require it in createHeartbeatLog.
+- **server/heartbeat.ts:1918** — The self-initiative error-path heartbeat log creation call omits tenantId for a tenant-scoped INSERT.
+  - _Fix:_ Pass the validated task tenant explicitly, e.g. tenantId: Number(task.tenantId), and require it in createHeartbeatLog.
+- **server/heartbeat.ts:1821** — Calls to createHeartbeatLog insert heartbeat log records without passing an explicit tenantId. The same omission occurs at lines 1834, 1870, 1883, 1904, 1918, 2045, 2057, 2081, 2100, 2190, 2203, 2237, and 2249. If heartbeat logs are tenant-scoped, these inserts cannot enforce tenant isolation under the stated invariant.
+  - _Fix:_ Pass the asserted tenantId explicitly in every createHeartbeatLog call and ensure the storage INSERT writes it to the tenant_id column; do not rely on taskId or implicit lookup to derive tenant ownership.
+- **server/heartbeat.ts:2190** — Calls to storage.createHeartbeatLog at lines 2190, 2203, 2237, 2249, 2318, and 2362 insert heartbeat log records without explicitly supplying tenantId. Heartbeat logs are tenant-scoped, so these inserts either violate the NOT NULL requirement or cannot reliably associate the record with the caller's tenant.
+  - _Fix:_ Pass the asserted task tenant explicitly in every createHeartbeatLog payload, e.g. tenantId: tenantId or Number(task.tenantId), and ensure the storage insert persists that column.
+- **server/heartbeat.ts:2462** — storage.getPersonas() reads the personas table without a tenant constraint. The result is then used to locate the Proof persona and create a tenant task, allowing persona data or IDs from another tenant to be selected if personas are tenant-scoped.
+  - _Fix:_ Use a tenant-scoped lookup such as storage.getPersonas(tenantId), or query personas with WHERE tenant_id = tenantId before selecting the Proof persona.
+- **server/heartbeat.ts:2597** — storage.getPersonas() reads all personas without constraining the result to tenantId. Delegation target selection can therefore resolve a persona belonging to another tenant and use its ID when creating a task for the current tenant.
+  - _Fix:_ Fetch personas using the current tenantId and enforce tenant ownership in the lookup, e.g. storage.getPersonas(tenantId), before resolving delegation targets.
+- **server/heartbeat.ts:2791** — delegateTaskFromChat loads personas with storage.getPersonas() without a tenant constraint, then resolves the caller-supplied targetPersonaName and fromPersonaId from that unscoped set. This can select or use a persona belonging to another tenant without verifying ownership.
+  - _Fix:_ Load personas using tenantId (for example, getPersonas(tenantId) with WHERE tenant_id = tenantId), and explicitly verify that fromPersonaId and the resolved target persona belong to the caller's tenant before proceeding.
+- **server/heartbeat.ts:2791** — getPersonas() loads personas without constraining them to tenantId. The subsequent target lookup by caller-supplied name and fromPersona lookup by caller-supplied fromPersonaId can resolve personas belonging to another tenant, and the cross-tenant target is then used to create a tenant-scoped conversation.
+  - _Fix:_ Fetch personas with tenantId filtering, or query each referenced persona with an explicit tenant_id predicate. Validate both target and fromPersonaId ownership before using their IDs.
+- **server/heartbeat.ts:3119** — createHeartbeatLog inserts into the tenant-scoped heartbeat_logs table without passing tenantId. This violates the requirement that every tenant-scoped insert explicitly set the caller's tenant.
+  - _Fix:_ Pass tenantId in the createHeartbeatLog payload and ensure the storage INSERT explicitly writes the tenant_id column.
+- **server/instinct-web-channel.ts:158** — The SELECT reads from the tenant-scoped personas table through an inner join constrained only by personas.id. It does not constrain personas.tenantId to the caller tenant, so a mismatched or cross-tenant persona association could expose another tenant's persona name.
+  - _Fix:_ Add the tenant predicate to the join or WHERE clause, for example: innerJoin(personas, and(eq(instinctOutbox.personaId, personas.id), eq(personas.tenantId, tenantId))).
+- **server/instinct-web-channel.ts:391** — The handler accepts conversationId from the request body and passes it to resumeFailedTurn without first verifying that the referenced conversation belongs to auth.tenantId. The recovery CSRF token is derived from the submitted ID, so it does not independently establish tenant ownership.
+  - _Fix:_ Before resuming, load the conversation or the tenant's active thread using auth.tenantId and require that its conversationId matches the submitted value; ensure resumeFailedTurn also applies tenant_id filtering to every read and update.
+- **server/instinct-web-channel.ts:416** — The handler accepts conversationId from the request body and passes it to reviewUncertainFailedTurn without first verifying that the referenced conversation belongs to auth.tenantId. The recovery CSRF token is derived from the submitted ID, so it does not independently establish tenant ownership.
+  - _Fix:_ Before reviewing, load the conversation or the tenant's active thread using auth.tenantId and require that its conversationId matches the submitted value; ensure reviewUncertainFailedTurn also applies tenant_id filtering to every read and update.
+- **server/internal-resolver.ts:113** — SELECTs the tenant-scoped event_log table by event ID without a tenant_id predicate. An arbitrary or cross-tenant eventId can reveal another tenant's ID and allow subsequent processing to operate in that tenant's context.
+  - _Fix:_ Pass a trusted caller/job tenantId into this function and add AND tenant_id = ${tenantId} to the event_log lookup; fail closed when the event is not owned by that tenant.
+- **server/internal-resolver.ts:180** — SELECTs tenant_id from the tenant-scoped event_log table using only eventId. This permits a cross-tenant event reference to establish the tenant context before mutating code_proposals.
+  - _Fix:_ Require a trusted tenantId from the caller or job context and constrain the lookup with AND tenant_id = ${tenantId} before processing the proposal.
+- **server/internal-resolver.ts:249** — The entry-point lookup reads tenant-scoped event_log by id without a tenant_id constraint, then trusts the returned tenant_id for all later finalization and related operations. A caller-controlled or malformed eventId can therefore select another tenant's event context.
+  - _Fix:_ Make resolveDroppedEvent tenant-aware by accepting a trusted tenantId and querying WHERE id = ${eventId} AND tenant_id = ${tenantId}; reject IDs not owned by that tenant.
+- **server/job-queue.ts:78** — enqueueJob inserts caller-supplied tenantId, personaId, and parentJobId without validating that the tenant owns the referenced persona or parent job. This permits cross-tenant job linkage and accepts arbitrary tenant scope.
+  - _Fix:_ Require an authenticated tenant context, validate tenantId against that context, and verify personaId and parentJobId belong to the same tenant before inserting.
+- **server/job-queue.ts:98** — enqueueUniqueJob validates only that tenantId is a positive integer; it does not verify that the caller owns that tenant or that personaId and parentJobId belong to it before inserting the tenant-scoped job.
+  - _Fix:_ Derive tenantId from the authenticated tenant context and verify all supplied foreign IDs are owned by that tenant before insertion.
+- **server/job-queue.ts:195** — claimDueJobs updates and selects pending agent_jobs without any tenant_id predicate. A worker invocation can claim jobs belonging to every tenant with no explicit tenant scope.
+  - _Fix:_ Require an explicit tenant scope, add tenant_id filtering to both the subquery and update, or use an explicit, tightly controlled ALL_TENANTS scope for trusted platform workers.
+- **server/job-queue.ts:230** — reclaimExpiredLeases performs a tenant-scoped UPDATE over all expired jobs without a tenant_id constraint.
+  - _Fix:_ Add the caller tenant predicate to the reclaim query, or require an explicit authorized ALL_TENANTS scope for platform maintenance.
+- **server/job-queue.ts:245** — The second reclaimExpiredLeases UPDATE requeues expired agent_jobs across all tenants without tenant filtering.
+  - _Fix:_ Constrain the UPDATE by tenant_id or require and authorize an explicit all-tenant maintenance scope.
+- **server/job-worker.ts:413** — The handler extracts missionId from the durable job payload and uses it for cost attribution before any visible verification that the referenced mission belongs to job.tenantId. A tampered or incorrectly enqueued payload could attribute work across tenants.
+  - _Fix:_ Verify mission ownership with a tenant-constrained query (for example, WHERE mission.id = missionId AND mission.tenant_id = job.tenantId) before calling withMissionCostAttribution, and reject the job on mismatch.
+- **server/knowledge-diversity-monitor.ts:266** — The SELECT against tenant-scoped agent_knowledge has no tenant_id constraint in its WHERE clause; it scans and reads rows across all tenants by grouping on tenant_id.
+  - _Fix:_ Enumerate tenants through an authorized system operation, then execute a separate query for each tenant with an explicit WHERE tenant_id = <tenantId> predicate (or otherwise ensure the query is constrained to the permitted tenant scope).
+- **server/knowledge-nudges.ts:164** — processNudge accepts conversationId as a foreign identifier and inserts it into knowledge_nudges without verifying that the referenced conversation belongs to tenantId. A caller could associate a nudge with another tenant's conversation.
+  - _Fix:_ Before inserting, query the conversations table with both the supplied conversationId and tenantId, reject missing or cross-tenant rows, and only then use the validated ID; alternatively derive the conversation ownership from trusted server context.
+- **server/lib/action-ledger.ts:268** — listUnknownAttemptsAllTenants performs a SELECT against the tenant-scoped action_attempts table without a tenant_id constraint, exposing attempt metadata across tenants.
+  - _Fix:_ Require a tenant_id filter for reads, or execute this as a separately authorized platform-maintenance operation with explicit per-tenant scoping and authorization.
+- **server/lib/action-ledger.ts:304** — sweepStaleAttempts updates action_attempts rows across all tenants because its outer UPDATE and subquery filter only by state and age, with no tenant_id constraint.
+  - _Fix:_ Add tenant_id scoping to the update and candidate subquery, or iterate through explicitly authorized tenant IDs and apply the tenant filter for each update.
+- **server/lib/aevo-meta-editor.ts:447** — The UPDATE of tenant-scoped procedureEvolutionRuns is constrained only by the run ID and omits tenant_id, violating application-level tenant isolation.
+  - _Fix:_ Add a tenant predicate to the WHERE clause, such as and(eq(procedureEvolutionRuns.id, runId), eq(procedureEvolutionRuns.tenantId, tenantId)).
+- **server/lib/aevo-meta-editor.ts:456** — The UPDATE of tenant-scoped procedureEvolutionRuns is constrained only by the run ID and omits tenant_id, violating application-level tenant isolation.
+  - _Fix:_ Add eq(procedureEvolutionRuns.tenantId, tenantId) to the WHERE clause alongside the run ID predicate.
+- **server/lib/aevo-meta-editor.ts:465** — The UPDATE of tenant-scoped procedureEvolutionRuns is constrained only by the run ID and omits tenant_id, violating application-level tenant isolation.
+  - _Fix:_ Add a tenant predicate to the WHERE clause, such as and(eq(procedureEvolutionRuns.id, runId), eq(procedureEvolutionRuns.tenantId, tenantId)).
+- **server/lib/aevo-meta-editor.ts:499** — The UPDATE of tenant-scoped procedureEvolutionRuns is constrained only by the run ID and omits tenant_id, violating application-level tenant isolation.
+  - _Fix:_ Add eq(procedureEvolutionRuns.tenantId, tenantId) to the WHERE clause alongside the run ID predicate.
+- **server/lib/aevo-meta-editor.ts:499** — The UPDATE of tenant-scoped procedureEvolutionRuns is constrained only by run ID and lacks a tenant_id predicate, allowing a run from another tenant to be modified if its ID is supplied.
+  - _Fix:_ Add eq(procedureEvolutionRuns.tenantId, tenantId) to the WHERE clause, and ensure the caller tenant is used for the tenantId value.
+- **server/lib/aevo-meta-editor.ts:487** — The INSERT into tenant-scoped procedureEdits does not visibly set tenantId explicitly, violating the requirement that every tenant-scoped insert provide the caller's validated tenant ID.
+  - _Fix:_ Include tenantId: tenantId in the inserted values, using the authenticated caller tenant rather than a request-derived or unvalidated value.
+- **server/lib/agent-trace.ts:130** — The UPDATE against tenant-scoped table agent_trace_spans is constrained only by span_id and omits tenant_id. A known or reused span ID could cause a span belonging to another tenant to be modified.
+  - _Fix:_ Capture the tenant ID when opening the span and include `AND tenant_id = ${tenantId}` in the UPDATE predicate, or otherwise apply an equivalent tenant-scoped Drizzle condition.
+- **server/lib/bwb-job-progress.ts:121** — The tenant-scoped videoJobs INSERT uses args.tenantId after only validating that it is a positive finite number. This exported function does not verify that the supplied tenant ID belongs to the authenticated caller, so an untrusted caller or compromised launch path could create a job in another tenant.
+  - _Fix:_ Derive tenantId from the authenticated tenant context rather than caller-controlled arguments/environment, or validate tenant ownership/membership before inserting. Reject any tenant ID that does not match the caller's authorized tenant.
+- **server/lib/bwb-oversight-shadow.ts:314** — The tenantId used for the eventLog INSERT is accepted from the caller (or an environment fallback) and only checked for being a positive integer; the function does not verify that the caller owns or is authorized for that tenant before writing the tenant-scoped row.
+  - _Fix:_ Require a trusted, authenticated tenant context and verify the supplied tenantId against it before inserting. Avoid accepting an arbitrary tenantId argument; derive it from the validated request/session context and pass that verified value to the INSERT.
+- **server/lib/chronicle-precision.ts:98** — The query reads the tenant-scoped `skills` table by `s.id = ps.promoted_skill_id` without constraining `s.tenant_id` to the caller's tenant. A cross-tenant skill row with a matching ID could affect `skill_exists`, `enabled`, and `active` evidence.
+  - _Fix:_ Add a tenant ownership predicate to the join, e.g. `LEFT JOIN skills s ON s.id = ps.promoted_skill_id AND s.tenant_id = ${tenantId}`.
+- **server/lib/customer-revenue-launchpad-seed.ts:90** — The SELECT against tenant-scoped project_notes is filtered only by project_id and note, without a tenant_id constraint. A project_id alone must not be treated as sufficient tenant isolation.
+  - _Fix:_ Add AND tenant_id = ${OWNER_TENANT_ID} to the project_notes query, or use an equivalent tenant-scoped Drizzle predicate.
+- **server/lib/customer-revenue-launchpad-seed.ts:103** — The INSERT into tenant-scoped project_notes omits tenant_id, violating the requirement that every tenant-scoped insert explicitly set the owning tenant.
+  - _Fix:_ Include tenant_id in the column list and ${OWNER_TENANT_ID} in the VALUES clause; optionally verify the referenced project belongs to that tenant in the same transaction.
+- **server/lib/ideabrowser-backfill.ts:50** — The SELECT against the tenant-scoped projects table filters only by tags and groups by tenant_id; it has no tenant_id constraint in the WHERE clause, allowing cross-tenant project data to participate in the backfill decision.
+  - _Fix:_ Restrict the query to the explicitly authorized tenant IDs from the validated snapshot, or query each tenant separately with WHERE tenant_id = <validated tenantId>.
+- **server/lib/ideabrowser-backfill.ts:101** — The SELECT against project_files is constrained only by project_id and does not apply a tenant_id predicate or otherwise verify that the referenced project belongs to the intended tenant.
+  - _Fix:_ Carry the validated tenantId alongside each mapped project and add tenant_id = tenantId to the WHERE clause; also verify the project ownership before accessing files.
+- **server/lib/ideabrowser-backfill.ts:105** — The INSERT into the tenant-scoped project_files table does not explicitly set tenant_id.
+  - _Fix:_ Add tenant_id to the column list and insert the validated owning tenant ID explicitly.
+- **server/lib/ideabrowser-backfill.ts:116** — The SELECT against project_notes is constrained only by project_id and does not apply a tenant_id predicate or otherwise verify that the referenced project belongs to the intended tenant.
+  - _Fix:_ Carry the validated tenantId alongside each mapped project and add tenant_id = tenantId to the WHERE clause; also verify the project ownership before accessing notes.
+- **server/lib/ideabrowser-backfill.ts:120** — The INSERT into the tenant-scoped project_notes table does not explicitly set tenant_id.
+  - _Fix:_ Add tenant_id to the column list and insert the validated owning tenant ID explicitly.
+- **server/lib/ideabrowser-dev-sync.ts:140** — The INSERT into tenant-scoped project_notes does not set tenant_id, and its NOT EXISTS lookup at line 143 is not constrained by tenant_id. This can violate the non-null tenant requirement and permits an unscoped child-row operation.
+  - _Fix:_ Include tenant_id in the INSERT column list and set it to the validated tenantId; add tenant_id = tenantId to the NOT EXISTS predicate (or join through projects while enforcing the same tenant).
+- **server/lib/ideabrowser-dev-sync.ts:150** — The INSERT into tenant-scoped project_files does not set tenant_id, and its NOT EXISTS lookup at line 154 is not constrained by tenant_id. This can violate the non-null tenant requirement and permits an unscoped child-row operation.
+  - _Fix:_ Include tenant_id in the INSERT column list and set it to the validated tenantId; add tenant_id = tenantId to the NOT EXISTS predicate (or join through projects while enforcing the same tenant).
+- **server/lib/income-discovery-runtime.ts:15** — conversationId is accepted as a foreign identifier and only checked for numeric validity; the code never verifies that the referenced conversation belongs to input.tenantId before passing it to guarded tools and jury evidence collection at lines 27 and 48. A conversation from another tenant could therefore be read or acted on.
+  - _Fix:_ Before using conversationId, query the conversations table with both conversation id and tenantId, reject if no matching row exists, and only then pass the verified identifier to downstream tools.
+- **server/lib/jury-experience.ts:186** — The INSERT stores caller-supplied responseId as source_response_id without verifying that the referenced response belongs to tenantId. This can create cross-tenant associations and may expose another tenant's response through later joins or administrative views.
+  - _Fix:_ Before inserting, query the referenced response with a tenant constraint (WHERE id = responseId AND tenant_id = tenantId), reject or null out responseId when it is absent from that tenant, and ensure any callers cannot supply an arbitrary tenantId.
+- **server/lib/mcp-api-keys.ts:169** — The tenant-scoped mcp_api_keys SELECT is filtered only by key_prefix and has no tenant_id constraint. A presented key prefix can therefore cause a lookup of a row belonging to any tenant, violating the requirement that every tenant-scoped read be constrained to the caller's tenant.
+  - _Fix:_ Require a trusted caller tenantId and add `AND tenant_id = ${tenantId}` to the WHERE clause, validating that the presented key belongs to that tenant before returning its identity and scopes. If tenant resolution must originate from the key, document and enforce this as a narrowly isolated authentication lookup rather than using the result as an unverified tenant authorization boundary.
+- **server/lib/mention-injection.ts:123** — The SELECT joins the tenant-scoped personas table only by p.id, without constraining p.tenant_id to the caller tenant. A cross-tenant persona ID referenced by a channel message could therefore expose that persona's name.
+  - _Fix:_ Add a tenant predicate to the join, for example: LEFT JOIN personas p ON p.id = cm.from_persona_id AND p.tenant_id = ${params.tenantId}.
+- **server/lib/outcome-promotion.ts:158** — SELECT against tenant-scoped table deliverable_grade_events without a tenant_id constraint in the WHERE clause.
+  - _Fix:_ Add a tenant_id filter to the WHERE clause (e.g., WHERE tenant_id = ${tenantId}) and process tenants individually rather than querying all tenants at once.
+- **server/lib/skill-optimizer-promotion.ts:724** — SELECT against tenant-scoped table `schema.skills` without `tenantId` constraint in WHERE clause.
+  - _Fix:_ Add `eq(schema.skills.tenantId, input.tenantId)` to the WHERE clause.
+- **server/lib/skill-optimizer-promotion.ts:839** — UPDATE against tenant-scoped table `schema.skills` without `tenantId` constraint in WHERE clause.
+  - _Fix:_ Add `eq(schema.skills.tenantId, input.tenantId)` to the WHERE clause.
+- **server/lib/skill-optimizer-promotion.ts:931** — SELECT against tenant-scoped table `schema.skills` without `tenantId` constraint in WHERE clause.
+  - _Fix:_ Add `eq(schema.skills.tenantId, tenantId)` to the WHERE clause.
+- **server/lib/skill-optimizer-promotion.ts:949** — UPDATE against tenant-scoped table `schema.skills` without `tenantId` constraint in WHERE clause.
+  - _Fix:_ Add `eq(schema.skills.tenantId, tenantId)` to the WHERE clause.
+- **server/lib/stuck-task-sweep.ts:56** — SELECT query against tenant-scoped table 'agent_runs' lacks a tenant_id constraint in its WHERE clause.
+  - _Fix:_ Pass the caller's tenantId to the function and add 'AND tenant_id = ${tenantId}' to the WHERE clause.
+- **server/lib/stuck-task-sweep.ts:84** — SELECT query against tenant-scoped table 'mind_tickets' lacks a tenant_id constraint in its WHERE clause.
+  - _Fix:_ Pass the caller's tenantId to the function and add 'AND tenant_id = ${tenantId}' to the WHERE clause.
+- **server/lib/system-probes.ts:163** — SELECT against the tenant-scoped `messages` table lacks a tenant_id constraint, exposing cross-tenant aggregate counts.
+  - _Fix:_ Add a .where(eq(messagesTable.tenantId, tenantId)) clause to restrict the count to the caller's tenant.
+- **server/lib/work-opportunity-radar-seed.ts:125** — INSERT into project_notes does not set tenant_id, and the embedded SELECT lacks a tenant_id constraint in its WHERE clause.
+  - _Fix:_ Add tenant_id to the INSERT column list and SELECT values, and enforce tenant_id = ${ADMIN_TENANT_ID} in the WHERE NOT EXISTS subquery.
+- **server/lib/work-opportunity-radar-seed.ts:135** — INSERT into project_files does not set tenant_id, and the embedded SELECT lacks a tenant_id constraint in its WHERE clause.
+  - _Fix:_ Add tenant_id to the INSERT column list and SELECT values, and enforce tenant_id = ${ADMIN_TENANT_ID} in the WHERE NOT EXISTS subquery.
+- **server/lib/workspace-verifier-store.ts:48** — SELECT against tenant-scoped table agent_jobs without tenant_id constraint in WHERE clause.
+  - _Fix:_ Add tenant_id constraint to the WHERE clause.
+- **server/lib/workspace-verifier-store.ts:73** — UPDATE against tenant-scoped table agent_jobs without tenant_id constraint in WHERE clause.
+  - _Fix:_ Add tenant_id constraint to the WHERE clause.
+- **server/lib/workspace-verifier-store.ts:81** — SELECT against tenant-scoped table agent_jobs without tenant_id constraint in WHERE clause.
+  - _Fix:_ Add tenant_id constraint to the WHERE clause.
+- **server/lib/workspace-verifier-store.ts:85** — SELECT against tenant-scoped table agent_jobs without tenant_id constraint in WHERE clause.
+  - _Fix:_ Add tenant_id constraint to the WHERE clause.
+- **server/lib/workspace-verifier-store.ts:94** — UPDATE against tenant-scoped table agent_jobs without tenant_id constraint in WHERE clause.
+  - _Fix:_ Add tenant_id constraint to the WHERE clause.
+- **server/martech-bundle.ts:325** — UPDATE against a tenant-scoped table without a tenant_id constraint in the WHERE clause.
+  - _Fix:_ Add eq(tenantVoiceProfiles.tenantId, opts.tenantId) to the WHERE clause.
+- **server/memory-graph.ts:130** — UPDATE against tenant-scoped table memory_categories is missing tenant_id constraint in WHERE clause.
+  - _Fix:_ Add `AND tenant_id = ${tenantId}` to the WHERE clause of the UPDATE statement.
+- **server/memory-graph.ts:710** — UPDATE against tenant-scoped table memory_entries lacks a tenant_id constraint in its WHERE clause.
+  - _Fix:_ Add AND tenant_id = ${tenantId} to the WHERE clause to enforce tenant isolation at the query level.
 
-### MEDIUM (8)
+### MEDIUM (24)
 
 - **server/agent-channels.ts:122** — Tenant-scoped query joins agent_channels and personas by id only, without constraining the joined tenant-scoped tables to the caller tenant. This can pull cross-tenant channel/persona metadata if ids collide or references are inconsistent.
   - _Fix:_ Add tenant filters to the joins, e.g. `LEFT JOIN agent_channels ac ON ac.id = cm.channel_id AND ac.tenant_id = ${params.tenantId}` and `LEFT JOIN personas p ON p.id = cm.from_persona_id AND p.tenant_id = ${params.tenantId}`.
@@ -160,8 +558,40 @@ _Generated 2026-11-05T02:52:35.125Z by `scripts/tenant-isolation-audit.ts` using
   - _Fix:_ Add tenant filtering inside each heartbeat_logs subquery, e.g. WHERE hl.task_id = ht.id AND hl.tenant_id = ${tenantId}, or rewrite using Drizzle with explicit eq(heartbeatLogs.tenantId, tenantId) conditions.
 - **server/agentic-engines.ts:879** — JOIN reads tenant-scoped research_programs by foreign key rp.id = re.program_id without verifying tenant ownership on the joined table. The WHERE clause scopes only research_experiments; a cross-tenant program_id reference could expose another tenant's program name.
   - _Fix:_ Constrain the joined table by tenant as well, e.g. JOIN research_programs rp ON rp.id = re.program_id AND rp.tenant_id = ${tenantId}, or otherwise verify the referenced program belongs to the same tenant before use.
+- **server/chat-engine/project-context.ts:24** — The SELECT from tenant-scoped project_conversations does not constrain pc.tenant_id; it relies only on the joined project's tenant_id.
+  - _Fix:_ Add pc.tenant_id = ${tenantId} to the WHERE clause and ensure the link row belongs to the caller's tenant.
+- **server/chat-engine/project-context.ts:45** — The EXISTS subquery reads tenant-scoped project_conversations without a tenant_id predicate.
+  - _Fix:_ Add pc.tenant_id = ${tenantId} inside the EXISTS condition.
+- **server/chat-engine/project-context.ts:183** — The project_conversations read is filtered by project_id and the joined conversation's tenant_id, but omits pc.tenant_id.
+  - _Fix:_ Add pc.tenant_id = ${tenantId} to the WHERE clause.
+- **server/data-protection.ts:404** — The message count query is constrained only by conversation_id and omits tenant_id. It can count another tenant's messages for the selected conversation and influence backup behavior across tenant boundaries.
+  - _Fix:_ Add AND tenant_id = ${tenantId} to the messages count query.
+- **server/delegation-events.ts:50** — subscribeToAllDelegations uses a fail-open tenant filter: when the requested tenantId is absent/falsy or an event has no tenantId, cross-tenant or unscoped events are delivered to the subscriber.
+  - _Fix:_ Require a tenantId and deliver only events whose tenantId exactly equals it; reject events without a tenantId rather than broadcasting them.
+- **server/heartbeat-seed.ts:212** — The mission_opportunity_scan seed existence check matches only on task type and does not constrain the task to ADMIN_TENANT_ID. A same-type task belonging to another tenant can therefore prevent the admin-tenant task from being created.
+  - _Fix:_ Require the existing task's tenantId to equal ADMIN_TENANT_ID, consistent with the tenant-scoped checks below.
+- **server/heartbeat-seed.ts:349** — The self_initiative seed existence check matches only on task type and does not constrain the task to ADMIN_TENANT_ID. A task from another tenant can prevent creation of the admin-tenant task.
+  - _Fix:_ Add a tenant ownership check, such as Number(t.tenantId) === ADMIN_TENANT_ID, to the existence predicate.
+- **server/heartbeat-seed.ts:372** — The Monthly Token Usage Audit seed existence check matches only on name and does not constrain the task to ADMIN_TENANT_ID. A same-named task from another tenant can block seeding the admin-tenant task.
+  - _Fix:_ Constrain the existence check to the admin tenant by requiring Number(t.tenantId) === ADMIN_TENANT_ID.
+- **server/heartbeat.ts:915** — createHeartbeatLog inserts a tenant-scoped heartbeat log without explicitly setting tenantId.
+  - _Fix:_ Include tenantId: assertTenantContext(task.tenantId, ...) in the insert payload and ensure the storage insert persists it.
+- **server/heartbeat.ts:985** — createHeartbeatLog inserts a tenant-scoped heartbeat log without explicitly setting tenantId.
+  - _Fix:_ Include the validated task tenantId in the insert payload.
+- **server/heartbeat.ts:998** — createHeartbeatLog inserts a tenant-scoped heartbeat log without explicitly setting tenantId.
+  - _Fix:_ Include the validated task tenantId in the insert payload.
+- **server/heartbeat.ts:1021** — createHeartbeatLog inserts a tenant-scoped heartbeat log without explicitly setting tenantId.
+  - _Fix:_ Include the validated task tenantId in the insert payload.
+- **server/heartbeat.ts:1033** — createHeartbeatLog inserts a tenant-scoped heartbeat log without explicitly setting tenantId.
+  - _Fix:_ Include the validated task tenantId in the insert payload.
+- **server/heartbeat.ts:1069** — createHeartbeatLog inserts a tenant-scoped heartbeat log without explicitly setting tenantId.
+  - _Fix:_ Include the validated task tenantId in the insert payload.
+- **server/heartbeat.ts:1081** — createHeartbeatLog inserts a tenant-scoped heartbeat log without explicitly setting tenantId.
+  - _Fix:_ Include the validated task tenantId in the insert payload.
+- **server/instinct-line.ts:83** — The SELECT joins the tenant-scoped personas table only on persona ID and does not constrain personas.tenant_id to the caller's tenant. This can associate a tenant's outbox rows with and expose persona data belonging to another tenant.
+  - _Fix:_ Add a tenant predicate to the join, such as and(eq(instinctOutbox.personaId, personas.id), eq(personas.tenantId, tenantId)), or otherwise verify the persona belongs to tenantId before returning it.
 
-### LOW (6)
+### LOW (7)
 
 - **server/auth.ts:1250** — DELETE from tenant-scoped password_reset_tokens is constrained only by the token hash and omits tenant_id. Although the token is unique and capability-like, the operation does not satisfy the required tenant predicate.
   - _Fix:_ Pass the validated tenantId from getResetToken into deleteResetToken and add AND tenant_id = ${tenantId} to the DELETE condition.
@@ -175,3 +605,5 @@ _Generated 2026-11-05T02:52:35.125Z by `scripts/tenant-isolation-audit.ts` using
   - _Fix:_ Make this an explicitly authorized global migration/maintenance operation, or invalidate rows per tenant with tenant_id constraints.
 - **server/business-tools.ts:127** — Request-derived values are interpolated into SQL-looking strings (`status` and `amount_paid`) rather than parameterized. Although the updates array is currently unused, retaining this construction creates an injection risk if it is later executed or reused.
   - _Fix:_ Remove the dead updates array, or construct any executed SQL with Drizzle parameter binding and a strict column allowlist.
+- **server/lib/restraint-trust.ts:90** — Use of sql.raw() with a request-derived value (the 'column' variable derived from the 'outcome' argument). Even with an allowlist, this violates the strict prohibition against using sql.raw() with request-derived data.
+  - _Fix:_ Remove sql.raw() and use Drizzle's standard query builder (e.g., db.update(trustScores).set({ [column]: ... })) or use a switch statement to execute fully static SQL statements for each specific column.

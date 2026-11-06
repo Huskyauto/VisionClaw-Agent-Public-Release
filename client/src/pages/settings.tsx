@@ -3917,23 +3917,20 @@ export default function SettingsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm">Default Model</FormLabel>
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-default-model" className="text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {models.map((m) => (
-                                <SelectItem key={m.id} value={m.id} className="text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">{m.label}</span>
-                                    <span className="text-xs text-muted-foreground">— {m.description}</span>
-                                  </div>
-                                </SelectItem>
+                          <FormControl>
+                            <select
+                              {...field}
+                              data-testid="select-default-model"
+                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            >
+                              {!models.some((model) => model.id === field.value) && (
+                                <option value={field.value}>{field.value || "Select a model"}</option>
+                              )}
+                              {models.map((model) => (
+                                <option key={model.id} value={model.id}>{model.label} — {model.description}</option>
                               ))}
-                            </SelectContent>
-                          </Select>
+                            </select>
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
