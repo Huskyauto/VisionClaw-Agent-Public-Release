@@ -185,11 +185,11 @@ export async function stampImmediateSuppressionIfAnchorCurrent(params: {
   return Array.isArray(rows) && rows.length === 1;
 }
 
-export async function suppressPendingRejectedPlanDuplicates(tenantId?: number): Promise<number> {
-  if (tenantId !== undefined && (!Number.isInteger(tenantId) || tenantId <= 0)) {
-    throw new Error("suppressPendingRejectedPlanDuplicates requires a positive tenantId when scoped");
+export async function suppressPendingRejectedPlanDuplicates(tenantId: number): Promise<number> {
+  if (!Number.isSafeInteger(tenantId) || tenantId <= 0) {
+    throw new Error("suppressPendingRejectedPlanDuplicates requires a positive tenantId");
   }
-  const tenantScope = tenantId === undefined ? sql`` : sql`AND p.tenant_id = ${tenantId}`;
+  const tenantScope = sql`AND p.tenant_id = ${tenantId}`;
   const result: any = await db.execute(sql`
     SELECT p.id, p.tenant_id, i.id AS insight_id, i.category, i.title, i.summary, i.details
     FROM plans p
@@ -478,11 +478,14 @@ export type HeartbeatRepairCandidate = {
 // but whose Minerva routing failed (action_taken still has the pending marker)
 // and retry routing. Runs alongside the regular auto-apply sweep on the same
 // 10-minute interval. Idempotent because routeInsightToMinerva itself is.
-export async function retryPendingMinervaRouting(): Promise<number> {
+export async function retryPendingMinervaRouting(tenantId: number): Promise<number> {
+  if (!Number.isSafeInteger(tenantId) || tenantId <= 0) {
+    throw new Error("retryPendingMinervaRouting requires a positive tenantId");
+  }
   try {
     const tenantResult: any = await db.execute(sql`
       SELECT DISTINCT tenant_id FROM heartbeat_tasks
-      WHERE tenant_id IS NOT NULL
+      WHERE tenant_id = ${tenantId}
       ORDER BY tenant_id ASC
       LIMIT 100
     `);
@@ -492,7 +495,7 @@ export async function retryPendingMinervaRouting(): Promise<number> {
         await produceHeartbeatCronRepairInsights(tid);
       }
     }
-    await suppressPendingRejectedPlanDuplicates().catch((error: unknown) => {
+    await suppressPendingRejectedPlanDuplicates(tenantId).catch((error: unknown) => {
       console.warn(
         `[agentic-engines] duplicate-plan suppression failed without blocking routing recovery: ${error instanceof Error ? error.message : "unknown error"}`,
       );
@@ -501,6 +504,7 @@ export async function retryPendingMinervaRouting(): Promise<number> {
       SELECT id, tenant_id, category, title, summary, details
       FROM ai_insights
       WHERE status = 'applied'
+        AND tenant_id = ${tenantId}
         AND priority = 'high'
         AND action_taken = ${PENDING_PLAN_MARKER}
       LIMIT 50
@@ -677,14 +681,14 @@ export async function produceHeartbeatCronRepairInsights(tenantId: number): Prom
 // R63: Backfill — sweep existing status='new' insights whose category is in the
 // auto-apply policy and mark them applied. Safe to call repeatedly; only touches
 // rows still status='new' so manually applied/dismissed items are untouched.
-export async function autoApplyEligibleInsights(tenantId?: number): Promise<number> {
+export async function autoApplyEligibleInsights(tenantId: number): Promise<number> {
+  if (!Number.isSafeInteger(tenantId) || tenantId <= 0) {
+    throw new Error("autoApplyEligibleInsights requires a positive integer tenantId");
+  }
   try {
-    if (tenantId !== undefined && (!Number.isInteger(tenantId) || tenantId <= 0)) {
-      throw new Error(`autoApplyEligibleInsights requires a positive integer tenantId when scoped (got: ${JSON.stringify(tenantId)})`);
-    }
     const cats = Array.from(AUTO_APPLY_CATEGORIES);
     const catList = sql.join(cats.map(c => sql`${c}`), sql`, `);
-    const tenantScope = tenantId === undefined ? sql`` : sql`AND tenant_id = ${tenantId}`;
+    const tenantScope = sql`AND tenant_id = ${tenantId}`;
     const result: any = await db.execute(sql`
       UPDATE ai_insights
       SET status = 'applied',
@@ -879,7 +883,7 @@ export async function runPredictiveEngine(tenantId: number): Promise<{ insights:
     const recentExperiments = await db.execute(sql`
       SELECT re.hypothesis, re.result, re.status, re.metric_value, rp.name as program_name
       FROM research_experiments re
-      JOIN research_programs rp ON rp.id = re.program_id
+      JOIN research_programs rp ON rp.id = re.program_id AND rp.tenant_id = re.tenant_id
       WHERE re.tenant_id = ${tenantId} AND re.status = 'keep'
       ORDER BY re.created_at DESC LIMIT 20
     `).catch(() => ({ rows: [] }));

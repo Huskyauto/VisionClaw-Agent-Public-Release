@@ -1,7 +1,7 @@
 import facts from "../../../docs/release-facts.json";
 
-export const CURRENT_SOURCE_RELEASE = "R137.2+sec";
-export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 4, 2026 webhook continuity, run confirmation and scoped recovery safeguards.`;
+export const CURRENT_SOURCE_RELEASE = "R137.3";
+export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 8, 2026 reliability review, current feature inventory and navigation reconciliation.`;
 export const DEVELOPMENT_PLATFORM_SUMMARY =
   `${facts.metrics.registeredTools} total registered tools; ` +
   `${facts.metrics.declaredTables} declared / ${facts.metrics.liveTables} live development tables; ` +
@@ -12,6 +12,9 @@ export const DEVELOPMENT_PLATFORM_SUMMARY =
 export const CURRENT_PLATFORM_DESCRIPTION =
   `${SOURCE_UPDATE_SUMMARY} ${DEVELOPMENT_PLATFORM_SUMMARY} ` +
   "Scoped evidence is not whole-platform certification. " +
+  "November 6 corrections tighten tenant-scoped insight recovery, channel writes, research references and agent-run ownership. " +
+  "Settings model selection and Memory navigation received focused repairs; provider health is platform-admin-only. " +
+  "Engineering Q&A provides 19 source-linked comparisons and private owner notes; reference text grants no tool authority. " +
   "Webhook follow-ups preserve tenant-bound issue/PR conversation context. Saved-run confirmation is read-only and does not replay actions. " +
   "Harness diagnosis prioritizes recurring failures; schema compaction is an opt-in development trial, not proven cost savings. " +
   "Weekly video discovery reviews every selected daily upload without a short-clip duration ceiling. " +

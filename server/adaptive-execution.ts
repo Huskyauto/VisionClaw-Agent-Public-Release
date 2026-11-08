@@ -138,16 +138,19 @@ export async function saveLessonLearned(
   toolName: string,
   error: string,
   solution: string,
-  tenantId?: number,
+  tenantId: number,
   personaId?: number,
 ): Promise<void> {
+  if (!Number.isSafeInteger(tenantId) || tenantId <= 0) {
+    throw new Error("saveLessonLearned requires a positive tenantId");
+  }
   try {
     const lesson = `[Tool Lesson] "${toolName}" failed with "${error.slice(0, 100)}". Solution: ${solution.slice(0, 200)}`;
     await storage.createMemoryEntry({
       content: lesson,
       type: "lesson",
       personaId: personaId || null,
-      tenantId: tenantId!,
+      tenantId,
       source: "adaptive-execution",
       importance: 7,
     } as any);

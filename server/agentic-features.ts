@@ -102,6 +102,15 @@ export async function saveEvidence(params: {
   contradicts?: string;
   projectId?: number;
 }) {
+  if (!Number.isSafeInteger(params.tenantId) || params.tenantId <= 0) {
+    throw new Error("Research evidence requires a positive tenantId");
+  }
+  if (params.projectId != null) {
+    const project = await db.execute<{ id: number }>(sql`
+      SELECT id FROM projects WHERE id = ${params.projectId} AND tenant_id = ${params.tenantId} LIMIT 1
+    `);
+    if (project.rows.length === 0) throw new Error("Project not found in this tenant");
+  }
   // Research evidence can originate in web, tool, or model output. Redact at
   // the durable boundary before it can later re-enter a synthesis prompt.
   const safeText = (value: string | undefined, maxLength: number): string | null => {
@@ -599,7 +608,7 @@ export async function competitorBriefing(params: { tenantId: number; period?: st
   const changes = await db.execute(sql`
     SELECT cc.*, cr.name as competitor_name, cr.website
     FROM competitor_changes cc
-    JOIN competitor_registry cr ON cr.id = cc.competitor_id
+    JOIN competitor_registry cr ON cr.id = cc.competitor_id AND cr.tenant_id = cc.tenant_id
     WHERE cc.tenant_id = ${params.tenantId}
       AND cc.created_at > NOW() - CAST(${period} AS INTERVAL)
     ORDER BY cc.created_at DESC
@@ -859,7 +868,7 @@ export async function enrollInSequence(params: {
   if (!((seq as any).rows?.length)) return { success: false, error: "Sequence not found" };
 
   const existing = await db.execute(sql`
-    SELECT id FROM outreach_enrollments WHERE sequence_id = ${params.sequenceId} AND contact_email = ${params.contactEmail} AND status = 'active'
+    SELECT id FROM outreach_enrollments WHERE tenant_id = ${params.tenantId} AND sequence_id = ${params.sequenceId} AND contact_email = ${params.contactEmail} AND status = 'active'
   `);
   if ((existing as any).rows?.length) return { success: false, error: "Contact already enrolled in this sequence" };
 
@@ -881,7 +890,7 @@ export async function advanceSequence(params: { tenantId: number; sequenceId?: n
   const enrollments = await db.execute(sql`
     SELECT e.*, s.name as sequence_name
     FROM outreach_enrollments e
-    JOIN outreach_sequences s ON s.id = e.sequence_id
+    JOIN outreach_sequences s ON s.id = e.sequence_id AND s.tenant_id = e.tenant_id
     WHERE ${filter}
     ORDER BY e.next_send_at ASC
     LIMIT 20
@@ -989,7 +998,7 @@ export async function classifyReply(params: {
   const enrollment = await db.execute(sql`
     SELECT e.*, s.name as sequence_name
     FROM outreach_enrollments e
-    JOIN outreach_sequences s ON s.id = e.sequence_id
+    JOIN outreach_sequences s ON s.id = e.sequence_id AND s.tenant_id = e.tenant_id
     WHERE e.tenant_id = ${params.tenantId} AND e.contact_email = ${params.contactEmail} AND e.status = 'active'
     ORDER BY e.created_at DESC LIMIT 1
   `);
@@ -1020,7 +1029,7 @@ export async function classifyReply(params: {
       await db.execute(sql`
         UPDATE outreach_enrollments
         SET reply_classification = ${parsed.classification}, reply_content = ${params.replyContent.slice(0, 2000)}, status = ${newStatus}, updated_at = NOW()
-        WHERE id = ${row.id}
+        WHERE id = ${row.id} AND tenant_id = ${params.tenantId}
       `);
     }
 
@@ -1042,9 +1051,9 @@ export async function listSequences(params: { tenantId: number }) {
   const seqs = await db.execute(sql`
     SELECT s.*,
       (SELECT COUNT(*) FROM outreach_sequence_steps WHERE sequence_id = s.id) as step_count,
-      (SELECT COUNT(*) FROM outreach_enrollments WHERE sequence_id = s.id AND status = 'active') as active_enrollments,
-      (SELECT COUNT(*) FROM outreach_enrollments WHERE sequence_id = s.id AND status = 'completed') as completed,
-      (SELECT COUNT(*) FROM outreach_enrollments WHERE sequence_id = s.id AND reply_classification IS NOT NULL) as replies
+      (SELECT COUNT(*) FROM outreach_enrollments WHERE sequence_id = s.id AND tenant_id = ${params.tenantId} AND status = 'active') as active_enrollments,
+      (SELECT COUNT(*) FROM outreach_enrollments WHERE sequence_id = s.id AND tenant_id = ${params.tenantId} AND status = 'completed') as completed,
+      (SELECT COUNT(*) FROM outreach_enrollments WHERE sequence_id = s.id AND tenant_id = ${params.tenantId} AND reply_classification IS NOT NULL) as replies
     FROM outreach_sequences s
     WHERE s.tenant_id = ${params.tenantId}
     ORDER BY s.created_at DESC

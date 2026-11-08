@@ -13,6 +13,7 @@ import {
   handleResetPassword,
   handleVerifyEmail,
   handleResendVerification,
+  requirePlatformAdmin,
 } from "../auth";
 import { generateCsrfToken, getCsrfSessionKey } from "../validation";
 
@@ -59,6 +60,7 @@ export function registerAuthMonitoringRoutes(app: Express, helpers: AuthMonitori
 
   // ─── Auth Monitoring ──────────────────────────────────────
   app.get("/api/auth/health", authMiddleware, async (req, res) => {
+    if (!requirePlatformAdmin(req, res)) return;
     const { getProviderHealth, getAuthStatusCode } = await import("../auth-monitor");
     const force = req.query.refresh === "true";
     const health = await getProviderHealth(force);
@@ -66,7 +68,8 @@ export function registerAuthMonitoringRoutes(app: Express, helpers: AuthMonitori
     res.json({ providers: health, exitCode, exitLabel: exitCode === 0 ? "ok" : exitCode === 1 ? "expired" : "expiring_soon" });
   });
 
-  app.get("/api/auth/health/check", authMiddleware, async (_req, res) => {
+  app.get("/api/auth/health/check", authMiddleware, async (req, res) => {
+    if (!requirePlatformAdmin(req, res)) return;
     const { getAuthStatusCode, getCachedHealth } = await import("../auth-monitor");
     const health = getCachedHealth();
     const exitCode = getAuthStatusCode(health);

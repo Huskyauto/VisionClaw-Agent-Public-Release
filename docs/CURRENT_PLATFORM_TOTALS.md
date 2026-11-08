@@ -10,7 +10,7 @@
 > is the filtered public index and intentionally excludes trusted-persona-only
 > tools. These are different valid metrics, not competing totals.
 
-**Release evidence date:** 2026-11-04. **Evidence environment: development.**
+**Release evidence date:** 2026-11-08. **Evidence environment: development.**
 This snapshot describes the measured source and evidence database, not proof
 of production publication, production schema parity, or live feature readiness.
 Database-derived values are a
@@ -36,7 +36,7 @@ checkout. Fresh checkouts verify committed facts with `verify-counts.ts`.
 | **Platform indexes (release aggregate)** | **889** | Live `pg_indexes` count minus versioned auth/session infrastructure exclusions |
 | **Non-PK indexes (evidence database)** | **617** | `SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'` |
 | **AI providers** | **6** | OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity |
-| **AI models (core registry)** | **91 curated** | `MODEL_REGISTRY.length` in `server/model-registry.ts` |
+| **AI models (core registry)** | **93 curated** | `MODEL_REGISTRY.length` in `server/model-registry.ts` |
 
 ---
 

@@ -6,6 +6,9 @@ import { isProductionRuntime } from "./runtime-env";
 import { db } from "../db";
 import { agentSettings } from "@shared/schema";
 import { encryptApiKey, decryptApiKey } from "../crypto";
+import { getGoogleConnectorToken, clearGoogleConnectorTokenCache } from "./google-connector-client";
+import { resolveOwnerEmail } from "./owner-email";
+import { resolveOwnerGmailReadToken } from "./owner-gmail-read-token";
 
 const TOKEN_FILE = path.join(process.cwd(), "data", ".gmail-direct-token.json");
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -162,6 +165,31 @@ export async function saveGmailDirectRefreshToken(t: GmailDirectToken): Promise<
 }
 
 export async function getGmailDirectAccessToken(): Promise<string | null> {
+  return resolveOwnerGmailReadToken({
+    owner: resolveOwnerEmail(),
+    managed: () => getGoogleConnectorToken("google-mail"),
+    profile: async (token) => {
+      try {
+        const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) {
+          if (response.status === 401) clearGoogleConnectorTokenCache("google-mail");
+          await response.body?.cancel();
+          return null;
+        }
+        return await response.json();
+      } catch {
+        console.warn("[gmail-direct] managed mailbox profile unavailable; checking legacy authorization");
+        return null;
+      }
+    },
+    legacy: getLegacyGmailDirectAccessToken,
+  });
+}
+
+async function getLegacyGmailDirectAccessToken(): Promise<string | null> {
   if (_accessCache && _accessCache.expiresAt > Date.now() + 30_000) {
     return _accessCache.token;
   }
@@ -193,6 +221,7 @@ export async function getGmailDirectAccessToken(): Promise<string | null> {
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 10_000);
       let resp: Response;
+      let payload: string;
       try {
         resp = await fetch(GOOGLE_TOKEN_URL, {
           method: "POST",
@@ -200,6 +229,7 @@ export async function getGmailDirectAccessToken(): Promise<string | null> {
           body,
           signal: ac.signal,
         });
+        payload = await resp.text();
       } catch (e: any) {
         console.error(`[gmail-direct] refresh fetch failed: ${e?.message || e}`);
         return null;
@@ -207,7 +237,7 @@ export async function getGmailDirectAccessToken(): Promise<string | null> {
         clearTimeout(timer);
       }
       if (!resp.ok) {
-        const text = await resp.text();
+        const text = payload;
         // Log ONLY allowlisted structured fields — never the raw response body
         // (token-endpoint error payloads are an avoidable sensitive log sink).
         let errCode = "unknown";
@@ -230,7 +260,7 @@ export async function getGmailDirectAccessToken(): Promise<string | null> {
         }
         return null;
       }
-      const json: any = await resp.json();
+      const json: any = JSON.parse(payload);
       const accessToken = json?.access_token;
       // R125+13.8+sec (architect MEDIUM closed): validate token shape BEFORE
       // caching. A malformed 200 (provider degradation, partial response)

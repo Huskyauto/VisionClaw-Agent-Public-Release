@@ -87,6 +87,37 @@ export async function emitEvent(params: {
   const rows = (result as any).rows || result;
   const eventId = rows[0]?.id;
 
+  await dispatchPersistedEvent(eventId, params, salience);
+  return eventId;
+}
+
+/**
+ * Dispatch a committed event without inserting a duplicate. Durable producers
+ * can enqueue atomically with their own state, then use the ordinary bus hooks.
+ * This is not an exactly-once contract for downstream notification side effects.
+ */
+export async function dispatchPersistedEvent(
+  eventId: number,
+  params: { type: string; source: string; tenantId: number; data?: any },
+  salience?: { score: number; meta: any } | null,
+): Promise<void> {
+  if (salience === undefined) {
+    try {
+      salience = await scoreEvent({
+        eventType: params.type, source: params.source,
+        data: params.data, tenantId: params.tenantId,
+      });
+    } catch (err: any) {
+      console.warn(`[event-bus] scoreEvent failed for ${params.type}: ${err.message}`);
+      salience = null;
+    }
+    await db.execute(sql`
+      UPDATE event_log
+      SET salience_score = ${salience?.score ?? null},
+          salience_meta = ${salience?.meta ? JSON.stringify(salience.meta) : null}::jsonb
+      WHERE id = ${eventId} AND tenant_id = ${params.tenantId}
+    `);
+  }
   if (eventId) {
     // High-salience events wake the owner immediately. Fire-and-forget so the
     // publisher's hot path is never blocked on email I/O.
@@ -159,7 +190,6 @@ export async function emitEvent(params: {
     }
   }
 
-  return eventId;
 }
 
 export async function routeEventToSubscribers(eventId: number, tenantId: number, eventType?: string, data?: any): Promise<void> {

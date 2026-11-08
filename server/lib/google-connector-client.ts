@@ -56,7 +56,7 @@ export async function getGoogleConnectorToken(
   options: { required?: boolean } = {},
 ): Promise<string | null> {
   const cached = connectorCache[connectorName];
-  if (cached && cached.expiresAt > Date.now()) return cached.token;
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
   try {
     const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;

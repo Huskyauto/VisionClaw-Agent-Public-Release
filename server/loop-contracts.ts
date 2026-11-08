@@ -66,6 +66,8 @@ export interface LoopReadiness {
   attemptCap?: string;
   /** Source token proving durable per-run observability (state file, ledger, report, log tag). */
   runLog?: string;
+  /** Distributed loops may prove each token in its actual repository source. */
+  sources?: Partial<Record<"killSwitch" | "attemptCap" | "runLog", string>>;
   /** How this loop satisfied the report-only-first rule (required for mutating/self-healing). */
   reportOnlyFirst?: string;
 }
@@ -314,9 +316,13 @@ export const LOOP_CONTRACTS: LoopContract[] = [
     verifier: "independent",
     spend: "capped",
     readiness: {
-      killSwitch: "TENANT_AUDIT_SCHEDULE_ENABLED=0 (restart); operator cancellation fences job writes. AUDIT_DRY_RUN suppresses email only.",
-      attemptCap: "maxAttempts",
-      runLog: "tenant-1 tenant_isolation_audit agent_jobs payload.auditReport; local tenant-isolation-audit-report.md is diagnostic, not scheduled-run truth",
+      killSwitch: "TENANT_AUDIT_SCHEDULE_ENABLED",
+      attemptCap: "maxAttempts: 2048",
+      runLog: 'auditJobState("auditReport"',
+      sources: {
+        killSwitch: "server/tenant-audit-cron.ts",
+        attemptCap: "server/tenant-audit-cron.ts",
+      },
       reportOnlyFirst:
         "Read-only by design; remediation ships OFF and HARD-tier findings are never auto-queued.",
     },
@@ -412,6 +418,35 @@ export const LOOP_CONTRACTS: LoopContract[] = [
         "HITL-gated tasks pause for owner approval before acting; system tasks are seeded/reconciled from code (seed.ts is canonical), not self-invented.",
     },
   },
+  {
+    id: "workspace-proposal-verifier",
+    name: "Workspace Proposal Verifier",
+    source: "scripts/workspace-proposal-verifier-worker.ts",
+    workflow: "Workspace Proposal Verifier",
+    trigger: "Poll signed production handoffs only while workspace verification is enabled.",
+    objective: "Independently verify a source-bound proposal without applying, merging, or publishing it.",
+    check: "Validate the signed snapshot, stage its exact source, run bounded verification, and settle the fenced claim.",
+    feedback: "Persist the verified outcome or a retryable resource/source deferral with the original snapshot.",
+    stop: [
+      "Disabled or missing provisioning prevents worker startup.",
+      "No claim or insufficient memory defers without running verification.",
+      "Each handoff request permits at most two transport attempts.",
+      "Shutdown stops claiming; claimed work settles or remains fenced for recovery.",
+    ],
+    escalate: [
+      "Invalid signatures, unsafe origins, or changed source fail closed.",
+      "Resource or source deferrals remain visible to the operator; they are not successful verification.",
+    ],
+    authority: "read-only",
+    failMode: "closed",
+    verifier: "independent",
+    spend: "none",
+    readiness: {
+      killSwitch: "PROPOSAL_VERIFIER_WORKSPACE_ENABLED",
+      attemptCap: "attempt < 2",
+      runLog: "[workspace-verifier]",
+    },
+  },
 ];
 
 // ─── Readiness rubric (loop-engineering borrow) ──────────────────────────────
@@ -452,8 +487,30 @@ export function proveReadiness(
   for (const key of ["killSwitch", "attemptCap", "runLog"] as const) {
     const token = c.readiness?.[key];
     if (!token) continue;
-    if (src.includes(token)) proof[key] = true;
-    else unproven.push(`${key} token "${token}" not found in ${c.source}`);
+    const evidenceSource = c.readiness?.sources?.[key] ?? c.source;
+    let evidence = src;
+    if (evidenceSource !== c.source) {
+      const root = path.resolve(repoRoot);
+      const target = path.resolve(root, evidenceSource);
+      if (!target.startsWith(root + path.sep)) {
+        unproven.push(`${key} evidence source escapes repository`);
+        continue;
+      }
+      try {
+        const canonicalRoot = fs.realpathSync(root);
+        const canonicalTarget = fs.realpathSync(target);
+        if (!canonicalTarget.startsWith(canonicalRoot + path.sep)) {
+          unproven.push(`${key} evidence source resolves outside repository`);
+          continue;
+        }
+        evidence = fs.readFileSync(canonicalTarget, "utf8");
+      } catch {
+        unproven.push(`${key} evidence source ${evidenceSource} unreadable`);
+        continue;
+      }
+    }
+    if (evidence.includes(token)) proof[key] = true;
+    else unproven.push(`${key} token "${token}" not found in ${evidenceSource}`);
   }
   return { proof, unproven };
 }

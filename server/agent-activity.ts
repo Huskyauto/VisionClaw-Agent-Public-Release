@@ -115,11 +115,12 @@ export async function trackActivity(params: TrackActivityParams): Promise<number
   }
 }
 
-export async function completeActivity(activityId: number, status: "complete" | "failed" = "complete", summary?: string): Promise<void> {
+export async function completeActivity(activityId: number, tenantId: number, status: "complete" | "failed" = "complete", summary?: string): Promise<void> {
+  if (!Number.isSafeInteger(tenantId) || tenantId <= 0) throw new Error("Activity completion requires a tenant");
   try {
     const updates: any = { status, completedAt: new Date() };
     if (summary) updates.summary = summary;
-    await db.update(agentActivity).set(updates).where(eq(agentActivity.id, activityId));
+    await db.update(agentActivity).set(updates).where(and(eq(agentActivity.id, activityId), eq(agentActivity.tenantId, tenantId)));
   } catch (err: any) {
     console.error(`[agent-activity] Complete failed:`, err.message);
   }

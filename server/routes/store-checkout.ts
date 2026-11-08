@@ -11,7 +11,7 @@ import type { CatalogProduct } from "../product-catalog";
 const storeCheckoutBodySchema = z.object({
   sku: z.string().min(1, "sku required").max(200),
   customerEmail: z.string().email("valid customerEmail required").max(320),
-  intake: z.record(z.unknown()).optional(),
+  intake: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Extracted from the inline /api/store/checkout handler that previously

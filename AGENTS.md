@@ -2,6 +2,10 @@
 
 > Companion to `replit.md`. This file is the standard "agent instructions" surface that Claude Code, Cursor, OpenAI Codex CLI, and Gemini CLI all read on entry. Replit Agent reads `replit.md`. Both files should stay in sync.
 
+`replit.md` is the compact operating index. Read its linked detailed operating
+contracts before changing the relevant subsystem; historical release records are
+dated evidence, not fresh authorization or proof of current production health.
+
 ## Identity
 
 You are a coding agent working on **VisionClaw** — a multi-tenant agentic AI platform (Express/TypeScript backend, React/Vite frontend, Drizzle/Postgres, Stripe + Coinbase billing, Replit Auth). Owner: Robert Washburn. Public mirror: https://github.com/Huskyauto/VisionClaw-Agent-Public-Release.
@@ -31,13 +35,13 @@ Right: query an index first, then read only the lines the index points you to.
 In this repo you have three indexes already wired up:
 1. **Hybrid BM25 + pgvector knowledge search** — `server/embeddings.ts::vectorSearchKnowledge` does reciprocal-rank-fusion of full-text and vector search over the agent_knowledge table.
 2. **Skill-RAG with LLM-as-judge** — `server/skill-rag.ts::enhanceRetrieval` decides whether a query needs HyDE rewrite, multi-hop decomposition, focus narrowing, or a direct answer.
-3. **Tool registry** — `server/tools/index.ts` exposes 393 tools, all described in `TOOL_DEFINITIONS`. Use `getAllToolDefinitions()` rather than grepping the registry. (Authoritative counts: `docs/CURRENT_PLATFORM_TOTALS.md`.)
+3. **Tool registry** — `server/tools/index.ts` exposes governed tools described in `TOOL_DEFINITIONS`. Use `getAllToolDefinitions()` rather than grepping the registry. (Authoritative dated counts: `docs/CURRENT_PLATFORM_TOTALS.md`.)
 
 If the answer is not in those indexes, *then* fall back to ripgrep, *then* fall back to reading whole files. Reading whole files is the last resort, not the first.
 
 ## Hard Rules (non-negotiable)
 
-1. **`shared/schema.ts` edits are allowed but require care.** Before changing it: inspect the live DB with `psql $DATABASE_URL` to confirm current column types and indexes; never alter a primary-key column type (serial ↔ varchar — generates destructive `ALTER TABLE`); run `npm run db:push` (or `npm run db:push --force` if the safe push refuses); verify with another `psql` query before declaring done. Sidecar files (e.g. `.local/code-health-checkpoint.json`) remain a fine alternative when the state is genuinely transient.
+1. **Schema changes require the database and schema-migration runbooks.** Confirm the target environment and current column types first. Never change primary-key types or bypass a refusal with `db:push --force`. Replit-managed production schema changes use the owner-initiated Publish flow, not agent-run production DDL; external databases follow their documented authorized migration process. Verify the resulting schema in the correct environment. Sidecar files remain an option for genuinely transient state.
 2. **Never `sql.raw()` user input.** Use parameterised queries via Drizzle.
 3. **Never log or print secrets.** Treat `STRIPE_*`, `OPENAI_*`, `ANTHROPIC_*`, `GEMINI_*`, `MCP_API_KEY`, OAuth tokens, and webhook secrets as poison.
 4. **Owner privacy:** "Bob Washburn" privately, "Robert Washburn" publicly (i.e. anything that touches the public mirror).
@@ -49,10 +53,10 @@ If the answer is not in those indexes, *then* fall back to ripgrep, *then* fall 
 - `server/index.ts` — Express bootstrap, registers all routes including `registerMcpRoutes` for the MCP server at `/api/mcp/sse`.
 - `server/routes.ts` — REST API routes (5,700+ lines; use search-before-reading).
 - `server/mcp-server.ts` — MCP stdio + SSE transports, multi-tenant key derivation.
-- `server/tools/` — 393 tool implementations, registered in `tools/index.ts`.
+- `server/tools/` — tool implementations, registered in `tools/index.ts`.
 - `server/skill-rag.ts` — Skill-RAG pipeline (hybrid search + LLM judge + fix-skills).
 - `server/code-health.ts` — Static-analysis "BS detector" (resumable since R74.13v).
-- `server/seed-persona-prompts.ts` — `PERSONA_DOCS` registry for all 16 personas.
+- `server/seed-persona-prompts.ts` — `PERSONA_DOCS` registry for the active persona roster.
 - `client/src/` — React + Vite frontend (wouter routing, shadcn/ui, TanStack Query).
 - `shared/schema.ts` — Drizzle schema (edits allowed, see Hard Rules above).
 
@@ -62,6 +66,7 @@ If the answer is not in those indexes, *then* fall back to ripgrep, *then* fall 
 2. **Plan in writing** — for non-trivial work, draft a `.local/session_plan.md` so the user can audit your intent.
 3. **Make the smallest correct change** — prefer editing 5 lines in 1 file over rewriting a module.
 4. **Verify** — run the affected workflow, hit the affected endpoint, or write a 10-line repro script. Do not declare "done" without proof.
+   Distinguish implemented, locally verified, published and production-verified states. A recorded check applies only to its checked source, scope and environment; report unknown outcomes explicitly.
 5. **Document** — update `replit.md` and (if architectural) this file.
 6. **Repository propagation** — keep the owner-authorized private backup workflow running. Normal private source commits/pushes do not need a new approval each time; public-mirror refreshes, force-pushes and application publication are not authorized by that backup permission.
 

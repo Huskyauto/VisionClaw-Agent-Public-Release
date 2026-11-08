@@ -21,6 +21,24 @@ type ReleaseFacts = {
 const facts = JSON.parse(fs.readFileSync("docs/release-facts.json", "utf8")) as ReleaseFacts;
 const indexHtml = fs.readFileSync("client/index.html", "utf8");
 
+test("PWA metadata and every static description carry the measured model inventory", () => {
+  const manifest = JSON.parse(fs.readFileSync("client/public/manifest.json", "utf8"));
+  const notice = fs.readFileSync("client/src/components/prepublication-notice.tsx", "utf8");
+  const release = notice.match(/CURRENT_SOURCE_RELEASE = "([^"]+)"/)?.[1];
+  assert.ok(release);
+  assert.ok(manifest.description.includes(release), "PWA revision must match the shared release");
+  for (const description of [
+    manifest.description,
+    metaContent("name", "description"),
+    metaContent("property", "og:description"),
+    metaContent("name", "twitter:description"),
+  ]) {
+    assert.ok(description.includes(`${facts.metrics.coreRegistryModels} curated models`));
+    assert.ok(description.includes(`${facts.metrics.declaredTables} declared / ${facts.metrics.liveTables} live development tables`));
+    assert.ok(description.includes(`${facts.metrics.platformIndexes} platform indexes`));
+  }
+});
+
 function metaContent(attribute: "name" | "property", value: string): string {
   const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = indexHtml.match(

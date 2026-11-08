@@ -82,6 +82,21 @@ export async function postMessage(params: {
     return null;
   }
 
+  if (params.threadId != null) {
+    const owned = await db.execute(sql`
+      SELECT id FROM channel_messages
+      WHERE id = ${params.threadId} AND tenant_id = ${params.tenantId} AND channel_id = ${channel.id}
+      LIMIT 1
+    `);
+    if (((owned as any).rows || owned).length === 0) throw new Error("Thread reference not found in this tenant channel");
+  }
+  if (params.eventRef != null) {
+    const owned = await db.execute(sql`
+      SELECT id FROM event_log WHERE id = ${params.eventRef} AND tenant_id = ${params.tenantId} LIMIT 1
+    `);
+    if (((owned as any).rows || owned).length === 0) throw new Error("Event reference not found in this tenant");
+  }
+
   const result = await db.execute(sql`
     INSERT INTO channel_messages (tenant_id, channel_id, from_persona_id, message_type, content, metadata, thread_id, event_ref)
     VALUES (
@@ -122,7 +137,7 @@ export async function readMessages(params: {
       const result = await db.execute(sql`
         SELECT cm.*, ac.name as channel_name, p.name as from_persona_name
         FROM channel_messages cm
-        LEFT JOIN agent_channels ac ON ac.id = cm.channel_id
+        LEFT JOIN agent_channels ac ON ac.id = cm.channel_id AND ac.tenant_id = cm.tenant_id
         LEFT JOIN personas p ON p.id = cm.from_persona_id
         WHERE cm.tenant_id = ${params.tenantId}
           AND cm.channel_id = ${channelId}
@@ -135,7 +150,7 @@ export async function readMessages(params: {
     const result = await db.execute(sql`
       SELECT cm.*, ac.name as channel_name, p.name as from_persona_name
       FROM channel_messages cm
-      LEFT JOIN agent_channels ac ON ac.id = cm.channel_id
+      LEFT JOIN agent_channels ac ON ac.id = cm.channel_id AND ac.tenant_id = cm.tenant_id
       LEFT JOIN personas p ON p.id = cm.from_persona_id
       WHERE cm.tenant_id = ${params.tenantId} AND cm.channel_id = ${channelId}
       ORDER BY cm.created_at DESC LIMIT ${limit}
@@ -156,7 +171,7 @@ export async function readMessages(params: {
     if (params.unreadOnly) {
       const result = await db.execute(sql`
         SELECT cm.*, ac.name as channel_name FROM channel_messages cm
-        JOIN agent_channels ac ON ac.id = cm.channel_id
+        JOIN agent_channels ac ON ac.id = cm.channel_id AND ac.tenant_id = cm.tenant_id
         WHERE cm.tenant_id = ${params.tenantId}
           AND cm.channel_id = ANY(${channelIds}::int[])
           AND NOT (cm.read_by @> ${JSON.stringify([params.personaId])}::jsonb)
@@ -167,7 +182,7 @@ export async function readMessages(params: {
 
     const result = await db.execute(sql`
       SELECT cm.*, ac.name as channel_name FROM channel_messages cm
-      JOIN agent_channels ac ON ac.id = cm.channel_id
+      JOIN agent_channels ac ON ac.id = cm.channel_id AND ac.tenant_id = cm.tenant_id
       WHERE cm.tenant_id = ${params.tenantId}
         AND cm.channel_id = ANY(${channelIds}::int[])
       ORDER BY cm.created_at DESC LIMIT ${limit}
@@ -177,7 +192,7 @@ export async function readMessages(params: {
 
   const result = await db.execute(sql`
     SELECT cm.*, ac.name as channel_name FROM channel_messages cm
-    JOIN agent_channels ac ON ac.id = cm.channel_id
+    JOIN agent_channels ac ON ac.id = cm.channel_id AND ac.tenant_id = cm.tenant_id
     WHERE cm.tenant_id = ${params.tenantId}
     ORDER BY cm.created_at DESC LIMIT ${limit}
   `);
@@ -199,7 +214,7 @@ export async function getUnreadCount(tenantId: number, personaId: number): Promi
   const result = await db.execute<UnreadChannelSqlRow>(sql`
     SELECT ac.name as channel_name, COUNT(*) as count
     FROM channel_messages cm
-    JOIN agent_channels ac ON ac.id = cm.channel_id
+    JOIN agent_channels ac ON ac.id = cm.channel_id AND ac.tenant_id = cm.tenant_id
     JOIN channel_subscriptions cs
       ON cs.channel_id = cm.channel_id
       AND cs.tenant_id = ${tenantId}
@@ -231,11 +246,16 @@ export async function subscribeToChannel(tenantId: number, channelId: number, pe
   if (((owned as any).rows || owned).length === 0) {
     throw new Error(`channel ${channelId} not found for tenant ${tenantId} (fail closed)`);
   }
-  await db.execute(sql`
+  const result = await db.execute(sql`
     INSERT INTO channel_subscriptions (tenant_id, channel_id, persona_id, priority)
     VALUES (${tenantId}, ${channelId}, ${personaId}, ${priority || "normal"})
     ON CONFLICT (channel_id, persona_id) DO UPDATE SET enabled = TRUE, priority = ${priority || "normal"}
+    WHERE channel_subscriptions.tenant_id = ${tenantId}
+    RETURNING id
   `);
+  if (((result as any).rows || result).length === 0) {
+    throw new Error("Channel subscription conflicts with another tenant");
+  }
 }
 
 export async function unsubscribeFromChannel(tenantId: number, channelId: number, personaId: number): Promise<void> {

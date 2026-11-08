@@ -6,7 +6,28 @@ and hardened private OAuth setup output. Browser checks, TypeScript, publishing
 preflight and production build passed. Dependency advisories and incomplete
 audit coverage remain; these checks are not a whole-platform security clearance.
 
-## Current source release — R137.2+sec (November 4, 2026)
+## Current source release — R137.3 (November 8, 2026)
+
+- **Durable wake handoff:** event enqueue and schedule completion now commit
+  atomically. Pending events retain the existing recovery path; uncertain legacy
+  claims require review rather than automatic replay. Exactly-once downstream
+  delivery and completed customer outcomes are not claimed.
+- **Reliability reconciliation:** explicit account ownership covers insight
+  recovery, channel/thread writes, research projects, agent parent runs, wakes,
+  task forces and captured project assets. Provider-health diagnostics are
+  platform-admin-only, including cached Settings rendering.
+- **Usability and operational corrections:** repaired Settings model selection
+  and Memory navigation; private OAuth setup avoids credential output.
+  Engineering Q&A and current feature/navigation summaries retain their
+  owner/admin boundaries.
+- **Review scope and status:** [November review](docs/platform-update-2026-11-08.md)
+  records measured inventory and verification limits. Production investigation
+  observed isolated failure and latency; resource telemetry was unavailable.
+  The tenant audit remains incomplete, not whole-platform certification.
+- **Source map:** `client/src` contains the UI, `server` backend services and
+  tools, `shared` contracts, `scripts` operational tooling, and `docs` references.
+  This repository is a sanitized export: private operational records, credentials,
+  database contents and uploads are deliberately not included.
 
 - **Engineering Q&A:** owner-only sidebar reference with 19 original project
   comparisons drawn from 18 selected interview answers, searchable evidence,
@@ -38,7 +59,7 @@ audit coverage remain; these checks are not a whole-platform security clearance.
 
 **428 registered tools · 386 publicly documented tools · 18 personas · 68 platform
 skills · 146 active capabilities · 197 declared / 278 live development tables ·
-889 platform indexes · 91 curated models · 41 governance rules.**
+889 platform indexes · 93 curated models · 41 governance rules.**
 These are dated development measurements, not production telemetry.
 
 Recent source additions include an eight-document **AI Stack Decision Review**
@@ -109,7 +130,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **Earlier source update — R137+sec (October 19, 2026): Business pilots, company report packages and evidence-first operations.** Owner-only health/re-scan, release, governance and cost/routing pilots; read-only website readiness; sourced company reports with required audio; private alert logs; receipt-backed delivery checks, outcome-first briefings and video packaging. Private report packages are excluded from generic tenant file access. [Feature/access matrix](docs/platform-update-2026-10-19.md). Forks need their own credentials, entitlements and configuration. Focused live pilot verification is not universal certification; GitHub synchronization is not website publication.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **428 total registered tools · 386 public documented tools · 68 total skills · 146 active capabilities · 18 personas · 197 declared / 278 live development tables · 41 governance rules · 889 platform indexes · 91 curated AI models · 6 AI providers · 6 deployment targets.** These are a November 4 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **428 total registered tools · 386 public documented tools · 68 total skills · 146 active capabilities · 18 personas · 197 declared / 278 live development tables · 41 governance rules · 889 platform indexes · 93 curated AI models · 6 AI providers · 6 deployment targets.** These are a November 8 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 ### October 9–14 source updates
 
@@ -373,7 +394,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | AI Agents (Personas) | 18 |
 | Tools (total registered) | 428 |
 | Tools (public documented) | 386 |
-| AI Models in Core Registry | 91 curated |
+| AI Models in Core Registry | 93 curated |
 | Daily Catalog Discovery | 1000+ models scanned on OpenRouter |
 | AI Providers | 6 (OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity) |
 | Governance Rules | 41 |
@@ -417,7 +438,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
         ┌────────────┐   ┌────────────┐   ┌────────────┐
         │ PostgreSQL │   │ Google     │   │ 6 AI       │
         │ + pgvector │   │ Drive      │   │ providers  │
-        │ D197/L278  │   │ storage    │   │ 91 curated │
+        │ D197/L278  │   │ storage    │   │ 93 curated │
         └────────────┘   └────────────┘   └────────────┘
 ```
 
@@ -463,7 +484,7 @@ Every agent has a defined role, personality, skill set, and operating rules. The
 
 ### AI & Intelligence
 
-- **91 Curated AI Models in the Development Registry** with configured routing across supported providers. Bring your own provider credentials — availability and billing are governed by provider and account terms, not a promise of universally free inference.
+- **93 Curated AI Models in the Development Registry** with configured routing across supported providers. Bring your own provider credentials — availability and billing are governed by provider and account terms, not a promise of universally free inference.
 - **Adaptive Model Discovery (R73)** — a daily background task scans OpenRouter's full catalog of 1000+ models, tier-classifies each by completion price (reasoning / powerful / balanced / fast), probes the Replit gateway for new releases, and emails the owner a ranked digest of new models worth adding to the registry. Hard caps prevent inbox spam (10 alerts/run max), lifetime dedupe prevents re-alerts, and silent days mean nothing changed.
 - **Streaming Responses** via Server-Sent Events (SSE) — real-time token-by-token output
 - **Thinking Mode** — explainable reasoning with decision traces for complex problems

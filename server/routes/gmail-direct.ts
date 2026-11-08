@@ -177,13 +177,13 @@ export function registerGmailDirectRoutes(app: Express): void {
   app.get("/api/admin/gmail-direct/status", async (req: Request, res: Response) => {
     if (!checkPinOr401(req, res)) return;
     const stored = await loadGmailDirectRefreshToken();
-    if (!stored) return res.json({ connected: false });
     const access = await getGmailDirectAccessToken();
     let profile: any = null;
     if (access) {
       try {
         const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
           headers: { Authorization: `Bearer ${access}` },
+          signal: AbortSignal.timeout(10_000),
         });
         profile = r.ok ? await r.json() : { error: r.status };
       } catch (e: any) {
@@ -194,9 +194,10 @@ export function registerGmailDirectRoutes(app: Express): void {
     // endpoint is PIN-gated, leaking the storage backend of the refresh token
     // narrows an attacker's search surface if the PIN is ever compromised.
     res.json({
-      connected: true,
-      scope: stored.scope,
-      saved_at: stored.saved_at,
+      connected: Boolean(access && profile && !profile.error),
+      reauthorizationRequired: !access,
+      scope: stored?.scope,
+      saved_at: stored?.saved_at,
       profile,
     });
   });

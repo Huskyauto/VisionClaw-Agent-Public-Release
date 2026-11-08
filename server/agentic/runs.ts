@@ -48,6 +48,12 @@ export async function createRun(params: {
   state?: any;
   parentRunId?: number | null;
 }) {
+  if (!Number.isSafeInteger(params.tenantId) || params.tenantId <= 0) {
+    throw new Error("createRun requires a positive tenantId");
+  }
+  if (params.parentRunId != null && !await getRun(params.parentRunId, params.tenantId)) {
+    throw new Error("Parent run not found in this tenant");
+  }
   const [run] = await db.insert(agentRuns).values({
     tenantId: params.tenantId,
     runType: params.runType,

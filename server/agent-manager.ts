@@ -201,6 +201,7 @@ export async function forkConversation(
   for (const msg of toCopy) {
     await storage.createMessage({
       conversationId: newConv.id,
+      tenantId,
       role: msg.role as "user" | "assistant" | "system",
       content: msg.content,
       model: (msg as any).model,

@@ -12,11 +12,11 @@ function loadUploadsMiddleware(options: {
   rawBasenameVariant?: boolean;
 }) {
   const source = readFileSync("server/routes.ts", "utf8");
-  const marker = 'app.use("/uploads", ';
+  const marker = 'app.use("/uploads", async ';
   const start = source.indexOf(marker);
   const end = source.indexOf("}, express.static(UPLOADS_DIR));", start);
   assert.ok(start >= 0 && end > start, "extract the actual production uploads middleware");
-  let handlerSource = source.slice(start + marker.length, end + 1)
+  let handlerSource = "async " + source.slice(start + marker.length, end + 1)
     .replaceAll('await import("./db")', "__dbModule")
     .replaceAll('await import("drizzle-orm")', "__drizzle")
     .replaceAll('await import("@shared/schema")', "__schema")
@@ -123,11 +123,11 @@ test("ordinary flat names and canonical presenter cache paths remain admitted", 
 
 test("actual uploads middleware rejects private and encoded paths before auth or static", async () => {
   const source = readFileSync("server/routes.ts", "utf8");
-  const marker = 'app.use("/uploads", ';
+  const marker = 'app.use("/uploads", async ';
   const start = source.indexOf(marker);
   const end = source.indexOf("}, express.static(UPLOADS_DIR));", start);
   assert.ok(start >= 0 && end > start, "extract the actual production uploads middleware");
-  const handlerSource = "module.exports = " + source.slice(start + marker.length, end + 1) + ";";
+  const handlerSource = "module.exports = async " + source.slice(start + marker.length, end + 1) + ";";
   const compiled = transformSync(handlerSource, { loader: "ts", target: "node20", format: "cjs" }).code;
   const module = { exports: undefined as any };
   vm.runInNewContext(compiled, { module, isSafeUploadsHttpPath });

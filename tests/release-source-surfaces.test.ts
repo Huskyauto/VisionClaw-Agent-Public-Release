@@ -11,15 +11,15 @@ const updates = JSON.parse(read("client/src/data/updates.json"));
 const release = /CURRENT_SOURCE_RELEASE = "([^"]+)"/.exec(notice)?.[1];
 
 test("current release agrees across shared summary, dashboard data and both READMEs", () => {
-  assert.equal(release, "R137.2+sec");
+  assert.equal(release, "R137.3");
   assert.equal(updates[0].version, release);
-  assert.equal(updates[0].date, "November 4, 2026");
+  assert.equal(updates[0].date, "November 8, 2026");
   const readmes = isPrivateSource ? ["README.md", "README.md"] : ["README.md"];
   for (const file of [...readmes, "ROADMAP.md"]) {
     assert.ok(read(file).slice(0, 18000).includes(release!));
     assert.doesNotMatch(read(file), /Latest source update[^\n]*R137\+sec/);
   }
-  assert.match(read("ROADMAP.md"), /November 4 development snapshot\)\. R137\.2\+sec/);
+  assert.match(read("ROADMAP.md"), /November 8 development snapshot\)\. R137\.3/);
   assert.match(sidebar, /badge-updates-new[\s\S]{0,160}\{CURRENT_SOURCE_RELEASE\}/);
   assert.match(read("client/src/components/home-release-updates.tsx"), /updatesData/);
   assert.match(read("client/src/components/seo-head.tsx"), /CURRENT_PLATFORM_DESCRIPTION/);
@@ -38,7 +38,7 @@ test("last-72-hour features reach both landing views and the shared dashboard re
     "Website readiness", "Company report", "Alert logs", "Outcome-first", "Video packaging"]) {
     assert.ok(current.includes(term), `missing current feature: ${term}`);
   }
-  assert.match(current, /November 4/);
+  assert.match(current, /Source updates through \{releaseFacts\.releaseDate\}/);
   assert.match(current, /owner-only/i);
   assert.match(JSON.stringify(updates[0]), /production/i);
   assert.match(JSON.stringify(updates[0]), /not certification/i);
@@ -52,7 +52,7 @@ test("November source changes reach landing, dashboard, SEO and repository summa
     assert.ok(current.toLowerCase().includes(term.toLowerCase()), `landing missing ${term}`);
     assert.ok(latest.toLowerCase().includes(term.toLowerCase()), `release feed missing ${term}`);
   }
-  assert.match(notice, /November 4, 2026/);
+  assert.match(notice, /November 8, 2026/);
   assert.match(notice, /audit remains degraded and incomplete/);
   assert.match(latest, /not certification/i);
   assert.match(latest, /does not replay/i);
@@ -117,8 +117,24 @@ test("public current-count table and architecture diagram agree with dated relea
   assert.ok(diagram?.includes(`${facts.coreRegistryModels} curated`));
 });
 
-test("private backup wording preserves the automatic-push hold", () => {
+test("private backup wording distinguishes standing authority from a temporary review hold", () => {
   if (!isPrivateSource) return; // Private backup instructions are not exported.
-  assert.match(read("README.md"), /Private source backup:[\s\S]{0,70}Auto Git Push is on HOLD/);
-  assert.match(read("replit.md"), /^## R136\.2 — .+ \(October 14, 2026\)$/m);
+  assert.match(read("README.md"), /Private source backup:[\s\S]{0,100}owner-authorized/);
+  assert.match(read("README.md"), /temporarily paused during review/);
+  assert.match(read("replit.md"), /Normal private GitHub backups through Auto Git Push are owner-authorized/);
+});
+
+test("private README current tables and every literal sidebar path remain aligned", () => {
+  if (isPrivateSource) {
+    const facts = JSON.parse(read("docs/release-facts.json")).metrics;
+    const currentReadme = read("README.md");
+    const architecture = currentReadme.split("## Architecture at a glance")[1]?.split("## Documentation")[0];
+    assert.ok(architecture?.includes(`${facts.declaredTables} declared / ${facts.liveTables} live development`));
+    assert.doesNotMatch(architecture ?? "", /195 declared \/ 276 live/);
+  }
+  const app = read("client/src/App.tsx");
+  const paths = [...sidebar.matchAll(/<NavLink\s+(?:[^>]*?\s+)?path="([^"?]+)/g)].map(m => m[1]);
+  assert.ok(paths.length > 60, "the navigation inventory must not silently shrink");
+  for (const path of new Set(paths)) assert.ok(app.includes(`path="${path}"`), `${path} lacks a route`);
+  assert.doesNotMatch(landing, /100% uptime|mean zero downtime|Every deliverable passes a universal quality gate/);
 });

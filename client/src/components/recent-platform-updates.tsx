@@ -1,8 +1,19 @@
 import { Link } from "wouter";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { CURRENT_SOURCE_RELEASE } from "./prepublication-notice";
+import releaseFacts from "../../../docs/release-facts.json";
 
 const updates = [
+  {
+    title: "Reliability review and clearer account boundaries",
+    business: "Recent repairs cover model selection in Settings, Memory navigation and account ownership checks. Scheduled wake-ups now save their event and handoff together; uncertain old outcomes require review instead of blind retries. Provider diagnostics are owner-only. Not every journey has been verified.",
+    technical: "November 6 changes enforce explicit tenant scope for insight recovery, channels, research projects, agent parent runs, wakes and task forces. Wake event insertion and schedule completion are now atomic, with central bus hooks preserved. Old ambiguous firing claims fail visibly; downstream delivery is not exactly-once. Provider health requires the current platform-admin role. Audit coverage remains incomplete.",
+  },
+  {
+    title: "Engineering Q&A and a current feature inventory",
+    business: "The owner-only Engineering Q&A menu offers 19 source-linked comparisons, search, filters and private notes. Both landing views, the dashboard, navigation and repository guides now share the current source summary and dated inventory.",
+    technical: "Owner notes use tenant-scoped persistence and stale-write protection; they remain literal reference text, not agent instructions. Static metadata and the PWA manifest track the measured registry. No new tools, customer permissions or automatic workflows are introduced by this reconciliation.",
+  },
   {
     title: "Webhook follow-ups stay with the right conversation",
     business: "Supported issue and pull-request follow-ups keep their tenant-bound conversation instead of starting over. Disabled, reassigned or invalid bindings are refused rather than mixed into another conversation.",
@@ -154,7 +165,7 @@ export function RecentPlatformUpdates({ technical = false }: { technical?: boole
         <span className="rounded bg-cyan-600 text-white px-2 py-1 text-xs font-semibold">{CURRENT_SOURCE_RELEASE}</span>
       </div>
       <p className="text-sm text-muted-foreground mb-6">
-        Source updates through November 4. Counts remain the dated development snapshot.
+        Source updates through {releaseFacts.releaseDate}. Counts remain the dated development snapshot.
         Integration access, account allowances and feature flags still apply.
         These notes describe the source, not a guarantee that every option is enabled on this deployment.
       </p>

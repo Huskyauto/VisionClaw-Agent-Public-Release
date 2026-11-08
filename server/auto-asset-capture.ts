@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 
 import { logSilentCatch } from "./lib/silent-catch";
-import { assertConversationInTenant } from "./storage-helpers/project-tenant-guard";
+import { assertConversationInTenant, assertProjectInTenant } from "./storage-helpers/project-tenant-guard";
 const ASSET_DIR = path.resolve(process.cwd(), "project-assets");
 
 interface DetectedAsset {
@@ -116,6 +116,7 @@ export async function captureProjectAssets(
     const convRows = (convRes as any).rows || convRes;
     const projectId = convRows?.[0]?.project_id;
     if (!projectId) return 0;
+    if (!(await assertProjectInTenant(projectId, tenantId))) return 0;
 
     const assets = detectDeliverables(assistantResponse);
     if (assets.length === 0) return 0;
@@ -206,7 +207,7 @@ export async function backfillProjectAssets(): Promise<void> {
       
       const msgRes = await db.execute(sql`
         SELECT content FROM messages
-        WHERE conversation_id = ${c.id} AND role = 'assistant'
+        WHERE conversation_id = ${c.id} AND tenant_id = ${c.tenant_id} AND role = 'assistant'
         ORDER BY created_at ASC
       `);
       const msgs = (msgRes as any).rows || msgRes;

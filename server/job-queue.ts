@@ -497,11 +497,15 @@ export async function failJob(
 
 /** Operator: cancel a pending or running job. Running jobs' handlers will
  *  still complete — cancellation only prevents future retries. */
-export async function cancelJob(id: number): Promise<void> {
+export async function cancelJob(id: number, scope: TenantScope): Promise<void> {
+  if (scope !== ALL_TENANTS && (!Number.isSafeInteger(scope) || scope <= 0)) {
+    throw new Error("Job cancellation requires a tenant or explicit operator scope");
+  }
+  const tenantFilter = scope === ALL_TENANTS ? sql`` : sql`AND tenant_id = ${scope}`;
   await db.execute(sql`
     UPDATE agent_jobs
     SET status = 'cancelled', completed_at = NOW()
-    WHERE id = ${id} AND status IN ('pending','running','failed')
+    WHERE id = ${id} AND status IN ('pending','running','failed') ${tenantFilter}
   `);
 }
 
@@ -555,7 +559,14 @@ export interface ListJobsFilter {
 }
 
 /** Operator: list jobs filtered by status/kind/tenant. */
-export async function listJobs(filter: ListJobsFilter = {}): Promise<AgentJob[]> {
+export async function listJobs(filter: ListJobsFilter, scope: TenantScope): Promise<AgentJob[]> {
+  if (scope !== ALL_TENANTS && (!Number.isSafeInteger(scope) || scope <= 0)) {
+    throw new Error("Job listing requires a tenant or explicit operator scope");
+  }
+  if (filter.tenantId !== undefined && (!Number.isSafeInteger(filter.tenantId) || filter.tenantId <= 0
+    || (scope !== ALL_TENANTS && filter.tenantId !== scope))) {
+    throw new Error("Job filter does not match its authorized tenant");
+  }
   const { status, kind, tenantId, limit = 100, offset = 0 } = filter;
   const statuses = Array.isArray(status) ? status : status ? [status] : null;
 
@@ -563,7 +574,8 @@ export async function listJobs(filter: ListJobsFilter = {}): Promise<AgentJob[]>
   const conditions: any[] = [];
   if (statuses && statuses.length) conditions.push(sql`status = ANY(${statuses})`);
   if (kind) conditions.push(sql`kind = ${kind}`);
-  if (tenantId) conditions.push(sql`tenant_id = ${tenantId}`);
+  if (scope !== ALL_TENANTS) conditions.push(sql`tenant_id = ${scope}`);
+  else if (tenantId !== undefined) conditions.push(sql`tenant_id = ${tenantId}`);
 
   const whereClause = conditions.length
     ? sql`WHERE ${sql.join(conditions, sql` AND `)}`

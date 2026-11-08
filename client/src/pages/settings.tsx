@@ -1546,20 +1546,25 @@ function ApiKeysSection() {
 
 function AuthHealthSettings() {
   const { toast } = useToast();
+  const { tenant } = useAuth();
+  const canViewProviderHealth = tenant?.id === 1 && tenant?.isAdmin === true;
   const [checking, setChecking] = useState(false);
 
   const { data, isLoading, refetch } = useQuery<{ providers: Record<string, any>; exitCode: number; exitLabel: string }>({
     queryKey: ["/api/auth/health"],
+    enabled: canViewProviderHealth,
     refetchInterval: 5 * 60 * 1000,
   });
 
   const handleCheck = async () => {
+    if (!canViewProviderHealth) return;
     setChecking(true);
     await refetch();
     setChecking(false);
     toast({ description: "Provider health refreshed" });
   };
 
+  if (!canViewProviderHealth) return null;
   const providers = data?.providers || {};
   const exitLabel = data?.exitLabel || "unchecked";
 

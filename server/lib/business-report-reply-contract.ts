@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 /** One structural contract for HTTP intake, downstream quality checks and clients. */
 export const reportActionTextSchemas = {
@@ -44,7 +43,7 @@ export const reportReplySchema = z.object({
 export const qualityReportReplySchema = reportReplySchema.extend({
   report: reportSchema.extend({ actionPlan, corrections }),
 });
-const jsonSchema = (schema: z.ZodTypeAny) => zodToJsonSchema(schema, { $refStrategy: "none" });
+const jsonSchema = (schema: z.ZodTypeAny) => z.toJSONSchema(schema, { unrepresentable: "any", io: "input" });
 export const REPORT_REPLY_CONTRACT = {
   protocol: "business-report-handoff-v1",
   versions: { "0": jsonSchema(reportReplySchema), "1": jsonSchema(qualityReportReplySchema) },

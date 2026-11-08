@@ -387,7 +387,7 @@ test("an unsupported operational insight is deferred without creating a Felix ca
     assert.equal(String((insight.rows ?? insight)[0].action_taken), "Deferred: no durable repair path.");
 
     await import("../../server/agentic-engines").then(({ retryPendingMinervaRouting }) =>
-      retryPendingMinervaRouting(),
+      retryPendingMinervaRouting(tenantId),
     );
     const afterRetry: any = await db.execute(sql`
       SELECT action_taken FROM ai_insights

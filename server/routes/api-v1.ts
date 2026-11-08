@@ -186,8 +186,8 @@ const revenueOrchestratorRunSchema = z.object({
 const revenueOrchestratorMissionSchema = z.object({
   sourceRunId: z.number().int().positive(),
   submissionNote: z.string().trim().max(2000).optional(),
-  mission: z.record(z.any()),
-  caps: z.record(z.any()).optional(),
+  mission: z.record(z.string(), z.any()),
+  caps: z.record(z.string(), z.any()).optional(),
 });
 
 /**
@@ -1426,7 +1426,7 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
     jsonrpc: z.literal("2.0"),
     id: z.union([z.string().max(200), z.number()]).nullable().optional(),
     method: z.enum(["message/send", "tasks/get"]),
-    params: z.record(z.any()).optional(),
+    params: z.record(z.string(), z.any()).optional(),
   });
 
   function a2aError(res: Response, rpcId: string | number | null, code: number, message: string) {
@@ -1619,7 +1619,7 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
   const produceVideoSchema = z
     .object({
       template: z.string().trim().max(80).optional(),
-      variables: z.record(z.string().max(MAX_NARRATION_CHARS)).optional(),
+      variables: z.record(z.string(), z.string().max(MAX_NARRATION_CHARS)).optional(),
       customScenes: z
         .array(
           z.object({

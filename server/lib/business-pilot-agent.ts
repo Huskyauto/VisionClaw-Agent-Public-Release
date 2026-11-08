@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { pilotSchemas, type PilotKind } from "../../shared/business-pilots";
 import { RELEASE_AREAS } from "../../shared/business-pilots/release";
 import { GOVERNANCE_CONTROLS } from "../../shared/business-pilots/governance";
@@ -43,7 +42,7 @@ export async function executeBusinessPilot(
     if (action === "describe") return {
       ok: true, kind, instructions,
       actions: kind === "readiness" ? ["describe", "run"] : ["describe", "run", "list", "get"],
-      inputSchema: zodToJsonSchema(kind === "readiness" ? readinessInput : pilotSchemas[kind], { $refStrategy: "none" }),
+      inputSchema: z.toJSONSchema(kind === "readiness" ? readinessInput : pilotSchemas[kind], { unrepresentable: "any", io: "input" }),
       ...(kind === "release" ? { requiredAreas: RELEASE_AREAS } : {}),
       ...(kind === "governance" ? { requiredControls: GOVERNANCE_CONTROLS } : {}),
       persistence: kind === "readiness" ? "Returned only; use existing website audit for saved audit history" : "Private owner history shared with Business Pilot Tools; maximum 50 runs per kind",

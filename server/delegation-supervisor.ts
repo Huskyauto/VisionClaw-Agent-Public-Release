@@ -10,7 +10,7 @@ const policySchema = z.object({
   mode: z.enum(["off", "report_only"]),
   ownerDecisionStatus: z.enum(["unresolved", "approved"]),
   killSwitch: z.boolean(),
-  tierFloors: z.record(z.enum(["tier_0", "tier_1", "tier_2", "tier_3"])).default({}),
+  tierFloors: z.record(z.string(), z.enum(["tier_0", "tier_1", "tier_2", "tier_3"])).default({}),
 }).strict();
 
 export type DelegationSupervisorPolicy = z.infer<typeof policySchema>;

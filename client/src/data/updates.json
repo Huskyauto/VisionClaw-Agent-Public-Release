@@ -1,5 +1,20 @@
 [
   {
+    "version": "R137.3",
+    "date": "November 8, 2026",
+    "title": "Reliability review, account boundaries and current feature inventory",
+    "type": "improvement",
+    "highlights": [
+      { "icon": "Clock", "text": "Wake event enqueue and schedule completion now commit atomically. A pre-commit crash leaves the wake pending; a committed event can be recovered by the existing event worker. Uncertain legacy firing claims fail visibly, without blind replay. This is not exactly-once downstream delivery." },
+      { "icon": "ShieldCheck", "text": "November 6 corrections require explicit tenant scope for insight recovery, channels, research projects and agent-run references. Provider health is platform-admin-only in both API access and cached Settings rendering. Focused checks are not certification of every customer journey." },
+      { "icon": "Settings", "text": "Settings model selection and Memory navigation received focused repairs; private OAuth setup avoids printing credentials. These corrections do not alter checkout, customer entitlement or owner approval gates." },
+      { "icon": "BookOpen", "text": "Owner-only Engineering Q&A contains 19 source-linked comparisons, search and category/verdict filters, plus private notes with stale-write protection. Notes are reference text, not instructions or tool authority." },
+      { "icon": "FileCheck", "text": "Both landing views, Latest Updates, dashboard, sidebar badges, SEO, PWA metadata and both READMEs share the current source inventory. All 74 literal sidebar links have implemented routes; role-gated owner/admin links remain gated." },
+      { "icon": "RefreshCw", "text": "Retained updates include webhook conversation continuity, read-only run confirmation that does not replay actions, bounded harness trials, complete selected daily upload coverage, PDF ownership and payment evidence safeguards, and clearer coding documentation." },
+      { "icon": "AlertTriangle", "text": "The tenant audit remains degraded and incomplete. Production investigation observed isolated endpoint failure and latency; resource telemetry was unavailable. Passing local checks or repository synchronization does not prove all production features work and does not publish the website." }
+    ]
+  },
+  {
     "version": "R137.2+sec",
     "date": "November 4, 2026",
     "title": "Webhook continuity, run confirmation and scoped recovery safeguards",

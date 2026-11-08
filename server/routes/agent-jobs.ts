@@ -45,7 +45,7 @@ export function registerAgentJobsRoutes(app: Express, deps: Deps) {
       const limit = Math.min(parseInt(String(req.query.limit)) || 100, 500);
       const offset = Math.max(parseInt(String(req.query.offset)) || 0, 0);
       const statuses = status ? (status.split(",") as any[]) : undefined;
-      const jobs = await listJobs({ status: statuses as any, kind, limit, offset });
+      const jobs = await listJobs({ status: statuses as any, kind, limit, offset }, ALL_TENANTS);
       res.json({ jobs, count: jobs.length });
     } catch (e: unknown) { res.status(500).json({ error: errMsg(e) }); }
   });
@@ -86,7 +86,7 @@ export function registerAgentJobsRoutes(app: Express, deps: Deps) {
     try {
       const id = parseInt(String(req.params.id), 10);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
-      await cancelJob(id);
+      await cancelJob(id, ALL_TENANTS);
       res.json({ success: true, id });
     } catch (e: unknown) { res.status(500).json({ error: errMsg(e) }); }
   });

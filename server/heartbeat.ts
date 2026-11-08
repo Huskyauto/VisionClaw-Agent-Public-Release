@@ -243,11 +243,22 @@ async function runAutoApplySweep() {
     const handoff = await import("./source-repair-handoff");
     await handoff.reconcileHandoffPendingPlans();
     const mod = await import("./agentic-engines");
-    await mod.autoApplyEligibleInsights();
+    // Only the system scheduler enumerates the global tenant registry.
+    // Every operational read/write below is then explicitly tenant-scoped.
+    const tenantRows = await db.execute<{ id: number }>(sql`SELECT id FROM tenants ORDER BY id`);
+    for (const tenant of tenantRows.rows) {
+      const tenantId = Number(tenant.id);
+      if (!Number.isSafeInteger(tenantId) || tenantId <= 0) continue;
+      try {
+        await mod.autoApplyEligibleInsights(tenantId);
+        await mod.retryPendingMinervaRouting(tenantId);
+      } catch (error) {
+        console.warn(`[heartbeat] Insight sweep failed for tenant ${tenantId}: ${errorMessage(error)}`);
+      }
+    }
     // Durability sweep: retry HIGH-priority insights whose Minerva routing
     // previously failed. Without this, a transient failure during plan creation
     // would silently leave the insight applied-but-planless forever.
-    await mod.retryPendingMinervaRouting();
   } catch (e) {
     console.warn(`[heartbeat] auto-apply sweep failed: ${errorMessage(e)}`);
   }

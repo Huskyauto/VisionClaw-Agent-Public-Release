@@ -13,7 +13,7 @@
  */
 import { db } from "../db";
 import { sql } from "drizzle-orm";
-import { emitEvent } from "../event-bus";
+import { dispatchPersistedEvent } from "../event-bus";
 import { logSilentCatch } from "../lib/silent-catch";
 
 export interface ScheduleWakeParams {
@@ -62,6 +62,18 @@ export async function scheduleWake(p: ScheduleWakeParams): Promise<{ id: number;
   }
   if (p.triggerFilter && !triggerEvent) {
     throw new Error("triggerFilter requires triggerEvent");
+  }
+  if (p.projectId != null) {
+    const project = await db.execute<{ id: number }>(sql`
+      SELECT id FROM projects WHERE id = ${p.projectId} AND tenant_id = ${p.tenantId} LIMIT 1
+    `);
+    if (project.rows.length === 0) throw new Error("Project not found in this tenant");
+  }
+  if (p.conversationId != null) {
+    const conversation = await db.execute<{ id: number }>(sql`
+      SELECT id FROM conversations WHERE id = ${p.conversationId} AND tenant_id = ${p.tenantId} LIMIT 1
+    `);
+    if (conversation.rows.length === 0) throw new Error("Conversation not found in this tenant");
   }
   const r: any = await db.execute(sql`
     INSERT INTO agent_wake_schedules
@@ -132,57 +144,80 @@ export async function listWakes(tenantId: number, status?: string): Promise<any[
 }
 
 /**
- * Heartbeat-callable. Claims due pending schedules (row-locked so concurrent
- * ticks can't double-fire), emits agent.wake, and marks them fired. On error,
- * re-queues unless attempts are exhausted.
+ * Heartbeat-callable. Atomically queues each event and completes its wake.
+ * A crash before commit leaves it pending; a crash after commit leaves one
+ * durable event for the existing heartbeat event-log worker. `fired` means
+ * queued, not subscriber completion or exactly-once downstream side effects.
  */
 export async function runDueWakes(limit = 10): Promise<{ fired: number; errors: number; failed: boolean }> {
   let fired = 0, errors = 0, failed = false;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    return { fired, errors, failed: true };
+  }
   try {
+    // Old releases committed `firing` separately from emission. Their outcome
+    // is unknowable after a crash; make stale claims visible, never replay them
+    // blindly. New handoffs below have no committed `firing` window.
+    const recovered = await db.execute(sql`
+      WITH stale AS (
+        SELECT id, tenant_id FROM agent_wake_schedules
+        WHERE status = 'firing' AND updated_at < now() - interval '10 minutes'
+        ORDER BY updated_at ASC LIMIT ${limit} FOR UPDATE SKIP LOCKED
+      )
+      UPDATE agent_wake_schedules w
+      SET status = 'failed', updated_at = now(),
+          result = jsonb_build_object(
+            'reason', 'legacy_firing_outcome_unknown',
+            'requiresReview', true,
+            'automaticReplay', false
+          )
+      FROM stale
+      WHERE w.id = stale.id AND w.tenant_id = stale.tenant_id
+      RETURNING w.id
+    `);
+    errors += recovered.rows.length;
+    if (errors > 0) {
+      failed = true;
+      console.error(`[wake-scheduler] ${errors} legacy firing claim(s) need outcome review; no automatic replay`);
+    }
     const r: any = await db.execute(sql`
-      UPDATE agent_wake_schedules
-      SET status = 'firing', attempts = attempts + 1, updated_at = now()
-      WHERE id IN (
-        SELECT id FROM agent_wake_schedules
+      WITH due AS (
+        SELECT * FROM agent_wake_schedules
         WHERE status = 'pending' AND wake_at <= now()
         ORDER BY wake_at ASC LIMIT ${limit}
         FOR UPDATE SKIP LOCKED
+      ), events AS (
+        INSERT INTO event_log (tenant_id, event_type, source, data, status)
+        SELECT tenant_id, 'agent.wake', 'wake-scheduler',
+          jsonb_build_object(
+            'wakeId', id, 'goal', goal, 'kind', kind, 'personaId', persona_id,
+            'conversationId', conversation_id, 'projectId', project_id,
+            'context', context, 'attempts', attempts + 1
+          ), 'pending'
+        FROM due
+        RETURNING id, tenant_id, data
       )
-      RETURNING *
+      UPDATE agent_wake_schedules w
+      SET status = 'fired', attempts = w.attempts + 1, updated_at = now(),
+          result = jsonb_build_object('eventId', e.id, 'queuedAt', now())
+      FROM events e
+      WHERE w.id = (e.data->>'wakeId')::integer AND w.tenant_id = e.tenant_id
+      RETURNING w.id, w.tenant_id, e.id AS event_id, e.data AS event_data
     `);
     const rows = (r.rows ?? r) as any[];
     for (const w of rows) {
+      fired++;
       try {
-        await emitEvent({
-          type: "agent.wake",
-          source: "wake-scheduler",
-          tenantId: w.tenant_id,
-          data: {
-            wakeId: w.id, goal: w.goal, kind: w.kind, personaId: w.persona_id,
-            conversationId: w.conversation_id, projectId: w.project_id,
-            context: w.context, attempts: w.attempts,
-          },
+        await dispatchPersistedEvent(w.event_id, {
+          type: "agent.wake", source: "wake-scheduler",
+          tenantId: w.tenant_id, data: w.event_data,
         });
-        await db.execute(sql`
-          UPDATE agent_wake_schedules
-          SET status = 'fired', updated_at = now(),
-              result = ${JSON.stringify({ firedAt: new Date().toISOString() })}::jsonb
-          WHERE id = ${w.id} AND tenant_id = ${w.tenant_id} AND status = 'firing'
-        `);
-        fired++;
       } catch (e: any) {
+        // The durable event remains pending for the existing event-log worker.
+        // Never reset the wake and create a second event after routing starts.
         errors++;
-        const exhausted = (w.attempts ?? 1) >= (w.max_attempts ?? 1);
-        await db.execute(sql`
-          UPDATE agent_wake_schedules SET status = ${exhausted ? "failed" : "pending"}, updated_at = now()
-          WHERE id = ${w.id} AND tenant_id = ${w.tenant_id}
-        `).catch(err => {
-          // The recovery UPDATE itself failing means the DB/claim path is down
-          // (not a per-wake logic error) — flag the whole sweep as failed so the
-          // heartbeat logs LOUD instead of reporting a false all-clear.
-          failed = true;
-          logSilentCatch("server/agentic/wake-scheduler.ts", err);
-        });
+        failed = true;
+        logSilentCatch("server/agentic/wake-scheduler.ts", e);
       }
     }
   } catch (e) { failed = true; logSilentCatch("server/agentic/wake-scheduler.ts", e); }

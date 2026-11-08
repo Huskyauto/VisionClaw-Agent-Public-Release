@@ -33,9 +33,16 @@ export interface CreateTaskForceParams {
 }
 
 export async function createTaskForce(p: CreateTaskForceParams): Promise<any> {
+  if (!Number.isSafeInteger(p.tenantId) || p.tenantId <= 0) throw new Error("createTaskForce requires a positive tenantId");
   if (!p.name?.trim() || !p.mission?.trim()) throw new Error("createTaskForce requires name and mission");
   if (p.budgetUsd !== undefined && (!Number.isFinite(p.budgetUsd) || p.budgetUsd < 0)) throw new Error("createTaskForce: budgetUsd must be a non-negative finite number");
   if (p.deadline != null && Number.isNaN(p.deadline.getTime())) throw new Error("createTaskForce: deadline must be a valid date");
+  if (p.projectId != null) {
+    const project = await db.execute<{ id: number }>(sql`
+      SELECT id FROM projects WHERE id = ${p.projectId} AND tenant_id = ${p.tenantId} LIMIT 1
+    `);
+    if (project.rows.length === 0) throw new Error("Project not found in this tenant");
+  }
   const literal = personaIdArrayLiteral(p.personaIds);
   const r: any = await db.execute(sql`
     INSERT INTO task_forces (tenant_id, name, mission, persona_ids, budget_usd, project_id, deadline, created_by)

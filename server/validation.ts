@@ -73,7 +73,7 @@ export const mcpServerSchema = z.object({
 export const mcpToolCallSchema = z.object({
   serverId: z.number().int().positive(),
   toolName: z.string().min(1).max(200),
-  args: z.record(z.any()).optional().default({}),
+  args: z.record(z.string(), z.any()).optional().default({}),
 });
 
 export const triggerSchema = z.object({
@@ -221,10 +221,10 @@ export function validate<T>(schema: z.ZodSchema<T>) {
   return (req: Request, res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      const firstError = result.error.errors[0];
+      const firstError = result.error.issues[0];
       return res.status(400).json({
         error: `Validation failed: ${firstError.path.join(".")} — ${firstError.message}`,
-        details: result.error.errors.map(e => ({
+        details: result.error.issues.map(e => ({
           field: e.path.join("."),
           message: e.message,
         })),
@@ -435,7 +435,7 @@ export const missionEvidenceSchema = z.object({
   externalRef: z.string().min(1).max(500).optional(),
   amountUsdCents: z.number().int().min(0).optional(),
   contactEmail: z.string().email().optional(),
-  raw: z.record(z.unknown()).optional(),
+  raw: z.record(z.string(), z.unknown()).optional(),
 }).refine(
   (v) => v.source === "manual" || (typeof v.externalRef === "string" && v.externalRef.length > 0),
   { message: "externalRef is required for non-manual evidence sources (gmail/stripe/web/crm) — provenance must be traceable", path: ["externalRef"] },
