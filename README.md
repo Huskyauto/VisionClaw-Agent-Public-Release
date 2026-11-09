@@ -20,9 +20,14 @@ audit coverage remain; these checks are not a whole-platform security clearance.
   and Memory navigation; private OAuth setup avoids credential output.
   Engineering Q&A and current feature/navigation summaries retain their
   owner/admin boundaries.
+- **Readiness follow-through:** cross-process storefront throttle initialization
+  is serialized; 15 isolated checkout regressions pass, including simultaneous
+  cold starts and restart durability. Review findings and overrides retain
+  their evidence rather than being silently discarded.
 - **Review scope and status:** [November review](docs/platform-update-2026-11-08.md)
   records measured inventory and verification limits. Production investigation
-  observed isolated failure and latency; resource telemetry was unavailable.
+  observed an isolated release-boundary error without sampled recurrence.
+  Corrected resource queries found no sustained memory/disk pressure in that window.
   The tenant audit remains incomplete, not whole-platform certification.
 - **Source map:** `client/src` contains the UI, `server` backend services and
   tools, `shared` contracts, `scripts` operational tooling, and `docs` references.

@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
 import https from "node:https";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import pg from "pg";
 
 // Regression suite for Task #29: storefront checkout throttle MUST key
 // off per-shopper identity (email or visitor partition + sku), NOT off
@@ -152,6 +155,99 @@ const TEST_HEADERS: Record<string, string> = {
   "x-test-rate-limit": String(TEST_LIMIT),
   "x-test-rate-window-ms": String(TEST_WINDOW_MS),
 };
+
+test("fresh storefront throttle initializes safely across simultaneous processes", { timeout: 40_000 }, async () => {
+  const schema = `sf_cold_${randomUUID().replaceAll("-", "")}`;
+  const admin = new pg.Client({ connectionString: process.env.DATABASE_URL,
+    connectionTimeoutMillis: 5000, query_timeout: 5000 });
+  const children: ReturnType<typeof spawn>[] = [];
+  const exits: Promise<void>[] = [];
+  let created = false;
+  await admin.connect();
+  try {
+    await admin.query(`CREATE SCHEMA "${schema}"`);
+    created = true;
+    const url = new URL(process.env.DATABASE_URL!);
+    url.searchParams.set("options", `-c search_path=${schema}`);
+    const source = `
+      import { recordStorefrontHit } from './server/storefront-rate-limit-store.ts';
+      import { pool } from './server/db.ts';
+      try {
+        const r = await pool.query('SELECT current_schema() AS name');
+        if (r.rows[0].name !== process.env.FIXTURE_SCHEMA) throw Error('fixture schema mismatch');
+        const start = new Promise(resolve => process.once('message', resolve));
+        process.send('ready'); await start;
+        const hit = await recordStorefrontHit('cold:' + process.pid, 5, 60000);
+        if (!hit.allowed) throw Error('fresh shopper denied');
+      } catch (error) {
+        console.error('cold-start failure', error.cause?.code ?? error.code ?? error.message);
+        process.exitCode = 1;
+      } finally { await pool.end(); process.disconnect(); }
+    `;
+    function launch(script: string) {
+      const child = spawn(process.execPath, [
+        "--max-old-space-size=192", "--import", "tsx", "--input-type=module", "-e", script,
+      ], {
+        cwd: process.cwd(),
+        // Deliberate fixture allowlist: no provider credentials or inherited
+        // NODE_OPTIONS/loader hooks can enter these database-only children.
+        env: { PATH: process.env.PATH, HOME: process.env.HOME, NODE_ENV: "test",
+          DATABASE_URL: url.toString(), FIXTURE_SCHEMA: schema },
+        timeout: 25_000,
+        stdio: ["ignore", "pipe", "pipe", "ipc"],
+      });
+      children.push(child);
+      // Register once, at spawn: signalled children retain exitCode=null even
+      // AFTER exit, so cleanup must not attach a new listener after the event.
+      exits.push(new Promise<void>(resolve => {
+        child.once("exit", () => resolve());
+        child.once("error", () => resolve());
+      }));
+      let stderr = "";
+      child.stdout!.resume();
+      child.stderr!.on("data", b => { stderr = (stderr + b.toString()).slice(-2000); });
+      const finished = new Promise<void>((resolve, reject) => {
+        child.once("error", reject);
+        child.once("exit", code => code === 0 ? resolve() : reject(new Error(stderr || "cold worker failed")));
+      });
+      finished.catch(() => {}); // readiness may reject before completion is awaited
+      // A startup failure must reject readiness too, rather than hang at a
+      // barrier that an exited child can never reach, including a zero exit.
+      const ready = new Promise<void>((resolve, reject) => {
+        let seenReady = false;
+        child.once("message", message => {
+          if (message !== "ready") return reject(new Error("invalid worker readiness"));
+          seenReady = true;
+          resolve();
+        });
+        child.once("error", reject);
+        child.once("exit", () => { if (!seenReady) reject(new Error(stderr || "worker exited before ready")); });
+      });
+      return { child, ready, finished };
+    }
+    const workers = Array.from({ length: 3 }, () => launch(source));
+    const completion = Promise.all(workers.map(w => w.finished));
+    completion.catch(() => {}); // readiness can fail before awaiting completion
+    await Promise.all(workers.map(w => w.ready));
+    for (const { child } of workers) child.send("start");
+    await completion;
+
+    // Exercise both lifecycle failures that can otherwise strand cleanup.
+    const early = launch("process.exit(0)");
+    await assert.rejects(early.ready, /before ready/);
+    await early.finished;
+    const signalled = launch("process.kill(process.pid, 'SIGTERM')");
+    await assert.rejects(signalled.ready, /before ready/);
+    await assert.rejects(signalled.finished, /worker failed/);
+  } finally {
+    for (const child of children) {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    }
+    await Promise.all(exits);
+    if (created) await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+    await admin.end();
+  }
+});
 
 async function postCheckout(
   url: string,

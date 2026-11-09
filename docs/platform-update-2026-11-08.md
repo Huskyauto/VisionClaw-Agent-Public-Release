@@ -90,6 +90,13 @@ Semantic skill review now covers all 61 on-disk skills; review findings and
 owner approval remain separate from coverage. These receipts do not certify
 every customer journey or authorize publication.
 
+The final follow-through also fixed a proven concurrent cold-start collision in
+storefront throttle initialization. Fifteen isolated checkout regressions pass,
+including three simultaneous processes and restart durability; no live payment
+was attempted. Skill review dispositions received explicit owner approval and
+retain the original findings. All 61 on-disk skill bundles now validate with no
+blocked reviews. This does not clear the separate incomplete tenant audit.
+
 Repository synchronization is not website publication. The private repository
 retains tracked source; the public repository receives the existing sanitized
 export, excluding private operational records and credentials. Neither Git

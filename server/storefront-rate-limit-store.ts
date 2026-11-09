@@ -65,8 +65,19 @@ function errorMessage(err: unknown): string {
 // drizzle migration. Tracked as a follow-up.
 async function ensureTable(): Promise<void> {
   if (__initPromise) return __initPromise;
-  __initPromise = (async () => {
-    await db.execute(sql`
+  __initPromise = db.transaction(async (tx) => {
+    // IF NOT EXISTS alone does not serialize PostgreSQL catalog creation:
+    // simultaneous cold processes can collide on the table/sequence/index.
+    // Hold a schema-scoped transaction lock through the complete DDL commit.
+    // Fail closed, but bound waits if another initializer is stuck.
+    await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+    await tx.execute(sql`SET LOCAL statement_timeout = '10s'`);
+    await tx.execute(sql`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(current_schema() || ':storefront_checkout_hits:init', 0)
+      )
+    `);
+    await tx.execute(sql`
       CREATE TABLE IF NOT EXISTS storefront_checkout_hits (
         id BIGSERIAL PRIMARY KEY,
         rate_key TEXT NOT NULL,
@@ -76,24 +87,24 @@ async function ensureTable(): Promise<void> {
     `);
     // (rate_key, expires_at) is the index every read uses: count rows
     // for a given key whose expires_at > NOW().
-    await db.execute(sql`
+    await tx.execute(sql`
       CREATE INDEX IF NOT EXISTS storefront_checkout_hits_key_exp
       ON storefront_checkout_hits (rate_key, expires_at)
     `);
     // Lookup-by-recency for the bounded-size LRU eviction inside the
     // insert CTE.
-    await db.execute(sql`
+    await tx.execute(sql`
       CREATE INDEX IF NOT EXISTS storefront_checkout_hits_hit_at
       ON storefront_checkout_hits (hit_at)
     `);
     // expires_at-only index makes the per-insert global sweep
     // (`WHERE expires_at <= NOW()`) an index scan instead of a seq scan
     // as the table approaches MAX_TOTAL_ROWS.
-    await db.execute(sql`
+    await tx.execute(sql`
       CREATE INDEX IF NOT EXISTS storefront_checkout_hits_expires_at
       ON storefront_checkout_hits (expires_at)
     `);
-  })().catch((err: unknown) => {
+  }).catch((err: unknown) => {
     __initPromise = null; // allow retry on next call
     console.error(`[storefront-throttle] failed to ensure table: ${errorMessage(err)}`);
     throw err;

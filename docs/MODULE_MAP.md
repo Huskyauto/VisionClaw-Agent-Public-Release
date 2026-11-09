@@ -7,7 +7,7 @@
 
 | Area | Modules | Lines |
 | :--- | ---: | ---: |
-| `server/` | 1306 | 322,236 |
+| `server/` | 1306 | 322,250 |
 | `client/src/` | 227 | 66,823 |
 | `scripts/` | 287 | 53,907 |
 | `shared/` | 35 | 8,815 |
@@ -332,7 +332,7 @@ Changes to these ripple widest — check importers before editing.
 | [`generate-triage-entries-3.ts`](../scripts/lib/generate-triage-entries-3.ts) | 75 | One-off addendum (task: nightly tenant-isolation audit permanently red, 2026-08-01): |
 | _…and 24 more (smaller modules)_ | | |
 
-### `server/` — 381 module(s), 177,557 lines
+### `server/` — 381 module(s), 177,568 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
@@ -451,7 +451,7 @@ Changes to these ripple widest — check importers before editing.
 | :--- | ---: | :--- |
 | [`project-context.ts`](../server/chat-engine/project-context.ts) | 279 | R54.D: tenant-scope every project query — was unfiltered IDOR vector |
 
-### `server/lib/` — 444 module(s), 70,316 lines
+### `server/lib/` — 444 module(s), 70,319 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |

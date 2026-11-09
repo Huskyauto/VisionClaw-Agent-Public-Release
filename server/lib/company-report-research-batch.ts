@@ -149,7 +149,7 @@ export async function researchCompanyPackageBatch(
         const u = new URL(match[1]);
         if (u.origin === root.origin && !u.username && !u.password && !u.search && !sitemapQueue.includes(u.href))
           sitemapQueue.push(u.href);
-      } catch { /* Malformed public metadata is not a crawl target. */ }
+      } catch { continue; /* Malformed public metadata is not a crawl target. */ }
     }
     await checkpoint();
   }
@@ -182,7 +182,7 @@ export async function researchCompanyPackageBatch(
           if (/\.xml$/i.test(u.pathname)) {
             if (!seenMaps.has(u.href) && !sitemapQueue.includes(u.href)) sitemapQueue.push(u.href);
           } else add(u.href);
-        } catch { /* Invalid sitemap entries cannot expand scope. */ }
+        } catch { return; /* Invalid sitemap entries cannot expand scope. */ }
       });
     } else {
       if (sitemapAttempts[url] < 2) sitemapQueue.push(url);

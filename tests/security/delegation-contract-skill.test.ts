@@ -42,7 +42,12 @@ test("current sales and trust surfaces use authoritative skill totals and distin
   for (const currentSurface of [pricing, landing]) {
     assert.doesNotMatch(currentSurface, /\b67 total skills\b/i);
   }
-  assert.match(pricing, new RegExp(`\\b${releaseFacts.metrics.totalSkills} (?:total )?(?:platform )?skills\\b`, "i"));
+  // Pricing, like Landing, now renders the shared JSON value instead of a
+  // duplicated literal. Keep verifying the binding, not the old source shape.
+  assert.equal(releaseFacts.metrics.totalSkills,
+    releaseFacts.metrics.dbSeededSkills + releaseFactsInput.platformAgentSkills);
+  assert.match(pricing, /import releaseFacts from ["']\.\.\/\.\.\/\.\.\/docs\/release-facts\.json["']/);
+  assert.match(pricing, /\$\{releaseFacts\.metrics\.totalSkills\} platform skills/);
   // Landing renders the authoritative JSON value instead of a duplicated literal.
   assert.match(landing, /import releaseFacts from ["']\.\.\/\.\.\/\.\.\/docs\/release-facts\.json["']/);
   assert.match(landing, /\{releaseFacts\.metrics\.totalSkills\} platform skills/);
@@ -51,7 +56,8 @@ test("current sales and trust surfaces use authoritative skill totals and distin
   assert.match(seo, /const effectiveDescription = useCurrentPlatformDescription\s+\? CURRENT_PLATFORM_DESCRIPTION/);
   assert.match(publicationNotice, /facts\.metrics\.totalSkills\} platform skills/);
   assert.match(publicationNotice, /Development evidence, not production telemetry/);
-  assert.match(publicationNotice, /Production verification.*remain incomplete/);
+  assert.match(publicationNotice, /Scoped evidence is not whole-platform certification/);
+  assert.match(publicationNotice, /not production proof/);
   assert.equal(releaseFactsInput.platformAgentSkills, 5);
   assert.match(refreshTotals, /releaseInput\.platformAgentSkills/);
   assert.doesNotMatch(refreshTotals, /skills=.*\(\+4=/);

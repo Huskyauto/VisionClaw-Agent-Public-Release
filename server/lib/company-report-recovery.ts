@@ -31,7 +31,10 @@ export function packageRecoveryPlan(job: any) {
   const validClaims = claims && typeof claims === "object" && !Array.isArray(claims) &&
     Object.values(claims).every(v => Number.isSafeInteger(v) && v > 0);
   let ceiling = PACKAGE_SPEND_CAP_MICROS;
-  try { ceiling = packageBudgetMicros(p); } catch { /* malformed authority stays unavailable below */ }
+  try { ceiling = packageBudgetMicros(p); } catch {
+    // Explicit conservative fallback; malformed authority stays unavailable below.
+    ceiling = PACKAGE_SPEND_CAP_MICROS;
+  }
   const reserved = validClaims ? Object.values(claims).reduce((a, b) => a + b, 0) : ceiling;
   const retryKeys = Object.keys(claims).filter(key => key.startsWith("draft:") &&
     !substantiveReportSection(p.packageDrafts?.[key.slice(6)]?.text)).sort();
