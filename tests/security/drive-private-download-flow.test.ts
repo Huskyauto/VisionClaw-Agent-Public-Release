@@ -8,6 +8,7 @@ import test from "node:test";
 import { transformSync } from "esbuild";
 import { assertDriveTenant, tenantDriveDownloadPath } from "../../server/lib/tenant-drive-access";
 import { resolveTenantDriveUploadSource } from "../../server/lib/tenant-drive-source";
+import { tenantFileAccessFilter, isPrivateOwnerApplicationFile } from "../../server/lib/private-business-pilot-files";
 
 const sourceBytes = Buffer.from("private tenant drive download\nsecond line");
 
@@ -42,6 +43,13 @@ function loadDownloadFromDrive(
     UPLOADS_DIR: uploadsRoot,
     MAX_TENANT_DRIVE_SOURCE_BYTES: 100 * 1024 * 1024,
     tenantDriveDownloadPath,
+    // Explicit authorization fixture: only the supplied metadata object is in
+    // scope. Production root/ancestry checks have their own access-boundary suite.
+    requireTenantDriveFileAccess: async (tenantId: number, fileId: string) => {
+      assertDriveTenant(tenantId);
+      assert.equal(fileId, provider.metadata.id);
+      return provider.metadata;
+    },
     readTenantDriveUploadBytes: tenantDriveReader,
     isPathWithin(root: string, candidate: string) {
       const relative = path.relative(root, candidate);
@@ -75,6 +83,7 @@ function loadReadFileHandler(
     .replaceAll('await import("node:fs")', "__fs")
     .replaceAll('await import("node:path")', "__path")
     .replaceAll('await import("../../../lib/silent-catch")', "__silent")
+    .replaceAll('await import("../../../lib/private-business-pilot-files")', "__privateFiles")
     .replaceAll('await import("../../../google-drive")', "__googleDrive")
     .replaceAll('await import("../../../db")', "__dbModule")
     .replaceAll('await import("@shared/schema")', "__schema")
@@ -112,6 +121,7 @@ function loadReadFileHandler(
     __path: path,
     path,
     __silent: { logSilentCatch() {} },
+    __privateFiles: { tenantFileAccessFilter, isPrivateOwnerApplicationFile },
     __googleDrive: { readTenantDriveUploadBytes: tenantDriveReader, ...(recoveryMocks.googleDrive || {}) },
     __dbModule: { db: fakeDb },
     __schema: {

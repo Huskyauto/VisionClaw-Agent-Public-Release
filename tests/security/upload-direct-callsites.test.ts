@@ -202,6 +202,12 @@ const UPLOAD_DIRECT_BASELINE: CallsiteMap = {
     { line: 2073, text: "const pdfUpload = await uploadAndShare({" },
     { line: 2106, text: "const pptxUpload = await uploadAndShare({" },
   ],
+  "server/lib/business-report-audio-delivery.ts": [
+    // Reviewed report-assembly asset upload, not a standalone delivery/send.
+    // The approved package renderer embeds the validated MP3 receipt in its PDF;
+    // durableArtifactKey and customerDelivery enforce recovery + reader sharing.
+    { line: 276, text: "const result = await uploadToDrive({" },
+  ],
   "server/mpeg-engine.ts": [
     { line: 937, text: "const driveResult = await uploadAndShare({" },
     { line: 1257, text: "const driveResult = await uploadAndShare({" },

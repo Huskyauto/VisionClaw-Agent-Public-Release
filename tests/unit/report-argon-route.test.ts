@@ -34,6 +34,10 @@ test("full compilations can use a bounded 16,384-token Argon response without pr
 
 test("Argon is bounded-report only; closed transport enforces exact model, output, no retries/fallbacks and expired grants", async () => {
   const previous = process.env.OWNER_JURY_DIRECT_API_ENABLED;
+  const previousKey = process.env.OPENROUTER_API_KEY;
+  // Client construction is exercised, never network dispatch. CI intentionally
+  // has no owner credential; do not make the invariant depend on a real secret.
+  process.env.OPENROUTER_API_KEY = "offline-argon-fixture-not-a-real-key";
   process.env.OWNER_JURY_DIRECT_API_ENABLED = "1";
   let calls = 0, reserved = false;
   const client = guardReportArgonClient({ chat: { completions: { create: async (params: any, options: any) => {
@@ -68,6 +72,8 @@ test("Argon is bounded-report only; closed transport enforces exact model, outpu
     await assert.rejects((client.chat.completions.create as any)(params), /grant/);
     assert.equal(calls, 1);
   } finally {
+    if (previousKey === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = previousKey;
     if (previous === undefined) delete process.env.OWNER_JURY_DIRECT_API_ENABLED;
     else process.env.OWNER_JURY_DIRECT_API_ENABLED = previous;
   }

@@ -74,6 +74,22 @@ unmodeled-table warnings also remain advisory gaps, not newly introduced tools.
 
 ## Publication boundaries
 
+### Readiness follow-through
+
+The previously offline database gap was closed with six passing tests in a
+disposable database containing only schema and synthetic identities. Fifty
+additional focused follow-through tests passed. CI setup/source fixtures were
+corrected without removing authorization or conservation assertions.
+
+The production investigation localized the historical server error to the release
+transition, with no observed recurrence in the following three six-hour windows.
+Corrected resource queries showed no sustained memory/disk pressure in that
+window; the exact request exception was not logged. The tenant audit has resumed
+through its configured provider fallback, but its full result remains pending.
+Semantic skill review now covers all 61 on-disk skills; review findings and
+owner approval remain separate from coverage. These receipts do not certify
+every customer journey or authorize publication.
+
 Repository synchronization is not website publication. The private repository
 retains tracked source; the public repository receives the existing sanitized
 export, excluding private operational records and credentials. Neither Git

@@ -29,7 +29,7 @@ test("tenant-specific agentic engines never read global heartbeat logs", () => {
 test("a tenant-triggered engine run scopes auto-apply to that tenant", () => {
   assert.match(
     source,
-    /export async function autoApplyEligibleInsights\(tenantId\?: number\)/,
+    /export async function autoApplyEligibleInsights\(tenantId: number\)/,
     "auto-apply must accept an explicit tenant scope for tenant-triggered runs",
   );
   assert.match(
@@ -37,4 +37,5 @@ test("a tenant-triggered engine run scopes auto-apply to that tenant", () => {
     /await autoApplyEligibleInsights\(tenantId\);/,
     "runAllEngines must not invoke a platform-wide auto-apply sweep",
   );
+  assert.match(source, /throw new Error\("autoApplyEligibleInsights requires a positive integer tenantId"\)/);
 });

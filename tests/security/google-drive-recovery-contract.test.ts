@@ -44,7 +44,9 @@ test("a dispatched upload with no observable response becomes reconciliation-onl
   assert.match(generatedUpload, /result\.completionUncertain/);
   assert.match(generatedUpload, /clearArtifactDriveUploadDispatchPending/);
   assert.match(source, /Bare artifact row IDs are recycled\/collide/);
-  assert.match(source, /\^\(\?:delivery\|artifact\):\[A-Za-z0-9:_-\]\{8,180\}\$/);
+  assert.match(source, /driveArtifactPropertyValue/);
+  const propertySource = fs.readFileSync(path.join(process.cwd(), "server/lib/drive-artifact-property.ts"), "utf8");
+  assert.match(propertySource, /\^\(\?:delivery\|artifact\):\[A-Za-z0-9:_-\]\{8,180\}\$/);
   assert.match(deliverySource, /durableArtifactKey: `delivery:\$\{deliveryId\}:primary`/);
   const artifactSource = fs.readFileSync(path.join(process.cwd(), "server/durable-artifacts.ts"), "utf8");
   assert.match(artifactSource, /durability_verification_uncertain/);

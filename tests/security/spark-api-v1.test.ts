@@ -28,7 +28,7 @@ test("follow-up messages require an API marker and fail closed on active turns",
   assert.match(route, /source:\s*"api-v1"/);
   assert.match(route, /message:\s*z\.string\(\)\.min\(1\)\.max\(MAX_TASK_LEN\)/);
   assert.match(route, /async:\s*z\.boolean\(\)\.default\(true\)/);
-  assert.match(route, /finishApiV1Turn\(tenantId,\s*conversationId,\s*"complete"\)/);
+  assert.match(route, /finishApiV1Turn\(tenantId,\s*conversationId,\s*"complete",\s*undefined,\s*result\)/);
   assert.match(route, /finishApiV1Turn\(tenantId,\s*conversationId,\s*"failed",/);
 });
 

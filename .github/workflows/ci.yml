@@ -156,6 +156,8 @@ jobs:
           node-version: "22.22.0"
           cache: "npm"
       - run: npm ci
+      - name: Install PDF extraction test dependency
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends poppler-utils
       - name: Enable pgvector extension
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -d visionclaw_test \

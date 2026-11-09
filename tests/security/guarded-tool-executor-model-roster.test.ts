@@ -32,6 +32,9 @@ function loadGuardedExecutor(dispatches: Array<{ toolName: string; args: Record<
       };
     }
     if (specifier === "./tool-router") return { getPersonaBlockedTools: () => new Set() };
+    if (specifier === "./lib/business-pilot-invocation") {
+      return { authorizePilotInvocation: () => { throw new Error("Business pilots are outside this roster fixture"); } };
+    }
     if (specifier === "./lib/silent-catch") return { logSilentCatch: () => undefined };
     if (specifier === "./safety/trusted-exec-stamp") return { trustedExecFlags, shouldSkipApprovalGate: () => true };
     if (specifier === "./safety/destructive-tool-policy") {
