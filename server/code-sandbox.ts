@@ -1,12 +1,26 @@
-import * as vm from "vm";
+import { spawn } from "node:child_process";
 
+export interface SandboxResult {
+  success: boolean;
+  output: string;
+  error?: string;
+  executionTimeMs: number;
+  returnValue?: any;
+}
+
+// This entire factory is self-contained so its compiled JS can run without a
+// TS loader or workspace imports in the disposable, credential-free child.
+function sandboxRuntime(vm: typeof import("node:vm")) {
 const MAX_EXECUTION_TIME_MS = 5000;
 const MAX_OUTPUT_LENGTH = 10000;
 const MAX_LOG_LINES = 5000;
 
 // SECURITY MODEL (be honest about what actually does the work here):
 //
-// The trust boundary is THREE properties, all required:
+// Resource containment is enforced OUTSIDE this VM: a disposable process,
+// total-address-space/CPU/core limits, bounded pipes, admission and a parent
+// wall deadline. This VM is not an OS privilege boundary.
+// The inner context restrictions are THREE properties, all required:
 //
 // (1) `codeGeneration: { strings: false, wasm: false }` on the vm context, AND
 // (2) injecting NO host-realm objects or functions into the sandbox, AND
@@ -64,14 +78,6 @@ const BLOCKED_PATTERNS = [
   /\[\s*["'`]\s*__proto__/i,
   /\[\s*["'`]\s*prototype/i,
 ];
-
-interface SandboxResult {
-  success: boolean;
-  output: string;
-  error?: string;
-  executionTimeMs: number;
-  returnValue?: any;
-}
 
 function validateCode(code: string): string | null {
   for (const pattern of BLOCKED_PATTERNS) {
@@ -205,6 +211,12 @@ function wrap(code: string): string {
           ${code}
         })();
         __safeStoreResult__(__result__);
+      } catch (error) {
+        // The error (including hostile getters/coercion) stays INSIDE the
+        // timed VM. Only a primitive string may cross the context boundary.
+        const message = error && typeof error.message === "string" ? error.message : "Sandbox execution failed";
+        __safeStoreResult__(undefined);
+        throw String(message);
       } finally {
         __safeStoreLogs__();
       }
@@ -254,7 +266,7 @@ function rebuildSafeReturnValue(sandbox: any): unknown {
   return raw;
 }
 
-export function executeCode(code: string): SandboxResult {
+function executeInContext(code: string): SandboxResult {
   const validationError = validateCode(code);
   if (validationError) {
     return { success: false, output: "", error: validationError, executionTimeMs: 0 };
@@ -267,6 +279,7 @@ export function executeCode(code: string): SandboxResult {
   const sandbox: any = Object.create(null);
   const context = vm.createContext(sandbox, {
     codeGeneration: { strings: false, wasm: false },
+    microtaskMode: "afterEvaluate",
   });
 
   vm.runInContext(CONTEXT_BOOTSTRAP, context, { filename: "sandbox-bootstrap.js" });
@@ -292,7 +305,9 @@ export function executeCode(code: string): SandboxResult {
     // Logs were collected in the wrapper's `finally` before the throw propagated.
     const output = readGlobalString(sandbox, "__logsStr__");
 
-    const errorMsg = err?.message || "Unknown error";
+    // User throws were serialized in the timed context; native VM timeout
+    // errors are created by Node, not by submitted JavaScript.
+    const errorMsg = typeof err === "string" ? err : "Sandbox execution failed or timed out";
     const isTimeout = typeof errorMsg === "string" && errorMsg.includes("Script execution timed out");
 
     return {
@@ -302,4 +317,90 @@ export function executeCode(code: string): SandboxResult {
       executionTimeMs,
     };
   }
+}
+return executeInContext;
+}
+
+let activeChildren = 0;
+const MAX_CHILDREN = 2;
+const WALL_LIMIT_MS = 6500;
+const MAX_WIRE_BYTES = 128 * 1024;
+
+/** Process/VM containment, not a claim of OS privilege separation or a secure
+ * general-purpose hostile-code host. Missing resource limiter fails CLOSED.
+ * prlimit bounds total address space (including ArrayBuffers), CPU and core
+ * dumps; the independent parent owns a hard wall deadline and output cap. */
+export async function executeCode(code: string): Promise<SandboxResult> {
+  const started = Date.now();
+  const failure = (error: string): SandboxResult => ({
+    success: false, output: "", error, executionTimeMs: Date.now() - started,
+  });
+  if (typeof code !== "string" || code.length > 50_000) {
+    return failure("Code must be a string of at most 50,000 characters");
+  }
+  if (activeChildren >= MAX_CHILDREN) return failure("Sandbox capacity reached; no code executed");
+  activeChildren++;
+  // __name is emitted by tsx/esbuild's keep-names transform. Keeping the
+  // factory self-contained also makes this work in the bundled production JS.
+  const source = `const __name = (fn) => fn;
+    const execute = (${sandboxRuntime.toString()})(require("node:vm"));
+    const code = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+    process.stdout.write(JSON.stringify(execute(code)));`;
+  return new Promise((resolve) => {
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn("/usr/bin/prlimit", [
+        "--as=536870912", "--cpu=6", "--core=0", "--",
+        process.execPath, "--jitless", "--max-old-space-size=64", "-e", source,
+      ], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
+    } catch {
+      activeChildren--;
+      resolve(failure("Sandbox isolation unavailable; no fallback execution"));
+      return;
+    }
+    let settled = false;
+    let bytes = 0;
+    const chunks: Buffer[] = [];
+    const finish = (result: SandboxResult) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      finish(failure("Sandbox execution timed out; isolated child terminated"));
+    }, WALL_LIMIT_MS);
+    child.stdout!.on("data", (chunk: Buffer) => {
+      bytes += chunk.length;
+      if (bytes > MAX_WIRE_BYTES) {
+        child.kill("SIGKILL");
+        finish(failure("Sandbox output exceeded its transfer limit"));
+      } else chunks.push(chunk);
+    });
+    // Drain without retaining OOM diagnostics or attacker-controlled messages.
+    child.stderr!.resume();
+    child.stdin!.on("error", () => {
+      child.kill("SIGKILL");
+      finish(failure("Sandbox input transfer failed"));
+    });
+    child.on("error", () => finish(failure("Sandbox isolation unavailable; no fallback execution")));
+    child.on("close", (exitCode) => {
+      // Retain admission until the OS confirms the child exited, even when
+      // its caller's deadline has already fired.
+      activeChildren--;
+      if (settled) return;
+      if (exitCode !== 0) return finish(failure("Sandbox child terminated or exceeded a resource limit"));
+      try {
+        const result: SandboxResult = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        if (typeof result.success !== "boolean" || typeof result.output !== "string") {
+          throw new Error("Invalid child response");
+        }
+        finish({ ...result, executionTimeMs: Date.now() - started });
+      } catch {
+        finish(failure("Sandbox returned an invalid result"));
+      }
+    });
+    child.stdin!.end(JSON.stringify(code));
+  });
 }

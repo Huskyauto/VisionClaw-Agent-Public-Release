@@ -30,10 +30,36 @@ export function assertValidDefinition(def: ToolDefinition): void {
   }
 }
 
-export function defineTool(definition: ToolDefinition, handler: ToolHandler): RegisteredTool {
+// Exact executor metadata, not an underscore wildcard or a public-field
+// allowlist: typos and protected business fields must still fail strict schemas.
+// Opt-in preserves legacy handlers which consume these hints from params.
+const FRAMEWORK_METADATA_KEYS = [
+  "_invokedByModel", "_invokedVia", "_skipTracking", "_selfHeal", "conversationId",
+  "_userId", "_personaName", "_projectDriveFolderId",
+] as const;
+
+export function defineTool(
+  definition: ToolDefinition,
+  handler: ToolHandler,
+  options?: { publicArgumentsOnly?: boolean },
+): RegisteredTool {
   assertValidDefinition(definition);
   if (typeof handler !== "function") {
     throw new Error(`[define-tool] ${definition.function.name}: handler must be a function`);
   }
-  return { definition, handler };
+  if (!options?.publicArgumentsOnly) return { definition, handler };
+  return {
+    definition,
+    handler: (params, ctx) => {
+      const input = { ...params };
+      for (const key of FRAMEWORK_METADATA_KEYS) {
+        // A declared public field wins: conversationId is a real argument for
+        // some tools. This option must not silently erase their business input.
+        if (!Object.prototype.hasOwnProperty.call(definition.function.parameters.properties ?? {}, key)) {
+          delete input[key];
+        }
+      }
+      return handler(input, ctx);
+    },
+  };
 }

@@ -1,10 +1,13 @@
 #!/usr/bin/env tsx
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { classifyReleaseScope, digestReleaseInputs, releaseInputPaths, sameReleaseMembership, runBoundedReleaseCommand, validReleasePath } from "./lib/targeted-release-check";
 import { confirmationDigest, confirmationMarkdown } from "../server/lib/run-confirmation";
 import { assessReleaseConfirmation } from "./lib/project-confirmation";
+import { buildOfflineVerificationEnv } from "./lib/offline-verification";
+import { sanitizeSpawnEnv } from "../server/safety/spawn-env-guard";
 
 const git = (...args: string[]) => execFileSync("git", ["--no-optional-locks", ...args], {
   encoding: "utf8", timeout: 15_000, maxBuffer: 8 * 1024 * 1024,
@@ -39,13 +42,21 @@ function snapshot(changed: string[]) {
 async function runCheck(dir: string, name: string, command: string, args: string[], timeoutMs: number) {
   const log = resolve(dir, `${name}.log`);
   console.log(`[release-check] ${name} started (limit ${timeoutMs / 1000}s)`);
-  const result = await runBoundedReleaseCommand(command, args, {
-    logFile: log, timeoutMs,
-    env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=3072", RUN_E2E: "0" },
-    onSpawn: kill => { activeKill = kill; },
-  });
-  console.log(`[release-check] ${name}: ${result.passed ? "PASS" : "FAIL"} (${Math.round(result.elapsedMs / 1000)}s); ${log}`);
-  return { name, ...result, log };
+  // The separately named mission-lifecycle integration intentionally retains its
+  // existing development DB contract. Only fixture regressions are isolated.
+  const home = name === "regressions" ? mkdtempSync(resolve(tmpdir(), "release-offline-home-")) : undefined;
+  try {
+    const env = home ? buildOfflineVerificationEnv(process.env, home) :
+      { ...sanitizeSpawnEnv(process.env), NODE_OPTIONS: "--max-old-space-size=3072", RUN_E2E: "0" };
+    const result = await runBoundedReleaseCommand(command, args, {
+      logFile: log, timeoutMs, env,
+      onSpawn: kill => { activeKill = kill; },
+    });
+    console.log(`[release-check] ${name}: ${result.passed ? "PASS" : "FAIL"} (${Math.round(result.elapsedMs / 1000)}s); ${log}`);
+    return { name, ...result, log, environment: home ? "credential-isolated-fixtures" : "existing-development-contract" };
+  } finally {
+    if (home) rmSync(home, { recursive: true, force: true });
+  }
 }
 
 async function main() {

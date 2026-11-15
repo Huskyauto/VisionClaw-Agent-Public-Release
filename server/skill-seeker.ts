@@ -352,6 +352,10 @@ export function scanForGaps(responseText: string): string | null {
 }
 
 export async function researchGap(gapId: number, tenantId: number): Promise<ResearchResult[]> {
+  const toolAuthority = {
+    tenantId, actor: "system" as const, invokedVia: "skill-seeker",
+    internalPurpose: "Read-only research for a tenant-scoped capability gap",
+  };
   const gapRows = await db.execute(sql`SELECT * FROM capability_gaps WHERE id = ${gapId} AND tenant_id = ${tenantId}`);
   if (gapRows.rows.length === 0) throw new Error(`Gap ${gapId} not found`);
   const gap = gapRows.rows[0] as any;
@@ -365,7 +369,7 @@ export async function researchGap(gapId: number, tenantId: number): Promise<Rese
     const webResults = await executeTool("web_search", {
       query: `${gap.gap_description} implementation tutorial API`,
       max_results: 8,
-    });
+    }, toolAuthority);
     if (webResults?.results) {
       for (const r of webResults.results.slice(0, 8)) {
         const url = r.url || r.link || "";
@@ -390,7 +394,7 @@ export async function researchGap(gapId: number, tenantId: number): Promise<Rese
     const ghResults = await executeTool("web_search", {
       query: `site:github.com ${gap.gap_description} typescript javascript`,
       max_results: 5,
-    });
+    }, toolAuthority);
     if (ghResults?.results) {
       for (const r of ghResults.results.slice(0, 5)) {
         const url = r.url || r.link || "";
@@ -415,7 +419,7 @@ export async function researchGap(gapId: number, tenantId: number): Promise<Rese
     const npmResults = await executeTool("web_search", {
       query: `site:npmjs.com ${gap.gap_description}`,
       max_results: 3,
-    });
+    }, toolAuthority);
     if (npmResults?.results) {
       for (const r of npmResults.results.slice(0, 3)) {
         const url = r.url || r.link || "";
@@ -448,7 +452,7 @@ export async function researchGap(gapId: number, tenantId: number): Promise<Rese
       if (detailCount >= 3) break;
       if (r.url && r.trust_score >= 0.7) {
         try {
-          const pageContent = await executeTool("web_fetch", { url: r.url, max_length: 3000 });
+          const pageContent = await executeTool("web_fetch", { url: r.url, max_length: 3000 }, toolAuthority);
           if (pageContent?.content || pageContent?.text) {
             const raw = (pageContent.content || pageContent.text).substring(0, 1500);
             r.implementation_hint = sanitizeResearchContent(raw);
@@ -856,7 +860,10 @@ export async function runSkillSeekerSweep(tenantId: number = 1): Promise<{
 
   if (summary.new_tools.length > 0 || summary.new_skills.length > 0) {
     try {
-      await executeTool("sync_personas", { _tenantId: ADMIN_TENANT_ID });
+      await executeTool("sync_personas", {}, {
+        tenantId: ADMIN_TENANT_ID, actor: "system", invokedVia: "skill-seeker",
+        internalPurpose: "Synchronize the platform persona contract after a skill update",
+      });
       console.log(`[skill-seeker] Synced persona docs after learning new capabilities`);
     } catch (_silentErr) { logSilentCatch("server/skill-seeker.ts", _silentErr); }
   }

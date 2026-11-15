@@ -51,6 +51,16 @@ Other production paths require deliberate scope expansion and relevant tests.
 Documentation, retained research and generated audit progress are identified
 separately; changing those does not establish security clearance.
 
+Weekly-video implementation and shared media-verification paths have explicit,
+reviewed regression selections. Fixture regressions run with an allowlisted
+environment, fake SDK constructor credentials, an unreachable loopback database
+target and disposable HOME; the separately named payment lifecycle integration
+still requires its existing development DB safeguards. Build/preflight steps
+retain their existing environment contract with loader-hijack variables scrubbed.
+This is not a filesystem/network sandbox. For just the weekly-video fixture
+suite use `npm run verify:bwb`; see `docs/offline-verification.md` for evidence
+and live-verification limits.
+
 The inventory used for drift detection covers tracked application, build and
 test inputs, documentation/build metadata (including imported release facts),
 tracked data inputs other than audit progress, plus changed inputs. Changed-path

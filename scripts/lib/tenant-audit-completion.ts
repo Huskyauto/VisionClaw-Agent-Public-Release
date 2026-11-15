@@ -1,4 +1,4 @@
-import { AUDIT_ROUTE_TIMEOUT_MS, AuditResponseError, completeAuditText, type AuditRoute } from "./tenant-audit-fallback";
+import { AUDIT_ROUTE_TIMEOUT_MS, AuditResponseError, AuditAdmissionError, AuditWorkDeferred, completeAuditText, type AuditRoute } from "./tenant-audit-fallback";
 
 type ResolveOptions = { providerLane?: Exclude<AuditRoute["providerLane"], "cheaperinference">; forbidMeteredFallback?: true };
 type Resolved = { client: { chat: { completions: { create(body: any, options: any): Promise<any> } } }; actualModelId: string };
@@ -14,6 +14,7 @@ export async function invokeAuditRoute(route: AuditRoute, system: string, user: 
   timeoutMs?: number;
   paidAllowed?: () => boolean;
   resolve?: (model: string, tenant: number, options: ResolveOptions) => Promise<Resolved>;
+  beforeDispatch?: () => Promise<void>;
 } = {}): Promise<{ raw: string; model: string }> {
   const timeoutMs = Math.min(AUDIT_ROUTE_TIMEOUT_MS, ports.timeoutMs ?? AUDIT_ROUTE_TIMEOUT_MS);
   if (!Number.isFinite(timeoutMs) || timeoutMs < 1 || !Number.isSafeInteger(maxTokens) || maxTokens < 1)
@@ -43,6 +44,12 @@ export async function invokeAuditRoute(route: AuditRoute, system: string, user: 
     if (controller.signal.aborted) throw new Error("Audit deadline expired before dispatch");
     const limit = Math.min(maxTokens, paid ? 8192 : maxTokens);
     const reasoning = /^(gpt-5|gpt-4\.1|o[1-9])/i.test(actualModelId);
+    try { await ports.beforeDispatch?.(); }
+    catch (error) {
+      if (error instanceof AuditWorkDeferred) throw error;
+      throw new AuditAdmissionError("Audit dispatch admission failed; no fallback permitted", { cause: error });
+    }
+    if (controller.signal.aborted) throw new AuditWorkDeferred("Audit deadline expired before SDK dispatch");
     const response = await client.chat.completions.create({
       model: actualModelId, messages: [{ role: "system", content: system }, { role: "user", content: user }],
       ...(reasoning ? { max_completion_tokens: limit } : { max_tokens: limit, temperature: 0 }),
@@ -92,6 +99,11 @@ export function readAuditProviderHealth(value: unknown): AuditProviderHealth {
   return value as AuditProviderHealth;
 }
 export function auditHealthKey(route: AuditRoute): string { return `${route.providerLane}:${route.model}`; }
+export function auditProviderSuccess(health: AuditProviderHealth, route: AuditRoute): AuditProviderHealth {
+  const next = { ...health };
+  delete next[auditHealthKey(route)];
+  return next;
+}
 export function auditProviderFailure(health: AuditProviderHealth, route: AuditRoute, error: unknown, now = Date.now()): AuditProviderHealth {
   const key = auditHealthKey(route);
   const failures = Math.min(12, (health[key]?.failures ?? 0) + 1);

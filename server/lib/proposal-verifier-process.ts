@@ -128,7 +128,7 @@ function getChildCommand(
     return { command: process.execPath, args: [`--max-old-space-size=${heapMb}`, bundlePath] };
   }
 
-  const tsxLoader = path.resolve(process.cwd(), "node_modules/tsx/dist/loader.mjs");
+  const tsxLoader = path.resolve(snapshotRoot ?? process.cwd(), "node_modules/tsx/dist/loader.mjs");
   const sourcePath = path.resolve(snapshotRoot ?? process.cwd(), "scripts/proposal-verifier-child.ts");
   if (!bundleExists(tsxLoader) || !bundleExists(sourcePath)) {
     throw new Error("Proposal verifier development runner is unavailable");

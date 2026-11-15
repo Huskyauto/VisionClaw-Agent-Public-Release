@@ -1,5 +1,6 @@
 import { DEFAULT_CHAT_MODEL_ID, HIGH_END_WORK_MODEL_ID } from "./chat-model-default";
 import type { ProviderLane } from "./providers";
+import { META_MODEL_ID, META_WONDER_MODEL_ID, metaModel, metaPrimaryAllowed } from "./lib/meta";
 
 type FelixModelContext = {
   tenantId: number;
@@ -41,9 +42,10 @@ export function selectFelixModel(model: string, context: FelixModelContext): str
 
 export type FelixExpertLane = Readonly<{ modelId: string; actualModelId: string; providerLane: ProviderLane }>;
 
-/** Subscription-first owner work; no new automatic metered-key fallback. */
+/** Approved Meta-primary owner work; legacy lanes remain strictly pinned. */
 export function getFelixExpertLanes(
   context: FelixModelContext & { source?: string; model?: string },
+  env: Record<string, string | undefined> = process.env,
 ): readonly FelixExpertLane[] | null {
   if ((context.enabled ?? (
         process.env.FELIX_HIGH_END_MODEL_ENABLED !== "0" &&
@@ -57,9 +59,16 @@ export function getFelixExpertLanes(
   const requested = context.model === "auto" ? DEFAULT_CHAT_MODEL_ID : context.model || DEFAULT_CHAT_MODEL_ID;
   const selected = selectFelixModel(requested, context);
   if (selected !== DEFAULT_CHAT_MODEL_ID && selected !== HIGH_END_WORK_MODEL_ID) return null;
-  return [
+  const lanes: FelixExpertLane[] = [
     { modelId: selected, actualModelId: selected, providerLane: "profundo" },
     // Retain the previously authorized fallback, not a new API-key spend lane.
     { modelId: "gpt-5.4", actualModelId: "gpt-5.4", providerLane: "replit" },
   ];
+  // The A2A expert roster previously bypassed the normal owner Meta-primary
+  // selector. Reuse its exact opt-in/owner policy, never a generic paid fallback.
+  if (metaPrimaryAllowed(context.tenantId, context.tenantId, {}, env)) {
+    const model = metaModel(selected === HIGH_END_WORK_MODEL_ID ? META_WONDER_MODEL_ID : META_MODEL_ID)!;
+    lanes.unshift({ modelId: model.id, actualModelId: model.upstream, providerLane: "meta-direct" });
+  }
+  return lanes;
 }

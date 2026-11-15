@@ -428,6 +428,7 @@ export async function juryTriage(opts: JuryTriageOptions): Promise<JuryDecision>
     decision.typesafeValidation = await validate({
       tenantId: opts.tenantId,
       subjectKind: "jury",
+      evidenceKind: "review_opinion",
       goal: [issue, opts.context || ""].filter(Boolean).join("\n\n").slice(0, 4000),
       output: [
         `VERDICT: ${verdict}`,

@@ -59,6 +59,7 @@ const PRIVATE_KEY_RE =
 const DB_CONNSTR_RE =
   /((?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp):\/\/[^:]+:)([^@]+)(@)/gi;
 const SIGNAL_PHONE_RE = /(\+[1-9]\d{6,14})(?![A-Za-z0-9])/g;
+const EMAIL_ADDRESS_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 
 function maskToken(token: string): string {
   if (token.length < 18) return "***";
@@ -84,6 +85,7 @@ export function redactSensitiveText(text: string, options: { force?: boolean } =
     if (phone.length <= 8) return phone.slice(0, 2) + "****" + phone.slice(-2);
     return phone.slice(0, 4) + "****" + phone.slice(-4);
   });
+  out = out.replace(EMAIL_ADDRESS_RE, "[REDACTED EMAIL]");
   return out;
 }
 

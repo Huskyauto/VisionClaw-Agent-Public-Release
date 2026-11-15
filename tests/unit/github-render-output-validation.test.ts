@@ -12,14 +12,14 @@ import { createStableVideoSnapshot, validateRenderedVideo } from "../../scripts/
 
 const VALID_RENDER = path.resolve(process.cwd(), "data/youtube/video-01-origin-story-v2.mp4");
 
-test("rejects a symlink even when it points to a real video file", () => {
+test("rejects a symlink even when it points to a real video file", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bwb-render-validation-"));
   const real = path.join(dir, "real.mp4");
   const link = path.join(dir, "final.mp4");
   try {
     fs.writeFileSync(real, "not a video");
     fs.symlinkSync(real, link);
-    const result = validateRenderedVideo(link);
+    const result = await validateRenderedVideo(link);
     assert.equal(result.ok, false);
     assert.match(result.reason, /regular file|symlink/i);
   } finally {
@@ -27,7 +27,7 @@ test("rejects a symlink even when it points to a real video file", () => {
   }
 });
 
-test("creates a stable regular-file snapshot for the bytes being delivered", () => {
+test("creates a stable regular-file snapshot for the bytes being delivered", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bwb-render-validation-"));
   const source = path.join(dir, "source.mp4");
   fs.copyFileSync(VALID_RENDER, source);
@@ -38,7 +38,7 @@ test("creates a stable regular-file snapshot for the bytes being delivered", () 
     const snapshotSize = fs.statSync(snapshot.filePath).size;
     fs.writeFileSync(source, "replacement bytes");
     assert.equal(fs.statSync(snapshot.filePath).size, snapshotSize, "snapshot must not change when the source pathname is replaced");
-    const result = validateRenderedVideo(snapshot.filePath);
+    const result = await validateRenderedVideo(snapshot.filePath);
     assert.equal(result.ok, true, result.reason);
   } finally {
     snapshot.cleanup();
@@ -60,13 +60,13 @@ test("refuses to snapshot a symlink before any delivery can use it", () => {
   }
 });
 
-test("accepts a completed 1920x1080 h264/aac render", () => {
-  const result = validateRenderedVideo(VALID_RENDER);
+test("accepts a completed 1920x1080 h264/aac render", async () => {
+  const result = await validateRenderedVideo(VALID_RENDER);
   assert.equal(result.ok, true, result.reason);
   assert.match(result.reason, /h264\/aac 1920x1080/);
 });
 
-test("rejects a truncated render artifact", () => {
+test("rejects a truncated render artifact", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bwb-render-validation-"));
   const truncated = path.join(dir, "truncated.mp4");
   try {
@@ -78,7 +78,7 @@ test("rejects a truncated render artifact", () => {
     } finally {
       fs.closeSync(source);
     }
-    const result = validateRenderedVideo(truncated);
+    const result = await validateRenderedVideo(truncated);
     assert.equal(result.ok, false);
     assert.match(result.reason, /ffprobe|duration|metadata/i);
   } finally {

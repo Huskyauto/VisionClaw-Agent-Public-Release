@@ -8,7 +8,7 @@ test("Profundo disabled switch prevents even explicitly pinned requests without 
   try {
     assert.equal(providerLaneLocallyReady("profundo"), false);
     await assert.rejects(getClientForModel("gpt-5.6-sol", 1, { providerLane: "profundo", juryLane: true }),
-      /unavailable/);
+      (error: any) => /unavailable/.test(error.message) && error.code === "PROFUNDO_DISABLED");
   } finally {
     if (saved === undefined) delete process.env.PROFUNDO_ENABLED;
     else process.env.PROFUNDO_ENABLED = saved;

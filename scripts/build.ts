@@ -1,9 +1,12 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile, mkdir, copyFile } from "fs/promises";
+import { rm, readFile, mkdir, copyFile, writeFile } from "fs/promises";
 import { execSync } from "child_process";
 import { stageTypeScriptStandardLibraries } from "./package-typescript-libs";
 import { buildDataPolicy } from "./lib/build-data-policy";
+import { buildGraph } from "./build-codebase-graph";
+import { captureVerifierSource } from "../server/lib/workspace-verifier-source";
+import { encodeVerifierSourceArtifact, VERIFIER_SOURCE_ARTIFACT } from "../server/lib/workspace-verifier-source-artifact";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -32,6 +35,9 @@ const allowlist = [
 ];
 
 async function buildAll() {
+  // Ship a current, disposable source index. Never build it on a chat/request
+  // path or silently publish an old graph when source indexing fails.
+  await buildGraph();
   const dataPolicy = buildDataPolicy(
     process.argv.includes("--release-check"),
     process.env.REPLIT_DEPLOYMENT === "1" || process.env.SKIP_DEV_DATA_SYNC === "1",
@@ -56,6 +62,9 @@ async function buildAll() {
     : null;
 
   await rm("dist", { recursive: true, force: true });
+  const verifierSource = captureVerifierSource();
+  await mkdir("dist", { recursive: true });
+  await writeFile(`dist/${VERIFIER_SOURCE_ARTIFACT}`, encodeVerifierSourceArtifact(verifierSource), { mode: 0o600 });
 
   if (snapshotExists) {
     const { writeFile, mkdir } = await import("fs/promises");
@@ -202,6 +211,9 @@ async function buildAll() {
       external: externals,
       logLevel: "info",
     });
+  }
+  if (captureVerifierSource().hash !== verifierSource.hash) {
+    throw new Error("[build] source changed during bundling; refusing mismatched verifier provenance");
   }
 }
 

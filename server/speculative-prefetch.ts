@@ -126,7 +126,11 @@ type Executor = (name: string, params: Record<string, any>) => Promise<any>;
 
 async function defaultExecutor(name: string, params: Record<string, any>): Promise<any> {
   const { executeToolWithTimeout } = await import("./tools");
-  return executeToolWithTimeout(name, params);
+  return executeToolWithTimeout(name, params, {
+    tenantId: params._tenantId, actor: "system", invokedVia: "speculative-prefetch",
+    internalPurpose: "Read-only, policy-screened speculative replay lookup",
+    metadata: { _speculativePrefetch: true },
+  });
 }
 
 /**

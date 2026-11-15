@@ -2,11 +2,11 @@
  * Tools-layer-split S2 — trusted-context builder.
  *
  * The dispatcher (S4) calls `buildToolContext` ONCE per invocation, deriving
- * identity from platform-internal values. Caller-supplied trust signals in
- * params (`_tenantId`, `_personaId`, `_conversationId`, `_approvedByGate`,
- * `_rateLimitChecked`) are NEVER read here — the legacy strip-and-restamp
- * hardening (R125+69–71) is preserved by construction: the only way identity
- * enters a new-package handler is via this function's explicit arguments.
+ * identity from sealed invocation-authority ALS, never from task parameters.
+ * The public tools entrance accepts host authority separately, removes model
+ * underscore keys and stamps compatibility fields for private legacy code.
+ * This builder formats that already-authenticated context; it does not itself
+ * authenticate callers. The dispatcher refuses invocation without authority.
  *
  * Contract: data/feature-contracts/tools-layer-split/spec.md
  */

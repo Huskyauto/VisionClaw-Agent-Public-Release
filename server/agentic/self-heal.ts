@@ -195,6 +195,7 @@ async function executeFix(plan: FixPlan, opts: { tenantId: number; runId: number
     const result = await executeGuardedTool(name, ctx, {
       tenantId: opts.tenantId,
       invokedVia: "self_heal",
+      actor: "system", internalPurpose: "Execute an existing denylist-screened self-repair action",
     });
     return result;
   };

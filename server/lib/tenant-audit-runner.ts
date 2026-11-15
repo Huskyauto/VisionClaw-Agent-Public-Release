@@ -1,23 +1,34 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import type { AgentJob } from "../job-queue";
 import { renewJobLease } from "../job-queue";
-import { auditCommand, isCompleteAuditReport, TENANT_AUDIT_JOB_KIND } from "./tenant-audit-schedule-policy";
-import { auditJobState, continueAuditJob, backoffAuditJob, recordAuditFailure, TenantAuditStop } from "./tenant-audit-job-state";
+import { auditCommand, isCompleteAuditReport, TENANT_AUDIT_JOB_KIND, AUDIT_DAILY_RUNTIME_MS } from "./tenant-audit-schedule-policy";
+import { auditJobState, claimAuditDailyBatch, continueAuditJob, backoffAuditJob, deferAuditDeadline, recordAuditFailure, TenantAuditStop } from "./tenant-audit-job-state";
 import { tryAcquireHeavyWorkLane, HeavyWorkDeferred } from "./heavy-work-lane";
 import { isProductionRuntime } from "./runtime-env";
 
-const RUNTIME_MS = 4 * 60_000; // below the existing five-minute job lease
+const RUNTIME_MS = AUDIT_DAILY_RUNTIME_MS; // lease renewed while the bounded daily batch runs
 export interface TenantAuditRunnerPorts {
   state(): Promise<any>;
   acquire(onLost: () => void): Promise<(() => Promise<void>) | null>;
-  claimSlice(): Promise<void>;
+  claimSlice(): Promise<void | boolean>;
   child(): Promise<{ code: number; deadline: boolean }>;
   continue(): Promise<void>;
-  outage(): Promise<void>;
+  outage(completedWork?: boolean): Promise<void>;
+  deadline(): Promise<void>;
   recordFailure(): Promise<void>;
   command(): ReturnType<typeof auditCommand>;
 }
-/** One bounded chunk (or resumable precision stage), never a second audit loop. */
+/** Cursor/heartbeat/health writes are not completed work. */
+export function auditProgressFingerprint(payload: any): string {
+  const cp = payload?.auditCheckpoint;
+  const keys = (value: unknown) => value && typeof value === "object" ? Object.keys(value).sort() : [];
+  return createHash("sha256").update(JSON.stringify({
+    completed: keys(cp?.completed), pending: keys(cp?.pending?.completed),
+    receipts: keys(cp?.unitLedger?.receipts), precision: keys(payload?.auditPrecision),
+  })).digest("hex");
+}
+/** One bounded daily batch, checkpointing the same weekly campaign. */
 export async function runTenantAuditJob(job: AgentJob,
   ports: Partial<TenantAuditRunnerPorts> = {}): Promise<Record<string, unknown>> {
   if (job.tenantId !== 1 || job.kind !== TENANT_AUDIT_JOB_KIND || job.payload.tenantId !== 1 ||
@@ -60,16 +71,8 @@ export async function runTenantAuditJob(job: AgentJob,
     const payload = await state();
     if ((payload.auditSlices ?? 0) >= 2048) throw new TenantAuditStop("Tenant audit slice ceiling reached; coverage incomplete");
     // Preserve all child-written fields; this counter is independently fenced.
-    if (ports.claimSlice) await ports.claimSlice();
-    else {
-    const { db } = await import("../db");
-    const { sql } = await import("drizzle-orm");
-    const claimed: any = await db.execute(sql`UPDATE agent_jobs SET payload=jsonb_set(payload,
-      '{auditSlices}',to_jsonb(COALESCE((payload->>'auditSlices')::int,0)+1))
-      WHERE id=${job.id} AND tenant_id=1 AND kind=${TENANT_AUDIT_JOB_KIND}
-      AND status='running' AND attempts=${job.attempts} AND lease_until > now() RETURNING id`);
-    if ((claimed.rows ?? claimed).length !== 1) throw new Error("Tenant audit lease lost");
-    }
+    const admitted = ports.claimSlice ? await ports.claimSlice() : await claimAuditDailyBatch(identity);
+    if (admitted === false) return { status: "daily_batch_wait", continued: true };
     if (laneLost) throw new Error("Tenant audit admission lost before dispatch");
     const outcome = ports.child ? await ports.child() : await new Promise<{ code: number; deadline: boolean }>((resolve, reject) => {
       let deadline = false, lost = false;
@@ -79,7 +82,7 @@ export async function runTenantAuditJob(job: AgentJob,
           PROFUNDO_ENABLED: process.env.PROFUNDO_ENABLED === "0" ? "0" : "1",
           AUDIT_PROVIDER_LANE: "profundo",
           AUDIT_MODEL: "claude-sonnet-5", AUDIT_TRIAGE_MODEL: "claude-sonnet-5",
-          AUDIT_SLICE_CHUNKS: "1",
+          AUDIT_SLICE_CHUNKS: "1", AUDIT_WEEKLY_BATCH: "1",
           AUDIT_MAX_CHUNKS: "0", TENANT_AUDIT_PRECISION: "1",
           AUDIT_TRIAGE_BATCH: "12", AUDIT_TRIAGE_MAX_BATCHES: "0",
           AUDIT_TRIAGE_MAX_TOKENS: "8000", AUDIT_TRIAGE_SNIPPET_LINES: "30",
@@ -88,6 +91,7 @@ export async function runTenantAuditJob(job: AgentJob,
           AUDIT_MAX_TOKENS: "32000",
           ALLOW_METERED_LLM: "0", TENANT_AUDIT_ENQUEUE_FIXES: "0", JURY_AUTOAPPLY: "0",
           AUDIT_DRY_RUN: "1", // scheduler supplies persistent notices; no repeated slice emails
+          AUDIT_DEADLINE_AT: String(Date.now() + RUNTIME_MS - 5_000),
         } });
       stop = () => {
         lost = true;
@@ -109,12 +113,23 @@ export async function runTenantAuditJob(job: AgentJob,
       });
     });
     const current = await state();
-    if (outcome.code === 8 || outcome.deadline) {
-      await (ports.outage ?? (() => backoffAuditJob(identity)))();
+    if ((outcome.deadline || outcome.code === 9 || outcome.code === 7) &&
+        auditProgressFingerprint(current) === auditProgressFingerprint(payload)) {
+      await (ports.deadline ?? (() => deferAuditDeadline(identity, payload.auditDeadlineStalls ?? 0)))();
+      return { status: "incomplete", continued: true };
+    }
+    if (outcome.code === 8 && !outcome.deadline) {
+      const completedWork = auditProgressFingerprint(current) !== auditProgressFingerprint(payload);
+      const outages = payload.auditOutages ?? 0;
+      if (!Number.isSafeInteger(outages) || outages < 0)
+        throw new TenantAuditStop("Invalid audit recovery counter");
+      if (!completedWork && outages >= 11)
+        throw new TenantAuditStop("Tenant audit stopped after twelve recovery passes without completed work; inspect unavailable routes or invalid source units");
+      await (ports.outage ?? ((progress?: boolean) => backoffAuditJob(identity, undefined, progress)))(completedWork);
       return { status: "provider_backoff", continued: true };
     }
-    // Completed source slices continue promptly; outages/hangs above back off.
-    if (outcome.code === 7) {
+    // Completed batches wait until tomorrow; outages cannot buy a second batch.
+    if (outcome.code === 7 || outcome.code === 9 || outcome.deadline) {
       await (ports.continue ?? (() => continueAuditJob(identity)))();
       return { status: "incomplete", continued: true };
     }

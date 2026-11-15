@@ -27,6 +27,8 @@ if ! timeout 60 npx tsx scripts/preflight-domain-boundaries.ts; then
 fi
 
 FILES=(
+  "tests/security/app-review-integrity.test.ts"
+  "tests/lib/demo-studio.test.ts"
   "tests/lib/harness-ab-sample.test.ts"
   "tests/lib/structured-prompt-profile.test.ts"
   "tests/lib/run-confirmation.test.ts"
@@ -142,6 +144,14 @@ FILES=(
   "tests/security/injection-scanner-patterns.test.ts"
   "tests/security/external-content-verbalization.test.ts"
   "tests/security/sandbox-escape.test.ts"
+  "tests/security/code-sandbox-isolation.test.ts"
+  "tests/security/external-tool-arguments.test.ts"
+  "tests/security/mcp-context-ingress.test.ts"
+  "tests/security/restricted-exec.test.ts"
+  "tests/security/autonomy-gate-failure.test.ts"
+  "tests/security/tool-authority-boundary.test.ts"
+  "tests/security/exec-lobster-owner-gate.test.ts"
+  "tests/security/exec-catastrophic-floor.test.ts"
   "tests/sandbox/firewall.test.ts"
   "tests/sandbox/replay.test.ts"
   "tests/sandbox/promote-race.test.ts"

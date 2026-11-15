@@ -18,4 +18,4 @@ export function errorMessageSlice(error: unknown, end: number, fallback = "Unkno
   return errorMessage(error, fallback).slice(0, end);
 }
 
-export const PROVIDERS_SUPPORTING_TOOLS = new Set(["replit", "openai", "anthropic", "google", "xai", "openrouter"]);
+export const PROVIDERS_SUPPORTING_TOOLS = new Set(["replit", "openai", "anthropic", "google", "xai", "openrouter", "meta-direct"]);

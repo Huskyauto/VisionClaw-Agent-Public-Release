@@ -1,9 +1,12 @@
-import { execSync } from "child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import fs from "fs";
 import path from "path";
 
 import { logSilentCatch } from "./lib/silent-catch";
 import { classifyCommand } from "./safety/danger-rails";
+import { restrictedCommand } from "./safety/restricted-exec";
+const execFileAsync = promisify(execFile);
 const CONFIG_PATH = path.join(process.cwd(), "data", "exec-config.json");
 const WORKSPACE_ROOT = process.cwd();
 
@@ -176,14 +179,18 @@ export function isCommandAllowed(command: string, config: ExecConfig): { allowed
     };
   }
 
-  // Owner-at-keyboard full mode: the catastrophic floor above is the ONLY limit.
+  // Owner-at-keyboard full mode retains BOTH hard accident-prevention floors.
   // The broader denyPatterns / command-substitution / redirection / allowlist
   // restrictions are allowlist-mode-only and are intentionally bypassed here —
-  // the owner-driven gate (admin tenant ∧ owner channel), the stripped env, and
-  // workspace-root containment in executeCommand are the real fence.
+  // The owner gate is authorization, not OS isolation. Scrubbing the provided
+  // environment and checking cwd do not prevent an authorized owner shell from
+  // reading other same-user files or process environments.
   if (config.securityMode === "full") {
     return { allowed: true };
   }
+
+  const restricted = restrictedCommand(command, config.workdir || WORKSPACE_ROOT);
+  if (restricted.error) return { allowed: false, reason: restricted.error };
 
   // Allowlist mode (agents, self-heal, customer tenants): full restriction set.
   for (const pattern of config.denyPatterns) {
@@ -241,15 +248,18 @@ export async function executeCommand(command: string, options?: {
   // command substitution / curl / node -e / any tooling it needs. The hard
   // safety floor STILL applies even in full mode: the CATASTROPHIC_DENY list
   // (rm -rf /, mkfs, dd, fork bomb, shutdown, ...) runs before the full-mode
-  // short-circuit in isCommandAllowed, plus the stripped env (no secrets handed
-  // to the shell) and workspace-root containment below. The broader denyPatterns
+  // short-circuit in isCommandAllowed. The supplied environment excludes
+  // credentials, but owner-full execution is NOT a filesystem/procfs jail.
+  // The broader denyPatterns
   // (exec/eval/curl/wget/env/node -e/...) and the command-substitution +
   // redirection blocks are allowlist-MODE restrictions, intentionally bypassed
   // for the owner. An explicit 'deny' kill switch or a disabled tool is NOT
   // overridden — we only ever upgrade the default 'allowlist' mode.
-  const config = (options?.elevateToFull && baseConfig.securityMode === "allowlist")
-    ? { ...baseConfig, securityMode: "full" as const }
-    : baseConfig;
+  // A writable settings file may restrict autonomous execution, NEVER turn it
+  // into a shell. Only the server's owner-interactive dispatch may elevate.
+  const config = baseConfig.securityMode === "deny" || !baseConfig.enabled
+    ? baseConfig
+    : { ...baseConfig, securityMode: options?.elevateToFull ? "full" as const : "allowlist" as const };
   const check = isCommandAllowed(command, config);
 
   if (!check.allowed) {
@@ -262,6 +272,7 @@ export async function executeCommand(command: string, options?: {
   }
 
   let workdir = config.workdir || WORKSPACE_ROOT;
+  if (!options?.workdir) options = { ...options, workdir };
   if (options?.workdir) {
     const resolved = path.resolve(WORKSPACE_ROOT, options.workdir);
     if (!isWithinWorkspace(resolved)) {
@@ -293,21 +304,25 @@ export async function executeCommand(command: string, options?: {
 
   const timeout = Math.min(
     (options?.timeout || config.timeoutSeconds) * 1000,
-    config.timeoutSeconds * 1000
+    config.timeoutSeconds * 1000,
+    30_000
   );
 
   const start = Date.now();
 
   try {
-    const result = execSync(command, {
+    const restricted = config.securityMode === "full" ? null : restrictedCommand(command, workdir);
+    if (restricted?.error) return { success: false, command, error: restricted.error };
+    const execution = execFileAsync(
+      restricted?.binary || "/bin/sh",
+      restricted?.args || ["-c", command], {
       cwd: workdir,
       timeout,
-      maxBuffer: config.maxOutputBytes,
+      maxBuffer: Math.min(config.maxOutputBytes, 32768),
       encoding: "utf-8",
-      // SECURITY: stripped env — exec is owner-only but if owner runs a
-      // prompt-injected shell command, do NOT hand it the platform's secrets
-      // (every other tenant's API keys, OAuth tokens, etc. live in process.env).
-      // Whitelist only the bare minimum needed for shell utilities to function.
+      // No inherited credentials/loader flags. This is NOT filesystem or
+      // process isolation: intentionally elevated owner shells retain owner
+      // privileges. Autonomous execution uses the fixed restricted argv above.
       env: {
         PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
         HOME: WORKSPACE_ROOT,
@@ -316,18 +331,19 @@ export async function executeCommand(command: string, options?: {
         LC_ALL: process.env.LC_ALL || "en_US.UTF-8",
         TERM: process.env.TERM || "dumb",
       },
-      stdio: ["pipe", "pipe", "pipe"],
     });
+    execution.child.stdin?.end();
+    const result = await execution;
 
     const durationMs = Date.now() - start;
-    const stdout = (result || "").toString();
+    const stdout = result.stdout;
     const truncated = stdout.length >= config.maxOutputBytes;
 
     return {
       success: true,
       command,
       stdout: truncated ? stdout.slice(0, config.maxOutputBytes) : stdout,
-      stderr: "",
+      stderr: result.stderr,
       exitCode: 0,
       durationMs,
       truncated,
@@ -347,11 +363,11 @@ export async function executeCommand(command: string, options?: {
     }
 
     return {
-      success: err.status === 0,
+      success: false,
       command,
       stdout: (err.stdout || "").toString().slice(0, config.maxOutputBytes),
       stderr: (err.stderr || "").toString().slice(0, 4096),
-      exitCode: err.status ?? 1,
+      exitCode: typeof err.code === "number" ? err.code : 1,
       durationMs,
       securityMode: config.securityMode,
     };

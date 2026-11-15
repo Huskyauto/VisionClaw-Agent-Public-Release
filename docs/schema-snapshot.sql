@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kfbsKPpau6aCitG8fZ9LJS4BMzg5oh66nUEcbBWhBXxHhnHkFO6g7UhafaseR1x
+\restrict ZsNbs5oJve6lBBfFJR7PgO6teE5Jn0EOwyWUrBlP1YkgJ024KTBG2Kd1vLVGlOa
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -4463,6 +4463,87 @@ CREATE SEQUENCE public.falsified_routes_id_seq
 --
 
 ALTER SEQUENCE public.falsified_routes_id_seq OWNED BY public.falsified_routes.id;
+
+
+--
+-- Name: felix_connector_records; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.felix_connector_records (
+    id text NOT NULL,
+    tenant_id integer NOT NULL,
+    kind text NOT NULL,
+    client_id text NOT NULL,
+    payload text NOT NULL,
+    expires_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: felix_line_audit; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.felix_line_audit (
+    id integer NOT NULL,
+    tenant_id integer NOT NULL,
+    client_id text NOT NULL,
+    tool text NOT NULL,
+    request_id text,
+    ok boolean NOT NULL,
+    error text,
+    at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: felix_line_audit_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.felix_line_audit_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: felix_line_audit_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.felix_line_audit_id_seq OWNED BY public.felix_line_audit.id;
+
+
+--
+-- Name: felix_line_clients; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.felix_line_clients (
+    client_id text NOT NULL,
+    tenant_id integer NOT NULL,
+    conversation_id integer NOT NULL,
+    outbox_cursor integer DEFAULT 0 NOT NULL,
+    delivered_id integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    allow_work boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: felix_line_turns; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.felix_line_turns (
+    request_id text NOT NULL,
+    tenant_id integer NOT NULL,
+    client_id text NOT NULL,
+    conversation_id integer NOT NULL,
+    idempotency_key text NOT NULL,
+    message_hash text NOT NULL,
+    result jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
 
 
 --
@@ -9507,6 +9588,7 @@ CREATE TABLE public.spark_outbox (
     message text NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     conversation_id integer,
+    recipient text DEFAULT 'spark'::text NOT NULL,
     CONSTRAINT spark_outbox_message_length CHECK (((char_length(message) >= 1) AND (char_length(message) <= 4000)))
 );
 
@@ -10297,7 +10379,8 @@ CREATE TABLE public.typesafe_fact_prefilter_observations (
     facts_written integer,
     error_class text,
     created_at timestamp without time zone DEFAULT now(),
-    updated_at timestamp without time zone DEFAULT now()
+    updated_at timestamp without time zone DEFAULT now(),
+    decision_receipt jsonb
 );
 
 
@@ -12657,6 +12740,13 @@ ALTER TABLE ONLY public.falsified_routes ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- Name: felix_line_audit id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_audit ALTER COLUMN id SET DEFAULT nextval('public.felix_line_audit_id_seq'::regclass);
+
+
+--
 -- Name: felix_loop_runs id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -14726,6 +14816,38 @@ ALTER TABLE ONLY public.failure_attributions
 
 ALTER TABLE ONLY public.falsified_routes
     ADD CONSTRAINT falsified_routes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: felix_connector_records felix_connector_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_connector_records
+    ADD CONSTRAINT felix_connector_records_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: felix_line_audit felix_line_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_audit
+    ADD CONSTRAINT felix_line_audit_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: felix_line_clients felix_line_clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_clients
+    ADD CONSTRAINT felix_line_clients_pkey PRIMARY KEY (client_id);
+
+
+--
+-- Name: felix_line_turns felix_line_turns_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_turns
+    ADD CONSTRAINT felix_line_turns_pkey PRIMARY KEY (request_id);
 
 
 --
@@ -18039,6 +18161,76 @@ CREATE INDEX idx_falsified_routes_tenant ON public.falsified_routes USING btree 
 
 
 --
+-- Name: idx_felix_connector_records_expiry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_felix_connector_records_expiry ON public.felix_connector_records USING btree (expires_at);
+
+
+--
+-- Name: idx_felix_connector_records_tenant_client; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_felix_connector_records_tenant_client ON public.felix_connector_records USING btree (tenant_id, client_id);
+
+
+--
+-- Name: idx_felix_line_audit_client; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_felix_line_audit_client ON public.felix_line_audit USING btree (client_id);
+
+
+--
+-- Name: idx_felix_line_audit_tenant_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_felix_line_audit_tenant_at ON public.felix_line_audit USING btree (tenant_id, at);
+
+
+--
+-- Name: idx_felix_line_clients_conversation; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_felix_line_clients_conversation ON public.felix_line_clients USING btree (conversation_id);
+
+
+--
+-- Name: idx_felix_line_clients_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_felix_line_clients_tenant ON public.felix_line_clients USING btree (tenant_id, client_id);
+
+
+--
+-- Name: idx_felix_line_turns_client; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_felix_line_turns_client ON public.felix_line_turns USING btree (client_id);
+
+
+--
+-- Name: idx_felix_line_turns_client_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_felix_line_turns_client_created ON public.felix_line_turns USING btree (tenant_id, client_id, created_at);
+
+
+--
+-- Name: idx_felix_line_turns_conversation; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_felix_line_turns_conversation ON public.felix_line_turns USING btree (conversation_id);
+
+
+--
+-- Name: idx_felix_line_turns_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_felix_line_turns_key ON public.felix_line_turns USING btree (tenant_id, client_id, idempotency_key);
+
+
+--
 -- Name: idx_felix_loop_runs_tenant_started; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -19723,6 +19915,13 @@ CREATE INDEX idx_spark_outbox_conversation ON public.spark_outbox USING btree (c
 --
 
 CREATE INDEX idx_spark_outbox_persona ON public.spark_outbox USING btree (persona_id);
+
+
+--
+-- Name: idx_spark_outbox_recipient_cursor; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spark_outbox_recipient_cursor ON public.spark_outbox USING btree (tenant_id, recipient, id);
 
 
 --
@@ -21440,6 +21639,70 @@ ALTER TABLE ONLY public.eval_runs
 
 
 --
+-- Name: felix_connector_records felix_connector_records_tenant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_connector_records
+    ADD CONSTRAINT felix_connector_records_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: felix_line_audit felix_line_audit_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_audit
+    ADD CONSTRAINT felix_line_audit_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.felix_line_clients(client_id);
+
+
+--
+-- Name: felix_line_audit felix_line_audit_tenant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_audit
+    ADD CONSTRAINT felix_line_audit_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: felix_line_clients felix_line_clients_conversation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_clients
+    ADD CONSTRAINT felix_line_clients_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id);
+
+
+--
+-- Name: felix_line_clients felix_line_clients_tenant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_clients
+    ADD CONSTRAINT felix_line_clients_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: felix_line_turns felix_line_turns_client_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_turns
+    ADD CONSTRAINT felix_line_turns_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.felix_line_clients(client_id);
+
+
+--
+-- Name: felix_line_turns felix_line_turns_conversation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_turns
+    ADD CONSTRAINT felix_line_turns_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES public.conversations(id);
+
+
+--
+-- Name: felix_line_turns felix_line_turns_tenant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.felix_line_turns
+    ADD CONSTRAINT felix_line_turns_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+
+--
 -- Name: financial_models financial_models_idea_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -22625,5 +22888,5 @@ ALTER TABLE public.skill_optimization_versions ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kfbsKPpau6aCitG8fZ9LJS4BMzg5oh66nUEcbBWhBXxHhnHkFO6g7UhafaseR1x
+\unrestrict ZsNbs5oJve6lBBfFJR7PgO6teE5Jn0EOwyWUrBlP1YkgJ024KTBG2Kd1vLVGlOa
 

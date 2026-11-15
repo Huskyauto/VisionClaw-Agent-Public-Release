@@ -24,6 +24,7 @@ import { tenantScope, assertValidTenantId, requiredTenantScope, requireTenantSco
 import { summarizeMemoryGroups } from "./storage-helpers/memory-stats";
 export { ALL_TENANTS, type TenantScope };
 import { redactRecordFields } from "./storage-helpers/pii-redaction-guard";
+import { persistMemorySupersession } from "./storage-helpers/memory-supersession";
 import {
   RESERVED_KNOWLEDGE_CATEGORIES,
   isPlatformManagedKnowledgeSource,
@@ -136,6 +137,7 @@ export interface IStorage {
   evictOldestConversationFacts(conversationId: number, tenantId: number, keep?: number): Promise<void>;
   getAllMemoriesForBackup(): Promise<MemoryEntry[]>;
   createMemoryEntry(data: InsertMemoryEntry): Promise<MemoryEntry>;
+  supersedeMemoryEntry(oldId: number, data: InsertMemoryEntry): Promise<MemoryEntry | undefined>;
   updateMemoryEntry(id: number, data: Partial<InsertMemoryEntry>, tenantId: number): Promise<MemoryEntry | undefined>;
   updateKnowledgeEmbedding(id: number, embedding: number[], tenantId: number): Promise<void>;
   deleteMemoryEntry(id: number, tenantId: TenantScope): Promise<void>;
@@ -586,7 +588,7 @@ export class DatabaseStorage implements IStorage {
     const [entry] = await db.select(memoryEntrySafeCols).from(memoryEntries).where(and(...conds));
     return entry;
   }
-  async createMemoryEntry(data: InsertMemoryEntry) {
+  async createMemoryEntry(data: InsertMemoryEntry, executor: Pick<typeof db, "insert"> = db) {
     // Gate-1 storage-boundary PII/secret redaction (central choke-point for all
     // memory writes — see storage-helpers/pii-redaction-guard.ts).
     const g = redactRecordFields(data, ["fact"]);
@@ -603,8 +605,11 @@ export class DatabaseStorage implements IStorage {
       source: "memory_entries",
       parts: [data.fact],
     });
-    const [entry] = await db.insert(memoryEntries).values(data).returning();
+    const [entry] = await executor.insert(memoryEntries).values(data).returning();
     return entry;
+  }
+  async supersedeMemoryEntry(oldId: number, data: InsertMemoryEntry) {
+    return persistMemorySupersession(db, (input, tx) => this.createMemoryEntry(input, tx), oldId, data);
   }
   async updateMemoryEntry(id: number, data: Partial<InsertMemoryEntry>, tenantId: number) {
     const conds = [

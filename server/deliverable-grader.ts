@@ -13,6 +13,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { runLlmTask } from "./llm-task";
 import { logSilentCatch } from "./lib/silent-catch";
+import { scanVideoDiagnostic } from "./lib/video-output-verification";
 
 const execFileAsync = promisify(execFile);
 
@@ -155,31 +156,6 @@ async function ffprobe(filePath: string): Promise<any> {
   return JSON.parse(stdout);
 }
 
-async function ffmpegBlackDetect(filePath: string, durSec: number): Promise<{ blackSegments: { start: number; end: number; dur: number }[]; raw: string }> {
-  // R110.20 — bundled ffmpeg-static.
-  const { getFfmpegPath } = await import("./lib/ffmpeg-paths");
-  const ffmpegBin = getFfmpegPath();
-  // black detection: any frame with avg luminance < 0.1 for >2s.
-  try {
-    const { stderr } = await execFileAsync(ffmpegBin, [
-      "-i", filePath,
-      "-vf", "blackdetect=d=2.0:pix_th=0.10",
-      "-an",
-      "-f", "null",
-      "-",
-    ], { timeout: Math.max(60000, Math.min(durSec * 2000, 240000)), maxBuffer: 8 * 1024 * 1024 });
-    const segments: { start: number; end: number; dur: number }[] = [];
-    const re = /black_start:([\d.]+).*?black_end:([\d.]+).*?black_duration:([\d.]+)/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(stderr)) !== null) {
-      segments.push({ start: parseFloat(m[1]), end: parseFloat(m[2]), dur: parseFloat(m[3]) });
-    }
-    return { blackSegments: segments, raw: stderr.slice(-2000) };
-  } catch (e: any) {
-    return { blackSegments: [], raw: `blackdetect failed: ${e?.message || String(e)}` };
-  }
-}
-
 // ---- VIDEO grader ----
 async function gradeVideo(input: GradeInput): Promise<GradeResult> {
   const issues: GradeIssue[] = [];
@@ -228,8 +204,12 @@ async function gradeVideo(input: GradeInput): Promise<GradeResult> {
 
   // Black frame detect (only for short-ish videos — skip if >5min to avoid blowing the timeout)
   if (formatDur > 0 && formatDur < 300) {
-    const { blackSegments, raw: _raw } = await ffmpegBlackDetect(abs, formatDur);
-    metrics.black_segments = blackSegments;
+    const diagnostic = await scanVideoDiagnostic(abs, "black", formatDur);
+    metrics.black_detect = diagnostic;
+    const blackSegments = diagnostic.segments ?? [];
+    // UNKNOWN is deliberately not represented as a successful empty scan.
+    if (diagnostic.status !== "UNKNOWN") metrics.black_segments = blackSegments;
+    else issues.push({ severity: "medium", message: diagnostic.detail });
     const longBlack = blackSegments.filter((s) => s.dur > 2);
     if (longBlack.length > 0) {
       issues.push({ severity: "medium", message: `${longBlack.length} black segment(s) >2s detected (longest ${longBlack[0].dur.toFixed(1)}s @ ${longBlack[0].start}s)` });
@@ -250,7 +230,7 @@ async function gradeVideo(input: GradeInput): Promise<GradeResult> {
 
   score = Math.max(0, Math.min(100, score));
   const passingBar = 85;
-  const critique = issues.length === 0 ? "Video passes all grader checks." : `Video grader found ${issues.length} issue(s):\n${issues.map((i) => `- [${i.severity}] ${i.message}`).join("\n")}`;
+   const critique = issues.length === 0 ? "Video passes the checks performed; see metrics for skipped or partial content coverage." : `Video grader found ${issues.length} issue(s):\n${issues.map((i) => `- [${i.severity}] ${i.message}`).join("\n")}`;
   return { ok: score >= passingBar, score, passingBar, issues, critique, metrics, graderFormat: "video" };
 }
 

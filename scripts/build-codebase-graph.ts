@@ -1,11 +1,17 @@
 #!/usr/bin/env tsx
 import { promises as fs } from "fs";
+import { constants } from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "path";
+import { analyzeSource } from "./lib/codebase-source-parser";
 
 const ROOT = process.cwd();
 const ROOTS = ["server", "client/src", "shared", "scripts"];
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".local", ".git", "attached_assets", "project-assets", "project-transcripts", "data", "uploads", "compaction-archives"]);
 const EXTS = [".ts", ".tsx"];
+const MAX_FILES = 20_000;
+const MAX_SOURCE_BYTES = 4 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 256 * 1024 * 1024;
 
 const ALIAS: Record<string, string> = {
   "@/": "client/src/",
@@ -48,19 +54,18 @@ function classifyLayer(rel: string): string {
 }
 
 async function walk(dir: string, out: string[]): Promise<void> {
-  let entries: any[];
-  try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
+  if (await fs.realpath(dir) !== dir) throw new Error("Source directory must not be a symlink");
+  const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const ent of entries) {
     if (SKIP_DIRS.has(ent.name) || ent.name.startsWith(".")) continue;
     const full = path.join(dir, ent.name);
     if (ent.isDirectory()) await walk(full, out);
-    else if (ent.isFile() && EXTS.some((e) => ent.name.endsWith(e)) && !ent.name.endsWith(".d.ts")) out.push(full);
+    else if (ent.isFile() && EXTS.some((e) => ent.name.endsWith(e)) && !ent.name.endsWith(".d.ts")) {
+      if (out.length >= MAX_FILES) throw new Error("Codebase graph file limit exceeded");
+      out.push(full);
+    }
   }
 }
-
-const IMPORT_RE = /(?:^|\n)\s*(?:import\s+(?:[^'"]*?\s+from\s+)?|export\s+(?:\*|\{[^}]*\})\s+from\s+|import\s*\(\s*)\s*['"]([^'"]+)['"]/g;
-const EXPORT_RE = /(?:^|\n)export\s+(?:default\s+)?(?:async\s+)?(?:function|class|const|let|var|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g;
-const EXPORT_DEFAULT_RE = /(?:^|\n)export\s+default\s+(?:async\s+function\s+([A-Za-z_$][\w$]*)|class\s+([A-Za-z_$][\w$]*))/g;
 
 function resolveSpecifier(spec: string, fromFile: string): string | null {
   if (!spec || spec.startsWith("node:")) return null;
@@ -75,73 +80,79 @@ function resolveSpecifier(spec: string, fromFile: string): string | null {
   return candidate;
 }
 
-async function existsAsFile(p: string): Promise<string | null> {
-  for (const ext of ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]) {
-    const candidate = p + ext;
-    try {
-      const st = await fs.stat(candidate);
-      if (st.isFile()) return candidate;
-    } catch {}
-  }
-  return null;
+function resolveInInventory(candidate: string, files: Map<string, string>): string | undefined {
+  const base = candidate.replace(/\.jsx?$/, "");
+  return [candidate, base + ".ts", base + ".tsx", candidate + "/index.ts", candidate + "/index.tsx"]
+    .find(file => files.has(file));
+}
+
+async function readSource(file: string): Promise<string> {
+  if (await fs.realpath(file) !== file) throw new Error("Source file must not traverse symlinks");
+  const handle = await fs.open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > MAX_SOURCE_BYTES) throw new Error(`Source outside graph size/type bounds: ${path.relative(ROOT, file)}`);
+    // Read at most the original size plus one byte; concurrent growth cannot
+    // turn a bounded stat check into an unbounded readFile allocation.
+    const buffer = Buffer.alloc(stat.size + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, offset, buffer.length - offset, offset);
+      if (!bytesRead) break;
+      offset += bytesRead;
+    }
+    if (offset !== stat.size) throw new Error("Source changed while indexing; rebuild required");
+    return buffer.subarray(0, offset).toString("utf8");
+  } finally { await handle.close(); }
 }
 
 async function buildGraph() {
   const allFiles: string[] = [];
-  for (const r of ROOTS) await walk(path.join(ROOT, r), allFiles);
+  for (const r of ROOTS) {
+    const dir = path.join(ROOT, r);
+    try { await fs.lstat(dir); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
+    await walk(dir, allFiles);
+  }
+  allFiles.sort();
 
-  const fileToId = new Map<string, string>();
+  const fileToId = new Map(allFiles.map(abs => [abs, path.relative(ROOT, abs).replace(/\\/g, "/")]));
   const nodes: Node[] = [];
-  const filesContent = new Map<string, string>();
   const layerCounts: Record<string, number> = {};
+  const edges: Edge[] = [];
+  const seen = new Set<string>();
+  const externalImports = new Map<string, number>();
+  let totalBytes = 0;
 
   for (const abs of allFiles) {
     const rel = path.relative(ROOT, abs).replace(/\\/g, "/");
-    let body = "";
-    try { body = await fs.readFile(abs, "utf8"); } catch { continue; }
-    filesContent.set(abs, body);
-    const exportsSet = new Set<string>();
-    let m: RegExpExecArray | null;
-    EXPORT_RE.lastIndex = 0;
-    while ((m = EXPORT_RE.exec(body))) exportsSet.add(m[1]);
-    EXPORT_DEFAULT_RE.lastIndex = 0;
-    while ((m = EXPORT_DEFAULT_RE.exec(body))) exportsSet.add(m[1] || m[2] || "default");
-    if (/(?:^|\n)export\s+default\s+/.test(body) && exportsSet.size === 0) exportsSet.add("default");
+    const body = await readSource(abs);
+    totalBytes += Buffer.byteLength(body, "utf8");
+    if (totalBytes > MAX_TOTAL_BYTES) throw new Error("Codebase graph total source limit exceeded");
+    const analysis = analyzeSource(abs, body);
     const layer = classifyLayer(rel);
     layerCounts[layer] = (layerCounts[layer] || 0) + 1;
     const node: Node = {
       id: rel,
       path: rel,
       layer,
-      exports: [...exportsSet].sort(),
-      importsCount: 0,
+      exports: analysis.exports,
+      importsCount: analysis.imports.length,
       lineCount: body.split("\n").length,
       bytes: Buffer.byteLength(body, "utf8"),
     };
     nodes.push(node);
-    fileToId.set(abs, rel);
-  }
-
-  const edges: Edge[] = [];
-  const seen = new Set<string>();
-  const externalImports = new Map<string, number>();
-
-  for (const abs of allFiles) {
-    const body = filesContent.get(abs) || "";
-    const rel = path.relative(ROOT, abs).replace(/\\/g, "/");
-    const node = nodes.find((n) => n.id === rel)!;
-    let m: RegExpExecArray | null;
-    IMPORT_RE.lastIndex = 0;
-    while ((m = IMPORT_RE.exec(body))) {
-      const spec = m[1];
-      node.importsCount++;
+    for (const spec of analysis.imports) {
       const candidate = resolveSpecifier(spec, abs);
       if (!candidate) {
         const pkg = spec.split("/")[0].startsWith("@") ? spec.split("/").slice(0, 2).join("/") : spec.split("/")[0];
         externalImports.set(pkg, (externalImports.get(pkg) || 0) + 1);
         continue;
       }
-      const resolved = await existsAsFile(candidate);
+      const resolved = resolveInInventory(candidate, fileToId);
       if (!resolved) continue;
       const toRel = path.relative(ROOT, resolved).replace(/\\/g, "/");
       if (toRel === rel) continue;
@@ -169,9 +180,16 @@ async function buildGraph() {
     nodes: nodes.sort((a, b) => a.id.localeCompare(b.id)),
     edges: edges.sort((a, b) => (a.from + a.to).localeCompare(b.from + b.to)),
   };
+  if (out.fileCount === 0) throw new Error("No source files found; refusing to replace graph");
   await fs.mkdir(path.join(ROOT, "data"), { recursive: true });
+  if (await fs.realpath(path.join(ROOT, "data")) !== path.join(ROOT, "data"))
+    throw new Error("Graph output directory must not be a symlink");
   const outPath = path.join(ROOT, "data", "codebase-graph.json");
-  await fs.writeFile(outPath, JSON.stringify(out, null, 2));
+  const temporary = `${outPath}.${randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(temporary, JSON.stringify(out, null, 2), { flag: "wx", mode: 0o600 });
+    await fs.rename(temporary, outPath);
+  } finally { await fs.rm(temporary, { force: true }); }
   console.log(`[codebase-graph] wrote ${outPath}`);
   console.log(`  files=${out.fileCount} edges=${out.edgeCount} layers=${Object.keys(layerCounts).length}`);
   console.log(`  layer breakdown:`, layerCounts);

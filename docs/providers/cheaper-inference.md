@@ -21,7 +21,7 @@ Profundo Luna identity remains separate.
 ## Spend and failure contract
 
 Before every request, reserve its conservative maximum atomically in the
-existing `aggregate_ai_spend_reservations` authority. Its shared $20 UTC-day
+existing `aggregate_ai_spend_reservations` authority. Its shared $30 UTC-day
 ceiling also counts any other reservation users of that authority; there is
 no second budget or duplicate ledger charge. Each attempt has a server-generated
 identity. Concurrent processes serialize admission with the existing DB lock.
@@ -45,7 +45,7 @@ All three boundaries (selection, request admission and upstream request) use
 the same value. Invalid configuration fails closed; it never relaxes to zero.
 This discount is against maker list rates, **not every competing service**.
 Reservations use full maker/maximum catalog rates regardless of the floor.
-Unavailable qualifying supply can return 503. The shared $20 daily cap and
+Unavailable qualifying supply can return 503. The shared $30 daily cap and
 owner-only admission remain unchanged; this is not global metered enablement.
 
 ## Catalog and agent usage

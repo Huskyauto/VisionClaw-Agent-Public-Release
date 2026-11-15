@@ -1,4 +1,7 @@
 import path from "path";
+import { currentToolAuthority, prepareToolInvocation, snapshotToolAuthority, withToolAuthority, type ToolAuthority } from "./tools/invocation-authority";
+import { withTenantContext } from "./lib/tenant-context";
+import { ADMIN_TENANT_ID as TOOL_ADMIN_TENANT_ID } from "./tenant-constants";
 import os from "os";
 import { bwbScriptCommand } from "../scripts/lib/bwb-script-runner";
 import * as crypto from "node:crypto";
@@ -2095,7 +2098,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "export_persona",
-      description: "Export any VisionClaw persona as a portable agent definition file. Produces a comprehensive package with the persona's identity (SOUL), trust profile, skills, tools, governance rules, express lanes, and knowledge domains. Output in JSON or markdown format. Use when the user wants to save, share, document, or back up an agent's full configuration.",
+      description: "Platform-owner tenant only: export a VisionClaw persona's internal configuration as JSON or markdown. Includes identity, trust, skills, routing and governance. Failed reads abort the export; never present a partial export as complete.",
       parameters: {
         type: "object",
         properties: {
@@ -2571,7 +2574,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "finalize_video",
-      description: "R98.14 W1.4 — Concatenate completed chapters into the final MP4 (and upload to Drive if enabled). IDEMPOTENT + RESUMABLE: if concat fails, the chapter MP4s stay on disk; calling finalize_video again retries JUST the concat step (no re-render). If already done, returns the cached result. If chapters are still rendering, returns the current progress without erroring. Returns {success, status, file_path?, drive_url?, duration_sec?, size_bytes?, error?, message}. This is the W1.4 'never re-render the cheap-but-failed-step' fix.",
+      description: "Finalize a video job with measured H.264/AAC, duration and declared format checks before Drive delivery. Required FAIL/UNKNOWN blocks upload. Returns verification with SHA-256 of the private delivery copy; technical PASS is not content approval. Retry the same job after upload failure to reuse and recheck its verified output without concatenating again. Concat failures preserve chapters. Done jobs return cached results; rendering jobs return progress. Returns {success,status,file_path?,drive_url?,duration_sec?,size_bytes?,verification?,error?,message}.",
       parameters: { type: "object", properties: { job_id: { type: "string", description: "Job ID returned by start_video_job." } }, required: ["job_id"] },
     },
   },
@@ -2663,7 +2666,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "build_html_app",
-      description: "R98.12 W5 — Build a single-file downloadable HTML utility app (password generator, tip calculator, unit converter, timer, todo list, form, simple game, dashboard). Generates one self-contained <!doctype html> document with CSS+JS inline (no external assets), then SMOKE-TESTS the output via jsdom — refuses to return on parse error, runtime JS error, empty body, or failed smoke_assertion. Saved under project-assets/html-apps/<slug>-<ts>/index.html. Use this BEFORE deliver_product when Bob asks for a downloadable utility — never hand-write the HTML yourself.",
+      description: "Build and smoke-test an offline HTML utility or a deterministic product walkthrough using demo. Deliver via existing approval and delivery checks.",
       parameters: {
         type: "object",
         properties: {
@@ -2672,6 +2675,33 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           features: { type: "array", items: { type: "string" }, description: "Optional bullet list of must-have features. Each ≤200 chars." },
           app_type: { type: "string", enum: ["calculator", "generator", "converter", "timer", "todo", "form", "game", "dashboard", "other"], description: "Hint for the LLM. Default 'other'." },
           style_notes: { type: "string", description: "Optional visual direction (color, density, vibe). Default is clean modern minimalist." },
+          demo: {
+            type: "object", additionalProperties: false,
+            description: "Optional structured walkthrough: deterministic, zero model calls. Same format as sidebar Demo Studio project JSON. Always labeled reconstruction, not live execution proof.",
+            properties: {
+              version: { type: "number", enum: [1] },
+              title: { type: "string", minLength: 1, maxLength: 120 },
+              steps: {
+                type: "array", minItems: 1, maxItems: 12,
+                items: {
+                  type: "object", additionalProperties: false,
+                  properties: {
+                    title: { type: "string", minLength: 1, maxLength: 120 },
+                    description: { type: "string", maxLength: 1800 },
+                    seconds: { type: "integer", minimum: 2, maximum: 30 },
+                    screenshot: { type: "string", maxLength: 1500000, description: "Optional data:image/png, jpeg or webp;base64,... only; no remote URL or SVG. Total project <=6MB." },
+                    pointer: {
+                      type: "object", additionalProperties: false,
+                      properties: { x: { type: "number", minimum: 0, maximum: 100 }, y: { type: "number", minimum: 0, maximum: 100 } },
+                      required: ["x", "y"],
+                    },
+                  },
+                  required: ["title", "description", "seconds"],
+                },
+              },
+            },
+            required: ["version", "title", "steps"],
+          },
           smoke_assertion: { type: "object", description: "R98.14 +sec-2 — STRUCTURED smoke assertion (free-form JS strings are REJECTED as a code-execution sink). Object with optional fields: selectors_exist:[css...] (each must match ≥1), selectors_absent:[css...] (each must match 0), text_includes:[{selector?,text}], min_count:[{selector,min}], attr_equals:[{selector,attr,value}], title_includes:string. Selectors are validated against an allowlist regex. Example: {selectors_exist:[\"button#go\",\"input#amount\"], min_count:[{selector:\".chip\",min:3}], title_includes:\"Tip Calculator\"}.", properties: { selectors_exist: { type: "array", items: { type: "string" } }, selectors_absent: { type: "array", items: { type: "string" } }, text_includes: { type: "array", items: { type: "object", properties: { selector: { type: "string" }, text: { type: "string" } }, required: ["text"] } }, min_count: { type: "array", items: { type: "object", properties: { selector: { type: "string" }, min: { type: "number" } }, required: ["selector", "min"] } }, attr_equals: { type: "array", items: { type: "object", properties: { selector: { type: "string" }, attr: { type: "string" }, value: { type: "string" } }, required: ["selector", "attr", "value"] } }, title_includes: { type: "string" } } },
         },
         required: ["topic"],
@@ -3296,7 +3326,41 @@ const PRODUCT_OUTPUT_TOOLS = getProductOutputTools();
 // avoid a static import cycle, hence this local mirror).
 const OWNER_INTERACTIVE_CHANNELS = new Set(["main_chat", "chat_engine", "auto-route"]);
 
-export async function executeTool(name: string, params: Record<string, any>): Promise<any> {
+/** The public entrance separates task data from server-owned authority.
+ * The implementation below is private; internal recursion inherits sealed ALS. */
+export async function executeTool(name: string, params: Record<string, any>, context?: ToolAuthority): Promise<any> {
+  const supplied = context ?? currentToolAuthority();
+  if (!supplied) return { error: "Missing trusted tool authority; no execution.", blocked: true };
+  let trusted: Readonly<ToolAuthority>;
+  let stamped: Record<string, any>;
+  try {
+    trusted = snapshotToolAuthority(supplied);
+    stamped = prepareToolInvocation(params, trusted);
+    if (!trusted.personaId && trusted.actor !== "system") {
+      const { classifyToolRisk } = await import("./tool-mutation");
+      if (classifyToolRisk(name, stamped).isMutating)
+        return { error: "A consequential tool requires authenticated persona identity or explicit internal service authority.", blocked: true };
+    }
+    const { enforceToolPolicy } = await import("./safety/destructive-tool-policy");
+    const policy = await enforceToolPolicy(name, stamped, {
+      tenantId: trusted.tenantId,
+      personaId: trusted.personaId ?? null,
+      personaName: trusted.personaName ??
+        (trusted.actor === "system" && trusted.tenantId === TOOL_ADMIN_TENANT_ID ? "system" : undefined),
+      invokedVia: trusted.invokedVia,
+      hasApproval: trusted.approvalGranted === true,
+    });
+    if (policy.action === "block") return { error: `Blocked by destructive-tool policy: ${policy.reason}`, blocked: true };
+  } catch {
+    return { error: "Tool authority or policy enforcement unavailable; no execution.", blocked: true };
+  }
+  // Execution failures are NOT represented as pre-dispatch denial: a side
+  // effect may already have happened, and ordinary retry would duplicate it.
+  return withTenantContext({ tenantId: trusted.tenantId, source: "explicit" }, () =>
+    withToolAuthority(trusted, () => executeToolBody(name, stamped)));
+}
+
+async function executeToolBody(name: string, params: Record<string, any>): Promise<any> {
   // R74.13f null-params guard — defend the dispatch against the
   // LLM-edge-case where the agent loop emits `null` for a tool's params
   // (observed on JSON-parse recovery paths). Without this coercion the
@@ -3477,6 +3541,9 @@ async function _executeToolInner(name: string, params: Record<string, any>): Pro
 setLegacyExecutor(_legacySwitchExec);
 
 async function _legacySwitchExec(name: string, params: Record<string, any>): Promise<any> {
+  const authority = currentToolAuthority();
+  if (!authority) return { error: "Legacy tool implementation requires sealed execution authority." };
+  params = prepareToolInvocation(params, authority);
   switch (name) {
     // Tools-layer-split S25v: create_plan + list_plans + get_plan handlers moved
     // → server/tools/domains/minerva/handlers.ts (read-from-ctx seam: params._tenantId
@@ -5107,7 +5174,7 @@ RULES:
       const ownerDriven =
         params._tenantId === execAdminTenant &&
         OWNER_INTERACTIVE_CHANNELS.has(String(params._invokedVia ?? ""));
-      if (params._invokedByModel === true && params._selfHeal !== true && !ownerDriven) {
+      if (!ownerDriven) {
         return { error: "exec is owner-only. An agent cannot run shell commands directly. Use request_approval to ask the owner to run this command, or use execute_code for sandboxed JavaScript." };
       }
       return executeCommand(params.command, {
@@ -5785,7 +5852,7 @@ RULES:
       const lobsterOwnerDriven =
         params._tenantId === lobsterAdminTenant &&
         OWNER_INTERACTIVE_CHANNELS.has(String(params._invokedVia ?? ""));
-      if (params._invokedByModel === true && params._selfHeal !== true && !lobsterOwnerDriven) {
+      if (!lobsterOwnerDriven) {
         return { error: "lobster is owner-only when invoked by an agent (it can run shell commands and escalate tool steps to the admin tenant). Use the sanctioned per-tool path instead, or have the owner run this." };
       }
       return runLobster({
@@ -6170,7 +6237,7 @@ RULES:
     }
     case "execute_code": {
       console.log(`[sandbox] Executing: ${params.description || "code"}`);
-      const result = runSandboxCode(params.code);
+      const result = await runSandboxCode(params.code);
       return {
         success: result.success,
         output: result.output,
@@ -7658,17 +7725,19 @@ RULES:
       return { error: "action must be 'start', 'answer', or 'abandon'" };
     }
     case "export_persona": {
-      const { exportPersona, exportToMarkdown } = await import("./persona-export");
-      if (!params._tenantId) return { error: "Tenant context required for export_persona" };
+      if (params._tenantId !== 1) return { error: "Platform-owner access required for persona exports" };
       const tenantId = params._tenantId;
-      if (!tenantId) return { error: "Authentication required" };
-      if (!params.persona_id) return { error: "persona_id is required" };
-
-      const exported = await exportPersona(params.persona_id, tenantId);
-      if (!exported) return { error: `Persona ${params.persona_id} not found` };
-
-      if (params.format === "json") return exported;
-      return { markdown: exportToMarkdown(exported), format: "visionclaw-agent-v1" };
+      if (!Number.isSafeInteger(params.persona_id) || params.persona_id < 1) return { error: "A positive integer persona_id is required" };
+      try {
+        const { exportPersona, exportToMarkdown } = await import("./persona-export");
+        const exported = await exportPersona(params.persona_id, tenantId);
+        if (!exported) return { error: `Persona ${params.persona_id} not found` };
+        if (params.format === "json") return exported;
+        return { markdown: exportToMarkdown(exported), format: "visionclaw-agent-v1" };
+      } catch {
+        console.error("[persona-export] Export failed; no complete export was produced");
+        return { error: "Persona export failed. No complete export was produced." };
+      }
     }
     case "skillify": {
       const { skillifyConversation } = await import("./skillify");
@@ -9253,6 +9322,7 @@ Reply with ONLY this JSON:
           features: Array.isArray(params.features) ? params.features.map((f: any) => String(f)) : undefined,
           app_type: params.app_type ? String(params.app_type) : undefined,
           style_notes: params.style_notes ? String(params.style_notes) : undefined,
+          demo: params.demo,
           smoke_assertion: (params.smoke_assertion && typeof params.smoke_assertion === "object" && !Array.isArray(params.smoke_assertion)) ? params.smoke_assertion : undefined,   // R98.14 +sec-2: structured object only; strings rejected silently (run-without-assertion)
           // R98.25 — pass through model + timeoutMs. Previous dispatcher silently dropped
           // these, so golden-path's tenant-aware model pin (gpt-5-mini for tenant 1, which
@@ -9272,6 +9342,7 @@ Reply with ONLY this JSON:
           bytes: res.bytes,
           smoke_passed: true,
           smoke_warnings: res.smokeWarnings,
+          verification_scope: res.verificationScope,
           title: res.title,
           deliverable_type: "html_page",
           next_step: "Call deliver_product (or deliverDigitalProduct) with this file_path + a customer_email to ship the app, then call verify_delivery_proof to confirm before declaring done.",
@@ -9528,7 +9599,7 @@ async function maybeAutoDeliverByEmail(toolName: string, params: any, result: an
     }
     toEmail = toEmail || process.env.OWNER_ALERT_EMAIL;
     if (!toEmail) { console.log(`[auto-deliver] ${toolName}: no recipient resolved (tenant.email/OWNER_ALERT_EMAIL/OUTPUT_DELIVERY_OVERRIDE_EMAIL all empty), skipping`); return; }
-    console.log(`[auto-deliver] ${toolName}: queueing email to ${toEmail} for ${driveUrl.slice(0, 60)}...`);
+    console.log(`[auto-deliver] ${toolName}: queueing delivery email`);
 
     // R74.13z-quint+10c: Read instant-play URLs already attached to result by
     // attachInstantPlayUrls (runs synchronously in executeTool BEFORE us). No
@@ -9603,7 +9674,7 @@ ${secondaryBlock}
 <p style="color:#666;font-size:12px;">— ${escText(platformName)} Production Team</p>
 </body></html>`;
         await sendEmail({ inboxId, to: toEmail, subject, text, html });
-        console.log(`[auto-deliver] ${toolName} → ${toEmail} (primary=${hasInstantPlay ? "instant-play" : "drive"} ${primaryUrl.slice(0, 60)}...)`);
+        console.log(`[auto-deliver] ${toolName}: delivery accepted (primary=${hasInstantPlay ? "instant-play" : "drive"})`);
       } catch (e) {
         console.warn(`[auto-deliver] Email failed for ${toolName}: ${errorMessageSlice(e, 200)}`);
       }
@@ -9614,7 +9685,15 @@ ${secondaryBlock}
   }
 }
 
-export async function executeToolWithTimeout(name: string, params: Record<string, any>): Promise<any> {
+export async function executeToolWithTimeout(name: string, params: Record<string, any>, context?: ToolAuthority): Promise<any> {
+  const supplied = context ?? currentToolAuthority();
+  if (!supplied) return { error: "Missing trusted tool authority; no execution.", blocked: true };
+  try {
+    context = snapshotToolAuthority(supplied);
+    params = prepareToolInvocation(params, context);
+  } catch {
+    return { error: "Invalid trusted tool authority; no execution.", blocked: true };
+  }
   const timeoutMs = getToolTimeoutMs(name);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -9645,7 +9724,7 @@ export async function executeToolWithTimeout(name: string, params: Record<string
     // reads it as authority and no retry keys off it (S5 owns retries).
     const { runWithToolAbortSignal } = await import("./lib/tool-abort-context");
     result = await Promise.race([
-      runWithToolAbortSignal(controller.signal, () => executeTool(name, params)),
+      runWithToolAbortSignal(controller.signal, () => executeTool(name, params, context)),
       new Promise((_, reject) => {
         controller.signal.addEventListener("abort", () => {
           timedOut = true;
@@ -9672,6 +9751,10 @@ export async function executeToolWithTimeout(name: string, params: Record<string
         const ctx = await import("./lib/action-ledger-context");
         const attempt = ctx.takeLedgerAttemptForSignal(controller.signal);
         if (attempt) {
+          // A real ledgered dispatch may have committed even when its outer
+          // timer expires. Carry that uncertainty to chat recovery; a plain
+          // read-only timeout without a registered attempt stays unchanged.
+          if (err instanceof Error) Object.assign(err, { outcomeUnknown: true });
           retryLib = await import("./lib/action-ledger-retry");
           if (retryLib.timeoutRetryEnabled()) {
             const decision = await retryLib.decideTimeoutRetry(attempt);
@@ -9700,7 +9783,7 @@ export async function executeToolWithTimeout(name: string, params: Record<string
                       reuseIdempotencyKey: decision.reuseIdempotencyKey,
                       retryOfAttemptId: decision.retryOfAttemptId,
                     },
-                    () => runWithToolAbortSignal(retryController.signal, () => executeTool(name, params)),
+                    () => runWithToolAbortSignal(retryController.signal, () => executeTool(name, params, context)),
                   ),
                   new Promise((_, reject) => {
                     retryController.signal.addEventListener("abort", () => {

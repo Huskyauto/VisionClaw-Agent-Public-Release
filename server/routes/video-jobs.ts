@@ -170,8 +170,8 @@ export function registerVideoJobRoutes(app: Express, helpers: Helpers) {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  // R112.13 — Force-cancel. Immediately marks the job FAILED in the DB
-  // regardless of runner state. The runner's in-flight ffmpeg/TTS may keep
+  // Force-cancel only active jobs; terminal outputs must remain available.
+  // The runner's in-flight ffmpeg/TTS may keep
   // running until it finishes its current op (we can't kill child processes
   // safely from here), but the UI clears NOW and no further chapters dispatch
   // because the runner's loop sees status != "rendering" on its next tick.
@@ -187,8 +187,9 @@ export function registerVideoJobRoutes(app: Express, helpers: Helpers) {
         errorMessage: "Force-cancelled by user (R112.13)",
         completedAt: new Date(),
         updatedAt: new Date(),
-      }).where(and(eq(videoJobs.jobId, jobId), eq(videoJobs.tenantId, tenantId))).returning({ jobId: videoJobs.jobId });
-      if (result.length === 0) return res.status(404).json({ error: "Job not found or not owned" });
+      }).where(and(eq(videoJobs.jobId, jobId), eq(videoJobs.tenantId, tenantId),
+        inArray(videoJobs.status, [...ACTIVE_STATUSES]))).returning({ jobId: videoJobs.jobId });
+      if (result.length === 0) return res.status(404).json({ error: "Job not found, not owned, or already finished" });
       res.json({ ok: true, message: "Job force-cancelled. The UI will clear immediately; any in-flight ffmpeg will finish its current operation then exit." });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });

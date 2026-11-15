@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { auditJobIdentity, auditJobState, continueAuditJob, deferAuditCapacity, recordAuditFailure, backoffAuditJob, isTenantAuditContinuation } from "../../server/lib/tenant-audit-job-state";
 
 test("only successfully rescheduled audit outcomes skip normal queue completion", () => {
-  for (const status of ["incomplete", "provider_backoff"])
+  for (const status of ["incomplete", "provider_backoff", "daily_batch_wait"])
     assert.equal(isTenantAuditContinuation("tenant_isolation_audit", { status, continued: true }), true);
   for (const result of [null, {}, { status: "complete", continued: true },
     { status: "incomplete", continued: false }, { status: "incomplete" }])

@@ -15,6 +15,8 @@ import { redactPiiForStorage, redactObjectForStorage } from "./storage-helpers/p
 import { assertMemoryValueNotTombstoned } from "./memory/tombstones";
 import { computeNextRecurringRun } from "./lib/recurring-next-run";
 import { runClaimedRecurringOccurrence } from "./lib/recurring-claim";
+import { isOwnerCommsSchedule } from "./lib/owner-comms-batch";
+import { ownerTenantId } from "./agentic/autonomous-budget";
 
 interface ScheduledDeliveryState {
   outcome: "pending" | "accepted" | "failed" | "uncertain";
@@ -266,7 +268,7 @@ async function _runDueInner(): Promise<{ fired: number; errors: number }> {
   let rows: any;
   try {
     rows = await db.execute(sql`
-    SELECT id, title, content, tenant_id
+    SELECT id, title, content, tenant_id, source
     FROM agent_knowledge
     WHERE category = 'recurring_message'
     LIMIT 500
@@ -303,7 +305,19 @@ async function _runDueInner(): Promise<{ fired: number; errors: number }> {
         return claim.rows?.length === 1;
       }, async () => {
       let messageText = p.prompt;
-      if (p.expandViaPersona) {
+      let target = p.target;
+      // This existing owner batch uses source-of-record evidence, never the
+      // reused scheduled chat or a literal-prompt fallback on retrieval failure.
+      const batchJob = {
+        id: r.id, tenantId: r.tenant_id, title: r.title, source: r.source,
+        expandViaPersona: p.expandViaPersona,
+      };
+      if (isOwnerCommsSchedule(batchJob, ownerTenantId())) {
+        const { buildOwnerCommsBatch } = await import("./owner-comms-batch");
+        const batch = await buildOwnerCommsBatch(batchJob, now);
+        messageText = batch.text;
+        target = batch.target;
+      } else if (p.expandViaPersona) {
         try {
           const { processMessage } = await import("./chat-engine");
           const { db: ddb } = await import("./db");
@@ -322,7 +336,7 @@ async function _runDueInner(): Promise<{ fired: number; errors: number }> {
         }
       }
 
-      const delivery = await deliverMessage(p.target, messageText.slice(0, 4000), { tenantId: r.tenant_id });
+      const delivery = await deliverMessage(target, messageText.slice(0, 4000), { tenantId: r.tenant_id });
       const updated: PayloadShape = {
         ...claimedPayload,
         lastDelivery: {

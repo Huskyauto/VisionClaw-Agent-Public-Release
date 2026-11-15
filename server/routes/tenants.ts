@@ -46,7 +46,7 @@ export function registerTenantsPublicRoutes(app: Express, helpers: TenantsPublic
         isActive: tenant.isActive,
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -113,7 +113,7 @@ export function registerTenantFilesRoutes(app: Express, helpers: TenantFilesHelp
       }).from(fileStorage).where(tenantFileAccessFilter(tenantId)).orderBy(desc(fileStorage.createdAt));
       res.json(files);
     } catch (err) {
-      console.error("[tenant-files] List failed:", (err as Error).message);
+      console.error("[tenant-files] List failed");
       res.status(500).json({ error: "Failed to list files" });
     }
   });
@@ -144,7 +144,7 @@ export function registerTenantFilesRoutes(app: Express, helpers: TenantFilesHelp
           const { downloadTenantFile } = await import("../object-storage");
           buffer = await downloadTenantFile(tenantId, file.storageKey);
         } catch (osErr) {
-          console.error("[tenant-files] Object Storage download failed:", (osErr as Error).message);
+          console.error("[tenant-files] Object Storage download failed");
         }
       }
       if (!buffer && file.data && file.data.length > 0) {
@@ -157,7 +157,7 @@ export function registerTenantFilesRoutes(app: Express, helpers: TenantFilesHelp
       res.setHeader("Content-Length", buffer.length.toString());
       res.send(buffer);
     } catch (err) {
-      console.error("[tenant-files] Download failed:", (err as Error).message);
+      console.error("[tenant-files] Download failed");
       res.status(500).json({ error: "Failed to download file" });
     }
   });
@@ -179,7 +179,10 @@ export function registerTenantFilesRoutes(app: Express, helpers: TenantFilesHelp
           const { deleteTenantFile } = await import("../object-storage");
           await deleteTenantFile(tenantId, file.storageKey);
         } catch (osErr) {
-          console.warn("[tenant-files] Object Storage delete failed:", (osErr as Error).message);
+          // Keep the row (including its storage key) so the owner can retry.
+          // Acknowledging success here would lose the only deletion reference.
+          console.warn("[tenant-files] Object Storage deletion deferred");
+          return res.status(503).json({ error: "File deletion could not finish. Please retry." });
         }
       }
 
@@ -188,7 +191,7 @@ export function registerTenantFilesRoutes(app: Express, helpers: TenantFilesHelp
       );
       res.json({ success: true });
     } catch (err) {
-      console.error("[tenant-files] Delete failed:", (err as Error).message);
+      console.error("[tenant-files] Delete failed");
       res.status(500).json({ error: "Failed to delete file" });
     }
   });
@@ -222,7 +225,7 @@ export function registerTemplatesRoutes(app: Express, helpers: TemplatesHelpers)
       const template = await storage.createConversationTemplate(parsed.data);
       res.status(201).json(template);
     } catch (err: any) {
-      console.error("[templates] Error:", err.message);
+      console.error("[templates] Create failed");
       res.status(500).json({ error: "Failed to create template" });
     }
   });
@@ -236,7 +239,7 @@ export function registerTemplatesRoutes(app: Express, helpers: TemplatesHelpers)
       const updated = await storage.updateConversationTemplate(parseInt(req.params.id as string), parsed.data);
       res.json(updated);
     } catch (err: any) {
-      console.error("[templates] Update error:", err.message);
+      console.error("[templates] Update failed");
       res.status(500).json({ error: "Failed to update template" });
     }
   });
@@ -283,7 +286,7 @@ export function registerTemplatesRoutes(app: Express, helpers: TemplatesHelpers)
 
       res.status(201).json(conv);
     } catch (err: any) {
-      console.error("[templates] Start error:", err.message);
+      console.error("[templates] Start failed");
       res.status(500).json({ error: "Failed to start from template" });
     }
   });

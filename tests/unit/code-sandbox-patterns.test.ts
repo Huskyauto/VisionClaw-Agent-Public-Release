@@ -15,62 +15,62 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { executeCode } from "../../server/code-sandbox";
 
-function blocked(res: ReturnType<typeof executeCode>): boolean {
+function blocked(res: Awaited<ReturnType<typeof executeCode>>): boolean {
   return res.success === false && /restricted pattern/.test(String(res.error));
 }
 
 // --- still blocked (security must NOT regress) ----------------------------
 
-test("blocks process.* access", () => {
-  assert.equal(blocked(executeCode("__result__ = process.env.SECRET;")), true);
+test("blocks process.* access", async () => {
+  assert.equal(blocked(await executeCode("__result__ = process.env.SECRET;")), true);
 });
 
-test("blocks eval(", () => {
-  assert.equal(blocked(executeCode('eval("1+1");')), true);
+test("blocks eval(", async () => {
+  assert.equal(blocked(await executeCode('eval("1+1");')), true);
 });
 
-test("blocks the Function constructor", () => {
-  assert.equal(blocked(executeCode('Function("return 1")();')), true);
+test("blocks the Function constructor", async () => {
+  assert.equal(blocked(await executeCode('Function("return 1")();')), true);
 });
 
-test("blocks require( and import(", () => {
-  assert.equal(blocked(executeCode('require("fs");')), true);
-  assert.equal(blocked(executeCode('import("fs");')), true);
+test("blocks require( and import(", async () => {
+  assert.equal(blocked(await executeCode('require("fs");')), true);
+  assert.equal(blocked(await executeCode('import("fs");')), true);
 });
 
-test("blocks prototype-chain escape vectors", () => {
-  assert.equal(blocked(executeCode("({}).constructor;")), true);
-  assert.equal(blocked(executeCode("const x = {}; x.__proto__;")), true);
-  assert.equal(blocked(executeCode("globalThis;")), true);
+test("blocks prototype-chain escape vectors", async () => {
+  assert.equal(blocked(await executeCode("({}).constructor;")), true);
+  assert.equal(blocked(await executeCode("const x = {}; x.__proto__;")), true);
+  assert.equal(blocked(await executeCode("globalThis;")), true);
 });
 
-test("blocks child_process and fs.", () => {
-  assert.equal(blocked(executeCode('const m = "child_process";')), true);
-  assert.equal(blocked(executeCode("fs.readFileSync('x');")), true);
+test("blocks child_process and fs.", async () => {
+  assert.equal(blocked(await executeCode('const m = "child_process";')), true);
+  assert.equal(blocked(await executeCode("fs.readFileSync('x');")), true);
 });
 
 // --- no longer falsely blocked (the false-positive fix) -------------------
 
-test("allows identifiers ending in 'Function'", () => {
-  const r = executeCode("const getFunction = () => 7; __result__ = getFunction();");
+test("allows identifiers ending in 'Function'", async () => {
+  const r = await executeCode("const getFunction = () => 7; __result__ = getFunction();");
   assert.equal(r.success, true);
   assert.equal(r.returnValue, 7);
 });
 
-test("allows identifiers ending in 'process'", () => {
-  const r = executeCode("const preprocess = { run: () => 9 }; __result__ = preprocess.run();");
+test("allows identifiers ending in 'process'", async () => {
+  const r = await executeCode("const preprocess = { run: () => 9 }; __result__ = preprocess.run();");
   assert.equal(r.success, true);
   assert.equal(r.returnValue, 9);
 });
 
-test("allows identifiers containing 'eval' (e.g. retrieval)", () => {
-  const r = executeCode("const retrieval = (x) => x * 2; __result__ = retrieval(5);");
+test("allows identifiers containing 'eval' (e.g. retrieval)", async () => {
+  const r = await executeCode("const retrieval = (x) => x * 2; __result__ = retrieval(5);");
   assert.equal(r.success, true);
   assert.equal(r.returnValue, 10);
 });
 
-test("allows identifiers containing 'fs' (e.g. refs/prefs)", () => {
-  const r = executeCode("const refs = { count: 3 }; __result__ = refs.count;");
+test("allows identifiers containing 'fs' (e.g. refs/prefs)", async () => {
+  const r = await executeCode("const refs = { count: 3 }; __result__ = refs.count;");
   assert.equal(r.success, true);
   assert.equal(r.returnValue, 3);
 });
@@ -78,24 +78,24 @@ test("allows identifiers containing 'fs' (e.g. refs/prefs)", () => {
 // --- adversarial: tokens the blocklist intentionally MISSES must still ----
 // --- fail safely via the vm context (defense-in-depth, not the regex) -----
 
-test("unicode-escaped 'process' is not caught by the regex but is unreachable in the vm", () => {
+test("unicode-escaped 'process' is not caught by the regex but is unreachable in the vm", async () => {
   // \\u0063 == 'c'; pro\u0063ess is the identifier `process`, which the
   // substring blocklist does NOT match — the vm context nulls it instead.
-  const r = executeCode("__result__ = (typeof pro\\u0063ess === 'undefined');");
+  const r = await executeCode("__result__ = (typeof pro\\u0063ess === 'undefined');");
   assert.equal(r.success, true);
   assert.equal(r.returnValue, true);
 });
 
-test("bracketed constructor escape is blocked by codeGeneration:false, not the regex", () => {
+test("bracketed constructor escape is blocked by codeGeneration:false, not the regex", async () => {
   // ['constructor']['constructor']('return 1')() is the classic Function escape;
   // bracket access dodges /\\.constructor/, but strings codegen is disabled.
-  const r = executeCode("__result__ = ({})['constructor']['constructor']('return 1')();");
+  const r = await executeCode("__result__ = ({})['constructor']['constructor']('return 1')();");
   assert.equal(r.success, false);
   assert.notEqual(r.returnValue, 1);
 });
 
-test("host serialization never executes a sandbox result getter", () => {
-  const result = executeCode(`
+test("host serialization never executes a sandbox result getter", async () => {
+  const result = await executeCode(`
     __result__ = {
       get value() {
         const started = Date.now();
@@ -120,9 +120,9 @@ test("host serialization never executes a sandbox result getter", () => {
   );
 });
 
-test("an infinite result getter is stopped by the VM timeout", () => {
+test("an infinite result getter is stopped by the VM timeout", async () => {
   const started = Date.now();
-  const result = executeCode(`
+  const result = await executeCode(`
     __result__ = {
       get value() {
         while (true) {}
@@ -135,19 +135,19 @@ test("an infinite result getter is stopped by the VM timeout", () => {
   assert.ok(Date.now() - started < 8000);
 });
 
-test("plain sandbox results preserve their normal data shapes", () => {
+test("plain sandbox results preserve their normal data shapes", async () => {
   assert.deepEqual(
-    executeCode("__result__ = { a: 1, b: [2, 3] };").returnValue,
+    (await executeCode("__result__ = { a: 1, b: [2, 3] };")).returnValue,
     { a: 1, b: [2, 3] },
   );
-  assert.equal(executeCode("__result__ = 42;").returnValue, 42);
-  assert.equal(executeCode('__result__ = "hello";').returnValue, "hello");
-  assert.equal(executeCode("__result__ = null;").returnValue, null);
-  assert.equal(executeCode("const untouched = true;").returnValue, undefined);
+  assert.equal((await executeCode("__result__ = 42;")).returnValue, 42);
+  assert.equal((await executeCode('__result__ = "hello";')).returnValue, "hello");
+  assert.equal((await executeCode("__result__ = null;")).returnValue, null);
+  assert.equal((await executeCode("const untouched = true;")).returnValue, undefined);
 });
 
-test("structured results larger than the display-output cap keep their shape", () => {
-  const result = executeCode('__result__ = { text: "x".repeat(12000) };');
+test("structured results larger than the display-output cap keep their shape", async () => {
+  const result = await executeCode('__result__ = { text: "x".repeat(12000) };');
 
   assert.equal(result.success, true);
   assert.equal(typeof result.returnValue, "object");
@@ -155,8 +155,8 @@ test("structured results larger than the display-output cap keep their shape", (
   assert.match(result.output, /output truncated/);
 });
 
-test("cyclic object results fail explicitly instead of becoming plausible strings", () => {
-  const result = executeCode(`
+test("cyclic object results fail explicitly instead of becoming plausible strings", async () => {
+  const result = await executeCode(`
     const value = {};
     value.self = value;
     __result__ = value;
@@ -167,8 +167,8 @@ test("cyclic object results fail explicitly instead of becoming plausible string
   assert.equal(result.returnValue, undefined);
 });
 
-test("a result getter cannot corrupt trusted reconstruction metadata", () => {
-  const result = executeCode(`
+test("a result getter cannot corrupt trusted reconstruction metadata", async () => {
+  const result = await executeCode(`
     __result__ = {
       get value() {
         __resultType__ = "string";
@@ -182,8 +182,8 @@ test("a result getter cannot corrupt trusted reconstruction metadata", () => {
   assert.deepEqual(result.returnValue, { value: 1 });
 });
 
-test("result toJSON cannot erase trusted reconstruction metadata", () => {
-  const result = executeCode(`
+test("result toJSON cannot erase trusted reconstruction metadata", async () => {
+  const result = await executeCode(`
     __result__ = {
       toJSON() {
         __resultType__ = "undefined";

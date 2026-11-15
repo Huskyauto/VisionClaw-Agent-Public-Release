@@ -14,6 +14,8 @@ async function sparkSendMessageHandler(
   }
 
   const message = params && typeof params === "object" && !Array.isArray(params) ? params.message : undefined;
+  const recipient = params?.recipient ?? "spark";
+  if (recipient !== "spark" && recipient !== "claude") return {error: "recipient must be spark or claude"};
   if (typeof message !== "string" || message.trim().length === 0 || message.length > 4000) {
     return { error: "message must contain 1–4000 non-whitespace characters" };
   }
@@ -28,8 +30,8 @@ async function sparkSendMessageHandler(
     const sparkLine = await import("../../../spark-line");
     const personaId = ctx.personaId as number;
     try {
-      const { outboxId, queuedAt } = await sparkLine.sendSparkMessage(tenantId, personaId, message, ctx.conversationId);
-      return { success: true, outboxId, queuedAt };
+      const { outboxId, queuedAt } = await sparkLine.sendSparkMessage(tenantId, personaId, message, ctx.conversationId, recipient);
+      return { success: true, recipient, outboxId, queuedAt };
     } catch (error) {
       if (error instanceof sparkLine.SparkLineRateLimitError) {
         return { error: "Spark Line message rate limit reached", status: 429 };

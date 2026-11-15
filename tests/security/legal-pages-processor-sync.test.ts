@@ -98,6 +98,8 @@ const INTERNAL_DEPS = new Set<string>([
   // separate third-party data processor. Keep new SDKs fail-closed below.
   "drizzle-kit", "drizzle-orm", "drizzle-zod", "esbuild", "exceljs", "express",
   "express-rate-limit", "express-session", "fast-uri", "ffmpeg-static", "ffprobe-static",
+  // In-process XML parser; no external service or independent data processor.
+  "fast-xml-parser",
   "graphology", "graphology-communities-louvain", "graphology-pagerank",
   "graphology-types", "header-generator", "helmet", "js-yaml", "jsdom",
   "magika", "mammoth", "memoizee", "memorystore", "minimatch", "multer",

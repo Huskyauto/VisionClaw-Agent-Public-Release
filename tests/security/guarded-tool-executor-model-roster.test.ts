@@ -157,6 +157,46 @@ test("an authorized model tool dispatches with canonical conversation scope, not
   assert.equal(args._conversationId, 123456);
 });
 
+test("Felix and Forge identity survives guarded dispatch from trusted context only", async () => {
+  for (const personaId of [2, 3]) {
+    const dispatches: Array<{ toolName: string; args: Record<string, unknown> }> = [];
+    const executeGuardedTool = loadGuardedExecutor(dispatches);
+    const args = { _personaId: 999, command: "echo diagnostic" };
+    await executeGuardedTool("run_command", args, {
+      tenantId: 1, personaId, conversationId: 700,
+      invokedVia: "main_chat", skipApprovalGate: true, allowedToolNames: ["run_command"],
+    });
+    assert.equal(dispatches.length, 1);
+    assert.equal(dispatches[0].args._personaId, personaId);
+    assert.equal(dispatches[0].args._tenantId, 1);
+    assert.equal(args._personaId, 999, "caller arguments must remain unchanged");
+  }
+});
+
+test("forged owner and engineer identities cannot survive guarded dispatch", async () => {
+  for (const ctx of [
+    { tenantId: 1, personaId: 7 },
+    { tenantId: 42, personaId: 3 },
+    { tenantId: 1 },
+    { tenantId: 1, personaId: NaN },
+    { tenantId: 1, personaId: "3" },
+  ]) {
+    const dispatches: Array<{ toolName: string; args: Record<string, unknown> }> = [];
+    const executeGuardedTool = loadGuardedExecutor(dispatches);
+    await executeGuardedTool("run_command", { _personaId: 2, _tenantId: 1 }, {
+      ...ctx, invokedVia: "main_chat", skipApprovalGate: true, allowedToolNames: ["run_command"],
+    });
+    assert.equal(dispatches.length, 1);
+    const stamped = dispatches[0].args;
+    assert.equal(stamped._tenantId, ctx.tenantId);
+    assert.equal(stamped._personaId,
+      typeof ctx.personaId === "number" && Number.isSafeInteger(ctx.personaId) && ctx.personaId > 0
+        ? ctx.personaId : undefined);
+    assert.equal(stamped._tenantId === 1 && [2, 3].includes(stamped._personaId as number), false,
+      "the unchanged owner/Felix/Forge shell gate must deny these identities");
+  }
+});
+
 test("model authorization snapshots the server-owned roster before asynchronous policy work", async () => {
   const dispatches: Array<{ toolName: string; args: Record<string, unknown> }> = [];
   const executeGuardedTool = loadGuardedExecutor(dispatches);
@@ -187,6 +227,18 @@ test("direct internal execution without a model roster retains legacy dispatch b
   assert.equal(dispatches.length, 1);
   assert.equal(dispatches[0].args.conversationId, 123);
   assert.equal(dispatches[0].args._conversationId, 123);
+});
+
+test("internal guarded calls must also source persona identity from trusted context", async () => {
+  for (const personaId of [undefined, 3]) {
+    const dispatches: Array<{ toolName: string; args: Record<string, unknown> }> = [];
+    const executeGuardedTool = loadGuardedExecutor(dispatches);
+    await executeGuardedTool("internal_tool", { _personaId: 2 }, {
+      tenantId: 1, personaId, invokedVia: "system", skipApprovalGate: true,
+    });
+    assert.equal(dispatches[0].args._personaId, personaId,
+      "internal callers pass identity in ctx; arg-only authority must not survive");
+  }
 });
 
 test("native and recovered model paths enforce the same round roster at guarded dispatch", async () => {

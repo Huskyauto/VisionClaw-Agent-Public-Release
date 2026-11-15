@@ -34,6 +34,7 @@ on:
       - 'data/tenant-isolation-audit/checkpoint.json'
       - 'data/tenant-isolation-audit/latest.json'
       - 'data/tenant-isolation-audit/degraded-latest.json'
+      - 'data/tenant-isolation-audit/precision-progress.json'
       - '.gitignore'
       - 'LICENSE'
   pull_request:
@@ -49,6 +50,7 @@ on:
       - 'data/tenant-isolation-audit/checkpoint.json'
       - 'data/tenant-isolation-audit/latest.json'
       - 'data/tenant-isolation-audit/degraded-latest.json'
+      - 'data/tenant-isolation-audit/precision-progress.json'
       - '.gitignore'
       - 'LICENSE'
 
@@ -89,8 +91,10 @@ jobs:
           node-version: "22.22.0"
           cache: "npm"
       - name: External install portability (before downloads)
-        run: node --test tests/deployment/portable-install.test.cjs
+        run: node --test tests/deployment/portable-install.test.cjs tests/deployment/portable-preflight.test.cjs
       - run: npm ci
+      - name: Audit progress trigger regression
+        run: node --test tests/deployment/ci-audit-progress.test.cjs
       - name: Production bundle
         run: npm run build
       - name: Share startup bundle with the database test job

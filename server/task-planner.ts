@@ -377,7 +377,12 @@ async function executeStep(step: PlanStep, plan: ExecutionPlan): Promise<void> {
         step.status = "failed";
         step.result = { error: policyBlockReason };
       } else {
-        const result = await executeTool(step.tool, args);
+        const result = await executeTool(step.tool, args, {
+          tenantId: plan.invokerTenantId ?? ADMIN_TENANT_ID,
+          actor: plan.invokerPersonaId ? "persona" : "system", personaId: plan.invokerPersonaId,
+          personaName: (plan.invokerTenantId ?? ADMIN_TENANT_ID) === ADMIN_TENANT_ID ? "system" : undefined,
+          invokedVia: "planner", internalPurpose: "Execute a policy-checked task-plan step",
+        });
         if (result && typeof result === "object" && result.error) {
           step.error = result.error;
           step.status = "failed";

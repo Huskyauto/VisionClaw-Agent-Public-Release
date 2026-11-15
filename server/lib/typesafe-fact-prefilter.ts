@@ -4,8 +4,10 @@ import {
   type JevResponse,
 } from "../typesafe-jev";
 import { scanOutbound } from "./outbound-redaction";
+import { buildJevDecisionTrace, type JevDecisionTrace } from "./typesafe-decision-trace";
 
-const SKIP_THRESHOLD = 0.02;
+export const SESSION_FACT_SKIP_THRESHOLD = 0.02;
+export const SESSION_FACT_PREFILTER_VERSION = "jev-session-fact-prefilter-v2";
 const MAX_TURN_CHARS = 4_000;
 
 export type SessionFactPrefilterMode = "off" | "shadow" | "enforce";
@@ -19,6 +21,7 @@ export interface SessionFactPrefilterResult {
   durableFactProbability?: number;
   model?: string;
   usage?: JevResponse["usage"];
+  trace?: JevDecisionTrace;
 }
 
 export interface SessionFactPrefilterInput {
@@ -104,16 +107,17 @@ export async function classifySessionFactNeed(
       },
     };
 
+    const started = performance.now();
     const result = await (input._askFn || askTypeSafeJev)(request);
     const answer = result.answers.has_durable_fact;
-    if (answer?.type !== "noul" || answer.noul === undefined) {
+    if (answer?.type !== "noul" || !Number.isFinite(answer.noul) || answer.noul! < 0 || answer.noul! > 1) {
       throw new Error("TypeSafe fact prefilter returned an incomplete signal");
     }
-    const wouldSkip = answer.noul <= SKIP_THRESHOLD;
+    const wouldSkip = answer.noul! <= SESSION_FACT_SKIP_THRESHOLD;
     const shouldRunExtractor = mode !== "enforce" || !wouldSkip;
     console.log(
       `[typesafe-fact-prefilter] mode=${mode} model=${result.model} ` +
-      `durable_fact=${answer.noul.toFixed(3)} would_skip=${wouldSkip} extractor=${shouldRunExtractor}`,
+      `durable_fact=${answer.noul!.toFixed(3)} would_skip=${wouldSkip} extractor=${shouldRunExtractor}`,
     );
     return {
       status: "validated",
@@ -123,6 +127,18 @@ export async function classifySessionFactNeed(
       durableFactProbability: answer.noul,
       model: result.model,
       usage: result.usage,
+      trace: buildJevDecisionTrace({
+        tenantId: input.tenantId, request, response: result,
+        output: JSON.stringify([input.userTurn, input.assistantTurn]),
+        questionVersion: SESSION_FACT_PREFILTER_VERSION,
+        latencyMs: performance.now() - started,
+        policy: {
+          version: SESSION_FACT_PREFILTER_VERSION, mode,
+          threshold: SESSION_FACT_SKIP_THRESHOLD, calibrated: false,
+          selectedRoute: shouldRunExtractor ? "extract" : "skip",
+          baselineRoute: "extract", wouldSkip,
+        },
+      }),
     };
   } catch (error) {
     const cause = error instanceof Error ? error.name : "unknown";

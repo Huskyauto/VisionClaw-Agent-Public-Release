@@ -90,6 +90,27 @@ test("file-labelled smaller units preserve every original numbered source line a
   assert.throws(() => splitAuditUnits(header + "x".repeat(AUDIT_UNIT_CHARS)), /Source line/);
 });
 
+test("small file-labelled sections share bounded units without changing source text or labels", () => {
+  const sections = Array.from({ length: 12 }, (_, i) => {
+    const file = `server/small-${i}.ts`;
+    const body = Array.from({ length: 15 }, (_, line) =>
+      `${String(line + 1).padStart(5)}| const value${line} = ${i};`).join("\n");
+    return `\n===== FILE: ${file} =====\n${body}\n`;
+  });
+  const source = sections.join("");
+  const units = splitAuditUnits(source);
+  assert.ok(units.length < sections.length, "packing should reduce calls versus one unit per file");
+  assert.ok(units.every(unit => unit.length <= AUDIT_UNIT_CHARS));
+  assert.equal(units.join(""), source, "packed units preserve exact labelled source text");
+  for (const section of sections) {
+    const header = section.match(/FILE: ([^\n]+) =====/);
+    assert.ok(header);
+    const file = header[1];
+    const line = Number(section.match(/\n\s*(\d+)\|/)?.[1]);
+    assert.ok(units.some(unit => auditUnitLocationMatches(unit, file, line)));
+  }
+});
+
 test("long-line windows make bounded progress rather than advancing one line per call", () => {
   const lines = Array.from({ length: 400 }, (_, i) => `${i+1}|${"x".repeat(500)}`);
   const units = splitAuditUnits("\n===== FILE: server/long.ts =====\n" + lines.join("\n"));
@@ -109,6 +130,18 @@ test("numbered source cannot forge a file boundary; finding paths and lines bind
   const window = "\n===== FILE: server/real.ts (lines 80-81 of 900) =====\n   80| query\n   81| done";
   assert.equal(auditUnitLocationMatches(window, "server/real.ts", 80), true);
   assert.equal(auditUnitLocationMatches(window, "server/real.ts", 79), false);
+});
+
+test("packed unit finding validation binds a line to its own labelled file section", () => {
+  const source =
+    "\n===== FILE: server/first.ts =====\n   10| first\n" +
+    "\n===== FILE: server/second.ts =====\n   20| second";
+  assert.equal(auditUnitLocationMatches(source, "server/first.ts", 10), true);
+  assert.equal(auditUnitLocationMatches(source, "server/first.ts", 20), false);
+  assert.equal(auditUnitLocationMatches(source, "server/second.ts", 20), true);
+  assert.equal(auditUnitLocationMatches(source, "server/second.ts"), false);
+  assert.equal(auditUnitLocationMatches(source, "server/missing.ts", 20), false);
+  assert.equal(auditUnitLocationMatches("   20| unlabelled", "server/second.ts", 20), false);
 });
 
 test("partial parent work survives process restart, and a new writer finishes only remaining units", async () => {

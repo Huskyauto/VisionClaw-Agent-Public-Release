@@ -236,9 +236,10 @@ test("jury triage automatically attaches a report-only TypeSafe validation witho
     _validationFn: async (input) => {
       validationCalls++;
       assert.equal(input.subjectKind, "jury");
+      assert.equal(input.evidenceKind, "review_opinion");
       assert.match(input.output, /ACCEPT/);
       return {
-        version: "jev-work-validation-v1",
+        version: "jev-work-validation-v2",
         advisoryOnly: true,
         subjectKind: "jury",
         status: "validated",

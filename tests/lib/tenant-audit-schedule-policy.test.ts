@@ -4,7 +4,7 @@ import { auditScheduleDecision, auditCommand } from "../../server/lib/tenant-aud
 
 const now = new Date("2026-10-24T09:00:00Z");
 test("a missing audit is due and warns rather than implying coverage", () => {
-  assert.deepEqual(auditScheduleDecision(now, []), { enqueue: true, warning: "missing", window: "2026-10-24" });
+  assert.deepEqual(auditScheduleDecision(now, []), { enqueue: true, warning: "missing", window: "2026-10-19" });
 });
 
 test("a newly published repair can rearm an old terminal audit without rearming unchanged failures", () => {
@@ -14,7 +14,7 @@ test("a newly published repair can rearm an old terminal audit without rearming 
 });
 test("an active audit prevents overlapping daily work but stale progress warns", () => {
   const job = { status: "pending", createdAt: "2026-10-23T01:00:00Z", window: "2026-10-23",
-    progressAt: "2026-10-23T02:00:00Z" };
+    progressAt: "2026-10-22T02:00:00Z" };
   assert.equal(auditScheduleDecision(now, [job]).enqueue, false);
   assert.equal(auditScheduleDecision(now, [job]).warning, "stalled");
   assert.equal(auditScheduleDecision(now, [{ ...job, progressAt: now.toISOString() }]).warning, "incomplete");
@@ -24,11 +24,11 @@ test("failed or incomplete current-day audit warns and is not silently replaced"
   assert.equal(auditScheduleDecision(now, [job]).enqueue, false);
   assert.equal(auditScheduleDecision(now, [job]).warning, "incomplete");
 });
-test("only complete current-day coverage suppresses warnings", () => {
+test("only complete current-week coverage suppresses warnings", () => {
   const job = { status: "succeeded", createdAt: now.toISOString(), window: "2026-10-24", complete: true };
   assert.equal(auditScheduleDecision(now, [job]).warning, null);
   assert.equal(auditScheduleDecision(now, [{ ...job, complete: false }]).warning, "incomplete");
-  assert.equal(auditScheduleDecision(now, [{ ...job, window: "2026-10-23" }]).enqueue, true);
+  assert.equal(auditScheduleDecision(now, [{ ...job, window: "2026-10-18" }]).enqueue, true);
 });
 test("production requires a plain-Node audit bundle and never installs a loader", () => {
   assert.throws(() => auditCommand(true, () => false), /bundle missing/);

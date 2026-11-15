@@ -9,6 +9,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Express, Request, Response, NextFunction } from "express";
 import { TOOL_DEFINITIONS, executeTool, getAllToolDefinitions } from "./tools";
+import { externalToolArguments } from "./tools/external-arguments";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -278,7 +279,7 @@ export function createMcpServer(tenantId: number = ADMIN_TENANT_ID): Server {
       };
     }
 
-    const params = { ...(request.params.arguments || {}), _tenantId: tenantId };
+    const params = externalToolArguments(request.params.arguments || {}, tenantId);
     const startTime = Date.now();
 
     try {
@@ -318,7 +319,9 @@ export function createMcpServer(tenantId: number = ADMIN_TENANT_ID): Server {
           isError: true,
         };
       }
-      const result = await executeTool(toolName, params);
+      const result = await executeTool(toolName, params, {
+        tenantId, actor: "external", invokedVia: "mcp-server",
+      });
       const elapsed = Date.now() - startTime;
       console.log(`[mcp-server] Tool ${toolName} completed in ${elapsed}ms`);
 
@@ -377,7 +380,9 @@ export function createMcpServer(tenantId: number = ADMIN_TENANT_ID): Server {
 
     switch (uri) {
       case "visionclaw://system/status": {
-        const result = await executeTool("check_system_status", { _tenantId: tenantId });
+        const result = await executeTool("check_system_status", {}, {
+          tenantId, actor: "external", invokedVia: "mcp-server",
+        });
         return {
           contents: [{
             uri,
@@ -387,7 +392,9 @@ export function createMcpServer(tenantId: number = ADMIN_TENANT_ID): Server {
         };
       }
       case "visionclaw://system/personas": {
-        const result = await executeTool("list_personas", { _tenantId: tenantId });
+        const result = await executeTool("list_personas", {}, {
+          tenantId, actor: "external", invokedVia: "mcp-server",
+        });
         return {
           contents: [{
             uri,

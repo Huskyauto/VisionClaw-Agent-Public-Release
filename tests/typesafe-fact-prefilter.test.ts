@@ -37,6 +37,10 @@ test("shadow mode observes a confident negative without skipping extraction", as
     assert.equal(result.wouldSkip, true);
     assert.equal(result.shouldRunExtractor, true);
     assert.deepEqual(result.usage, { input_tokens: 40, output_tokens: 2 });
+    assert.equal(result.trace?.questionVersion, "jev-session-fact-prefilter-v2");
+    assert.equal(result.trace?.policy.mode, "shadow");
+    assert.equal(result.trace?.policy.selectedRoute, "extract");
+    assert.ok(result.trace?.stateDigest);
   } finally {
     if (prior === undefined) delete process.env.TYPESAFE_FACT_PREFILTER_MODE;
     else process.env.TYPESAFE_FACT_PREFILTER_MODE = prior;

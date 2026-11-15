@@ -1,4 +1,11 @@
-fastapi==0.115.6
+# FastAPI's current supported metadata allows Starlette 1.x; pin the pair to the
+# current secure release rather than relying on the old Starlette<0.42 resolver cap.
+fastapi==0.162.4
+starlette==1.10.0
 uvicorn[standard]==0.34.0
 pydantic==2.10.5
 scrapling[fetchers]==0.4.15
+# Explicit safe floors for transitive HTTP dependencies (h11 request-smuggling,
+# idna encoding resource-exhaustion fixes).
+h11>=0.16.0
+idna>=3.15

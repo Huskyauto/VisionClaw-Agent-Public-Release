@@ -14,6 +14,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { logSilentCatch } from "./lib/silent-catch";
+import { verifyVideoOutput, type VideoVerificationReport } from "./lib/video-output-verification";
+import { createStableVideoSnapshot } from "./lib/video-output-snapshot";
 import { tryAcquireHeavyWorkLane } from "./lib/heavy-work-lane";
 import { produceVideo, concatenateClips, type MpegScene, type ChapterSpec } from "./mpeg-engine";
 import { markInternalRenderStaging } from "./lib/internal-render-markers";
@@ -63,8 +65,8 @@ function isValidJobId(jobId: string): boolean { return typeof jobId === "string"
 // Architect CRITICAL fix: jobs (especially failed ones with chapter MP4s on
 // disk) accumulate forever without a sweeper. Sweep on every startVideoJob
 // call (cheap; runs at most once per job creation) — delete job dirs older
-// than this TTL regardless of status. Successful jobs keep the final concat
-// in project-assets, not in the job dir, so this is safe.
+// than this TTL regardless of status. Final delivery copies are recoverable
+// caches in the job directory; successful uploads remain durable in Drive.
 const JOB_TTL_MS = 7 * 24 * 60 * 60 * 1000;       // 7 days
 
 export type VideoJobStatus = "queued" | "rendering" | "ready_to_concat" | "concating" | "done" | "failed";
@@ -123,6 +125,9 @@ export interface VideoJobState {
   final_drive_url?: string;
   final_size_bytes?: number;
   final_duration_sec?: number;
+  verification?: VideoVerificationReport;
+  // Recoverable cache only: Drive is still the durable destination.
+  pending_verified_output?: { file_path: string; sha256: string; expected_duration_sec?: number };
   concat_attempts: number;
   last_concat_error?: string;
 }
@@ -151,7 +156,7 @@ function writeStateAtomic(state: VideoJobState, options: { mirror?: boolean } = 
   // instead of silently orphaning it. Fire-and-forget; disk remains source
   // of truth for the binaries.
   if (options.mirror !== false) {
-    void mirrorStateToDb(state).catch((_e) => logSilentCatch("video-job-runner:db-mirror", _e));
+    void (_finalizeTestHooks.mirror ?? mirrorStateToDb)(state).catch((_e) => logSilentCatch("video-job-runner:db-mirror", _e));
   }
 }
 
@@ -954,7 +959,7 @@ async function runChaptersInBackground(state: VideoJobState, chapters: ChapterSp
             delete (delivered.spec as any).autoDeliveryClaimedAt;
             writeStateAtomic(delivered);
           }
-          console.log(`[video-job-runner] R112 auto-delivered ${fresh.job_id} to ${customerEmail || customerName}`);
+          console.log(`[video-job-runner] R112 auto-delivered ${fresh.job_id}`);
         } catch (e: any) {
           const after = readJobState(fresh.job_id);
           if (after) {
@@ -1093,6 +1098,7 @@ export interface FinalizeVideoResult {
   duration_sec?: number;
   size_bytes?: number;
   error?: string;
+  verification?: VideoVerificationReport;
   message: string;
 }
 
@@ -1125,6 +1131,8 @@ export function verifyFinalVideo(filePath: string, durationSeconds?: number): st
 export const _finalizeTestHooks: {
   concat?: typeof concatenateClips;
   incident?: (input: any) => void;
+  upload?: typeof import("./google-drive").uploadAndShare;
+  mirror?: (state: VideoJobState) => Promise<void>;
 } = {};
 
 // Customer delivery creates external side effects (Drive folders + email), so
@@ -1180,7 +1188,7 @@ export async function finalizeVideoJob(input: FinalizeVideoInput): Promise<Final
 
   // If already done, return cached result (idempotent).
   if (state.status === "done" && state.final_file_path && fs.existsSync(state.final_file_path)) {
-    return { success: true, job_id: input.jobId, status: "done", file_path: state.final_file_path, drive_url: state.final_drive_url, duration_sec: state.final_duration_sec, size_bytes: state.final_size_bytes, message: "Already finalized — returning cached result. (W1.4 idempotent.)" };
+    return { success: true, job_id: input.jobId, status: "done", file_path: state.final_file_path, drive_url: state.final_drive_url, duration_sec: state.final_duration_sec, size_bytes: state.final_size_bytes, verification: state.verification, message: "Already finalized — returning cached result. (W1.4 idempotent.)" };
   }
 
   // Wait for chapters to be ready. We do NOT block forever — the caller is
@@ -1197,7 +1205,7 @@ export async function finalizeVideoJob(input: FinalizeVideoInput): Promise<Final
 
   // Gather successful chapter files (in order).
   const successChapters = state.chapters.filter((c) => c.status === "done" && c.file_path && fs.existsSync(c.file_path)).sort((a, b) => a.idx - b.idx);
-  if (successChapters.length === 0) {
+  if (successChapters.length === 0 && !state.pending_verified_output) {
     state.status = "failed";
     state.last_concat_error = "No successful chapters to concat.";
     writeStateAtomic(state);
@@ -1205,13 +1213,25 @@ export async function finalizeVideoJob(input: FinalizeVideoInput): Promise<Final
   }
 
   state.status = "concating";
-  state.concat_attempts += 1;
+  if (!state.pending_verified_output) state.concat_attempts += 1;
   writeStateAtomic(state);
 
   try {
     const safeTitle = state.title.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 50);
     const doConcat = _finalizeTestHooks.concat ?? concatenateClips;
-    const concatRes = await doConcat(
+    // Reuse the accepted copy after delivery failure. Never trust a free-form
+    // retained path: it must be the private snapshot inside this owned job.
+    const pending = state.pending_verified_output;
+    if (pending) {
+      const parent = path.dirname(pending.file_path);
+      if (path.dirname(parent) !== jobDir(input.jobId) || !path.basename(parent).startsWith(".bwb-delivery-")
+        || path.basename(pending.file_path) !== "final.mp4" || fs.realpathSync(parent) !== parent)
+        throw new Error("retained output escaped its job snapshot directory");
+    }
+    const concatRes = pending ? {
+      success: true, filePath: pending.file_path, durationSeconds: pending.expected_duration_sec,
+      sizeBytes: state.verification?.identity?.sizeBytes, error: undefined,
+    } : await doConcat(
       successChapters.map((c) => c.file_path!),
       safeTitle,
       state.spec.transition || "fade",
@@ -1240,9 +1260,44 @@ export async function finalizeVideoJob(input: FinalizeVideoInput): Promise<Final
     // done / uploading to Drive. A zero-length or non-MP4 output (overlayFS
     // EIO truncation, ffmpeg partial write) must never be delivered as a
     // finished video. Fail-closed: back to retry-able state + repair incident.
+    let snapshot: ReturnType<typeof createStableVideoSnapshot> | undefined;
     {
       const verifyErrs = verifyFinalVideo(concatRes.filePath, concatRes.durationSeconds);
+      if (verifyErrs.length) state.verification = {
+        version: 1, ok: false, checks: verifyErrs.map(detail => ({ name: "basic_file", status: "FAIL", required: true, detail })),
+      };
+      if (!verifyErrs.length) {
+        if (!pending) {
+          snapshot = createStableVideoSnapshot(concatRes.filePath, jobDir(input.jobId));
+          concatRes.filePath = snapshot.filePath;
+        }
+        const report = await verifyVideoOutput(concatRes.filePath, {
+          requireAudio: true, videoCodec: "h264", audioCodec: "aac",
+          expectedDurationSeconds: concatRes.durationSeconds,
+          ...(state.spec.resolution === "720p" ? { width: 1280, height: 720 }
+            : state.spec.resolution === "1080p" ? { width: 1920, height: 1080 }
+            : state.spec.resolution === "4k" ? { width: 3840, height: 2160 } : {}),
+          ...(state.spec.fps !== undefined && { fps: state.spec.fps }),
+        });
+        state.verification = report;
+        if (pending && report.identity?.sha256 !== pending.sha256) {
+          report.ok = false;
+          report.checks.push({ name: "retained_identity", status: "FAIL", required: true, detail: "retained output differs from its accepted bytes" });
+        }
+        verifyErrs.push(...report.checks.filter(c => c.required && c.status !== "PASS").map(c => `${c.name}: ${c.detail}`));
+        if (report.ok) {
+          state.pending_verified_output = {
+            file_path: concatRes.filePath, sha256: report.identity!.sha256,
+            expected_duration_sec: concatRes.durationSeconds,
+          };
+          concatRes.durationSeconds = report.durationSeconds;
+          concatRes.sizeBytes = report.identity!.sizeBytes;
+          // Checkpoint BEFORE the external upload; a retry must not reconcat.
+          writeStateAtomic(state);
+        }
+      }
       if (verifyErrs.length > 0) {
+        snapshot?.cleanup();
         state.status = "ready_to_concat";
         state.last_concat_error = `quality-gate: ${verifyErrs.join("; ")}`.slice(0, 500);
         writeStateAtomic(state);
@@ -1253,13 +1308,13 @@ export async function finalizeVideoJob(input: FinalizeVideoInput): Promise<Final
           error: verifyErrs.join("; "),
           metadata: { jobId: input.jobId, filePath: concatRes.filePath, sizeBytes: concatRes.sizeBytes },
         });
-        return { success: false, job_id: input.jobId, status: "ready_to_concat", message: `Final video failed the quality gate (${state.last_concat_error}) — it was NOT uploaded or delivered. Chapter files preserved; call finalize_video again to retry. The self-repair system has been notified.`, error: state.last_concat_error };
+        return { success: false, job_id: input.jobId, status: "ready_to_concat", verification: state.verification, message: `Final video failed the quality gate (${state.last_concat_error}) — it was NOT uploaded or delivered. Source files preserved. The self-repair system has been notified.`, error: state.last_concat_error };
       }
     }
 
     let driveUrl: string | undefined;
     try {
-      const { uploadAndShare } = await import("./google-drive");
+      const uploadAndShare = _finalizeTestHooks.upload ?? (await import("./google-drive")).uploadAndShare;
       const ur = await uploadAndShare({
         filePath: concatRes.filePath,
         fileName: `${safeTitle}.mp4`,
@@ -1268,7 +1323,10 @@ export async function finalizeVideoJob(input: FinalizeVideoInput): Promise<Final
         folderLabel: "VisionClaw Media/Videos",
         parentFolderId: state.spec._projectDriveFolderId || undefined,
         tenantId: input.tenantId,
-        generatedArtifact: { artifactKind: "video", logicalName: `${safeTitle}.mp4`, sourceRunKey: `video-job:${input.jobId}` },
+        generatedArtifact: {
+          artifactKind: "video", logicalName: `${safeTitle}.mp4`, sourceRunKey: `video-job:${input.jobId}`,
+          metadata: { outputVerification: state.verification },
+        },
       });
       if (!ur.success) {
         state.status = "ready_to_concat";
@@ -1289,6 +1347,7 @@ export async function finalizeVideoJob(input: FinalizeVideoInput): Promise<Final
     state.final_drive_url = driveUrl;
     state.final_duration_sec = concatRes.durationSeconds;
     state.final_size_bytes = concatRes.sizeBytes;
+    state.pending_verified_output = undefined;
     state.last_concat_error = undefined;
     writeStateAtomic(state);
 
@@ -1300,6 +1359,7 @@ export async function finalizeVideoJob(input: FinalizeVideoInput): Promise<Final
       drive_url: driveUrl,
       duration_sec: concatRes.durationSeconds,
       size_bytes: concatRes.sizeBytes,
+      verification: state.verification,
       message: `Finalized: ${successChapters.length}/${state.total_chapters} chapters concatenated into ${concatRes.durationSeconds?.toFixed(1)}s video${driveUrl ? ` (Drive: ${driveUrl})` : ""}.`,
     };
   } catch (e: any) {

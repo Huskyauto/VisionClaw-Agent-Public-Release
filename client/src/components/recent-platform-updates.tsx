@@ -5,6 +5,16 @@ import releaseFacts from "../../../docs/release-facts.json";
 
 const updates = [
   {
+    title: "Subscription, memory and finished-video integrity repairs",
+    business: "An old paid checkout is no longer enough to reactivate a canceled subscription. Memory replacement saves the new fact before retiring the old one, and force-cancel preserves finished video jobs. These are source changes, not evidence of production rollout.",
+    technical: "Current subscription status/customer/price checks cover activation and both subscription webhook upgrade paths. MCP replacement and successor linking share one database transaction; force-cancel updates only active statuses. The MCP persona catalog column and Hono advisories are corrected. Source review and bounded local checks do not clear incomplete tenant auditing or staged RLS.",
+  },
+  {
+    title: "Demo Studio and integrated interface-quality guidance",
+    business: "The owner sidebar now opens Demo Studio: author steps, add screenshots, preview playback, save/reopen a project file and export an offline HTML walkthrough. Walkthroughs are labeled reconstructions, not live recordings. Drafts require an explicit project download.",
+    technical: "The existing build_html_app tool accepts the same validated demo contract and renders without a model call. Shared escaping, bounded raster data, sandboxed previews and deterministic timeline seeking keep the output self-contained. Ordinary HTML generation now always requests mobile/keyboard access, difficult-data handling, recovery states and motion restraint. Server validation is static DOM analysis, not JavaScript execution proof.",
+  },
+  {
     title: "Reliability review and clearer account boundaries",
     business: "Recent repairs cover model selection in Settings, Memory navigation and account ownership checks. Scheduled wake-ups now save their event and handoff together; uncertain old outcomes require review instead of blind retries. Provider diagnostics are owner-only. Not every journey has been verified.",
     technical: "November 6 changes enforce explicit tenant scope for insight recovery, channels, research projects, agent parent runs, wakes and task forces. Wake event insertion and schedule completion are now atomic, with central bus hooks preserved. Old ambiguous firing claims fail visibly; downstream delivery is not exactly-once. Provider health requires the current platform-admin role. Audit coverage remains incomplete.",

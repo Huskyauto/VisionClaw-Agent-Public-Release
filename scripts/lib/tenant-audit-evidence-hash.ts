@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { auditScanContext } from "./tenant-audit-unit-ledger";
 
 const INCLUDED_CONFIG = [
   "scripts/tenant-isolation-audit.ts",
@@ -11,10 +12,24 @@ const INCLUDED_CONFIG = [
   "scripts/lib/tenant-audit-provider-policy.ts",
   "scripts/lib/tenant-audit-fallback.ts",
   "scripts/lib/tenant-audit-completion.ts",
+  "scripts/lib/tenant-audit-unit-ledger.ts",
+  "scripts/lib/tenant-audit-deadline.ts",
+  "scripts/lib/tenant-audit-precision-cache.ts",
+  "scripts/lib/tenant-audit-paid-attempts.ts",
+  "scripts/lib/triage-verdict-match.ts",
   "shared/schema.ts",
   "data/tenant-isolation-audit/suppressions.json",
   "data/tenant-isolation-audit/deferrals.json",
 ];
+
+/** Only evidence-producing code/config, not unrelated source or final dispositions. */
+export function computeTenantAuditScanContext(root: string, configuration: unknown): string {
+  const producers = INCLUDED_CONFIG.filter(f =>
+    f.startsWith("scripts/") && !f.endsWith("tenant-audit-report-writer.ts"));
+  return auditScanContext(configuration, producers.map(file => ({
+    file, hash: createHash("sha256").update(fs.readFileSync(path.join(root, file))).digest("hex"),
+  })));
+}
 
 function walkTypescript(dir: string, out: string[]): void {
   const entries = fs.readdirSync(dir, { withFileTypes: true });

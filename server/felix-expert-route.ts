@@ -1,5 +1,7 @@
 import type OpenAI from "openai";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { setTimeout as delay } from "node:timers/promises";
+import { replitRetryDelay } from "./lib/replit-admission";
 import { ownerTenantId } from "./agentic/autonomous-budget";
 import { getFelixExpertLanes } from "./felix-model-policy";
 import type { FelixExpertLane } from "./felix-model-policy";
@@ -153,6 +155,41 @@ function classifyFelixExpertAttempt(error: unknown, contextRejected: boolean): F
   return "uncertain";
 }
 
+/**
+ * Retry only a positively rejected completion, never processMessage or tool work.
+ * The shared admission transport remains authoritative after this wait.
+ * One allowance spans every tool round of this API turn.
+ */
+export async function withFelixReplitRateLimitRecovery<T>(
+  request: () => Promise<T>,
+  options: {
+    providerLane?: string;
+    budget: { used: boolean };
+    wait?: (ms: number) => Promise<void>;
+  },
+): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    const err = errorObject(error);
+    const quotaError = error as { code?: unknown; error?: { code?: unknown; type?: unknown } };
+    const permanentQuota = [quotaError?.code, quotaError?.error?.code, quotaError?.error?.type]
+      .some(code => typeof code === "string" &&
+        /^(insufficient_quota|billing_hard_limit_reached|usage_limit_reached|quota_exceeded)$/i.test(code));
+    if (options.providerLane !== "replit" || options.budget.used ||
+        errorStatus(err?.status ?? err?.statusCode ?? err?.response?.status) !== 429 ||
+        isFelixExpertTransportAmbiguous(error) || permanentQuota) throw error;
+    const headers = (error as { headers?: unknown }).headers;
+    const waitMs = replitRetryDelay(headers instanceof Headers ? headers : new Headers());
+    // Long restrictions need operator attention, not a parked request.
+    if (waitMs > 60_000) throw error;
+    options.budget.used = true;
+    console.info(`[felix-expert] Replit rate limited; one completion retry after ${waitMs}ms`);
+    await (options.wait ?? (ms => delay(ms)))(waitMs);
+    return request();
+  }
+}
+
 /** Holds only classification outcomes, never raw provider errors or response payloads. */
 export class FelixExpertFailureHistory {
   private readonly outcomes = new Set<FelixExpertAttemptOutcome>();
@@ -185,8 +222,20 @@ export async function resolveFelixExpertLane(
       }
       console.info(`[felix-expert] using ${lane.providerLane}/${lane.modelId}`);
       return { client: routed.client, modelId: routed.actualModelId, registryModelId: lane.modelId, index };
-    } catch {
-      console.warn(`[felix-expert] ${lane.providerLane} unavailable before completion`);
+    } catch (error) {
+      const details = errorObject(error);
+      const reasons: Record<string, string> = {
+        PROFUNDO_DISABLED: "disabled",
+        PROFUNDO_CREDENTIAL_UNAVAILABLE: "credential_unavailable",
+        PROFUNDO_COOLDOWN: "health_cooldown",
+        PROFUNDO_MODEL_UNSUPPORTED: "unsupported_model",
+      };
+      const status = errorStatus(details?.status ?? details?.statusCode ?? details?.response?.status);
+      const reason = typeof details?.code === "string" && Object.hasOwn(reasons, details.code)
+        ? reasons[details.code] : undefined;
+      const safeReason = reason ?? (Number.isInteger(status) && status! >= 400 && status! <= 599
+        ? `http_${status}` : "unclassified");
+      console.warn(`[felix-expert] ${lane.providerLane} unavailable before completion (${safeReason})`);
     }
   }
   throw new FelixExpertUnavailableError();

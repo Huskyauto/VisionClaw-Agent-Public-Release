@@ -20,6 +20,7 @@ import { apiRequest, queryClient, authFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { AgentSettings } from "@shared/schema";
 import { ErrorState } from "@/components/error-state";
+import { FelixConnectorSettings } from "@/components/settings/felix-connector-settings";
 
 const settingsSchema = z.object({
   agentName: z.string().min(1, "Name required").max(50),
@@ -4181,6 +4182,7 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
             <ApiKeysSection />
+            <FelixConnectorSettings />
             <AuthHealthSettings />
           </TabsContent>
 

@@ -1,5 +1,6 @@
 import { processMessage } from "./chat-engine";
 import { getClientForModel } from "./providers";
+import { completeOrchestrationPlan } from "./lib/orchestration-planner-completion";
 import { ADMIN_TENANT_ID } from "./auth";
 
 import { logSilentCatch } from "./lib/silent-catch";
@@ -308,66 +309,7 @@ Respond with ONLY a valid JSON array, no markdown, no explanation:
 ]`;
 
   const model = modelId || "gpt-5.6-sol";
-  const fallbackModels = [model, "gpt-5.6-sol", "gpt-5.4", "google/gemini-3.7-flash", "gpt-5", "claude-sonnet-4-5"];
-  let client: any;
-  let actualModel: string = "";
-  let lastError: any;
-
-  for (const candidateModel of fallbackModels) {
-    try {
-      const result = await getClientForModel(candidateModel, tenantId);
-      client = result.client;
-      actualModel = result.actualModelId;
-      break;
-    } catch (err: any) {
-      lastError = err;
-      console.log(`[ceo-orchestrator] Provider ${candidateModel} unavailable: ${err.message?.slice(0, 80)}`);
-    }
-  }
-
-  if (!client) {
-    throw new Error(`All orchestration models unavailable: ${lastError?.message || "unknown"}`);
-  }
-
-  // Opus 4.7+ rejects non-default temperature/top_p/top_k with HTTP 400 — strip them.
-  const buildParams = (modelId: string, base: Record<string, any>) => {
-    const isOpus47Plus = /^claude-opus-4-[78]/.test(modelId) || /claude-opus-4-[78]/.test(actualModel || "");
-    if (isOpus47Plus) {
-      const { temperature, top_p, top_k, ...safe } = base;
-      return safe;
-    }
-    return base;
-  };
-
-  let response: any;
-  try {
-    response = await client.chat.completions.create(buildParams(actualModel!, {
-      model: actualModel!,
-      messages: [{ role: "user", content: plannerPrompt }],
-      max_completion_tokens: 1000,
-      temperature: 0.3,
-    } as any));
-  } catch (llmErr: any) {
-    console.log(`[ceo-orchestrator] LLM call failed with ${actualModel}: ${llmErr.message?.slice(0, 100)}`);
-    for (const retryModel of ["gpt-5.6-sol", "google/gemini-3.7-flash", "gpt-5", "claude-sonnet-4-5"]) {
-      try {
-        const retryResult = await getClientForModel(retryModel, tenantId);
-        response = await retryResult.client.chat.completions.create((buildParams as any)(retryResult.actualModelId, {
-          model: retryResult.actualModelId,
-          messages: [{ role: "user", content: plannerPrompt }],
-          max_completion_tokens: 1000,
-          temperature: 0.3,
-        }));
-        console.log(`[ceo-orchestrator] Retry succeeded with ${retryModel}`);
-        break;
-      } catch (retryErr: any) {
-        console.log(`[ceo-orchestrator] Retry ${retryModel} also failed: ${retryErr.message?.slice(0, 80)}`);
-      }
-    }
-    if (!response) {
-      throw new Error(`Orchestration planning failed — all providers down: ${llmErr.message}`);
-    }
-  }
+  const response = await completeOrchestrationPlan(plannerPrompt, model, tenantId, getClientForModel);
 
   const rawContent = response.choices?.[0]?.message?.content || "[]";
 

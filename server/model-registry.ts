@@ -11,6 +11,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { MAMMOUTH_MODELS } from "./lib/mammouth-catalog";
+import { META_MODELS, META_MAX_OUTPUT, metaModel } from "./lib/meta";
 
 export interface ModelInfo {
   id: string;
@@ -38,6 +39,10 @@ export interface ModelInfo {
 export const REFLECTION_BEAM_PATTERN = /^reflection(?:ai|-ai)?\/beam(?:[-.:][a-z0-9][a-z0-9_.:-]*)?$/i;
 
 export function getCatalogModelPricing(entry: ModelInfo | undefined): ModelInfo["catalogPricing"] {
+  if (entry?.provider === "meta-direct") {
+    const model = metaModel(entry.id);
+    return model ? { inputUsdPerToken: model.input / 1e6, outputUsdPerToken: model.output / 1e6 } : undefined;
+  }
   if (entry?.provider === "mammouth") {
     const model = MAMMOUTH_MODELS.find(model => model.id === entry.id);
     return model ? { inputUsdPerToken: model.inputPerMillion / 1e6,
@@ -105,10 +110,12 @@ export const MODEL_REGISTRY: ModelInfo[] = [
   { id: "claude-opus-4-8", label: "Claude Opus 4.8", provider: "anthropic", tier: "powerful", description: "1M context, 128K output, hi-res vision, xhigh effort, adaptive thinking; supersedes Opus 4.7 (superseded as flagship by Opus 5, Bob 2026-07-24)", capabilities: ["vision", "code", "tools"], costClass: "free", trainingRegime: "rlvr" },
   { id: "claude-opus-5", label: "Claude Opus 5", provider: "anthropic", tier: "powerful", description: "DEFAULT Anthropic flagship (Bob 2026-07-24) — verified live on api.anthropic.com /models 2026-07-24; 1M context, 128K output; $5/$25 per M (live OpenRouter rate, same as Opus 4.8); supersedes Opus 4.8; covered by the Claude Runner flat-rate lane", capabilities: ["vision", "code", "tools"], costClass: "free", trainingRegime: "rlvr" },
   { id: "claude-fable-5", label: "Claude Fable 5", provider: "anthropic", tier: "powerful", description: "LAST-RESORT super-expert escalation ONLY — Profundo flat-rate route is available, but this model remains excluded from automatic proposer, aggregator, and frontier defaults.", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
-  { id: "claude-fable-5-1", label: "Claude Fable 5.1", provider: "anthropic", tier: "powerful", description: "Anthropic's most capable broadly available model — owner-only explicit final-decision option; 1M context, 128K output, direct API billing at $10/M input and $50/M output with $0.25/M cache reads; never automatic customer routing", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
+  { id: "claude-fable-5-1", label: "Claude Fable 5.1", provider: "anthropic", tier: "powerful", description: "Previous Fable generation — owner-only explicit final-decision option; 1M context, 128K output, direct API billing at $10/M input and $50/M output with $0.25/M cache reads; never automatic customer routing", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
+  { id: "claude-fable-5-2", label: "Claude Fable 5.2 (owner escalation)", provider: "anthropic", tier: "powerful", description: "Owner-only explicit complex-reasoning escalation, not an automatic default. 1M context, 128K output, $8/M input and $40/M output; 30-day provider retention, not zero retention. Shared paid-AI budget applies.", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "unknown" },
 
   // Grok 4.7 uses xAI direct; older Grok variants below retain their OpenRouter routes.
 
+  { id: "gemini-4-carbon", label: "Gemini 4 Carbon (high-end direct API)", provider: "google", tier: "powerful", description: "Explicit owner-only high-end reasoning via a dedicated Google API key; not an automatic default. 1M context, account-verified 32K output. $2/$10 per million input/output through November 2026, then $4/$20. Shared paid-AI cap; no automatic paid retry.", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "unknown" },
   { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", provider: "google", tier: "powerful", description: "FLAGSHIP Google model (Google I/O 2026-05-19) — frontier intelligence + action, excels at long-horizon agentic tasks and coding; promoted to high-end tier in R125+3.7 pending Gemini 3.5 Pro release. METERED — NOT on the free Replit modelfarm lane; bills the Google API key (~$0.12/call). Reserve for complex work / the jury; cheap autonomous work uses gemini-2.5-flash.", capabilities: ["vision", "audio", "video", "code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
   { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", provider: "google", tier: "powerful", description: "Agentic multimodal reasoning model — retired from the flat-rate catalog; direct Google route is metered", capabilities: ["vision", "audio", "video", "code", "tools"], costClass: "paid", trainingRegime: "rlvr" },
   { id: "gemini-3-pro-preview", label: "Gemini 3 Pro", provider: "google", tier: "powerful", description: "Powerful agentic model and vibe-coding", capabilities: ["vision", "audio", "video", "code", "tools"], costClass: "free", trainingRegime: "rlvr" },
@@ -185,6 +192,11 @@ export const MODEL_REGISTRY: ModelInfo[] = [
     id: model.id, label: model.label, provider: "mammouth", tier: model.tier,
     description: `Owner-selected Mammouth API credits, not unlimited subscription usage. Upper-bound rates: $${model.inputPerMillion}/M input, $${model.outputPerMillion}/M output. No automatic routing or jury replacement.`,
     capabilities: ["code", "tools"] as ("code" | "tools")[], costClass: "paid" as const,
+  })),
+  ...META_MODELS.map(model => ({
+    id: model.id, label: model.label, provider: "meta-direct", tier: model.tier,
+    description: `Owner-funded direct Meta API. $${model.input}/M input, $${model.output}/M output. Existing shared $20 daily paid-AI ceiling. ${model.upstream.endsWith("-contributor") ? "Owner approved Meta training use for simple tasks." : "Standard private mode."}`,
+    capabilities: ["vision", "code", "tools"] as ("vision" | "code" | "tools")[], costClass: "paid" as const,
   })),
   // Standard (non-contributor) 1.3 verified in OpenRouter's catalog 2026-10-07.
   { id: "meta/muse-spark-1.3", label: "Muse Spark 1.3", provider: "openrouter", tier: "powerful", description: "Meta Muse Spark 1.3 — 1M ctx, $1.25/M in $4.25/M out. Metered model option; NOT in the standing jury or $0 tier routing", capabilities: ["code", "tools"], costClass: "paid", trainingRegime: "unknown" },
@@ -269,6 +281,7 @@ export function getMultimodalModelsForTier(tier: "fast" | "balanced" | "powerful
 }
 
 export const MODEL_MAX_OUTPUT: Record<string, number> = {
+  "gemini-4-carbon": 32768,
   "mammouth/glm-5.3-flash": 8192,
   "mammouth/mistral-large-4": 8192,
   "claude-sonnet-4-5": 16384,
@@ -282,6 +295,7 @@ export const MODEL_MAX_OUTPUT: Record<string, number> = {
   "google/gemini-3.8-flash": 65536,
   "claude-fable-5": 131072,
   "claude-fable-5-1": 131072,
+  "claude-fable-5-2": 128000,
   "gpt-5.6-sol": 65536,
   "gpt-5.6-luna": 65536,
   "gpt-5.6-terra": 65536,
@@ -359,10 +373,13 @@ export const MODEL_MAX_OUTPUT: Record<string, number> = {
 
 export function isOwnerOnlyFinalDecisionModel(modelId: string): boolean {
   return (
+    modelId.startsWith("meta-direct/") ||
     modelId.startsWith("mammouth/") ||
     modelId.startsWith("cheaperinference/") ||
     modelId === "gpt-6-astra" ||
     modelId === "claude-fable-5-1" ||
+    modelId === "claude-fable-5-2" ||
+    modelId === "gemini-4-carbon" ||
     modelId === "tencent/hy4-preview"
   );
 }
@@ -376,6 +393,7 @@ export function isSyntheticEvaluationModel(modelId: string): boolean {
 }
 
 export function getMaxOutputTokens(modelId: string): number {
+  if (metaModel(modelId)) return META_MAX_OUTPUT;
   if (modelId.startsWith("cheaperinference/")) return 8192;
   return MODEL_MAX_OUTPUT[modelId] || 16384;
 }
@@ -384,6 +402,7 @@ export function getMaxOutputTokens(modelId: string): number {
 // the metered-cost policy. Never send the selected model's output ceiling to
 // the actual model (e.g. DeepSeek 384k -> GPT 32k).
 export function getRoutedMaxOutputTokens(requestedModelId: string, actualModelId: string): number {
+  if (metaModel(actualModelId)) return META_MAX_OUTPUT;
   if (requestedModelId.startsWith("cheaperinference/")) return 8192;
   if (!actualModelId || actualModelId === requestedModelId) return getMaxOutputTokens(requestedModelId);
   if (MODEL_MAX_OUTPUT[actualModelId]) return MODEL_MAX_OUTPUT[actualModelId];

@@ -1,5 +1,9 @@
 # Tenant audit recurrence repair
 
+Current cadence is superseded by the owner-approved weekly campaign with bounded
+daily batches in [tenant-audit-weekly-batches.md](tenant-audit-weekly-batches.md).
+The daily recurrence and prompt-continuation descriptions below are historical.
+
 Scope: run the existing read-only auditor from the always-on production VM,
 through the durable job queue, and publish persistent owner notifications when
 coverage is incomplete, stalled or missing. Workspace Run is not a timer.

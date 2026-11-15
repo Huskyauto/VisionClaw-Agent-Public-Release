@@ -19,7 +19,8 @@ import { ownerTenantId } from "./agentic/autonomous-budget";
 import { insertKnowledgeSchema, insertSkillSchema, insertDailyNoteSchema, conversations, messages, heartbeatTasks, heartbeatLogs, memoryEntries, fileStorage, notifications, activityLog } from "@shared/schema";
 import { isOwnerOnlyFinalDecisionModel } from "./model-registry";
 import { splitSystemForCache } from "./anthropic-prompt-cache";
-import { getClientForModel, getAvailableModels, getAvailableModelsForTenant, MODEL_REGISTRY, normalizeModelId, replitOpenai, getMaxOutputTokens, maskApiKey, markSubscriptionFailed, markProviderUnhealthy, getUnhealthyProviders, resetProviderHealth } from "./providers";
+import { getClientForModel, getModelForTierAsync, getAvailableModels, getAvailableModelsForTenant, MODEL_REGISTRY, normalizeModelId, replitOpenai, getMaxOutputTokens, maskApiKey, markSubscriptionFailed, markProviderUnhealthy, getUnhealthyProviders, resetProviderHealth } from "./providers";
+import { metaTitleTokenLimit } from "./lib/meta";
 import { getRoutedMaxOutputTokens } from "./model-registry";
 // R74.13k — A-MEDIUM cleanup: stopHeartbeat + delegateTaskFromChat were dead
 // (stopHeartbeat is wired through the lifecycle module, delegateTaskFromChat is
@@ -2442,9 +2443,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         try {
           const inboxId = await getPrimaryInboxId();
           await sendEmail({ inboxId, to: rawEmail, subject, text, html });
-          console.log(`[store] order lookup code sent to ${rawEmail}`);
+          console.log("[store] order lookup code sent");
         } catch (sendErr: unknown) {
-          console.error(`[store] order lookup code email failed for ${rawEmail}:`, errorMessage(sendErr));
+          console.error("[store] order lookup code email failed");
         }
       } catch (err: unknown) {
         console.error("[store] order lookup (async) error:", errorMessage(err));
@@ -4496,6 +4497,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         );
         activeClient = result.client;
         activeModelId = result.actualModelId;
+        if (/^muse-(spark-1\.3(?:-contributor)?|wonder-1\.0)$/.test(activeModelId)) {
+          currentRegistryModelId = `meta-direct/${activeModelId}`;
+        }
       } catch (primaryErr: unknown) {
         if (streamAbortController.signal.aborted || errorName(primaryErr) === "AbortError") {
           throw primaryErr;
@@ -6125,13 +6129,13 @@ ${buildFelixProtocol()}`
           const contextSnippet = content.slice(0, 200);
           const responseSnippet = fullResponse.slice(0, 200);
           const { client: titleClient, actualModelId: titleModel } =
-            await getClientForModel(DEFAULT_CHAT_MODEL_ID, conv.tenantId ?? ADMIN_TENANT_ID);
+            await getClientForModel(await getModelForTierAsync("fast", conv.tenantId ?? ADMIN_TENANT_ID), conv.tenantId ?? ADMIN_TENANT_ID);
           const titleResp = await titleClient.chat.completions.create({
             model: titleModel,
             messages: [
               { role: "user", content: `Generate a concise, descriptive 3-7 word title summarizing this conversation.\n\nUser said: "${contextSnippet}"\nAssistant replied about: "${responseSnippet}"\n\nReply with ONLY the title text, no quotes, no punctuation at the end.` }
             ],
-            max_completion_tokens: 30,
+            max_completion_tokens: metaTitleTokenLimit(titleModel),
           });
           let newTitle = titleResp.choices[0]?.message?.content?.trim().replace(/^["']|["']$/g, "").replace(/\.+$/, "") || "";
           if (!newTitle || newTitle.toLowerCase() === "new chat") {
@@ -7477,7 +7481,7 @@ ${buildFelixProtocol()}`
   const { registerAdminHvacMissedCallRoutes } = await import("./routes/admin-hvac-missed-call");
   registerAdminHvacMissedCallRoutes(app, { authMiddleware, getTenantFromRequest, isAdminRequest });
   registerMcpRoutes(app, { isAdminRequest, requirePlatformAdmin });
-  registerMcpServerRoutes(app, { requirePlatformAdmin, getTenantFromRequest });
+  await registerMcpServerRoutes(app, { requirePlatformAdmin, getTenantFromRequest });
   registerMindsRoutes(app, { authMiddleware, getTenantFromRequest, requirePlatformAdmin });
   registerBrowserRoutes(app, { authMiddleware, getTenantFromRequestAsync, isPlatformAdmin, requirePlatformAdmin });
   registerApiV1Routes(app, { authMiddleware, getTenantFromRequest });

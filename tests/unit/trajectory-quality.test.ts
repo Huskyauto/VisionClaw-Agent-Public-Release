@@ -10,6 +10,7 @@
  * Run: node --import tsx --test tests/unit/trajectory-quality.test.ts
  */
 import test from "node:test";
+import { checkTrajectoryStep } from "../../server/lib/trajectory-quality";
 import assert from "node:assert/strict";
 import {
   scoreTrajectory,
@@ -128,3 +129,13 @@ test("scorer consumes the redundancy count end-to-end", () => {
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+test("offline trajectory checks detect policy/retry/budget issues without retaining payload values", () => {
+  const result = checkTrajectoryStep({
+    toolName: "send_email", allowedTools: ["web_search"], retryCount: 3,
+    retrieval: { queryPresent: true, remainingBudget: 0 },
+    args: { password: "PRIVATE-NOT-FOR-LOGS" }, result: "PRIVATE-RESULT",
+  });
+  assert.deepEqual(result, ["tool_not_allowed", "retry_limit_exceeded", "retrieval_budget_exhausted"]);
+  assert.doesNotMatch(JSON.stringify(result), /PRIVATE|password/);
+});

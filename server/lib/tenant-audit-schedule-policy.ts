@@ -2,6 +2,27 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const TENANT_AUDIT_JOB_KIND = "tenant_isolation_audit";
+export const AUDIT_DAILY_RUNTIME_MS = 15 * 60_000;
+export function auditDailyChunkTarget(total: number): number {
+  if (!Number.isSafeInteger(total) || total <= 0) throw new Error("Invalid audit chunk count");
+  return Math.ceil(total / 7);
+}
+/** Cache evidence survives campaign rotation; completion and authority never do. */
+export function auditCarryForward(payload: any): Record<string, unknown> {
+  const retained: Record<string, unknown> = {};
+  for (const field of ["auditCheckpoint", "auditPrecision", "auditHandoff", "auditProviderHealth", "auditPaidAttempts"]) {
+    if (payload?.[field] !== undefined) retained[field] = payload[field];
+  }
+  return retained;
+}
+/** Monday-based UTC campaign identity, stable across restarts and daily batches. */
+export function auditWeekWindow(now: Date): string {
+  if (!Number.isFinite(now.getTime())) throw new Error("Invalid audit schedule clock");
+  const monday = new Date(now);
+  monday.setUTCHours(0, 0, 0, 0);
+  monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7);
+  return monday.toISOString().slice(0, 10);
+}
 export function isCompleteAuditReport(report: any): boolean {
   const c = report?.coverage;
   return report?.degraded === false && Number.isInteger(c?.scanned) && c.scanned > 0 &&
@@ -17,17 +38,24 @@ export interface AuditScheduleJob {
   complete?: boolean;
   sourceHash?: string;
   findingsRequireAttention?: boolean;
+  nextRunAt?: string;
 }
 export function auditScheduleDecision(now: Date, jobs: AuditScheduleJob[], sourceHash?: string) {
   if (!Number.isFinite(now.getTime())) throw new Error("Invalid audit schedule clock");
-  const window = now.toISOString().slice(0, 10);
+  const window = auditWeekWindow(now);
   const active = jobs.find(j => j.status === "pending" || j.status === "running");
   if (active) {
+    if (active.window < window)
+      return { window, enqueue: false, warning: "overdue" } as const;
+    if (active.status === "pending" && active.nextRunAt && Date.parse(active.nextRunAt) > now.getTime()
+        && active.nextRunAt.slice(0, 10) > now.toISOString().slice(0, 10))
+      return { window, enqueue: false, warning: "batch_scheduled" } as const;
     const progress = Date.parse(active.progressAt || active.createdAt);
-    return { window, enqueue: false, warning: !Number.isFinite(progress) || now.getTime() - progress > 2 * 3600_000
+    return { window, enqueue: false, warning: !Number.isFinite(progress) || now.getTime() - progress > 36 * 3600_000
       ? "stalled" : "incomplete" } as const;
   }
-  const today = jobs.find(j => j.window === window);
+  // Legacy daily jobs within this week retain their valid completion evidence.
+  const today = jobs.find(j => j.window >= window && j.window <= now.toISOString().slice(0, 10));
   if (today && sourceHash && today.sourceHash && today.sourceHash !== sourceHash)
     return { window, enqueue: true, warning: "source_changed" } as const;
   return { window, enqueue: !today, warning: !today ? "missing"

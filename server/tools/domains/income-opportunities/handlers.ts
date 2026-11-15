@@ -73,6 +73,6 @@ async function fileHandler(params: Record<string, any>, ctx: ToolContext): Promi
 }
 
 export const incomeOpportunityDomainTools: RegisteredTool[] = [
-  defineTool(opportunityBankFileDefinition, fileHandler),
-  defineTool(ownerBusinessOverviewDefinition, overviewHandler),
+  defineTool(opportunityBankFileDefinition, fileHandler, { publicArgumentsOnly: true }),
+  defineTool(ownerBusinessOverviewDefinition, overviewHandler, { publicArgumentsOnly: true }),
 ];

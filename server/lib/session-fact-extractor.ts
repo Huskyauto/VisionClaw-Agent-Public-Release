@@ -27,6 +27,7 @@ import {
   getSessionFactPrefilterMode,
   isSessionFactPrefilterTenantAllowed,
   type SessionFactPrefilterResult,
+  SESSION_FACT_PREFILTER_VERSION,
 } from "./typesafe-fact-prefilter";
 
 const EXTRACTOR_MODEL = "gemini-2.5-flash";
@@ -105,7 +106,7 @@ export interface SessionFactExtractionResult {
   prefilter?: SessionFactPrefilterResult;
 }
 
-const FACT_PREFILTER_VERSION = "jev-session-fact-prefilter-v1";
+const FACT_PREFILTER_VERSION = SESSION_FACT_PREFILTER_VERSION;
 
 export async function claimPrefilterObservation(input: ExtractAndPersistInput): Promise<boolean> {
   const mode = getSessionFactPrefilterMode();
@@ -145,6 +146,7 @@ async function settlePrefilterClassification(
           input_tokens = ${prefilter.usage?.input_tokens ?? null},
           output_tokens = ${prefilter.usage?.output_tokens ?? null},
           model = ${prefilter.model ?? null},
+          decision_receipt = ${prefilter.trace ? JSON.stringify(prefilter.trace) : null}::jsonb,
           updated_at = NOW()
       WHERE tenant_id = ${input.tenantId}
         AND source_message_id = ${Number(input.sourceMessageId)}
@@ -161,13 +163,24 @@ async function finalizePrefilterExtraction(
   input: ExtractAndPersistInput,
   extractorRan: boolean,
   written: number,
+  errorClass: "extractor_failed" | "persistence_failed" | null = null,
+  execution?: { durationMs?: number; servedModel?: string },
 ): Promise<void> {
   if (!Number.isInteger(input.sourceMessageId) || Number(input.sourceMessageId) <= 0) return;
   try {
     await db.execute(sql`
       UPDATE typesafe_fact_prefilter_observations
       SET extractor_ran = ${extractorRan},
-          facts_written = ${written},
+          facts_written = ${errorClass ? null : written},
+          error_class = ${errorClass},
+          decision_receipt = CASE WHEN decision_receipt IS NULL THEN NULL ELSE
+            decision_receipt || ${JSON.stringify({
+              downstream: {
+                extractorRan, factsWritten: errorClass ? null : written, errorClass,
+                durationMs: execution?.durationMs ?? null,
+                servedModel: execution?.servedModel ?? null,
+              },
+            })}::jsonb END,
           updated_at = NOW()
       WHERE tenant_id = ${input.tenantId}
         AND source_message_id = ${Number(input.sourceMessageId)}
@@ -229,7 +242,7 @@ export async function extractAndPersistSessionFacts(input: ExtractAndPersistInpu
     } catch (error) {
       if (prefilterPromise) {
         prefilter = prefilter || await prefilterPromise;
-        await finalizePrefilterExtraction(input, true, 0);
+        await finalizePrefilterExtraction(input, true, 0, "extractor_failed");
       }
       throw error;
     }
@@ -237,7 +250,7 @@ export async function extractAndPersistSessionFacts(input: ExtractAndPersistInpu
     if (!res.success || !res.json) {
       if (prefilterPromise) {
         prefilter = prefilter || await prefilterPromise;
-        await finalizePrefilterExtraction(input, true, 0);
+        await finalizePrefilterExtraction(input, true, 0, "extractor_failed", res);
       }
       return { written: 0, skipped: res.error || "extractor failed", ...(prefilter ? { prefilter } : {}) };
     }
@@ -246,7 +259,7 @@ export async function extractAndPersistSessionFacts(input: ExtractAndPersistInpu
     if (facts.length === 0) {
       if (prefilterPromise) {
         prefilter = prefilter || await prefilterPromise;
-        await finalizePrefilterExtraction(input, true, 0);
+        await finalizePrefilterExtraction(input, true, 0, null, res);
       }
       return { written: 0, skipped: "no facts extracted", ...(prefilter ? { prefilter } : {}) };
     }
@@ -303,7 +316,8 @@ export async function extractAndPersistSessionFacts(input: ExtractAndPersistInpu
 
     if (prefilterPromise) {
       prefilter = prefilter || await prefilterPromise;
-      await finalizePrefilterExtraction(input, true, written);
+      const expectedWrites = facts.filter((fact) => String(fact.fact || "").trim().length >= 5).length;
+      await finalizePrefilterExtraction(input, true, written, written < expectedWrites ? "persistence_failed" : null, res);
     }
     return { written, ...(prefilter ? { prefilter } : {}) };
   } catch (e: any) {

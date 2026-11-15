@@ -10,13 +10,12 @@
  * Routing:
  *   1. Migrated tool (registered in ./registry) → its handler, with
  *      caller-visible trust signals STRIPPED from params and identity passed
- *      via the trusted ToolContext instead. At this seam the `_tenantId` /
- *      `_personaId` / `_conversationId` / `_rateLimitChecked` values on
- *      params are the platform's own stamped channel (executeGuardedTool and
- *      the step executors strip-and-restamp caller-supplied values upstream —
- *      R125+69–71), so reading them here is exactly what the legacy arms did.
+ *      via the trusted ToolContext instead. Identity comes ONLY from sealed
+ *      invocation-authority ALS. The dispatcher never derives identity from
+ *      task parameters and refuses calls without separate host authority.
  *   2. Unmigrated tool → the injected legacy switch, with the ORIGINAL
- *      params (zero behavior change).
+ *      compatibility params. The private legacy implementation also requires
+ *      sealed authority and re-stamps identity before evaluating its switch.
  *   3. No legacy executor injected (unit tests / boot error) → the same
  *      structured unknown-tool error the legacy default arm returns.
  *
@@ -27,6 +26,7 @@ import { getMigratedHandler } from "./registry";
 import { stripTrustSignals, buildToolContext } from "./context";
 import { getLegacyExecutor } from "./legacy-switch";
 import { unknownToolError } from "./unknown-tool";
+import { currentToolAuthority } from "./invocation-authority";
 import type { ToolResult } from "./types";
 
 // Importing the domain barrels registers their handlers (side-effectful by
@@ -124,6 +124,8 @@ export async function dispatchTool(
   name: string,
   params: Record<string, any>,
 ): Promise<ToolResult> {
+  const authority = currentToolAuthority();
+  if (!authority) return { error: "Missing trusted tool authority; dispatcher refused execution." };
   const handler = getMigratedHandler(name);
   if (handler) {
     // Action Ledger S4 — abort-signal ALS lives in server/lib/; a call-time
@@ -139,15 +141,13 @@ export async function dispatchTool(
       console.warn("[silent-catch] server/tools/dispatcher.ts:", (e as any)?.message ?? e);
     }
     const ctx = buildToolContext({
-      invokedVia: typeof params._invokedVia === "string" ? params._invokedVia : undefined,
-      tenantId: typeof params._tenantId === "number" ? params._tenantId : undefined,
-      personaId: typeof params._personaId === "number" ? params._personaId : undefined,
-      conversationId: typeof params._conversationId === "number" ? params._conversationId : undefined,
-      projectId: typeof params._projectId === "number" ? params._projectId : undefined,
-      allowedPaths: Array.isArray(params._allowedPaths)
-        ? params._allowedPaths.filter((p: unknown): p is string => typeof p === "string")
-        : undefined,
-      rateLimitChecked: params._rateLimitChecked === true,
+      invokedVia: authority.invokedVia,
+      tenantId: authority.tenantId,
+      personaId: authority.personaId,
+      conversationId: authority.conversationId,
+      projectId: authority.projectId,
+      allowedPaths: authority.allowedPaths ? [...authority.allowedPaths] : undefined,
+      rateLimitChecked: authority.rateLimitChecked === true,
       abortSignal,
     });
     return handler(stripTrustSignals(params), ctx);

@@ -19,7 +19,7 @@ const baseArgs = {
   user: "brief",
   label: "test",
   _validationFn: async () => ({
-    version: "jev-work-validation-v1" as const,
+    version: "jev-work-validation-v2" as const,
     advisoryOnly: true as const,
     subjectKind: "deliverable" as const,
     status: "disabled" as const,
@@ -124,13 +124,16 @@ test("successful ensemble output automatically carries a report-only TypeSafe va
   let validationCalls = 0;
   const result = await draftWithEnsemble({
     ...baseArgs,
+    sourceEvidence: [{ id: "fixture-source", title: "Fixture", text: "Supplied evidence.", tenantId: 42, provenance: "supplied_context" }],
     _completionFn: async (model) => model === "gpt-5.6-sol" ? baseline : LONG,
     _validationFn: async (input) => {
       validationCalls++;
       assert.equal(input.subjectKind, "deliverable");
       assert.equal(input.output, baseline);
+      assert.equal(input.sources?.[0].id, "fixture-source");
+      assert.equal(input.sources?.[0].tenantId, 42);
       return {
-        version: "jev-work-validation-v1",
+        version: "jev-work-validation-v2",
         advisoryOnly: true,
         subjectKind: "deliverable",
         status: "validated",

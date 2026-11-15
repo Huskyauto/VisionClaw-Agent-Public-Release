@@ -202,10 +202,10 @@ export function resolveBriefVoiceLock(
   const overrideOk = process.env.BWB_VOICE_OVERRIDE_OK === "1";
   const locked = input.bwbBrand === true && !overrideOk;
   if (input.bwbBrand === true && overrideOk) {
-    console.warn(`[build-video-from-brief] BWB_VOICE_OVERRIDE_OK=1 — brand-voice lock BYPASSED; rendering "${logTitle || "(untitled)"}" in voice="${input.voice || "(default)"}" provider="${input.voiceProvider || "(default)"}". Intended only for deliberate guest segments.`);
+    console.warn(`[build-video-from-brief] BWB_VOICE_OVERRIDE_OK=1 — brand-voice lock BYPASSED for deliberate guest segment.`);
   }
   if (locked && input.voice && input.voice !== FISH_VOICE_BOB_DIRECT) {
-    console.warn(`[build-video-from-brief] bwbBrand render — overriding requested voice="${input.voice}" with Bob's Fish clone (${FISH_VOICE_BOB_DIRECT}). Set BWB_VOICE_OVERRIDE_OK=1 for a deliberate guest voice.`);
+    console.warn("[build-video-from-brief] Brand voice lock applied; requested voice omitted from logs.");
   }
   return {
     voice: locked ? FISH_VOICE_BOB_DIRECT : (input.voice || "onyx"),
@@ -453,12 +453,12 @@ export async function buildVideoFromBrief(input: BuildVideoFromBriefInput): Prom
     if (fsmod.existsSync(heroCandidate)) {
       validatedUserImage = heroCandidate;
     } else {
-      console.warn(`[build-video-from-brief] bwbBrand render but hero photo missing at ${heroCandidate} — scene 1 will fall back to an AI image. Add the asset or pass userImageDriveFileId.`);
+      console.warn("[build-video-from-brief] bwbBrand render but default hero photo is missing — scene 1 will fall back to an AI image.");
     }
   }
   const heroBlock = validatedUserImage ? `\n\nHERO IMAGE: Scene 1 will use a REAL PHOTO of the narrator (already on disk — do not generate an image prompt for scene 1). Write scene 1's narration to introduce the person on screen by name and hook the viewer (e.g. "This is Bob. Two and a half years ago he weighed 504 pounds…"). All other scenes get AI-generated cinematic images per the IMAGE PROMPT RULES below.\n` : "";
 
-  console.log(`[build-video-from-brief] Planning: brief="${input.brief.slice(0, 80)}..." target=${targetMinutes}min → ${shape.chapters} chapters × ${shape.scenesPerChapter} scenes${validatedUserImage ? ` (hero image: ${validatedUserImage})` : ""}`);
+  console.log(`[build-video-from-brief] Planning video brief: target=${targetMinutes}min → ${shape.chapters} chapters × ${shape.scenesPerChapter} scenes${validatedUserImage ? " (user-supplied hero image)" : ""}`);
 
   // R125+18 — BWB videos narrate FIRST-PERSON as Bob; everything else keeps the
   // default second-person rules.
@@ -570,7 +570,7 @@ Return STRICT JSON (no markdown):
     try {
       const { validateBwbScript, assertRenderableFormat, assertBobVoice } = await import("../scripts/lib/bwb-validate");
       const failFn = (m: string) => { throw new Error(m); };
-      const warnFn = (m: string) => console.warn(m);
+      const warnFn = (_m: string) => console.warn("[build-video-from-brief] Brand validation emitted a warning.");
       validateBwbScript(script as any, failFn, warnFn);
       // Parity with both render backends: reject unsupported (Shorts) formats and
       // a non-Bob voice BEFORE we detach the render, so they fail loud here.
@@ -726,7 +726,7 @@ Return STRICT JSON (no markdown):
           _instruction: "This video renders on the GitHub Actions farm (NOT the in-process job runner), so it will NOT appear on /jobs. Tell the user it's rendering in parallel and will be delivered + emailed automatically; render progress is in data/youtube/render-logs/.",
         } as BuildVideoFromBriefResult;
       } catch (e: any) {
-        console.warn(`[build-video-from-brief] failed to dispatch generic GitHub-farm render (${e?.message || String(e)}) — falling back to the in-process runner.`);
+        console.warn("[build-video-from-brief] Failed to dispatch generic GitHub-farm render; falling back to the in-process runner.");
       }
     }
   } else if (genericBackend === "github" && !haveGenericGithubPat) {

@@ -1,6 +1,30 @@
 # Felix Line — handoff for Spark
 
-**Status (September 27, 2026):** Live in the **original published VisionClaw app**. Production startup verified Felix's routed menu contains Spark and cash-flow, and Bob saved the two-minute Spark Line guidance in Felix's production Daily Routine. **Spark's authenticated, model-driven round trip is still pending**; deployment and startup checks are not acceptance of an actual outbox delivery.
+**Current status (November 9, 2026):** Bob republished the repair and confirmed
+Spark communicated with Felix. Production records independently show a new
+thread-620 connection check completed at 20:08:22 UTC, with assistant message
+3290 exactly `SPARK-FELIX-OK`. The run resolved `gpt-5.4` and observed
+`gpt-5.4-2026-03-05`, proving the live Replit fallback reply. Production
+`PROFUNDO_ENABLED=1` and credential presence were read back separately; this is
+not proof of successful Profundo inference. Earlier September startup, outbox
+and menu checks below remain historical, not fresh acceptance of every watcher
+or outbound delivery behavior.
+
+## Preserve the working connection
+
+Bob's standing instruction is to preserve Spark–Felix communication. Do not
+disable subscription eligibility, remove the approved fallback/recovery,
+reset the working thread, or revoke/rotate the existing connection as routine
+cleanup. Intentional changes require Bob's explicit approval; security
+containment and owner revocation remain possible. No provider can be guaranteed
+permanently available.
+
+Before changing provider routing, authentication or these API endpoints, retain
+the focused policy/recovery/failure tests. After owner-approved publication,
+verify one new harmless reply through Spark's existing connection, without
+tools or side effects. Keep the exact turn identity and result; do not replay old
+failed messages or treat dispatch acceptance as completion. Spark's own watcher,
+cursor and key storage remain external and cannot be locked by this repository.
 
 ## What changed
 
@@ -64,6 +88,19 @@ The response includes `status` (`pending`, `running`, `complete`, or `failed`), 
 **Completion contract:** For a marked API conversation, `status: "complete"` always includes the full, untruncated final assistant text in `lastAssistantMessage.content` (including any tool summary stored with it). There is no text truncation flag or reply-size cap at this endpoint; `messageCount` describes only the most recent 50 history rows, **not** the reply size. If no non-empty final assistant message was persisted, the run fails with `reason: "missing_reply"` instead of reporting complete. On `status: "failed"`, `reason` is always present (`"processing_error"`, `"missing_reply"`, or `"timeout"`), with `failedAt` when available; `lastAssistantMessage` on a failure could be from an earlier turn and must **not** be treated as a new reply.
 
 The server-side watchdog scans every 30 seconds and marks a run `failed` / `reason: "timeout"` after **15 minutes since it started**. This is an age limit, not a proof that the worker stopped or a guarantee of completion by then. To avoid overlapping a possibly still-running worker, a timed-out conversation is **blocked from starting another turn** until an operator reconciles the old run; never automatically replay it. Report the failure to Bob once.
+
+**Provider recovery (published November 9; fresh reply verified):** owner Felix
+API/A2A turns retain the existing Profundo subscription → Replit GPT-5.4 ladder.
+Profundo must be enabled in the production environment; a present credential does
+not override `PROFUNDO_ENABLED=0`. Resolution logs distinguish disabled,
+credential-unavailable, health-cooldown and unsupported-model cases without
+printing credentials or provider bodies. A confirmed Replit HTTP 429 permits one
+completion-only retry per turn after its Retry-After delay, at most 60 seconds.
+Known quota restrictions, ambiguous transport failures and longer delays stop.
+The shared admission gate still applies. This does not replay messages or tools,
+unlock another paid provider, or authorize an external watcher to resend a failed
+operation. A fresh advisory follow-up after a settled provider rejection is
+different from retrying the old work; use a new message identity only when approved.
 
 ## 2. Poll Felix's outbound signals
 

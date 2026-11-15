@@ -122,7 +122,7 @@ export async function createCustomTool(description: string, tenantId: number): P
       return { error: "Invalid or too-long implementation" };
     }
 
-    const basicTest = executeCode(`const args = {};\n${parsed.implementation}`);
+    const basicTest = await executeCode(`const args = {};\n${parsed.implementation}`);
     if (!basicTest.success && !basicTest.error?.includes("Cannot read")) {
       return { error: `Tool validation failed: ${basicTest.error}` };
     }
@@ -228,7 +228,7 @@ async function tryAndRevert(tool: any): Promise<{ status: "kept" | "reverted" | 
     const argsSetup = buildCustomToolArgsSetup(tc.args || {});
 
     const code = `const args = {};\n${argsSetup}\n${currentImpl}`;
-    const result = executeCode(code);
+    const result = await executeCode(code);
 
     if (result.success) {
       passed++;
@@ -272,7 +272,7 @@ async function tryAndRevert(tool: any): Promise<{ status: "kept" | "reverted" | 
         const argsSetup = buildCustomToolArgsSetup(tc.args || {});
 
         const code = `const args = {};\n${argsSetup}\n${fixedImpl}`;
-        const result = executeCode(code);
+        const result = await executeCode(code);
 
         if (result.success) {
           fixPassed++;
@@ -354,7 +354,7 @@ export async function executeCustomTool(name: string, args: Record<string, any>,
   const argsSetup = buildCustomToolArgsSetup(args);
 
   const code = `const args = {};\n${argsSetup}\n${tool.implementation}`;
-  const result = executeCode(code);
+  const result = await executeCode(code);
 
   const incremented = await db.update(customTools)
     .set({ usageCount: sql`${customTools.usageCount} + 1` })

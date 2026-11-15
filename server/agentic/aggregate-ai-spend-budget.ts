@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
 
-export const AGGREGATE_AI_DAILY_CAP_CENTS = 2_000;
+export const AGGREGATE_AI_DAILY_CAP_CENTS = 3_000;
 
 export interface AggregateAiReservation {
   id: number;
@@ -65,7 +65,7 @@ export async function reserveAggregateAiSpend(
   requireAttemptKey(args.attemptKey);
   requirePositiveSafeInteger(args.maximumCostCents, "maximumCostCents");
   if (args.maximumCostCents > AGGREGATE_AI_DAILY_CAP_CENTS) {
-    throw new Error("[aggregate-ai-budget] request bound exceeds the $20 UTC-day ceiling");
+    throw new Error("[aggregate-ai-budget] request bound exceeds the $30 UTC-day ceiling");
   }
   const store = deps.store ?? databaseStore;
 
@@ -81,7 +81,7 @@ export async function reserveAggregateAiSpend(
       throw new Error("[aggregate-ai-budget] stored daily total is invalid; refusing paid admission");
     }
     if (committedAndHeld + args.maximumCostCents > AGGREGATE_AI_DAILY_CAP_CENTS) {
-      throw new Error("[aggregate-ai-budget] $20 UTC-day metered-AI budget exhausted");
+      throw new Error("[aggregate-ai-budget] $30 UTC-day metered-AI budget exhausted");
     }
     return tx.insertReservation({
       tenantId: args.tenantId,
@@ -127,6 +127,31 @@ export async function settleAggregateAiSpend(
       state: "settled",
       actualCents: args.actualCostCents,
     };
+  });
+}
+
+/**
+ * Observation, not spending permission: if a provider reports more than the
+ * admitted maximum, keep the request held at the larger observed amount.
+ * This may put today's total over cap; subsequent admissions then fail closed.
+ */
+export async function retainAggregateAiObservedOverrun(args: {
+  tenantId: number; reservationId: number; attemptKey: string; observedCostCents: number;
+}): Promise<void> {
+  requirePositiveSafeInteger(args.tenantId, "tenantId");
+  requirePositiveSafeInteger(args.reservationId, "reservationId");
+  requirePositiveSafeInteger(args.observedCostCents, "observedCostCents");
+  requireAttemptKey(args.attemptKey);
+  await db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('aggregate-ai-spend-budget'), 0)`);
+    const result = await tx.execute(sql`
+      UPDATE aggregate_ai_spend_reservations SET reserved_cents = ${args.observedCostCents}
+      WHERE tenant_id = ${args.tenantId} AND id = ${args.reservationId}
+        AND attempt_key = ${args.attemptKey} AND state = 'reserved'
+        AND reserved_cents < ${args.observedCostCents}
+      RETURNING id
+    `);
+    if (rowsOf(result).length !== 1) throw new Error("[aggregate-ai-budget] observed overrun could not be retained");
   });
 }
 

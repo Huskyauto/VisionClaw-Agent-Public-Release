@@ -33,7 +33,7 @@ export default function PrivacyPage() {
 
       <div className="max-w-4xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-2" data-testid="text-privacy-title">Privacy Policy</h1>
-        <p className="text-sm text-muted-foreground mb-8">Last updated: August 2, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: November 11, 2026</p>
 
         <div className="prose prose-sm dark:prose-invert max-w-none space-y-6">
           <section>
@@ -94,6 +94,12 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-xl font-semibold mb-3">4. AI Processing and Third-Party Providers</h2>
+            <p className="text-muted-foreground leading-relaxed mb-3">
+              The optional owner-only Claude Fable 5.2 escalation uses Anthropic's direct API.
+              This model requires 30-day provider retention and is not a zero-data-retention
+              option. It is not an automatic customer route; selecting it does not authorize
+              forwarding sensitive customer material.
+            </p>
             <p className="text-muted-foreground leading-relaxed">
               To provide AI capabilities, your messages, uploaded files, and other content you submit may be processed by third-party AI providers including OpenAI, Anthropic, Google (Gemini), xAI, and additional models accessed through OpenRouter. Voice synthesis is provided by ElevenLabs. These providers process your data according to their respective privacy policies and data processing agreements. We select providers that offer appropriate data protection standards. Your conversation data is sent to these providers for processing and is not used to train their models outside of what their standard policies allow. If you connect your own AI provider API keys (BYOK), your requests are sent directly to your chosen provider under your own agreement with that provider.
             </p>

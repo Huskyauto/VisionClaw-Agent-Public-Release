@@ -89,17 +89,17 @@ export function timeoutRetryEnabled(env: NodeJS.ProcessEnv = process.env): boole
 
 /** Loud "the side effect LANDED — do not re-invoke" error (replaces the timeout). */
 export function buildCommitConfirmedError(toolName: string, timeoutMs: number, attemptId: number): Error {
-  return new Error(
+  return Object.assign(new Error(
     `Tool "${toolName}" timed out after ${timeoutMs / 1000}s, but the provider-side commit is CONFIRMED ` +
     `(action ledger attempt ${attemptId}). Do NOT retry this call — the side effect already happened.`,
-  );
+  ), { outcomeCommitted: true });
 }
 
 /** The single S5 retry's own timeout (replaces the original — escalation is parked). */
 export function buildRetryTimeoutError(toolName: string, timeoutMs: number): Error {
-  return new Error(
+  return Object.assign(new Error(
     `Tool "${toolName}" retry timed out after ${timeoutMs / 1000}s (single S5 retry — escalating to reconciler)`,
-  );
+  ), { outcomeUnknown: true });
 }
 
 /**

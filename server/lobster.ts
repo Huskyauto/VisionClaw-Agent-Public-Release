@@ -364,7 +364,12 @@ async function executeStep(
         return { id: step.id, status: "failed", error: `Destructive-tool policy check failed for '${step.tool}'. Refusing to execute.`, durationMs: Date.now() - start };
       }
 
-      const result = await executeTool(step.tool, args);
+      const result = await executeTool(step.tool, args, {
+        tenantId: invokerTenantId ?? ADMIN_TENANT_ID,
+        actor: invokerPersonaId ? "persona" : "system", personaId: invokerPersonaId,
+        personaName: (invokerTenantId ?? ADMIN_TENANT_ID) === ADMIN_TENANT_ID ? "system" : undefined,
+        invokedVia: "lobster", internalPurpose: "Execute a persisted, policy-checked workflow step",
+      });
 
       if (result && typeof result === "object" && "error" in result && !("success" in result)) {
         return {

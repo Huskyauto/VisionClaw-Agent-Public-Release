@@ -41,6 +41,10 @@ type MemoryHelpers = {
  */
 export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
   const { getTenantFromRequest, isAdminRequest, isPlatformAdmin, ADMIN_TENANT_ID, requirePlatformAdmin } = helpers;
+  const internalError = (res: Response, event: string) => {
+    console.error(`[memory] ${event} failed`);
+    return res.status(500).json({ error: "Internal server error" });
+  };
 
   const actorIdForRequest = (req: Request): number | null => {
     const request = req as any;
@@ -134,8 +138,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
       const { getCategoryTree } = await import("../memory-graph");
       const tree = await getCategoryTree(tenantId);
       res.json(tree);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch {
+      internalError(res, "category lookup");
     }
   });
 
@@ -146,8 +150,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
       const { getMemoryGraph } = await import("../memory-graph");
       const graph = await getMemoryGraph(tenantId);
       res.json(graph);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch {
+      internalError(res, "graph lookup");
     }
   });
 
@@ -159,8 +163,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
       const { categorizeExistingMemories } = await import("../memory-graph");
       const count = await categorizeExistingMemories(tenantId);
       res.json({ success: true, categorized: count });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch {
+      internalError(res, "categorization");
     }
   });
 
@@ -197,8 +201,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
         and(inArray(memoryEntries.id, linkedIds), tenantClause)
       );
       res.json(linkedEntries);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch {
+      internalError(res, "memory links lookup");
     }
   });
 
@@ -256,8 +260,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
         memoriesRemaining: Math.max(0, memoriesWithout.length - memCount),
         knowledgeRemaining: Math.max(0, knowledgeWithout.length - kCount),
       });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch {
+      internalError(res, "embedding backfill");
     }
   });
 
@@ -269,8 +273,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
       const { getMemoryHealth } = await import("../memory-intelligence");
       const health = await getMemoryHealth(personaId, tenantId);
       res.json(health);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch {
+      internalError(res, "memory health lookup");
     }
   });
 
@@ -282,8 +286,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
       const { deduplicateMemories } = await import("../memory-intelligence");
       const result = await deduplicateMemories(personaId, tenantId);
       res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch {
+      internalError(res, "memory deduplication");
     }
   });
 
@@ -298,8 +302,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
       const { runMemoryBackupToGoogleDrive } = await import("../backup");
       const summary = await runMemoryBackupToGoogleDrive();
       res.json({ success: true, summary });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch {
+      internalError(res, "memory backup");
     }
   });
 
@@ -352,7 +356,7 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
       };
 
       res.json(exportData);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch { internalError(res, "memory export"); }
   });
 
   app.post("/api/memory/backup-to-drive", async (req, res) => {
@@ -435,7 +439,7 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
       });
 
       if (!delivery.success) {
-        return res.status(500).json({ error: delivery.error || "Memory backup delivery failed" });
+        return internalError(res, "memory backup delivery");
       }
 
       res.json({
@@ -447,7 +451,7 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
         deliveryId: delivery.deliveryId,
         stats: backupData.stats,
       });
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch { internalError(res, "memory backup to Drive"); }
   });
 
   app.get("/api/memory/compaction-archives", async (req, res) => {
@@ -476,7 +480,7 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
         `);
       }
       res.json((result as any).rows || result);
-    } catch (e: any) { res.status(500).json({ error: e.message }); }
+    } catch { internalError(res, "compaction archive lookup"); }
   });
 
   // ─── R122 Unified Memory Context ──────────────────────────
@@ -508,8 +512,8 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
         limit,
       });
       res.json(result);
-    } catch (e: any) {
-      res.status(500).json({ error: e?.message || "unified-memory failed" });
+    } catch {
+      internalError(res, "unified memory lookup");
     }
   });
 
@@ -658,7 +662,7 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
           console.error("[memory-forgetting] durable request finalization failed", {
             tenantId,
             requestKey: durableRequestKey,
-            error: finalizeError instanceof Error ? finalizeError.message : "unknown",
+            error: "Erasure finalization failed",
           });
         });
       }

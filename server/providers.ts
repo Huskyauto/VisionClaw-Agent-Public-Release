@@ -32,6 +32,10 @@ import { normalizeRetiredModelId, wrapClientWithParamAdaptation } from "./lib/pa
 import { wrapProfundoTransientRetry } from "./lib/profundo-transient-retry";
 import { MAMMOUTH_BASE_URL, mammouthModel } from "./lib/mammouth-catalog";
 import { mammouthReady, assertMammouthAccess, mammouthRequest, mammouthUsageCost, runMammouthBudgeted } from "./lib/mammouth";
+import { META_BASE_URL, META_MODEL_ID, metaReady, metaPrimaryAllowed, metaUsageCost, metaModel, metaModelForTier } from "./lib/meta";
+import { createMetaClient } from "./lib/meta-client";
+import { FABLE_52_MODEL, createFable52Completion, fable52Timeout } from "./lib/fable-5-2";
+import { CARBON_MODEL, CARBON_TIMEOUT_MS, carbonReady, createCarbonCompletion } from "./lib/gemini-carbon";
 // R94 SECURITY — static import (tsx/ESM does NOT define `require`; the previous
 // dynamic require() silently threw and made every cost lookup fall back to ADMIN).
 import { currentTenantId } from "./lib/tenant-context";
@@ -168,9 +172,10 @@ export function buildPatchedCreate(
       !isFlatRate &&
       (providerLabel.toLowerCase().includes("anthropic") ||
         String(modelResolver(params) || "").toLowerCase().startsWith("claude"));
+    const fableVersion = modelResolver(params) === FABLE_52_MODEL ? "5.2" : "5.1";
     const mandatoryFableAccounting =
-      isAnthropic && modelResolver(params) === "claude-fable-5-1";
-    if (isAnthropic && Array.isArray(params?.messages)) {
+      isAnthropic && ["claude-fable-5-1", FABLE_52_MODEL].includes(modelResolver(params));
+    if (isAnthropic && modelResolver(params) !== FABLE_52_MODEL && Array.isArray(params?.messages)) {
       try {
         const callerSetCache = params.messages.some((m: any) => {
           if (m?.cache_control) return true;
@@ -235,7 +240,7 @@ export function buildPatchedCreate(
     }
 
     const requestOptions = mandatoryFableAccounting
-      ? { ...(options || {}), timeout: 60_000, maxRetries: 0 }
+      ? { ...(options || {}), timeout: modelResolver(params) === FABLE_52_MODEL ? fable52Timeout(options?.timeout) : 60_000, maxRetries: 0 }
       : options;
     const result: any = await origCreate(params, requestOptions);
 
@@ -266,10 +271,10 @@ export function buildPatchedCreate(
             configurable: true,
           });
           if (mandatoryFableAccounting && recorded !== true) {
-            throw new Error("mandatory Claude Fable 5.1 usage record was not persisted");
+            throw new Error(`mandatory Claude Fable ${fableVersion} usage record was not persisted`);
           }
         } else if (mandatoryFableAccounting) {
-          throw new Error("missing mandatory Claude Fable 5.1 usage");
+          throw new Error(`missing mandatory Claude Fable ${fableVersion} usage`);
         } else if (providerLabel === "llm.cheaperinference") {
           console.warn("[providers] CheaperInference omitted token usage; cost accounting unavailable");
         }
@@ -295,7 +300,7 @@ export function buildPatchedCreate(
     if (!result || typeof result[Symbol.asyncIterator] !== "function") {
       // Not an iterable (defensive — shouldn't happen for stream:true)
       if (mandatoryFableAccounting) {
-        throw new Error("malformed Claude Fable 5.1 stream");
+        throw new Error(`malformed Claude Fable ${fableVersion} stream`);
       }
       return result;
     }
@@ -318,7 +323,7 @@ export function buildPatchedCreate(
         }
         const { tokensIn, tokensOut, cachedTokensIn, cacheWriteTokens } = extractUsageTokens(mandatoryUsage);
         if (!tokensIn && !tokensOut) {
-          throw new Error("missing mandatory Claude Fable 5.1 usage");
+          throw new Error(`missing mandatory Claude Fable ${fableVersion} usage`);
         }
         const recordCost = recordCostOverride ?? (await import("./agentic/cost-ledger")).recordCost;
         const recorded = await recordCost({
@@ -332,7 +337,7 @@ export function buildPatchedCreate(
           operation: "chat.completions.create.stream",
         });
         if (recorded !== true) {
-          throw new Error("mandatory Claude Fable 5.1 usage record was not persisted");
+          throw new Error(`mandatory Claude Fable ${fableVersion} usage record was not persisted`);
         }
         markStreamLedgerRecorded(true);
         for (const chunk of buffered) yield chunk;
@@ -591,6 +596,7 @@ export const replitOpenai = new OpenAI({
 
 export const PROVIDER_CONFIG: Record<string, { name: string; baseUrl: string; description: string }> = {
   mammouth: { name: "Mammouth API (credits)", baseUrl: MAMMOUTH_BASE_URL, description: "Owner-selected GLM 5.3 Flash and Mistral Large 4; metered API credits, not unlimited subscription calls" },
+  "meta-direct": { name: "Meta Model API (owner credits)", baseUrl: META_BASE_URL, description: "Owner primary: approved Spark Contributor for simple work, standard Spark for general work, Wonder for high-end thinking; shared paid-AI daily ceiling" },
   cheaperinference: { name: "CheaperInference", baseUrl: CHEAPER_INFERENCE_BASE_URL, description: "Owner-selected Luna reasoning; metered wallet billing, not a flat-rate lane" },
   replit: { name: "Replit AI (Built-in)", baseUrl: "", description: "Built-in - GPT-5.4, GPT-5.1, no API key needed" },
   openai: { name: "OpenAI", baseUrl: "https://api.openai.com/v1", description: "GPT-5, GPT-5.4, GPT-6 Luna" },
@@ -608,10 +614,11 @@ export const PROVIDER_CONFIG: Record<string, { name: string; baseUrl: string; de
 // registry provider named by a model. MoA uses this to keep simultaneous jury
 // seats independently paced and health-scoped instead of letting the generic
 // fallback ladder collapse every vote onto one endpoint.
-export type ProviderLane = "replit" | "openference" | "profundo" | "standard-compute" | "claude-runner" | "anthropic-api" | "openai-api" | "zai" | "openrouter" | "xai" | "mammouth";
+export type ProviderLane = "replit" | "openference" | "profundo" | "standard-compute" | "claude-runner" | "anthropic-api" | "openai-api" | "zai" | "openrouter" | "xai" | "mammouth" | "meta-direct";
 
 export function providerLaneCanServeModel(lane: ProviderLane, modelId: string): boolean {
   switch (lane) {
+    case "meta-direct": return !!metaModel(modelId);
     case "mammouth": return !!mammouthModel(modelId);
     case "replit":
       return modelId === "gpt-5.4";
@@ -673,6 +680,7 @@ function getProfundoKey(): string | null {
 export function providerLaneLocallyReady(lane: ProviderLane): boolean {
   if (!isProviderHealthy(lane)) return false;
   switch (lane) {
+    case "meta-direct": return metaReady();
     case "mammouth": return mammouthReady();
     case "claude-runner": return isClaudeRunnerAvailable();
     case "profundo": return getProfundoKey() !== null;
@@ -1564,6 +1572,8 @@ async function getPinnedProviderLane(
     }
     case "mammouth":
       throw new Error("Mammouth must use the explicit verified owner-selection factory");
+    case "meta-direct":
+      throw new Error("Meta must use the owner-scoped budgeted client factory");
     case "xai": {
       if (!providerLaneCanServeModel(lane, modelId) || model?.provider !== "xai") {
         throw new Error(`[providers] pinned xAI lane cannot serve "${modelId}"`);
@@ -1597,8 +1607,21 @@ async function getPinnedProviderLane(
       return resolved;
     }
     case "profundo": {
+      if (process.env.PROFUNDO_ENABLED === "0") {
+        throw Object.assign(new Error('[providers] pinned provider lane "profundo" is unavailable: disabled'),
+          { code: "PROFUNDO_DISABLED" });
+      }
       if (!providerLaneCanServeModel(lane, modelId)) {
-        throw new Error(`[providers] pinned provider lane "profundo" cannot serve model "${modelId}"`);
+        throw Object.assign(new Error(`[providers] pinned provider lane "profundo" cannot serve model "${modelId}"`),
+          { code: "PROFUNDO_MODEL_UNSUPPORTED" });
+      }
+      if (!getProfundoKey()) {
+        throw Object.assign(new Error('[providers] pinned provider lane "profundo" is unavailable: credential'),
+          { code: "PROFUNDO_CREDENTIAL_UNAVAILABLE" });
+      }
+      if (!isProviderHealthy("profundo")) {
+        throw Object.assign(new Error('[providers] pinned provider lane "profundo" is unavailable: health cooldown'),
+          { code: "PROFUNDO_COOLDOWN" });
       }
       const resolved = tryProfundoLane(modelId, tenantId);
       if (!resolved) throw new Error(`[providers] pinned provider lane "profundo" is unavailable for "${modelId}"`);
@@ -1660,6 +1683,85 @@ export async function getClientForModel(
     allowMeteredFallback?: boolean;
   },
 ): Promise<{ client: OpenAI; actualModelId: string }> {
+  if (modelId === CARBON_MODEL) {
+    const admin = (await import("./auth")).ADMIN_TENANT_ID;
+    if (tenantId !== admin || options?.explicitOwnerSelection !== true
+      || options?.platformAdminVerified !== true || options?.meteredOverride !== true
+      || options?.providerLane || options?.forbidMeteredFallback || options?.allowMeteredFallback === false
+      || (currentTenantId() !== null && currentTenantId() !== tenantId) || !carbonReady()) {
+      throw new Error("Carbon requires explicit owner selection, paid access and its dedicated credential");
+    }
+    const sdk = new OpenAI({
+      apiKey: process.env.GEMINI_HIGH_END_API_KEY!,
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      maxRetries: 0, timeout: CARBON_TIMEOUT_MS,
+    });
+    const create = createCarbonCompletion(tenantId, {
+      create: sdk.chat.completions.create.bind(sdk.chat.completions),
+      checkAccess: () => {
+        if (currentTenantId() !== tenantId || !carbonReady()) throw new Error("Carbon owner context or credential unavailable");
+      },
+      budget: async () => {
+        const { reserveAggregateAiSpend, settleAggregateAiSpend, retainAggregateAiObservedOverrun } = await import("./agentic/aggregate-ai-spend-budget");
+        return { reserve: reserveAggregateAiSpend, settle: settleAggregateAiSpend, observeOverrun: retainAggregateAiObservedOverrun };
+      },
+      record: async entry => (await import("./agentic/cost-ledger")).recordCost(entry),
+    });
+    return { client: { chat: { completions: { create } } } as unknown as OpenAI, actualModelId: CARBON_MODEL };
+  }
+  if (modelId === FABLE_52_MODEL) {
+    const admin = (await import("./auth")).ADMIN_TENANT_ID;
+    if (process.env.FABLE_52_DISABLED === "1" || tenantId !== admin || options?.explicitOwnerSelection !== true ||
+        options?.platformAdminVerified !== true || options?.meteredOverride !== true ||
+        options?.providerLane || options?.forbidMeteredFallback || options?.allowMeteredFallback === false ||
+        (currentTenantId() !== null && currentTenantId() !== tenantId)) {
+      throw new Error("Fable 5.2 requires explicit owner selection and paid access; no substitution");
+    }
+    const local = await storage.getTenantProviderKey(tenantId, "anthropic");
+    const platform = local?.api_key ? null : await storage.getProviderKey("anthropic");
+    const key = local?.api_key ? decryptApiKey(local.api_key) :
+      platform?.enabled && platform.apiKey ? decryptApiKey(platform.apiKey) : process.env.ANTHROPIC_API_KEY;
+    if (!key?.startsWith("sk-ant-")) throw new Error("Fable 5.2 direct Anthropic credential unavailable");
+    const sdk = new OpenAI({ apiKey: key, baseURL: "https://api.anthropic.com/v1", maxRetries: 0, timeout: 60_000 });
+    const tracked = buildPatchedCreate(sdk.chat.completions.create.bind(sdk.chat.completions),
+      () => FABLE_52_MODEL, () => tenantId, "llm.anthropic");
+    const create = createFable52Completion(tracked, () => {
+      if (process.env.FABLE_52_DISABLED === "1" || currentTenantId() !== tenantId || !isProviderHealthy("anthropic")) {
+        throw new Error("Fable 5.2 requires the current owner tenant and healthy Anthropic provider");
+      }
+    }, tenantId, async () => {
+      const { reserveAggregateAiSpend, settleAggregateAiSpend } = await import("./agentic/aggregate-ai-spend-budget");
+      return { reserve: reserveAggregateAiSpend, settle: settleAggregateAiSpend };
+    });
+    return { client: { chat: { completions: { create } } } as unknown as OpenAI, actualModelId: FABLE_52_MODEL };
+  }
+  const ownerScope = tenantId ?? currentTenantId() ?? undefined;
+  const useMetaPrimary = metaPrimaryAllowed(ownerScope, currentTenantId(), options) &&
+    isProviderHealthy("meta-direct") && !isSyntheticEvaluationModel(modelId) &&
+    !isOwnerOnlyFinalDecisionModel(modelId);
+  if (modelId.startsWith("meta-direct/") || options?.providerLane === "meta-direct" || useMetaPrimary) {
+    if ((modelId.startsWith("meta-direct/") || options?.providerLane === "meta-direct") && !metaModel(modelId)) {
+      throw new Error("Unknown pinned Meta model; substitution forbidden");
+    }
+    if (ownerScope !== 1 || currentTenantId() !== 1 ||
+        options?.forbidMeteredFallback === true || options?.allowMeteredFallback === false ||
+        (options?.providerLane !== undefined && options.providerLane !== "meta-direct")) {
+      throw new Error("Meta paid route requires owner scope and metered permission");
+    }
+    const selectedMeta = metaModel(modelId) ?? metaModel(metaModelForTier(MODEL_REGISTRY.find(m => m.id === modelId)?.tier))!;
+    const client = createMetaClient(ownerScope, create =>
+      buildPatchedCreate(create, () => selectedMeta.id, () => ownerScope, "llm.meta-direct",
+        undefined, (_label, usage) => {
+          const cost = metaUsageCost(usage, selectedMeta.id);
+          return cost === undefined ? {} : { costUsd: cost };
+        }),
+      () => isProviderHealthy("meta-direct"),
+      () => markProviderUnhealthyOnce("meta-direct", new Error("Meta paid dispatch failed"),
+        "Meta request failed; uncertain usage is not automatically replayed"),
+      undefined, selectedMeta.id);
+    logAutoRoute("primary", selectedMeta.id, "owner Meta credits (paid)");
+    return { client, actualModelId: selectedMeta.upstream };
+  }
   const normalizedModelId = normalizeModelId(modelId);
   if (normalizedModelId !== modelId) {
     console.log(`[providers] Legacy/retired model alias: "${modelId}" → "${normalizedModelId}"`);
@@ -2279,6 +2381,13 @@ export async function getModelForTierAsync(
   tenantId?: number,
   options?: { freeTierOnly?: boolean; allowMeteredFallback?: boolean },
 ): Promise<string> {
+  if (metaPrimaryAllowed(tenantId ?? currentTenantId() ?? undefined, currentTenantId(), {
+    ...options, freeTierOnly: options?.freeTierOnly ?? (process.env.BACKGROUND_FREE_TIER_ONLY === "true"),
+  }) && isProviderHealthy("meta-direct")) {
+    const selected = metaModelForTier(tier);
+    logAutoRoute(tier, selected, "owner Meta credits (paid)");
+    return selected;
+  }
   const freeTierOnly = options?.freeTierOnly ?? (process.env.BACKGROUND_FREE_TIER_ONLY === "true");
   const replitReady = isProviderHealthy("replit") &&
     (!cheaperAutomaticAllowed(tenantId) || !(await replitCooldownActive()));
@@ -2512,6 +2621,9 @@ export async function getModelForTierAsync(
 }
 
 export function getModelForTier(tier: "fast" | "balanced" | "powerful" | "reasoning"): string {
+  if (metaPrimaryAllowed(currentTenantId() ?? undefined, currentTenantId(), {
+    freeTierOnly: process.env.BACKGROUND_FREE_TIER_ONLY === "true",
+  }) && isProviderHealthy("meta-direct")) return metaModelForTier(tier);
   // Cost policy (Bob 2026-06-14): cheap/autonomous tiers run on the FREE modelfarm
   // lane (gemini-2.5-flash); only heavier tiers may use metered Gemini 3.7 Flash.
   // The central metered-authorization guard still remaps unauthorized traffic to
@@ -2549,6 +2661,8 @@ export async function getAvailableModelsForTenant(tenantId: number, isAdmin: boo
   const userKeyProviders = new Set(keys.filter((k) => k.enabled).map((k) => k.provider));
 
   const enabledProviders = new Set<string>();
+  if (tenantId === 1 && isAdmin && carbonReady()) enabledProviders.add("google");
+  if (tenantId === 1 && isAdmin && metaReady()) enabledProviders.add("meta-direct");
   if (tenantId === 1 && isAdmin && mammouthReady()) enabledProviders.add("mammouth");
   if (tenantId === 1 && isAdmin && cheaperInferenceReady()) enabledProviders.add("cheaperinference");
   if (hasOpenferenceKey()) enabledProviders.add("openference");
@@ -2578,10 +2692,11 @@ export async function getAvailableModelsForTenant(tenantId: number, isAdmin: boo
   const models = MODEL_REGISTRY.filter(
     (m) =>
       enabledProviders.has(m.provider) &&
-      (!["cheaperinference", "mammouth"].includes(m.provider) || (tenantId === 1 && isAdmin)) &&
+      (!["cheaperinference", "mammouth", "meta-direct"].includes(m.provider) || (tenantId === 1 && isAdmin)) &&
       !RETIRED_MODEL_IDS.has(m.id) &&
       !isSyntheticEvaluationModel(m.id) &&
-      (!isOwnerOnlyFinalDecisionModel(m.id) || isAdmin),
+      (!isOwnerOnlyFinalDecisionModel(m.id) || isAdmin) &&
+      (m.id !== CARBON_MODEL || (tenantId === 1 && isAdmin && carbonReady())),
   );
   if (!models.find(m => m.id === "auto")) {
     const auto = MODEL_REGISTRY.find(m => m.id === "auto");

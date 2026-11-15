@@ -618,6 +618,7 @@ function defaultDeps(): RepoSurgeonDeps {
         const out = await executeGuardedTool(toolName, { ...clean, _tenantId: tenantId, _invokedByModel: true }, {
           tenantId,
           invokedVia: "self_heal",
+          actor: "system", internalPurpose: "Re-run an existing policy-screened repository repair action",
         });
         const ok = !(out && typeof out === "object" && "error" in out && out.error);
         return { ok, output: JSON.stringify(out).slice(0, 4000) };

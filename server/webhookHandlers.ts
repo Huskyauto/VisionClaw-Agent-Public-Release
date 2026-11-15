@@ -530,6 +530,16 @@ export class WebhookHandlers {
         const { getUncachableStripeClient } = await import('./stripeClient');
         const stripe = await getUncachableStripeClient();
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        if (sub.status !== "active" && sub.status !== "trialing") {
+          console.warn("[stripe-webhook] Ignoring checkout activation for an inactive subscription");
+          return;
+        }
+        const { hasCurrentSubscriptionEntitlement } = await import("./lib/subscription-entitlement");
+        if (!hasCurrentSubscriptionEntitlement(sub, {
+          subscriptionId, customerId, tenantId, plan,
+        })) {
+          throw new Error("Subscription is not currently eligible for this plan");
+        }
         const item = sub.items?.data?.[0];
         const price = item?.price;
         if (!price) {
@@ -1320,6 +1330,17 @@ export class WebhookHandlers {
 
     const plan = metadata.plan;
     if (tenantId && plan && ['starter', 'pro', 'enterprise'].includes(plan)) {
+      // A delayed subscription.updated event must not resurrect a canceled
+      // plan either. Read current provider state rather than its old snapshot.
+      const { getUncachableStripeClient } = await import('./stripeClient');
+      const stripe = await getUncachableStripeClient();
+      const current = await stripe.subscriptions.retrieve(subscription.id);
+      if (current.status !== "active" && current.status !== "trialing") return;
+      const { hasCurrentSubscriptionEntitlement } = await import("./lib/subscription-entitlement");
+      if (!hasCurrentSubscriptionEntitlement(current, {
+        subscriptionId: subscription.id, customerId: subscription.customer, tenantId, plan,
+      })) throw new Error("Stripe subscription.updated entitlement mismatch");
+      subscription = current;
       // R74.13z-quint+7 SECURITY follow-up (Tier-1 #6 extension): the
       // architect re-review caught that update-driven plan changes
       // (subscription.updated) skipped the price re-verification we added

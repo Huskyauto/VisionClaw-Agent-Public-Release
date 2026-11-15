@@ -143,3 +143,32 @@ export function countRedundantToolChains(chains: Array<string[] | undefined>): n
   }
   return redundant;
 }
+
+export type TrajectoryIssue = "invalid_metadata" | "tool_not_allowed"
+  | "retry_limit_exceeded" | "retrieval_budget_exhausted" | "empty_retrieval_query";
+
+/**
+ * Offline research adaptation: accepts projected metadata only and returns
+ * fixed issue codes. No argument/result values, SQL, prompts or IDs are kept.
+ * Diagnostic evidence is not an authorization decision or approval receipt.
+ */
+export function checkTrajectoryStep(step: {
+  toolName: string; allowedTools: string[]; retryCount: number;
+  retrieval?: { queryPresent: boolean; remainingBudget: number };
+  [key: string]: unknown;
+}): TrajectoryIssue[] {
+  if (!step || typeof step.toolName !== "string" || !step.toolName
+    || !Array.isArray(step.allowedTools) || !step.allowedTools.every(t => typeof t === "string" && t.length > 0)
+    || !Number.isSafeInteger(step.retryCount) || step.retryCount < 0
+    || (step.retrieval && (typeof step.retrieval.queryPresent !== "boolean"
+      || !Number.isSafeInteger(step.retrieval.remainingBudget) || step.retrieval.remainingBudget < 0)))
+    return ["invalid_metadata"];
+  const issues: TrajectoryIssue[] = [];
+  if (!step.allowedTools.includes(step.toolName)) issues.push("tool_not_allowed");
+  if (step.retryCount > 2) issues.push("retry_limit_exceeded");
+  if (step.retrieval) {
+    if (!step.retrieval.queryPresent) issues.push("empty_retrieval_query");
+    else if (step.retrieval.remainingBudget === 0) issues.push("retrieval_budget_exhausted");
+  }
+  return issues;
+}

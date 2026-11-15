@@ -10,7 +10,7 @@ import { fetch as safeFetch } from "undici";
 import { ssrfSafeUrl, pinnedDispatcher } from "../server/lib/ssrf-jail";
 import { readEffectiveVerifierMemory } from "../server/lib/verifier-memory-source";
 import { canStartVerifierWorker } from "../server/lib/bounded-verifier-worker";
-import { stageVerifierSource } from "../server/lib/workspace-verifier-source";
+import { readVerifierBaseline, stageSealedVerifierBaseline } from "../server/lib/workspace-verifier-baseline";
 import {
   signWorkspaceRequest, validateWorkspaceSnapshot, WORKSPACE_VERIFIER_PREFIX,
   MAX_WORKSPACE_VERIFIER_BYTES, type WorkspaceProposalSnapshot,
@@ -20,8 +20,9 @@ import type { VerifyResult } from "../server/proposal-verifier";
 
 export interface WorkspaceTickDependencies {
   ready(): boolean;
-  claim(requestId: string): Promise<{ state: string; snapshot?: WorkspaceProposalSnapshot }>;
-  stage(hash: string): { root: string; cleanup(): void };
+  context(): string | undefined;
+  claim(requestId: string, contextSha256: string): Promise<{ state: string; snapshot?: WorkspaceProposalSnapshot }>;
+  stage(hash: string): { root: string; cleanup(): void; assertUnchanged(): void };
   verify(snapshot: WorkspaceProposalSnapshot, root: string): Promise<VerifyResult>;
   settle(input: { snapshot: WorkspaceProposalSnapshot; result?: VerifyResult; deferred?: string }): Promise<unknown>;
   stopping(): boolean;
@@ -29,17 +30,26 @@ export interface WorkspaceTickDependencies {
 
 export async function runWorkspaceVerificationTick(deps: WorkspaceTickDependencies): Promise<string> {
   if (!deps.ready()) return "waiting_for_memory";
-  const claimed = await deps.claim(randomUUID());
+  let context: string | undefined;
+  try { context = deps.context(); } catch { return "baseline_unavailable"; }
+  if (!context) return "waiting_for_baseline";
+  const claimed = await deps.claim(randomUUID(), context);
   if (claimed.state !== "claimed") return claimed.state;
   const snapshot = validateWorkspaceSnapshot(claimed.snapshot);
   let staged: ReturnType<WorkspaceTickDependencies["stage"]>;
-  try { staged = deps.stage(snapshot.contextSha256); } catch {
+  try {
+    if (snapshot.contextSha256 !== context) throw new Error("Claimed context changed");
+    staged = deps.stage(snapshot.contextSha256);
+  } catch {
     await deps.settle({ snapshot, deferred: "source" });
     return "source_deferred";
   }
   try {
     let result: VerifyResult;
-    try { result = await deps.verify(snapshot, staged.root); } catch {
+    try {
+      result = await deps.verify(snapshot, staged.root);
+      staged.assertUnchanged();
+    } catch {
       await deps.settle({ snapshot, deferred: deps.stopping() ? "shutdown" : "indeterminate" });
       return "execution_deferred";
     }
@@ -114,8 +124,17 @@ async function main(): Promise<void> {
     try {
       state = await runWorkspaceVerificationTick({
         ready: () => canStartVerifierWorker(readEffectiveVerifierMemory(), process.memoryUsage().rss),
-        claim: id => request("claim", { requestId: id }),
-        stage: hash => stageVerifierSource(process.cwd(), hash),
+        // Explicit baseline only. No fallback to the live development checkout.
+        context: () => {
+          const root = process.env.PROPOSAL_VERIFIER_BASELINE_ROOT;
+          return root ? readVerifierBaseline(root).contextSha256 : undefined;
+        },
+        claim: (id, contextSha256) => request("claim", { requestId: id, contextSha256 }),
+        stage: hash => {
+          const root = process.env.PROPOSAL_VERIFIER_BASELINE_ROOT;
+          if (!root) throw new Error("Baseline unavailable");
+          return stageSealedVerifierBaseline(root, hash);
+        },
         verify: (snapshot, root) => verifyWorkspaceSnapshotIsolated(snapshot, root, stop.signal),
         settle: input => request("settle", input),
         stopping: () => stop.signal.aborted,

@@ -51,6 +51,7 @@ import {
 import { lookupOutputSkill, listOutputSkills } from "../lib/output-skills";
 import { getProjectBrief, listProjectBriefs } from "../lib/mcp-project-briefs";
 import { validate, mcpKeyCreateSchema, emptyBodySchema } from "../validation";
+import { registerFelixConnectorRoutes } from "../felix-connector/routes";
 
 // ──────────────────────────────────────────────────────────────────────────
 // Tool registration (one place; mirrored by the tests as the source of truth).
@@ -252,7 +253,7 @@ function buildMcpServer(auth: VerifiedKey): McpServer {
     "list_personas",
     {
       title: "List VCA personas",
-      description: "List the 16 platform personas (name, role, department). Read-only, platform-global.",
+      description: "List active platform personas (name, role, department). Read-only, platform-global.",
       inputSchema: {},
     },
     async () => {
@@ -262,7 +263,7 @@ function buildMcpServer(auth: VerifiedKey): McpServer {
       const r = await db.execute(sql`
         SELECT id, name, role, department
           FROM personas
-         WHERE active = TRUE
+         WHERE is_active = TRUE
          ORDER BY id ASC
       `);
       const rows = (r as any).rows || r;
@@ -485,7 +486,7 @@ function buildMcpServer(auth: VerifiedKey): McpServer {
     {
       title: "Supersede an existing memory entry with a new fact",
       description:
-        "Phantom-stage supersession: mark memory entry `oldId` as superseded by a new fact (which is enqueued via the same quality-gated pipeline as memory_save). Both rows must belong to the calling tenant.",
+        "Atomically save a quality-scored replacement and mark owned memory entry `oldId` superseded with its successor link. Rejected or failed writes leave the old fact active.",
       inputSchema: {
         oldId: z.number().int().positive(),
         newFact: z.string().min(3).max(4000),
@@ -510,32 +511,31 @@ function buildMcpServer(auth: VerifiedKey): McpServer {
           return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "old memory not found, not active, or not owned by tenant" }, null, 2) }] };
         }
 
-        // 2) enqueue the replacement (gets quality-graded + dedup). MUST succeed
-        //    BEFORE we flip the old row — else we orphan the old fact without a
-        //    replacement (R116 architect finding: data-integrity bug).
-        const { enqueueMemoryFact } = await import("../lib/memory-queue");
-        const enq = enqueueMemoryFact({
+        // Queue acceptance is not durable replacement evidence. Keep the same
+        // confidence/quality rules, but insert and supersede in one transaction.
+        const { getMemoryQueueConfig } = await import("../lib/memory-queue");
+        const { computeQualityScore } = await import("../lib/quality-score");
+        const { storage } = await import("../storage");
+        const confidence = typeof args.confidence === "number" ? args.confidence : 0.9;
+        if (confidence < getMemoryQueueConfig().confidenceThreshold || args.newFact.trim().length < 4) {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "replacement rejected; old row left active" }) }] };
+        }
+        const data = {
           tenantId: auth.tenantId,
           personaId: owner.persona_id ?? null,
-          fact: args.newFact,
+          fact: args.newFact.trim(),
           category: args.category || owner.category || "preference",
           source: "mcp_supersede",
-          confidence: typeof args.confidence === "number" ? args.confidence : 0.9,
+          confidence,
           confidenceSource: `mcp:key=${auth.keyId} supersedes=${args.oldId}` + (args.reason ? ` reason=${args.reason.slice(0, 120)}` : ""),
+        };
+        const replacement = await storage.supersedeMemoryEntry(args.oldId, {
+          ...data, qualityScore: computeQualityScore(data).score,
         });
-        if (!enq || enq.ok === false) {
-          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "replacement enqueue rejected; old row left active", enqueue: enq }, null, 2) }] };
+        if (!replacement) {
+          return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: "old memory not found, not active, or not owned by tenant" }) }] };
         }
-
-        // 3) mark the old row superseded (status='superseded') — we set succeeded_by_id
-        //    later once the queue flushes; for now the status flip is the contract.
-        await db.execute(sql`
-          UPDATE memory_entries
-             SET status = 'superseded'
-           WHERE id = ${args.oldId} AND tenant_id = ${auth.tenantId}
-        `);
-
-        return { content: [{ type: "text", text: JSON.stringify({ ok: true, supersededId: args.oldId, newFactEnqueued: true, enqueue: enq }, null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify({ ok: true, supersededId: args.oldId, replacementId: replacement.id, newFactPersisted: true }, null, 2) }] };
       } catch (e: any) {
         return { content: [{ type: "text", text: JSON.stringify({ ok: false, error: e?.message || String(e) }, null, 2) }] };
       }
@@ -596,7 +596,8 @@ type AdminHelpers = {
   getTenantFromRequest: (req: Request) => number | null;
 };
 
-export function registerMcpServerRoutes(app: Express, helpers: AdminHelpers) {
+export async function registerMcpServerRoutes(app: Express, helpers: AdminHelpers) {
+  await registerFelixConnectorRoutes(app);
   const { requirePlatformAdmin, getTenantFromRequest } = helpers;
 
   // ── Health (unauthenticated) ────────────────────────────────────────────

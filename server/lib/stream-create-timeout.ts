@@ -38,7 +38,9 @@ export class StreamCreateTimeoutError extends Error {
  * Free transports retain the existing bounded recovery behavior.
  */
 export function paidStreamRecoveryPolicy(modelId: string, defaultTimeoutMs: number) {
-  const paid = modelId.startsWith("cheaperinference/") || modelId.startsWith("mammouth/");
+  if (modelId === "gemini-4-carbon") return { creationTimeoutMs: 185_000, allowRecovery: false };
+  const paid = modelId === "claude-fable-5-2" || modelId.startsWith("cheaperinference/") || modelId.startsWith("mammouth/") ||
+    modelId.startsWith("meta-direct/") || /^muse-(spark-1\.3(?:-contributor)?|wonder-1\.0)$/.test(modelId);
   return { creationTimeoutMs: paid ? 65_000 : defaultTimeoutMs, allowRecovery: !paid };
 }
 

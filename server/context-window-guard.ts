@@ -22,6 +22,8 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   "google/gemini-3.8-flash": 1_048_576,
   "claude-fable-5": 1_000_000,
   "claude-fable-5-1": 1_000_000,
+  "claude-fable-5-2": 1_000_000,
+  "gemini-4-carbon": 1_048_576,
   "gpt-5.6-sol": 1_000_000,
   "gpt-5.5": 1_000_000,
   "gemini-3.5-flash": 1_000_000,

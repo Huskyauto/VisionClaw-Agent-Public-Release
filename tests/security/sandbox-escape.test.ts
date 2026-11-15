@@ -20,8 +20,8 @@ const keywordFreeEscapeProbes: Array<[string, string]> = [
 ];
 
 for (const [name, code] of keywordFreeEscapeProbes) {
-  test(`vm layer blocks codegen (regex-bypassing): ${name}`, () => {
-    const r = executeCode(code);
+  test(`vm layer blocks codegen (regex-bypassing): ${name}`, async () => {
+    const r = await executeCode(code);
     // Must NOT have compiled a function from a string.
     assert.notEqual(r.returnValue, "function", `escape: ${name} compiled a function from a string`);
     assert.equal(r.success, false, `escape: ${name} should fail closed`);
@@ -37,8 +37,8 @@ for (const [name, code] of keywordFreeEscapeProbes) {
 // codeGeneration:{strings:false} + no-host-objects hold even when the regex
 // sees nothing. Do not "fix" a failure here by adding regex patterns.
 for (const [name, code] of keywordFreeEscapeProbes) {
-  test(`blocklist not load-bearing: ${name} passes the regex yet still fails closed`, () => {
-    const r = executeCode(code);
+  test(`blocklist not load-bearing: ${name} passes the regex yet still fails closed`, async () => {
+    const r = await executeCode(code);
     assert.equal(r.success, false, `${name} should fail closed at the vm layer`);
     assert.ok(
       !(r.error ?? "").startsWith("Blocked:"),
@@ -58,8 +58,8 @@ const escapePayloads: Array<[string, string]> = [
 ];
 
 for (const [name, code] of escapePayloads) {
-  test(`no host process leak: ${name}`, () => {
-    const r = executeCode(code);
+  test(`no host process leak: ${name}`, async () => {
+    const r = await executeCode(code);
     const leakedProcess = r.success && r.returnValue && typeof r.returnValue === "object"
       && typeof (r.returnValue as any).version === "string";
     assert.equal(leakedProcess, false, `escape: ${name} leaked host process`);
@@ -77,8 +77,8 @@ const benign: Array<[string, string, string]> = [
 ];
 
 for (const [name, code, expected] of benign) {
-  test(`benign still works: ${name}`, () => {
-    const r = executeCode(code);
+  test(`benign still works: ${name}`, async () => {
+    const r = await executeCode(code);
     const got = r.returnValue !== undefined ? String(r.returnValue) : r.output;
     assert.equal(r.success, true, `benign ${name} should succeed (err: ${r.error})`);
     assert.equal(got, expected);
@@ -86,8 +86,8 @@ for (const [name, code, expected] of benign) {
 }
 
 // --- console capture still works.
-test("console.log output is captured", () => {
-  const r = executeCode(`console.log("captured", 42);`);
+test("console.log output is captured", async () => {
+  const r = await executeCode(`console.log("captured", 42);`);
   assert.equal(r.success, true);
   assert.match(r.output, /captured 42/);
 });
@@ -110,9 +110,9 @@ const promptProbes: Array<[string, string]> = [
 ];
 
 for (const [name, code] of promptProbes) {
-  test(`no host hang — read-back untouched by poison: ${name}`, () => {
+  test(`no host hang — read-back untouched by poison: ${name}`, async () => {
     const t0 = Date.now();
-    const r = executeCode(code);
+    const r = await executeCode(code);
     const elapsed = Date.now() - t0;
     assert.ok(elapsed < 4000, `read-back hung: ${name} took ${elapsed}ms`);
     assert.equal(r.success, true, `${name} should complete (err: ${r.error})`);
@@ -122,18 +122,18 @@ for (const [name, code] of promptProbes) {
 // The architect's exact repro: __logs__ is no longer a global handle, so this
 // TypeErrors inside the (bounded) script and returns promptly rather than hanging
 // the host on a getter during read-back.
-test("no host hang — architect repro (defineProperty on __logs__ index)", () => {
+test("no host hang — architect repro (defineProperty on __logs__ index)", async () => {
   const t0 = Date.now();
-  const r = executeCode(`console.log("x"); Object.defineProperty(__logs__, "0", { get() { while (true) {} } }); __result__ = 1;`);
+  const r = await executeCode(`console.log("x"); Object.defineProperty(__logs__, "0", { get() { while (true) {} } }); __result__ = 1;`);
   const elapsed = Date.now() - t0;
   assert.ok(elapsed < 4000, `hung: took ${elapsed}ms`);
 });
 
 // Hostile toJSON on the RESULT is serialized inside the script — bounded by the
 // 5s timeout (returns a timeout error), never an unbounded host hang.
-test("hostile result toJSON is BOUNDED by script timeout (not unbounded)", () => {
+test("hostile result toJSON is BOUNDED by script timeout (not unbounded)", async () => {
   const t0 = Date.now();
-  const r = executeCode(`__result__ = { toJSON() { while (true) {} } };`);
+  const r = await executeCode(`__result__ = { toJSON() { while (true) {} } };`);
   const elapsed = Date.now() - t0;
   assert.ok(elapsed < 7000, `not bounded by timeout: took ${elapsed}ms`);
   assert.equal(r.success, false);
@@ -144,9 +144,9 @@ test("hostile result toJSON is BOUNDED by script timeout (not unbounded)", () =>
 // inside the (bounded) script; the host read-back is unaffected and prompt.
 const subvertProbes = ["__logsStr__", "__resultStr__", "__collectLogs__", "__toResultStr__"];
 for (const prop of subvertProbes) {
-  test(`cannot redefine ${prop} as an accessor (non-configurable)`, () => {
+  test(`cannot redefine ${prop} as an accessor (non-configurable)`, async () => {
     const t0 = Date.now();
-    const r = executeCode(
+    const r = await executeCode(
       `try { Object.defineProperty(this === undefined ? ({}) : this, "${prop}", { get() { while (true) {} } }); } catch (e) {} console.log("ok"); __result__ = 1;`,
     );
     const elapsed = Date.now() - t0;

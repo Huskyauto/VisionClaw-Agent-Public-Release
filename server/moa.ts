@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { COST_LEDGER_RECORDED, getClientForModel, MODEL_REGISTRY, meteredLlmEnabled, providerLaneCanServeModel, isProviderHealthy, providerLaneLocallyReady } from "./providers";
 import type { ProviderLane } from "./providers";
 import { StandardComputeCompletionError } from "./lib/standard-compute";
+import { metaHelperTokenLimit } from "./lib/meta";
 import { incomeOpenaiApiEnabled, withIncomeOpenaiApiGrant, INCOME_OPENAI_MODEL } from "./lib/income-openai-route";
 import { reserveIncomeApiBudget } from "./lib/income-claude-route";
 import { executeOwnerJuryApiCall, hasOwnerJuryApiGrant, ownerJuryDirectApiEnabled } from "./lib/owner-jury-api-route";
@@ -15,7 +16,7 @@ import { recordCost, estimateCostUsd, ownerJuryMeteredEnabled, ownerJuryCeiling,
 import { ADMIN_TENANT_ID } from "./auth";
 import { generateEmbedding, cosineSimilarity } from "./embeddings";
 import { logSilentCatch } from "./lib/silent-catch";
-import { recoverSubscriptionSeats, runSubscriptionSynthesis, isPaidJuryBackup, subscriptionRecoveryAllowed, type SynthesisAttempt } from "./lib/subscription-jury-recovery";
+import { recoverSubscriptionSeats, runSubscriptionSynthesis, isPaidJuryBackup, subscriptionRecoveryAllowed, defaultJuryRecoveryAllowed, type SynthesisAttempt } from "./lib/subscription-jury-recovery";
 import { applyComplementaryPerspectives, complementarySynthesisRules, recoverPerspectiveSpec, estimatePromptInputTokens } from "./lib/complementary-perspectives";
 import { observeFinalOutput } from "./lib/evidence-bound-runtime";
 import type { EvidenceObservation, EvidenceSource } from "./lib/evidence-bound-observation";
@@ -221,6 +222,8 @@ export interface ProposerResult {
   finishReason?: string;
   /** Stored once on the first result for durable synthesis recovery evidence; not a ballot. */
   synthesisAttempts?: SynthesisAttempt[];
+  /** Rejected backup candidates, not dispatched attempts and never ballots. */
+  recoverySkips?: Array<{ modelId: string; providerLane?: ProviderLane; reason: string }>;
   evidence?: import("./lib/jury-evidence").JuryEvidencePass;
   /** Provider response identity; absent means unknown, not the routed request id. */
   reportedModel?: string;
@@ -869,7 +872,7 @@ async function callAggregator(
     const resp = await withTimeout(
       client.chat.completions.create({
         model: actualModelId,
-        max_completion_tokens: AGGREGATOR_MAX_TOKENS,
+        max_completion_tokens: metaHelperTokenLimit(actualModelId, AGGREGATOR_MAX_TOKENS),
         messages: [{ role: "user", content: prompt }],
       }, { signal: abort.signal, ...(spec.noRetry ? { maxRetries: 0 } : {}) }) as Promise<any>,
       aggregatorTimeoutForLane(spec.providerLane),
@@ -1525,13 +1528,17 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
   // once. Each backup transport/model is dispatched at most once across the run.
   const subscriptionRecovery = proposerSpecs.some(s =>
     subscriptionRecoveryAllowed(opts.tenantId === ADMIN_TENANT_ID, explicitProposerIds, s.providerLane));
+  const defaultSeatRecovery = (poolChoice === undefined || poolChoice === "frontier" || poolChoice === "frontier-lite") &&
+    proposerSpecs.some(s => defaultJuryRecoveryAllowed(
+      opts.tenantId === ADMIN_TENANT_ID, explicitProposerIds, s.providerLane));
   const allowPaidSubscriptionBackup = ownerOverride && ownerJuryDirectApiEnabled();
   const backupEligible = (spec: ProposerCallSpec) =>
     !!spec.providerLane && providerLaneCanServeModel(spec.providerLane, spec.modelId) &&
     providerLaneLocallyReady(spec.providerLane);
-  if (subscriptionRecovery) {
+  if (subscriptionRecovery || defaultSeatRecovery) {
     proposers = await recoverSubscriptionSeats({
       specs: proposerSpecs, results: proposers, allowPaid: allowPaidSubscriptionBackup,
+      recoverPinnedSeats: defaultSeatRecovery,
       eligible: backupEligible,
       call: async (spec, seatIndex) => {
         // An investigative replacement must own fresh evidence; it cannot adopt
@@ -1540,7 +1547,9 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
           ? await opts.collectProposerEvidence(spec) : undefined;
         const { juryEvidencePrompt } = await import("./lib/jury-evidence");
         if (isPaidJuryBackup(spec)) meteredRecoveryActive = true;
-        const p = await callProposer(spec, question + (evidence ? juryEvidencePrompt(evidence, opts.evidenceFormat) : ""),
+        const callSpec = evidence ? { ...spec, maxTokens: Math.max(spec.maxTokens ?? 0, 8192),
+          timeoutMs: spec.timeoutMs ?? 90_000 } : spec;
+        const p = await callProposer(callSpec, question + (evidence ? juryEvidencePrompt(evidence, opts.evidenceFormat) : ""),
           opts.tenantId, isPaidJuryBackup(spec) && allowPaidSubscriptionBackup);
         return { ...p, evidence };
       },
@@ -1553,7 +1562,7 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
   // evidence, but it is never a ballot and does not lower jurySeatCount. A
   // full three-lane frontier jury normally has no spare lane; that honest
   // outcome escalates rather than duplicating one of its two survivors.
-  const failedPinned = opts.collectProposerEvidence || subscriptionRecovery || explicitProposerIds ? [] : proposers.filter(p =>
+  const failedPinned = opts.collectProposerEvidence || subscriptionRecovery || defaultSeatRecovery || explicitProposerIds ? [] : proposers.filter(p =>
     !p.ok && p.providerLane &&
     (p.failureKind === "provider_overload" || p.failureKind === "model_timeout" || p.failureKind === "provider_unavailable" || p.failureKind === "provider_rate_limit"),
   );
@@ -1752,7 +1761,7 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
         // explicit large proposer pools (8) + dissent (+2) can't punch above
         // the cap. Keep the originals (lowest indices) and trim any overflow
         // from the tail of the steelman pair if needed.
-        if (proposers.length > MAX_PROPOSERS && !subscriptionRecovery) {
+        if (proposers.length > MAX_PROPOSERS && !subscriptionRecovery && !defaultSeatRecovery) {
           const dropped = proposers.length - MAX_PROPOSERS;
           console.warn(`[moa] proposer overflow after steelman append (${proposers.length} > ${MAX_PROPOSERS}) — trimming ${dropped} from tail`);
           proposers = proposers.slice(0, MAX_PROPOSERS);
@@ -1902,7 +1911,7 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
       modelId: p.modelId, provider: p.provider, providerLane: p.providerLane,
       requestedModel: p.requestedModel, actualModel: p.actualModel, reportedModel: p.reportedModel,
       routeReason: p.routeReason, failureKind: p.failureKind, label: p.label, role: p.role,
-      synthesisAttempts: p.synthesisAttempts, evidence: p.evidence,
+       synthesisAttempts: p.synthesisAttempts, recoverySkips: p.recoverySkips, evidence: p.evidence,
       ok: p.ok, latencyMs: p.latencyMs, error: p.error, answerLen: p.answer?.length || 0,
     }))).redacted);
     const inserted = await db.execute(sql`

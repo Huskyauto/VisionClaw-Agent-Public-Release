@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
-import { captureVerifierSource } from "./workspace-verifier-source";
+import { captureDeployedVerifierSource } from "./workspace-verifier-source-artifact";
 import {
   sha256Text, validateWorkspaceSnapshot, UUID_PATTERN,
   readWorkspaceVerificationContext,
@@ -11,6 +11,7 @@ import { parseProposalDiff } from "./proposal-diff";
 import { extractArtifactAuthorityReceipt, validateArtifactAuthorityReceipt } from "./artifact-authority";
 import { heldOutEvalGate } from "../safety/held-out-eval-gate";
 import type { VerifyResult } from "../proposal-verifier";
+import { nextWorkspaceRecovery } from "./workspace-verifier-recovery";
 
 const kinds = sql`AND kind IN ('research_proposal_verification', 'source_repair_verification')`;
 // Only a server-issued workspace lease gets its uncompleted attempt restored.
@@ -22,6 +23,8 @@ export const expiredWorkspaceRetryAccounting = {
   attempts: sql`CASE WHEN payload->'workspaceVerifier'->>'nonce' IS NOT NULL
     AND payload->'workspaceVerifier'->>'snapshotDigest' IS NOT NULL
     THEN GREATEST(attempts-1,0) ELSE attempts END`,
+  nextRunAt: sql`CASE WHEN payload->'workspaceVerifier'->'recovery'->>'paused' = 'true'
+    THEN '9999-01-01T00:00:00Z'::timestamptz ELSE NOW() + interval '30 seconds' END`,
 };
 const rows = (result: any): any[] => result.rows ?? result;
 
@@ -40,8 +43,14 @@ export function assertWorkspaceLease(row: any, snapshot: WorkspaceProposalSnapsh
 }
 
 /** Trusted service boundary; no caller-selected job kind or tenant alias. */
-export async function claimWorkspaceVerification(requestId: unknown) {
+export async function claimWorkspaceVerification(requestId: unknown, workerContextSha256?: unknown) {
   if (typeof requestId !== "string" || !UUID_PATTERN.test(requestId)) throw new Error("Invalid request identity");
+  // Refuse before reclaiming or selecting any job. A busy checkout must never
+  // churn production leases merely to discover that its source is different.
+  const source = captureDeployedVerifierSource();
+  if (workerContextSha256 !== source.hash) {
+    return { state: "source_required" as const, contextSha256: source.hash };
+  }
   return db.transaction(async tx => {
     // Serialize claims/replays across every production instance.
     await tx.execute(sql`SELECT pg_advisory_xact_lock(125136, 1)`);
@@ -74,7 +83,7 @@ export async function claimWorkspaceVerification(requestId: unknown) {
       UPDATE agent_jobs SET
         status = ${expiredWorkspaceRetryAccounting.status},
         attempts = ${expiredWorkspaceRetryAccounting.attempts},
-        next_run_at = NOW() + interval '30 seconds', lease_until = NULL,
+        next_run_at = ${expiredWorkspaceRetryAccounting.nextRunAt}, lease_until = NULL,
         error = 'Workspace verification lease expired; result not accepted'
       WHERE status = 'running' AND (lease_until IS NULL OR lease_until < NOW()) ${kinds}
     `);
@@ -84,7 +93,11 @@ export async function claimWorkspaceVerification(requestId: unknown) {
     if (busy.length) return { state: "busy" as const };
     const selected = rows(await tx.execute(sql`
       SELECT id, tenant_id, payload, attempts FROM agent_jobs
-      WHERE status = 'pending' AND next_run_at <= NOW() AND attempts < max_attempts
+      WHERE status = 'pending' AND attempts < max_attempts
+        AND NOT COALESCE(payload->'workspaceVerifier'->'recovery' @>
+          ${JSON.stringify({ contextSha256: source.hash, paused: true })}::jsonb, false)
+        AND (next_run_at <= NOW() OR (payload->'workspaceVerifier'->'recovery'->>'paused' = 'true'
+          AND payload->'workspaceVerifier'->'recovery'->>'contextSha256' <> ${source.hash}))
       ${kinds} ORDER BY next_run_at, id FOR UPDATE SKIP LOCKED LIMIT 1
     `))[0];
     if (!selected) return { state: "idle" as const };
@@ -106,7 +119,16 @@ export async function claimWorkspaceVerification(requestId: unknown) {
         WHERE id=${selected.id} AND tenant_id=${selected.tenant_id}`);
       return { state: "invalid" as const };
     }
-    const source = captureVerifierSource();
+    let recovery;
+    try {
+      recovery = nextWorkspaceRecovery(selected.payload?.workspaceVerifier?.recovery, source.hash);
+    } catch {
+      // Malformed or exhausted accounting must not wedge the head of the queue.
+      await tx.execute(sql`UPDATE agent_jobs SET next_run_at='9999-01-01T00:00:00Z'::timestamptz,
+        error='Workspace verification recovery requires operator inspection'
+        WHERE id=${selected.id} AND tenant_id=${selected.tenant_id}`);
+      return { state: "recovery_paused" as const };
+    }
     let snapshot: WorkspaceProposalSnapshot;
     try {
       const bytes = source.files.get(proposal.target_file);
@@ -128,6 +150,7 @@ export async function claimWorkspaceVerification(requestId: unknown) {
     const binding = {
       requestId, nonce: snapshot.nonce, snapshotDigest: workspaceSnapshotDigest(snapshot),
       sourceSha256: snapshot.sourceSha256, contextSha256: snapshot.contextSha256,
+      recovery,
     };
     await tx.execute(sql`
       UPDATE code_proposals SET verification_status='unverified',
@@ -177,17 +200,20 @@ export async function settleWorkspaceVerification(input: WorkspaceSettlement) {
       && (row.status === "succeeded" || row.status === "pending")) return { state: "already_settled" };
     assertWorkspaceLease(row, snapshot, Date.now());
     if (deferred) {
-      const delay = deferred === "source" ? 30 * 60_000 : 2 * 60_000;
+      const pause = deferred === "source" || binding.recovery?.paused === true;
+      const recovery = { ...binding.recovery, contextSha256: snapshot.contextSha256, paused: pause };
       await tx.execute(sql`
         UPDATE agent_jobs SET status='pending', attempts=GREATEST(attempts-1,0),
-          next_run_at=${new Date(Date.now() + delay)}, lease_until=NULL,
-          error=${`Workspace verification deferred: ${deferred}`},
+          next_run_at=${pause ? sql`'9999-01-01T00:00:00Z'::timestamptz` : sql`${new Date(Date.now() + 2 * 60_000)}`},
+          lease_until=NULL,
+          payload=jsonb_set(payload, '{workspaceVerifier,recovery}', ${JSON.stringify(recovery)}::jsonb),
+          error=${`Workspace verification ${pause ? "paused" : "deferred"}: ${deferred}`},
           result=${JSON.stringify({ workspaceOutcomeDigest: outcomeDigest })}::jsonb
         WHERE id=${snapshot.jobId} AND tenant_id=${snapshot.tenantId}
       `);
-      return { state: "deferred" };
+      return { state: pause ? "paused" : "deferred" };
     }
-    const source = captureVerifierSource();
+    const source = captureDeployedVerifierSource();
     if (source.hash !== snapshot.contextSha256) throw new Error("Production source changed during verification");
     const parsed = parseProposalDiff(snapshot.codeDiff);
     if (result!.status === "passed") {

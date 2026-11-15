@@ -7,6 +7,7 @@ import { shouldSkipApprovalGate, trustedExecFlags } from "./safety/trusted-exec-
 import type { CmmcAuthoritativeSourceLock } from "./lib/tool-routing-context";
 import { isToolAllowedInModelRound, snapshotAllowedToolNames, trustedConversationScope } from "./lib/model-tool-authorization";
 import { authorizePilotInvocation } from "./lib/business-pilot-invocation";
+import { resolveToolPersonaId } from "./tools/invocation-authority";
 export type InvokedVia =
   | "main_chat"
   | "public_chat"
@@ -18,6 +19,9 @@ export type InvokedVia =
   | "system";
 
 export interface GuardedExecContext {
+  /** Explicit host service authority, never derived from task arguments. */
+  actor?: "persona" | "external" | "system";
+  internalPurpose?: string;
   /** Host-only cancellation, never sourced from model arguments. */
   signal?: AbortSignal;
   tenantId: number;
@@ -33,6 +37,9 @@ export interface GuardedExecContext {
   personaName?: string;
   /** Authenticated conversation persona identity, never model arguments. */
   personaId?: number;
+  /** Host-owned scope, never copied out of model-authored arguments. */
+  projectId?: number;
+  allowedPaths?: string[];
   invokedVia: InvokedVia;
   /** When true, allows tenantId fallback to admin tenant (1). Required for "system" / "self_heal". */
   allowSystemFallback?: boolean;
@@ -130,6 +137,17 @@ export async function executeGuardedTool(
   const scopedArgs = hasModelToolRoster
     ? { ...args, ...trustedConversationScope(ctx.conversationId, true) }
     : args;
+  let resolvedPersonaId: number | undefined;
+  try {
+    resolvedPersonaId = await resolveToolPersonaId({
+      actor: ctx.actor ?? "persona", personaId: ctx.personaId, personaName: ctx.personaName,
+    }, async () => {
+      const { storage } = await import("./storage");
+      return storage.getPersonas();
+    });
+  } catch {
+    return { error: "Trusted persona identity could not be resolved; no execution.", blocked: true };
+  }
 
   // SECURITY (R125+75): tenant is sourced ONLY from the trusted execution
   // context, NEVER from caller/model-authored args. Every current call site
@@ -183,7 +201,7 @@ export async function executeGuardedTool(
     const { enforceToolPolicy } = await import("./safety/destructive-tool-policy");
     const policyResult = await enforceToolPolicy(toolName, scopedArgs, {
       tenantId,
-      personaId: (ctx as any).personaId ?? null,
+      personaId: resolvedPersonaId ?? null,
       // Trust gate keys on the persona NAME (e.g. "Forge"), NOT the role/title
       // (e.g. "Staff Engineer"). Prefer the explicit name; fall back to role
       // only when a caller hasn't supplied a name (system/glasses/self_heal).
@@ -232,6 +250,7 @@ export async function executeGuardedTool(
   // high-risk / confirmation-required tools. Same "stop the consumer reading
   // the caller field" pattern as _approvedByGate / _tenantId above. Fail-CLOSED.
   const skipGate = shouldSkipApprovalGate(ctx);
+  let trustedApprovalGranted = ctx.skipApprovalGate === true;
   if (!skipGate) {
     try {
       const { classifyToolRisk, requestToolConfirmation, recordMutation } = await import("./tool-mutation");
@@ -264,6 +283,7 @@ export async function executeGuardedTool(
           };
         }
         console.log(`[guarded-exec] HITL APPROVED: tool=${toolName} via=${ctx.invokedVia} conf=${confirmationId}`);
+        trustedApprovalGranted = true;
       }
     } catch (gateErr: any) {
       console.error(`[guarded-exec] approval gate error for ${toolName}: ${gateErr?.message || gateErr}`);
@@ -317,7 +337,15 @@ export async function executeGuardedTool(
     }
     if (ctx.signal?.aborted) throw new Error("Trusted execution cancelled before dispatch");
     ctx.onDispatch?.();
-    result = await executeToolWithTimeout(toolName, execArgs);
+    result = await executeToolWithTimeout(toolName, execArgs, {
+      tenantId, actor: ctx.actor ?? "persona", invokedVia: ctx.invokedVia,
+      internalPurpose: ctx.internalPurpose,
+      personaId: resolvedPersonaId, personaName: ctx.personaName ?? ctx.personaRole,
+      conversationId: ctx.conversationId,
+      projectId: ctx.projectId, allowedPaths: ctx.allowedPaths,
+      approvalGranted: trustedApprovalGranted,
+      rateLimitChecked: true, skipTracking: true,
+    });
   } catch (err: any) {
     result = { error: err?.message || "Tool execution failed" };
   }

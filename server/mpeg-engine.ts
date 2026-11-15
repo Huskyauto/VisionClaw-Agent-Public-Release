@@ -342,7 +342,11 @@ export async function produceVideo(options: MpegJobOptions): Promise<MpegJobResu
   let executeTool: any;
   try {
     const toolsMod = await import("./tools");
-    executeTool = toolsMod.executeTool;
+    executeTool = (name: string, params: Record<string, any>, tenantId?: number | import("./tools/invocation-authority").ToolAuthority) =>
+      toolsMod.executeTool(name, params, typeof tenantId === "object" ? tenantId : {
+        tenantId: tenantId ?? options.tenantId ?? 0, actor: "system",
+        invokedVia: "video-render", internalPurpose: "Render the requested tenant video",
+      });
   } catch (err: any) {
     return { success: false, scenesProcessed: 0, steps: [`Failed to load tools: ${err.message}`], error: err.message };
   }
@@ -1088,7 +1092,10 @@ export async function produceVideo(options: MpegJobOptions): Promise<MpegJobResu
         subject: `Your video is ready: ${options.title}`,
         text: `Your video "${options.title}" has been produced.\n\nWatch/download: ${driveUrl}\n\n— VisionClaw MPEG Engine`,
         _tenantId: deliveryTenantId,
-      }, deliveryTenantId);
+      }, {
+        tenantId: deliveryTenantId, actor: "system", invokedVia: "video-delivery",
+        internalPurpose: "Deliver the completed tenant video",
+      });
       steps.push(`Email sent to ${options.emailTo}`);
     } catch (err: any) {
       steps.push(`⚠️ Email failed: ${err.message?.slice(0, 80)}`);
@@ -1452,12 +1459,15 @@ export async function produceVideoParallel(options: ParallelVideoOptions): Promi
   if (options.emailTo && driveUrl) {
     try {
       const { executeTool } = await import("./tools");
-      await (executeTool as any)("send_email", {
+      await executeTool("send_email", {
         to: options.emailTo,
         subject: `Your video is ready: ${options.title}`,
         text: `Your video "${options.title}" has been produced using parallel chapter rendering.\n\nChapters: ${chapters.length}\nTotal scenes: ${totalScenes}\n\nWatch/download: ${driveUrl}\n\n— VisionClaw MPEG Engine (Parallel)`,
         _tenantId: options.tenantId,
-      }, options.tenantId);
+      }, {
+        tenantId: options.tenantId ?? 0, actor: "system", invokedVia: "video-delivery",
+        internalPurpose: "Deliver the completed parallel tenant video",
+      });
       steps.push(`Email sent to ${options.emailTo}`);
     } catch (_silentErr) { logSilentCatch("server/mpeg-engine.ts", _silentErr); }
   }

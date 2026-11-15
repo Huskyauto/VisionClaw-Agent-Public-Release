@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { closeSync, openSync, writeSync } from "node:fs";
+import { sanitizeSpawnEnv } from "../../server/safety/spawn-env-guard";
+import { BWB_VERIFICATION_INPUTS, BWB_VERIFICATION_TESTS, MEDIA_VERIFICATION_INPUTS, MEDIA_VERIFICATION_TESTS } from "./bwb-verification-profile";
 
 const KNOWN_RISK_TESTS = [
   "tests/security/tenant-audit-blockers.test.ts",
@@ -35,7 +37,9 @@ const AREA_TESTS: Record<string, string[]> = {
     "tests/release-facts-contract.test.ts",
     "tests/security/legal-pages-processor-sync.test.ts",
   ],
-  "release-tooling": ["tests/lib/targeted-release-check.test.ts", "tests/lib/public-mirror-contract.test.ts"],
+  "release-tooling": ["tests/lib/targeted-release-check.test.ts", "tests/lib/public-mirror-contract.test.ts", "tests/lib/offline-verification.test.ts"],
+  bwb: [...BWB_VERIFICATION_TESTS],
+  "media-verification": [...MEDIA_VERIFICATION_TESTS],
   "run-confirmation": [
     "tests/lib/structured-prompt-profile.test.ts", "tests/lib/harness-ab-sample.test.ts",
     "tests/lib/run-confirmation.test.ts", "tests/lib/plan-run-confirmation.test.ts",
@@ -89,6 +93,10 @@ const PATH_AREAS: Record<string, string> = {
   "scripts/lib/tenant-audit-fallback.ts": "audit",
   "scripts/targeted-release-check.ts": "release-tooling",
   "scripts/lib/targeted-release-check.ts": "release-tooling",
+  "scripts/lib/offline-verification.ts": "release-tooling",
+  "scripts/lib/bwb-verification-profile.ts": "bwb",
+  ".agents/skills/bwb-weekly-recap/SKILL.md": "bwb",
+  ".replitignore": "release-tooling",
   "scripts/build-public-mirror.sh": "release-tooling",
   "scripts/build.ts": "release-tooling",
   "scripts/lib/build-data-policy.ts": "release-tooling",
@@ -104,6 +112,8 @@ const PATH_AREAS: Record<string, string> = {
   "client/src/pages/admin-ai-stack-decision-review.tsx": "public-interface",
   "client/src/pages/landing.tsx": "public-interface",
 };
+for (const file of BWB_VERIFICATION_INPUTS) PATH_AREAS[file] = "bwb";
+for (const file of MEDIA_VERIFICATION_INPUTS) PATH_AREAS[file] = "media-verification";
 for (const [area, tests] of Object.entries(AREA_TESTS)) {
   for (const file of tests) PATH_AREAS[file] = area;
 }
@@ -188,7 +198,7 @@ export async function runBoundedReleaseCommand(command: string, args: string[], 
   return await new Promise<{ passed: boolean; code: number | null; timedOut: boolean; outputLimitExceeded: boolean; elapsedMs: number }>(done => {
     let timedOut = false, settled = false, outputLimitExceeded = false, written = 0;
     const child = spawn(command, args, {
-      detached: true, stdio: ["ignore", "pipe", "pipe"], env: options.env ?? process.env,
+      detached: true, stdio: ["ignore", "pipe", "pipe"], env: options.env ?? sanitizeSpawnEnv(process.env),
     });
     const kill = () => {
       if (child.pid) try { process.kill(-child.pid, "SIGKILL"); } catch { /* already exited */ }

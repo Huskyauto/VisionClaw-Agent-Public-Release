@@ -144,7 +144,9 @@ export async function scanWatchlistItem(tenantId: number, item: any): Promise<{ 
 
     for (const query of searchQueries.slice(0, 3)) {
       try {
-        const searchResult = await executeTool("web_search", { query, max_results: 5, _tenantId: tenantId });
+        const searchResult = await executeTool("web_search", { query, max_results: 5 }, {
+          tenantId, actor: "system", invokedVia: "watchlist", internalPurpose: "Read-only watchlist search",
+        });
         const resultText = typeof searchResult === "string" ? searchResult : JSON.stringify(searchResult);
 
         const lines = resultText.split("\n").filter((l: string) => l.trim().length > 10);

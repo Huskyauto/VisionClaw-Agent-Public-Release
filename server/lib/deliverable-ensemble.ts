@@ -363,6 +363,8 @@ export async function draftWithEnsemble(args: EnsembleDraftArgs): Promise<Ensemb
             subjectKind: "deliverable",
             goal: args.user,
             output: selectedText,
+            sources: args.sourceEvidence,
+            evidenceKind: "generation_metadata",
             evidence: [
               `Independent drafts: ${drafts.map((draft) => draft.model).join(", ")}`,
               `Aggregator: ${cfg.aggregator}`,

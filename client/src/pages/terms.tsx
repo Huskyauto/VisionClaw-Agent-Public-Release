@@ -33,7 +33,7 @@ export default function TermsPage() {
 
       <div className="max-w-4xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-2" data-testid="text-terms-title">Terms of Service</h1>
-        <p className="text-sm text-muted-foreground mb-8">Last updated: August 2, 2026</p>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: November 11, 2026</p>
 
         <div className="prose prose-sm dark:prose-invert max-w-none space-y-6">
           <section>
@@ -66,6 +66,13 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-xl font-semibold mb-3">5. Subscription and Billing</h2>
+            <p className="text-muted-foreground leading-relaxed mb-3">
+              Owner-only premium model selections are separate metered API usage, not
+              included customer subscription entitlements. Claude Fable 5.2 is an explicit
+              escalation option subject to access controls and the shared paid-AI budget,
+              with no automatic paid retries. Provider availability and a successful
+              completion are not guaranteed.
+            </p>
             <p className="text-muted-foreground leading-relaxed">
               Paid subscriptions are billed monthly through Stripe. You authorize us to charge your payment method on a recurring basis. We also accept cryptocurrency payments for certain purchases through Coinbase Commerce; cryptocurrency payments are final once confirmed on-chain except where a refund is required by law or granted at our discretion. You may cancel your subscription at any time, and cancellation will take effect at the end of your current billing period. Refunds are handled on a case-by-case basis at our discretion. You are responsible for any taxes, network fees, or exchange-rate fluctuations associated with your chosen payment method.
             </p>

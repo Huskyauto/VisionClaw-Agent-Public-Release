@@ -1,5 +1,18 @@
 [
   {
+    "version": "R137.3+sec",
+    "date": "November 14, 2026",
+    "title": "Subscription, memory and video integrity review",
+    "type": "improvement",
+    "highlights": [
+      { "icon": "ShieldCheck", "text": "Subscription activation checks current provider status, customer and price instead of treating an old paid checkout as current entitlement. Checkout and update webhook activation paths also inspect current subscription state." },
+      { "icon": "RefreshCw", "text": "MCP memory replacement saves the new fact and links its predecessor in one transaction. Failed writes leave the old fact active. Force-cancel updates active video jobs only, preserving finished playback." },
+      { "icon": "Settings", "text": "Corrected the MCP persona catalog query, patched Hono advisories and reduced customer-address and delivery-link logging in selected operational paths." },
+      { "icon": "BookOpen", "text": "Both repository READMEs now distinguish internal guarded dispatch, scoped MCP access and incomplete tenant-audit/RLS coverage. Demo Studio supports explicit project save/reopen and deterministic offline HTML exports." },
+      { "icon": "AlertTriangle", "text": "Risk-based source review and bounded local checks are not whole-platform certification, production rollout or proof that every external integration works. Existing tenant-audit and RLS limitations remain." }
+    ]
+  },
+  {
     "version": "R137.3",
     "date": "November 8, 2026",
     "title": "Reliability review, account boundaries and current feature inventory",

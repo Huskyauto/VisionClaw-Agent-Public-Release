@@ -51,8 +51,8 @@ test("concurrent tenants cannot reserve more than the global UTC-day ceiling", a
   const store = new MemoryStore();
   const now = () => new Date("2026-09-30T23:59:59.900Z");
   const results = await Promise.allSettled([
-    reserveAggregateAiSpend({ tenantId: 1, attemptKey: "attempt-a", maximumCostCents: 1_500 }, { store, now }),
-    reserveAggregateAiSpend({ tenantId: 2, attemptKey: "attempt-b", maximumCostCents: 1_500 }, { store, now }),
+    reserveAggregateAiSpend({ tenantId: 1, attemptKey: "attempt-a", maximumCostCents: 2_000 }, { store, now }),
+    reserveAggregateAiSpend({ tenantId: 2, attemptKey: "attempt-b", maximumCostCents: 2_000 }, { store, now }),
   ]);
   assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
   assert.equal(results.filter((result) => result.status === "rejected").length, 1);
@@ -118,7 +118,7 @@ test("tenant-bound keys prevent cross-tenant settlement and uncertain reservatio
     /not found for this tenant/,
   );
   const second = await reserveAggregateAiSpend(
-    { tenantId: 2, attemptKey: "shared-visible-key", maximumCostCents: 500 },
+    { tenantId: 2, attemptKey: "shared-visible-key", maximumCostCents: 1_500 },
     { store, now: day },
   );
   assert.equal(second.tenantId, 2);
@@ -136,6 +136,21 @@ test("tenant-bound keys prevent cross-tenant settlement and uncertain reservatio
     ),
     /budget exhausted/,
   );
+});
+
+test("$30 is admitted exactly, but another cent or an oversized request is refused", async () => {
+  const store = new MemoryStore();
+  const deps = { store, now: () => new Date("2026-10-01T12:00:00Z") };
+  await assert.rejects(reserveAggregateAiSpend(
+    { tenantId: 1, attemptKey: "oversized", maximumCostCents: 3_001 }, deps,
+  ), /\$30 UTC-day ceiling/);
+  const held = await reserveAggregateAiSpend(
+    { tenantId: 1, attemptKey: "exact-limit", maximumCostCents: 3_000 }, deps,
+  );
+  assert.equal(held.reservedCents, 3_000);
+  await assert.rejects(reserveAggregateAiSpend(
+    { tenantId: 2, attemptKey: "one-more-cent", maximumCostCents: 1 }, deps,
+  ), /\$30 UTC-day metered-AI budget exhausted/);
 });
 
 test("fractional-cent bounds and settlement above the reservation are refused", async () => {

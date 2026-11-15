@@ -1,7 +1,7 @@
 import facts from "../../../docs/release-facts.json";
 
-export const CURRENT_SOURCE_RELEASE = "R137.3";
-export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 8, 2026 reliability review, current feature inventory and navigation reconciliation.`;
+export const CURRENT_SOURCE_RELEASE = "R137.3+sec";
+export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 14, 2026 subscription, memory and video integrity repairs, dependency maintenance and updated source documentation.`;
 export const DEVELOPMENT_PLATFORM_SUMMARY =
   `${facts.metrics.registeredTools} total registered tools; ` +
   `${facts.metrics.declaredTables} declared / ${facts.metrics.liveTables} live development tables; ` +

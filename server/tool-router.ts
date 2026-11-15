@@ -569,7 +569,9 @@ export async function routeTools(
   let deprecatedDropped = 0;
   try {
     const before = filtered.length;
-    filtered = filterDeprecated(filtered);
+    const nonDeprecated = new Set(filterDeprecated(filtered).map(t => t.function.name));
+    filtered = filtered.filter(t => ALWAYS_INCLUDE.has(t.function.name)
+      || mandatoryContextTools.includes(t.function.name) || nonDeprecated.has(t.function.name));
     deprecatedDropped = before - filtered.length;
   } catch (err) {
     console.warn("[tool-router] deprecation filter failed:", (err as Error).message);

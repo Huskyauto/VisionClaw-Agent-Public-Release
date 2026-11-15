@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { getToolFailureRetryPolicy } from "../../server/lib/tool-failure-retry-policy";
+import { getToolFailureRetryPolicy, recordToolFailureOutcome, copyToolFailureOutcome } from "../../server/lib/tool-failure-retry-policy";
+import { buildRetryTimeoutError, buildCommitConfirmedError } from "../../server/lib/action-ledger-retry";
 
 test("second_opinion timeout is disclosed but never automatically retried", () => {
   const policy = getToolFailureRetryPolicy("second_opinion", {
@@ -15,6 +16,39 @@ test("second_opinion timeout is disclosed but never automatically retried", () =
   assert.match(policy.selfHealHint, /do not retry second_opinion/i);
   assert.match(policy.selfHealHint, /completed in-house jury/i);
   assert.match(policy.userFacingInstruction, /external second-opinion timed out/i);
+});
+
+test("explicit uncertain completion suppresses retries without interpreting an ordinary timeout as success", () => {
+  const result = { ok: false, outcomeUnknown: true };
+  recordToolFailureOutcome(result, Object.assign(new Error("timeout"), { outcomeUnknown: true }));
+  const policy = getToolFailureRetryPolicy("send_email", result);
+  assert.equal(policy.suppressAdaptiveRetry, true);
+  assert.match(policy.selfHealHint, /DO NOT retry/);
+  assert.match(policy.userFacingInstruction, /unconfirmed/i);
+  assert.equal(getToolFailureRetryPolicy("web_search", { ok: false, outcomeUnknown: "true" }).suppressAdaptiveRetry, false);
+});
+
+test("action-ledger timeout signals preserve their confirmed versus uncertain outcome", () => {
+  const unknown = buildRetryTimeoutError("send_email", 1000) as Error & { outcomeUnknown?: boolean };
+  assert.equal(unknown.outcomeUnknown, true);
+  const committed = buildCommitConfirmedError("send_email", 1000, 12) as Error & { outcomeCommitted?: boolean };
+  assert.equal(committed.outcomeCommitted, true);
+  const result = { error: committed.message, outcomeCommitted: true };
+  recordToolFailureOutcome(result, committed);
+  const cleaned = Object.assign(Object.create(null), result);
+  copyToolFailureOutcome(result, cleaned);
+  const policy = getToolFailureRetryPolicy("send_email", cleaned);
+  assert.equal(policy.suppressAdaptiveRetry, true);
+  assert.match(policy.userFacingInstruction, /confirmed/i);
+});
+
+test("tool-returned outcome booleans cannot impersonate engine confirmation", () => {
+  assert.equal(getToolFailureRetryPolicy("send_email", { error: "untrusted", outcomeCommitted: true }).suppressAdaptiveRetry, false);
+  assert.equal(getToolFailureRetryPolicy("send_email", { error: "untrusted", outcomeUnknown: true }).suppressAdaptiveRetry, false);
+  const spoof = { error: "untrusted", outcomeCommitted: true };
+  const cleaned = { ...spoof };
+  copyToolFailureOutcome(spoof, cleaned);
+  assert.equal(getToolFailureRetryPolicy("send_email", cleaned).suppressAdaptiveRetry, false);
 });
 
 test("other terminal second_opinion provider outcomes also suppress automatic retries", () => {
@@ -69,6 +103,7 @@ test("chat-engine gives the terminal policy precedence over every generic retry 
   );
 
   assert.match(source, /getToolFailureRetryPolicy\(toolName, resultRecord\)/);
+  assert.match(source, /copyToolFailureOutcome\(result, cleaned\);\s*result = cleaned/);
   assert.match(source, /if \(!suppressAdaptiveRetry\) \{\s*const retryKey/);
   assert.match(source, /if \(!suppressAdaptiveRetry && attempt <= 2/);
   assert.match(source, /const fallback = suppressAdaptiveRetry\s*\?\s*null/);

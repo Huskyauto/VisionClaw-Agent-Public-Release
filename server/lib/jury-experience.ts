@@ -20,6 +20,7 @@
 
 import { db } from "../db";
 import { getClientForModel } from "../providers";
+import { metaHelperTokenLimit, metaModel } from "./meta";
 import { generateEmbedding } from "../embeddings";
 import { sql } from "drizzle-orm";
 
@@ -122,10 +123,13 @@ function parseLesson(raw: string): ExtractedLesson | null {
 }
 
 async function callExtractor(prompt: string, tenantId: number): Promise<string | null> {
+  const attemptedModels = new Set<string>();
   for (const modelId of EXTRACTOR_MODELS) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const { client, actualModelId } = await getClientForModel(modelId, tenantId);
+      if (attemptedModels.has(actualModelId)) continue;
+      attemptedModels.add(actualModelId);
       const timeout = new Promise<never>((_, rej) => {
         timer = setTimeout(() => rej(new Error("extractor timeout")), EXTRACTOR_TIMEOUT_MS);
         if (typeof timer.unref === "function") timer.unref();
@@ -133,7 +137,7 @@ async function callExtractor(prompt: string, tenantId: number): Promise<string |
       const resp: any = await Promise.race([
         client.chat.completions.create({
           model: actualModelId,
-          max_completion_tokens: EXTRACTOR_MAX_TOKENS,
+          max_completion_tokens: metaHelperTokenLimit(actualModelId, EXTRACTOR_MAX_TOKENS),
           messages: [
             { role: "system", content: EXTRACTOR_SYSTEM_PROMPT },
             { role: "user", content: prompt },
@@ -145,6 +149,8 @@ async function callExtractor(prompt: string, tenantId: number): Promise<string |
       if (text) return text;
     } catch (err) {
       console.warn(`[jury-experience] extractor ${modelId} failed: ${(err as Error).message?.slice(0, 120)}`);
+      // No automatic replay of a dispatched Meta request through model aliases.
+      if ([...attemptedModels].some(id => metaModel(id))) return null;
     } finally {
       if (timer) clearTimeout(timer);
     }

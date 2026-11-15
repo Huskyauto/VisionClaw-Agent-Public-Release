@@ -840,6 +840,8 @@ app.use((req, res, next) => {
   try {
     const { startTenantAuditScheduler } = await import("./tenant-audit-cron");
     startTenantAuditScheduler();
+    const { startSecurityReviewObserver } = await import("./security-review-observer");
+    startSecurityReviewObserver();
   } catch (e: any) {
     log(`Tenant audit scheduler failed to start: ${e.message}`, "tenant-audit");
   }

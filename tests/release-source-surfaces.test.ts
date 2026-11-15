@@ -11,15 +11,18 @@ const updates = JSON.parse(read("client/src/data/updates.json"));
 const release = /CURRENT_SOURCE_RELEASE = "([^"]+)"/.exec(notice)?.[1];
 
 test("current release agrees across shared summary, dashboard data and both READMEs", () => {
-  assert.equal(release, "R137.3");
+  assert.equal(release, "R137.3+sec");
   assert.equal(updates[0].version, release);
-  assert.equal(updates[0].date, "November 8, 2026");
+  assert.equal(updates[0].date, "November 14, 2026");
   const readmes = isPrivateSource ? ["README.md", "README.md"] : ["README.md"];
   for (const file of [...readmes, "ROADMAP.md"]) {
     assert.ok(read(file).slice(0, 18000).includes(release!));
     assert.doesNotMatch(read(file), /Latest source update[^\n]*R137\+sec/);
   }
-  assert.match(read("ROADMAP.md"), /November 8 development snapshot\)\. R137\.3/);
+  const evidenceDate = JSON.parse(read("docs/release-facts.json")).releaseDate;
+  const [year, month, day] = evidenceDate.split("-").map(Number);
+  const evidenceLabel = new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+  assert.ok(read("ROADMAP.md").includes(`${evidenceLabel} development snapshot). ${release}`));
   assert.match(sidebar, /badge-updates-new[\s\S]{0,160}\{CURRENT_SOURCE_RELEASE\}/);
   assert.match(read("client/src/components/home-release-updates.tsx"), /updatesData/);
   assert.match(read("client/src/components/seo-head.tsx"), /CURRENT_PLATFORM_DESCRIPTION/);
@@ -41,18 +44,18 @@ test("last-72-hour features reach both landing views and the shared dashboard re
   assert.match(current, /Source updates through \{releaseFacts\.releaseDate\}/);
   assert.match(current, /owner-only/i);
   assert.match(JSON.stringify(updates[0]), /production/i);
-  assert.match(JSON.stringify(updates[0]), /not certification/i);
+  assert.match(JSON.stringify(updates[0]), /not whole-platform certification/i);
   assert.match(read("client/src/pages/home.tsx"), /HOME_RELEASES\.slice/);
 });
 
-test("November source changes reach landing, dashboard, SEO and repository summaries without overstating readiness", () => {
+test("retained November changes stay documented while current summaries use the latest source date", () => {
   const current = read("client/src/components/recent-platform-updates.tsx");
-  const latest = JSON.stringify(updates[0]);
+  const latest = JSON.stringify(updates);
   for (const term of ["Webhook", "confirmation", "harness", "daily upload", "PDF", "payment", "documentation"]) {
     assert.ok(current.toLowerCase().includes(term.toLowerCase()), `landing missing ${term}`);
     assert.ok(latest.toLowerCase().includes(term.toLowerCase()), `release feed missing ${term}`);
   }
-  assert.match(notice, /November 8, 2026/);
+  assert.match(notice, /November 14, 2026/);
   assert.match(notice, /audit remains degraded and incomplete/);
   assert.match(latest, /not certification/i);
   assert.match(latest, /does not replay/i);

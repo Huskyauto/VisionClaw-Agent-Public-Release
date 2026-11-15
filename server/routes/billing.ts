@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
 import { getUncachableStripeClient } from "../stripeClient";
+import { hasCurrentSubscriptionEntitlement } from "../lib/subscription-entitlement";
 
 type BillingHelpers = {
   getTenantFromRequest: (req: Request) => number | null;
@@ -17,8 +18,9 @@ type BillingHelpers = {
 export function isAuthoritativePaidCheckout(session: {
   status?: string | null;
   payment_status?: string | null;
+  mode?: string | null;
 }): boolean {
-  return session.status === "complete" && (
+  return session.mode === "subscription" && session.status === "complete" && (
     session.payment_status === "paid" ||
     session.payment_status === "no_payment_required"
   );
@@ -112,7 +114,7 @@ export function registerBillingRoutes(app: Express, helpers: BillingHelpers) {
       }
 
       const sessionTenantId = session.metadata?.tenantId;
-      if (!sessionTenantId || parseInt(sessionTenantId, 10) !== tenantId) {
+      if (sessionTenantId !== String(tenantId)) {
         return res.status(403).json({ error: "Session does not belong to this account" });
       }
 
@@ -121,9 +123,33 @@ export function registerBillingRoutes(app: Express, helpers: BillingHelpers) {
         return res.status(400).json({ error: "Plan mismatch" });
       }
 
-      await db.execute(sql`
-        UPDATE tenants SET plan = ${plan} WHERE id = ${tenantId}
+      if (session.mode !== "subscription" || typeof session.subscription !== "string"
+        || typeof session.customer !== "string") {
+        return res.status(402).json({ error: "Matching subscription required" });
+      }
+      const subscription = await stripe.subscriptions.retrieve(session.subscription);
+      if (!hasCurrentSubscriptionEntitlement(subscription, {
+        subscriptionId: session.subscription, customerId: session.customer, tenantId, plan,
+      })) {
+        return res.status(402).json({ error: "Subscription is not currently eligible for this plan" });
+      }
+      // Match webhook ownership rules; never silently rebind an existing customer.
+      const tenant = await storage.getTenant(tenantId);
+      if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+      if (tenant.stripeCustomerId && tenant.stripeCustomerId !== session.customer) {
+        return res.status(403).json({ error: "Subscription customer mismatch" });
+      }
+      const activation = await db.execute(sql`
+        UPDATE tenants SET plan = ${plan},
+          stripe_customer_id = ${session.customer},
+          stripe_subscription_id = ${session.subscription}
+        WHERE id = ${tenantId}
+          AND (stripe_customer_id IS NULL OR stripe_customer_id = ${session.customer})
+        RETURNING id
       `);
+      if (!activation.rows.length) {
+        return res.status(409).json({ error: "Account subscription changed; refresh and try again" });
+      }
 
       console.log(`[subscribe] Tenant ${tenantId} upgraded to ${plan} (verified session: ${sessionId})`);
       res.json({ success: true, plan });

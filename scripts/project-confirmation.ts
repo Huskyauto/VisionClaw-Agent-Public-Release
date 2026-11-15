@@ -1,15 +1,16 @@
 #!/usr/bin/env -S npx tsx
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { confirmationDigest, confirmationMarkdown, createRunConfirmation, type CheckStatus } from "../server/lib/run-confirmation";
 import { getConfirmationProfile, snapshotConfirmationSources, assessTapCheck } from "./lib/project-confirmation";
 import { runBoundedReleaseCommand } from "./lib/targeted-release-check";
-import { sanitizeSpawnEnv } from "../server/safety/spawn-env-guard";
+import { buildOfflineVerificationEnv } from "./lib/offline-verification";
 
 async function main() {
   const args = process.argv.slice(2);
   if (args.length !== 2 || args[0] !== "--profile") {
-    throw new Error("Usage: npx tsx scripts/project-confirmation.ts --profile harness-rollout");
+    throw new Error("Usage: npx tsx scripts/project-confirmation.ts --profile <harness-rollout|bwb>");
   }
   const profile = getConfirmationProfile(args[1]);
   const sources = snapshotConfirmationSources(profile.sources);
@@ -23,10 +24,8 @@ async function main() {
   write("manifest.json", JSON.stringify({ version: 1, profile, sources, subjectDigest, requirements,
     createdAt: new Date().toISOString(), node: process.version }, null, 2));
   // Never give offline tests owner credentials, database URLs or loader overrides.
-  const env = sanitizeSpawnEnv({
-    PATH: process.env.PATH, HOME: "/tmp", TMPDIR: "/tmp", LANG: "C.UTF-8",
-    NODE_ENV: "test", RUN_E2E: "0",
-  });
+  const home = mkdtempSync(resolve(tmpdir(), "verification-home-"));
+  const env = buildOfflineVerificationEnv(process.env, home);
   let activeKill: (() => void) | undefined;
   const stop = () => { activeKill?.(); };
   process.once("SIGINT", stop);
@@ -37,14 +36,16 @@ async function main() {
     const result = await runBoundedReleaseCommand(process.execPath, [
       "--max-old-space-size=768", "--import", "tsx", "--test", "--test-concurrency=1",
       "--test-reporter=tap", ...profile.tests,
-    ], { logFile: resolve(dir, "regressions.log"), timeoutMs: 120_000, maxLogBytes: 1024 * 1024, env,
+    ], { logFile: resolve(dir, "regressions.log"), timeoutMs: profile.timeoutMs, maxLogBytes: profile.maxLogBytes, env,
       onSpawn: kill => { activeKill = kill; } });
     const logPath = resolve(dir, "regressions.log");
-    if (statSync(logPath).size > 1024 * 1024) throw new Error("Check log exceeds read budget");
+    if (statSync(logPath).size > profile.maxLogBytes) throw new Error("Check log exceeds read budget");
     const log = readFileSync(logPath);
     status = result.outputLimitExceeded ? "unverified" : assessTapCheck(log.toString("utf8"), result.passed);
     evidence = `exit=${result.code}; timedOut=${result.timedOut}; outputLimitExceeded=${result.outputLimitExceeded}; log SHA-256=${confirmationDigest(log.toString("base64"))}; elapsed=${result.elapsedMs}ms.`;
   } finally {
+    activeKill?.();
+    rmSync(home, { recursive: true, force: true });
     process.removeListener("SIGINT", stop);
     process.removeListener("SIGTERM", stop);
   }

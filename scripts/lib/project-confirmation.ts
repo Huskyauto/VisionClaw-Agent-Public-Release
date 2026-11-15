@@ -1,6 +1,7 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { confirmationDigest, createRunConfirmation, type CheckStatus } from "../../server/lib/run-confirmation";
+import { BWB_VERIFICATION_INPUTS, BWB_VERIFICATION_TESTS, MEDIA_VERIFICATION_INPUTS } from "./bwb-verification-profile";
 
 const TESTS = [
   "tests/lib/structured-prompt-profile.test.ts",
@@ -25,10 +26,26 @@ const SOURCES = [
 
 /** Closed, reviewed offline profiles, not caller-provided commands or paths. */
 export function getConfirmationProfile(name: string) {
-  if (name !== "harness-rollout") throw new Error("Unknown confirmation profile; available: harness-rollout");
+  if (name === "bwb") {
+    return {
+      name, scope: "Offline weekly-video fixture checks for declared sources only; not live model, farm, Drive, inbox or production evidence. Credential isolation is not a filesystem/network sandbox.",
+      tests: [...BWB_VERIFICATION_TESTS],
+      sources: [...new Set([...BWB_VERIFICATION_INPUTS, ...MEDIA_VERIFICATION_INPUTS,
+        ...BWB_VERIFICATION_TESTS, "scripts/project-confirmation.ts",
+        "scripts/lib/project-confirmation.ts", "scripts/lib/bwb-verification-profile.ts",
+        "scripts/lib/offline-verification.ts", "scripts/lib/targeted-release-check.ts",
+        "server/lib/run-confirmation.ts", "server/lib/fish-voice-ids.ts",
+        "server/safety/spawn-env-guard.ts", "scripts/lib/eio-read.ts",
+        "package.json", "package-lock.json", "tsconfig.json",
+      ])].sort(),
+      timeoutMs: 180_000, maxLogBytes: 8 * 1024 * 1024,
+    };
+  }
+  if (name !== "harness-rollout") throw new Error("Unknown confirmation profile; available: harness-rollout, bwb");
   return {
     name, scope: "Offline harness-rollout regression checks only (no live model calls, UI browser checks or external outcomes).",
-    tests: [...TESTS], sources: [...SOURCES, ...TESTS].sort(),
+    tests: [...TESTS], sources: [...SOURCES, ...TESTS, "scripts/lib/offline-verification.ts", "scripts/lib/bwb-verification-profile.ts"].sort(),
+    timeoutMs: 120_000, maxLogBytes: 1024 * 1024,
   };
 }
 

@@ -70,6 +70,7 @@ const AdminAiTaskFitAuditPage = lazy(() => import("@/pages/admin-ai-task-fit-aud
 const AdminAiStackDecisionReviewPage = lazy(() => import("@/pages/admin-ai-stack-decision-review"));
 const AdminResearchFrontierPage = lazy(() => import("@/pages/admin-research-frontier"));
 const AdminEngineeringReferencePage = lazy(() => import("@/pages/admin-engineering-reference"));
+const AdminDemoStudioPage = lazy(() => import("@/pages/admin-demo-studio"));
 const AdminHumanAiSynergyTrialPage = lazy(() => import("@/pages/admin-human-ai-synergy-trial"));
 const OperatorPage = lazy(() => import("@/pages/operator"));
 const AnalyticsPage = lazy(() => import("@/pages/analytics"));
@@ -80,6 +81,7 @@ const VaultPage = lazy(() => import("@/pages/vault"));
 const ScheduledTasksPage = lazy(() => import("@/pages/scheduled-tasks"));
 const SocialCalendarPage = lazy(() => import("@/pages/social-calendar"));
 const McpKeysPage = lazy(() => import("@/pages/mcp-keys"));
+const FelixConnectorPage = lazy(() => import("@/pages/felix-connector"));
 const ProcedureEditsPage = lazy(() => import("@/pages/procedure-edits"));
 const ProjectsPage = lazy(() => import("@/pages/projects"));
 const JobsPage = lazy(() => import("@/pages/jobs"));
@@ -219,6 +221,7 @@ function PageRouter() {
       <Switch>
         <Route path="/chat/:id" component={ChatPage} />
         <Route path="/chat" component={ChatPage} />
+        <Route path="/felix-connector" component={FelixConnectorPage} />
         {isAdmin && <Route path="/settings" component={SettingsPage} />}
         <Route path="/skills" component={SkillsPage} />
         <Route path="/personas" component={PersonasPage} />
@@ -261,6 +264,7 @@ function PageRouter() {
         {isPlatformAdmin && <Route path="/income-opportunities/ai-stack-decision-review" component={AdminAiStackDecisionReviewPage} />}
          {isPlatformAdmin && config.researchFrontierEnabled && <Route path="/admin/research-frontier" component={AdminResearchFrontierPage} />}
          {isPlatformAdmin && <Route path="/admin/engineering-reference" component={AdminEngineeringReferencePage} />}
+         {isPlatformAdmin && <Route path="/admin/demo-studio" component={AdminDemoStudioPage} />}
         {isPlatformAdmin && humanAiSynergyTrialEnabled && <Route path="/admin/human-ai-synergy-trial" component={AdminHumanAiSynergyTrialPage} />}
         {isAdmin && <Route path="/admin/persona-cost" component={AdminPersonaCostPage} />}
         {isAdmin && <Route path="/admin/repair-ledger" component={AdminRepairLedgerPage} />}
@@ -313,7 +317,7 @@ function PageRouter() {
 function AuthGate() {
   const { token, authRequired, isChecking, tenant, isReplitAuth } = useAuth();
   const isAuthenticated = !!token || isReplitAuth;
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
   const { data: setupStatus } = useQuery<{ needsSetup: boolean; isFreshDeploy: boolean }>({
     queryKey: ["/api/setup/status"],
@@ -324,6 +328,14 @@ function AuthGate() {
   useEffect(() => {
     setAuthToken(token);
   }, [token]);
+
+  useEffect(() => {
+    if (!isAuthenticated || location !== "/") return;
+    const pendingRequest = sessionStorage.getItem("felix_connector_login_return");
+    if (!pendingRequest) return;
+    sessionStorage.removeItem("felix_connector_login_return");
+    navigate(`/felix-connector?request=${encodeURIComponent(pendingRequest)}`);
+  }, [isAuthenticated, location, navigate]);
 
   useEffect(() => {
     const setupAllowedPaths = ["/setup", "/signup", "/login", "/terms", "/privacy"];
@@ -344,6 +356,7 @@ function AuthGate() {
     return (
       <Suspense fallback={<PageLoadingFallback />}>
         <Switch>
+          <Route path="/felix-connector" component={FelixConnectorPage} />
           <Route path="/login" component={LoginPage} />
           <Route path="/signup" component={SignupPage} />
           <Route path="/forgot-password" component={ForgotPasswordPage} />
@@ -379,6 +392,7 @@ function AuthGate() {
     return (
       <Suspense fallback={<PageLoadingFallback />}>
         <Switch>
+          <Route path="/felix-connector" component={FelixConnectorPage} />
           <Route path="/signup" component={SignupPage} />
           <Route path="/login" component={LoginPage} />
           <Route path="/forgot-password" component={ForgotPasswordPage} />
@@ -434,6 +448,7 @@ function AuthGate() {
   return (
     <Suspense fallback={<PageLoadingFallback />}>
       <Switch>
+        <Route path="/felix-connector" component={FelixConnectorPage} />
         <Route path="/landing" component={LandingPage} />
         <Route path="/setup" component={SetupPage} />
         <Route path="/signup" component={SignupPage} />

@@ -2,13 +2,31 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { selectFelixModel, getFelixExpertLanes } from "../../server/felix-model-policy";
 import { resolveFelixExpertLane, FelixExpertUnavailableError } from "../../server/felix-expert-route";
+const metaEnv = { META_PRIMARY_ENABLED: "1", META_API_KEY: "synthetic" };
+
+test("owner Felix advisory ingress uses approved Meta primary before the two constrained legacy lanes", () => {
+  const context = { tenantId: 1, ownerTenantId: 1, personaId: 2, source: "api-v1", enabled: true };
+  const lanes = getFelixExpertLanes(context, metaEnv)!;
+  assert.deepEqual(lanes.map(l => l.providerLane), ["meta-direct", "profundo", "replit"]);
+  assert.equal(lanes[0].modelId, "meta-direct/muse-spark-1.3");
+  assert.equal(lanes[0].actualModelId, "muse-spark-1.3");
+  const demanding = getFelixExpertLanes({ ...context, content: "Run a complex investigation" }, metaEnv)!;
+  assert.equal(demanding[0].actualModelId, "muse-wonder-1.0");
+  assert.equal(getFelixExpertLanes({ ...context, tenantId: 9 }, metaEnv), null);
+  assert.equal(getFelixExpertLanes({ ...context, personaId: 3 }, metaEnv), null);
+  assert.equal(getFelixExpertLanes({ ...context, source: "web" }, metaEnv), null);
+  assert.equal(getFelixExpertLanes({ ...context, model: "claude-opus-5-5" }, metaEnv), null);
+  for (const env of [{}, { ...metaEnv, META_ENABLED: "0" }, { ...metaEnv, META_PRIMARY_ENABLED: "0" }]) {
+    assert.deepEqual(getFelixExpertLanes(context, env)!.map(l => l.providerLane), ["profundo", "replit"]);
+  }
+});
 test("owner Felix agent turns prefer Luna subscription with the existing Replit fallback", () => {
   const context = { tenantId: 1, ownerTenantId: 1, personaId: 2, enabled: true };
-  assert.deepEqual(getFelixExpertLanes({ ...context, source: "api-v1" }), [
+  assert.deepEqual(getFelixExpertLanes({ ...context, source: "api-v1" }, {}), [
     { modelId: "gpt-5.6-luna", actualModelId: "gpt-5.6-luna", providerLane: "profundo" },
     { modelId: "gpt-5.4", actualModelId: "gpt-5.4", providerLane: "replit" },
   ]);
-  assert.equal(getFelixExpertLanes({ ...context, source: "a2a" })?.length, 2);
+  assert.equal(getFelixExpertLanes({ ...context, source: "a2a" }, {})?.length, 2);
   assert.equal(getFelixExpertLanes({ ...context, source: "web" }), null);
   assert.equal(getFelixExpertLanes({ ...context, source: "api-v1", tenantId: 3 }), null);
   assert.equal(getFelixExpertLanes({ ...context, source: "api-v1", personaId: 3 }), null);
@@ -48,7 +66,7 @@ test("expert route crosses providers without accepting a lower-model substitutio
 });
 
 test("Felix's subscription-first route detects substitution and exhausts without a new paid provider", async () => {
-  const lanes = getFelixExpertLanes({ tenantId: 1, ownerTenantId: 1, personaId: 2, source: "api-v1", enabled: true })!;
+  const lanes = getFelixExpertLanes({ tenantId: 1, ownerTenantId: 1, personaId: 2, source: "api-v1", enabled: true }, {})!;
   const resolved = await resolveFelixExpertLane(lanes, 0, async () =>
     ({ client: {} as never, actualModelId: "gpt-5.4" }));
   assert.equal(resolved.registryModelId, "gpt-5.4");
@@ -64,6 +82,24 @@ test("Felix's subscription-first route detects substitution and exhausts without
   await assert.rejects(resolveFelixExpertLane(lanes, 2, async () => {
     assert.fail("must not retry inference or choose another provider");
   }), FelixExpertUnavailableError);
+});
+
+test("expert resolution logs only allowlisted local failure reasons, never error payloads", async () => {
+  const original = console.warn;
+  const logs: string[] = [];
+  console.warn = message => { logs.push(String(message)); };
+  try {
+    for (const code of ["PROFUNDO_DISABLED", "constructor", "private-value"]) {
+      await assert.rejects(resolveFelixExpertLane([
+        { modelId: "gpt-5.6-luna", actualModelId: "gpt-5.6-luna", providerLane: "profundo" },
+      ], 0, async () => { throw Object.assign(new Error("private-provider-payload"), { code }); }),
+      FelixExpertUnavailableError);
+    }
+  } finally { console.warn = original; }
+  assert.match(logs[0], /\(disabled\)/);
+  assert.match(logs[1], /\(unclassified\)/);
+  assert.match(logs[2], /\(unclassified\)/);
+  assert.ok(logs.every(log => !log.includes("private-")));
 });
 
 const owner = { tenantId: 1, ownerTenantId: 1, personaId: 2 };

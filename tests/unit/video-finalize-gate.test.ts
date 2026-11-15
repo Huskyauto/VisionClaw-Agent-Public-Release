@@ -11,10 +11,13 @@
  * through the _finalizeTestHooks seams so ffmpeg and the self-repair loop are
  * never touched.
  */
-import { test, after } from "node:test";
+import { test, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "fs";
 import * as path from "path";
+import { execFileSync } from "node:child_process";
+import { getFfmpegPath } from "../../server/lib/ffmpeg-paths";
+import { sanitizeSpawnEnv } from "../../server/safety/spawn-env-guard";
 import {
   finalizeVideoJob,
   verifyFinalVideo,
@@ -26,6 +29,12 @@ import {
 const JOBS_ROOT = path.resolve(process.cwd(), "data", "video-jobs");
 const TMP = path.resolve(process.cwd(), "data", "video-jobs", "_gate_test_tmp");
 const CREATED: string[] = [];
+// Every nested side effect must be isolated: incident dispatch can call models,
+// and state persistence otherwise mirrors synthetic job records into the live DB.
+beforeEach(() => {
+  _finalizeTestHooks.incident = () => {};
+  _finalizeTestHooks.mirror = async () => {};
+});
 
 function makeJobId(suffix: string): string {
   const id = `vj_gatetest_${suffix}`;
@@ -58,8 +67,93 @@ function baseState(jobId: string, over: Partial<VideoJobState> = {}): VideoJobSt
 after(() => {
   delete _finalizeTestHooks.concat;
   delete _finalizeTestHooks.incident;
+  delete _finalizeTestHooks.upload;
+  delete _finalizeTestHooks.mirror;
   for (const d of CREATED) fs.rmSync(d, { recursive: true, force: true });
   fs.rmSync(TMP, { recursive: true, force: true });
+});
+
+test("a spoofed MP4 header and positive concat duration cannot reach upload", async () => {
+  fs.mkdirSync(TMP, { recursive: true });
+  const file = path.join(TMP, "spoof.mp4");
+  const bytes = Buffer.alloc(8192);
+  bytes.write("ftyp", 4);
+  fs.writeFileSync(file, bytes);
+  const jobId = makeJobId("measured");
+  writeState(baseState(jobId, {
+    chapters: [{ idx: 0, title: "c1", scene_count: 1, status: "done", file_path: file, attempts: 1 }],
+  }));
+  let uploads = 0;
+  _finalizeTestHooks.concat = async () => ({ success: true, filePath: file, durationSeconds: 10, sizeBytes: bytes.length, scenesProcessed: 1, steps: [] });
+  _finalizeTestHooks.upload = async () => { uploads++; return { success: false, error: "must not upload" }; };
+  _finalizeTestHooks.incident = () => {};
+  try {
+    const result = await finalizeVideoJob({ tenantId: 1, jobId });
+    assert.equal(result.success, false);
+    assert.equal(uploads, 0);
+    assert.match(result.error!, /quality-gate/);
+    assert.equal(readJobState(jobId)?.verification?.ok, false);
+  } finally {
+    delete _finalizeTestHooks.concat;
+    delete _finalizeTestHooks.upload;
+    delete _finalizeTestHooks.incident;
+  }
+});
+
+test("failed upload retries the exact verified copy without repeating concat", async () => {
+  fs.mkdirSync(TMP, { recursive: true });
+  const file = path.join(TMP, "retry-av.mp4");
+  execFileSync(getFfmpegPath(), ["-y", "-v", "error", "-f", "lavfi", "-i", "color=c=blue:s=320x180:r=30",
+    "-f", "lavfi", "-i", "sine=frequency=440", "-t", "1", "-c:v", "libx264", "-threads", "1", "-c:a", "aac", file],
+  { timeout: 15_000, env: sanitizeSpawnEnv(process.env) });
+  const jobId = makeJobId("uploadretry");
+  writeState(baseState(jobId, {
+    chapters: [{ idx: 0, title: "c1", scene_count: 1, status: "done", file_path: file, attempts: 1 }],
+  }));
+  let concats = 0;
+  const uploadPaths: string[] = [];
+  _finalizeTestHooks.concat = async () => { concats++; return { success: true, filePath: file, durationSeconds: 1, scenesProcessed: 1, steps: [] }; };
+  _finalizeTestHooks.upload = async input => {
+    assert.ok(input.filePath);
+    uploadPaths.push(input.filePath);
+    return { success: false, error: "offline upload failure" };
+  };
+  try {
+    const first = await finalizeVideoJob({ tenantId: 1, jobId });
+    assert.equal(first.success, false);
+    const identity = readJobState(jobId)?.verification?.identity;
+    assert.ok(identity?.sha256);
+    fs.unlinkSync(file); // accepted snapshot, not the producer pathname, is reused
+    await finalizeVideoJob({ tenantId: 1, jobId });
+    assert.equal(concats, 1);
+    assert.equal(uploadPaths.length, 2);
+    assert.equal(uploadPaths[0], uploadPaths[1]);
+    assert.deepEqual(readJobState(jobId)?.verification?.identity, identity);
+    const acceptedBytes = fs.readFileSync(uploadPaths[0]);
+    fs.chmodSync(uploadPaths[0], 0o600);
+    fs.writeFileSync(uploadPaths[0], "replaced bytes");
+    const changed = await finalizeVideoJob({ tenantId: 1, jobId });
+    assert.equal(changed.success, false);
+    assert.equal(uploadPaths.length, 2, "changed retained bytes cannot reach upload");
+    assert.equal(concats, 1, "identity failure cannot silently start another render");
+    fs.writeFileSync(uploadPaths[0], acceptedBytes);
+    _finalizeTestHooks.upload = async input => {
+      assert.equal(input.tenantId, 1);
+      assert.deepEqual(input.generatedArtifact?.metadata?.outputVerification, readJobState(jobId)?.verification);
+      return { success: true, viewUrl: "https://example.invalid/offline-drive-fixture" };
+    };
+    const success = await finalizeVideoJob({ tenantId: 1, jobId });
+    assert.equal(success.success, true);
+    assert.deepEqual(success.verification?.identity, identity);
+    assert.equal(readJobState(jobId)?.status, "done");
+    assert.equal(readJobState(jobId)?.pending_verified_output, undefined);
+    const cached = await finalizeVideoJob({ tenantId: 1, jobId });
+    assert.deepEqual(cached.verification?.identity, identity);
+    assert.equal(concats, 1);
+  } finally {
+    delete _finalizeTestHooks.concat;
+    delete _finalizeTestHooks.upload;
+  }
 });
 
 // ---------- verifyFinalVideo (pure quality gate) ----------

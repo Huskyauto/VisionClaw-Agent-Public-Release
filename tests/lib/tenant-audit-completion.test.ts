@@ -3,6 +3,51 @@ import assert from "node:assert/strict";
 import { invokeAuditRoute, parseAuditObject, AuditRouteRefused, auditProviderFailure,
   auditHealthKey, readAuditProviderHealth, auditFailureSummary } from "../../scripts/lib/tenant-audit-completion";
 import { auditRoutes, completeAuditText, AuditResponseError } from "../../scripts/lib/tenant-audit-fallback";
+import { auditProviderSuccess } from "../../scripts/lib/tenant-audit-completion";
+
+test("a validated provider success resets its lifetime failure streak without changing other routes", () => {
+  const [route, other] = auditRoutes();
+  let health = auditProviderFailure({}, route, Error("503"), 0);
+  health = auditProviderFailure(health, other, Error("503"), 0);
+  health = auditProviderSuccess(health, route);
+  assert.equal(health[auditHealthKey(route)], undefined);
+  assert.ok(health[auditHealthKey(other)]);
+  health = auditProviderFailure(health, route, Error("503"), 10);
+  assert.equal(health[auditHealthKey(route)].until, 300_010);
+});
+
+test("paid write-ahead admission happens after eligibility and resolution, immediately before SDK dispatch", async () => {
+  const events: string[] = [];
+  const route = auditRoutes()[4];
+  const resolve = async () => {
+    events.push("resolve");
+    return { actualModelId: route.model.slice("cheaperinference/".length), client: {
+      chat: { completions: { create: async () => { events.push("SDK"); return {
+        choices: [{ finish_reason: "stop", message: { content: '{"findings":[]}' } }],
+      }; } } },
+    } };
+  };
+  await invokeAuditRoute(route, "s", "u", 100, {
+    paidAllowed: () => true, resolve,
+    beforeDispatch: async () => { events.push("marker"); },
+  });
+  assert.deepEqual(events, ["resolve", "marker", "SDK"]);
+  events.length = 0;
+  await assert.rejects(() => invokeAuditRoute(route, "s", "u", 100, {
+    paidAllowed: () => false, resolve, beforeDispatch: async () => { events.push("marker"); },
+  }));
+  assert.deepEqual(events, []);
+  await assert.rejects(() => invokeAuditRoute(route, "s", "u", 100, {
+    paidAllowed: () => true, resolve: async () => { throw new Error("resolve failed"); },
+    beforeDispatch: async () => { events.push("marker"); },
+  }), /resolve failed/);
+  assert.deepEqual(events, []);
+  await assert.rejects(() => invokeAuditRoute(route, "s", "u", 100, {
+    paidAllowed: () => true, resolve,
+    beforeDispatch: async () => { throw new Error("admission persistence failed"); },
+  }), /no fallback permitted/);
+  assert.equal(events.includes("SDK"), false);
+});
 
 test("audit response diagnostics distinguish truncation, refusal, empty and invalid shape without exposing content", () => {
   const cases: [any, string][] = [

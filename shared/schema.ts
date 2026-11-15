@@ -261,18 +261,89 @@ export const sparkOutbox = pgTable("spark_outbox", {
   personaId: integer("persona_id").notNull().references(() => personas.id),
   conversationId: integer("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
   message: text("message").notNull(),
+  recipient: text("recipient").notNull().default("spark"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   tenantCursorIdx: index("idx_spark_outbox_tenant_id").on(t.tenantId, t.id),
   tenantCreatedIdx: index("idx_spark_outbox_tenant_created").on(t.tenantId, t.createdAt),
   personaIdx: index("idx_spark_outbox_persona").on(t.personaId),
   conversationIdx: index("idx_spark_outbox_conversation").on(t.conversationId),
+  recipientCursorIdx: index("idx_spark_outbox_recipient_cursor").on(t.tenantId, t.recipient, t.id),
   messageLength: check("spark_outbox_message_length", sql`char_length(${t.message}) BETWEEN 1 AND 4000`),
 }));
 
 export const insertSparkOutboxSchema = createInsertSchema(sparkOutbox).omit({ id: true, createdAt: true });
 export type SparkOutboxMessage = typeof sparkOutbox.$inferSelect;
 export type InsertSparkOutboxMessage = z.infer<typeof insertSparkOutboxSchema>;
+
+/** Owner-scoped OAuth metadata/credentials. Opaque record ids are hashes;
+ * payload is authenticated-encrypted, never an agent memory source. */
+export const felixConnectorRecords = pgTable("felix_connector_records", {
+  id: text("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  clientId: text("client_id").notNull(),
+  payload: text("payload").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, t => ({
+  tenantClient: index("idx_felix_connector_records_tenant_client").on(t.tenantId, t.clientId),
+  expiry: index("idx_felix_connector_records_expiry").on(t.expiresAt),
+}));
+export const insertFelixConnectorRecordSchema = createInsertSchema(felixConnectorRecords);
+export type FelixConnectorRecord = typeof felixConnectorRecords.$inferSelect;
+export type InsertFelixConnectorRecord = z.infer<typeof insertFelixConnectorRecordSchema>;
+
+export const felixLineClients = pgTable("felix_line_clients", {
+  clientId: text("client_id").primaryKey(),
+  allowWork: boolean("allow_work").notNull().default(false),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  conversationId: integer("conversation_id").notNull().references(() => conversations.id),
+  outboxCursor: integer("outbox_cursor").notNull().default(0),
+  deliveredId: integer("delivered_id").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => ({
+  tenantClient: index("idx_felix_line_clients_tenant").on(t.tenantId, t.clientId),
+  conversation: uniqueIndex("idx_felix_line_clients_conversation").on(t.conversationId),
+}));
+export const insertFelixLineClientSchema = createInsertSchema(felixLineClients).omit({ createdAt: true });
+export type FelixLineClient = typeof felixLineClients.$inferSelect;
+export type InsertFelixLineClient = z.infer<typeof insertFelixLineClientSchema>;
+
+export const felixLineTurns = pgTable("felix_line_turns", {
+  requestId: text("request_id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  clientId: text("client_id").notNull().references(() => felixLineClients.clientId),
+  conversationId: integer("conversation_id").notNull().references(() => conversations.id),
+  idempotencyKey: text("idempotency_key").notNull(),
+  messageHash: text("message_hash").notNull(),
+  result: jsonb("result"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => ({
+  tenantKey: uniqueIndex("idx_felix_line_turns_key").on(t.tenantId, t.clientId, t.idempotencyKey),
+  clientCreated: index("idx_felix_line_turns_client_created").on(t.tenantId, t.clientId, t.createdAt),
+  client: index("idx_felix_line_turns_client").on(t.clientId),
+  conversation: index("idx_felix_line_turns_conversation").on(t.conversationId),
+}));
+export const insertFelixLineTurnSchema = createInsertSchema(felixLineTurns).omit({ createdAt: true });
+export type FelixLineTurn = typeof felixLineTurns.$inferSelect;
+export type InsertFelixLineTurn = z.infer<typeof insertFelixLineTurnSchema>;
+
+export const felixLineAudit = pgTable("felix_line_audit", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  clientId: text("client_id").notNull().references(() => felixLineClients.clientId),
+  tool: text("tool").notNull(),
+  requestId: text("request_id"),
+  ok: boolean("ok").notNull(),
+  error: text("error"),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+}, t => ({
+  tenantAt: index("idx_felix_line_audit_tenant_at").on(t.tenantId, t.at),
+  client: index("idx_felix_line_audit_client").on(t.clientId),
+}));
+export const insertFelixLineAuditSchema = createInsertSchema(felixLineAudit).omit({ id: true, at: true });
+export type FelixLineAudit = typeof felixLineAudit.$inferSelect;
+export type InsertFelixLineAudit = z.infer<typeof insertFelixLineAuditSchema>;
 
 /** Felix-to-Grok messages are tenant-scoped and retained for 30 days. */
 export const grokOutbox = pgTable("grok_outbox", {
@@ -2132,6 +2203,7 @@ export const typesafeFactPrefilterObservations = pgTable("typesafe_fact_prefilte
   extractorRan: boolean("extractor_ran"),
   factsWritten: integer("facts_written"),
   errorClass: text("error_class"),
+  decisionReceipt: jsonb("decision_receipt"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

@@ -10,6 +10,11 @@ const PRIMARY_USERNAME = process.env.AGENTMAIL_USERNAME || "agent";
 let client: AgentMailClient | null = null;
 let primaryInboxId: string | null = null;
 
+function errorDiagnostic(error: unknown): string {
+  const status = Number((error as any)?.status);
+  return `${(error as any)?.name || "Error"}${Number.isInteger(status) ? ` status=${status}` : ""}`;
+}
+
 function getClient(): AgentMailClient {
   if (!client) {
     if (!AGENTMAIL_API_KEY) {
@@ -98,7 +103,7 @@ export async function getOrCreateTenantInbox(tenantId: number): Promise<{ inboxI
     agentmailEmail: virtualEmail,
   }).where(eq(tenants.id, tenantId));
 
-  console.log(`[email] Assigned virtual inbox to tenant ${tenantId}: ${virtualEmail}`);
+  console.log(`[email] Assigned virtual inbox to tenant ${tenantId}`);
   return { inboxId, email: virtualEmail };
 }
 
@@ -116,7 +121,7 @@ export async function provisionAllTenantInboxes(): Promise<void> {
         agentmailInboxId: inboxId,
         agentmailEmail: virtualEmail,
       }).where(eq(tenants.id, t.id));
-      console.log(`[email] Assigned virtual inbox to tenant ${t.id} (${t.name}): ${virtualEmail}`);
+      console.log(`[email] Assigned virtual inbox to tenant ${t.id}`);
       provisioned++;
     }
 
@@ -126,7 +131,7 @@ export async function provisionAllTenantInboxes(): Promise<void> {
       console.log(`[email] All tenants already have virtual inboxes`);
     }
   } catch (err: any) {
-    console.warn(`[email] provisionAllTenantInboxes error: ${err.message}`);
+    console.warn(`[email] provisionAllTenantInboxes failed (${errorDiagnostic(err)})`);
   }
 }
 
@@ -237,7 +242,7 @@ async function sendEmailInternal(params: {
       });
       // Opportunistic flush — if 24h have rolled over, this call will send
       // the digest now. Fire-and-forget so we don't block the hot path.
-      flushIfDue().catch((e) => console.warn(`[email] digest flush error: ${e?.message}`, e?.stack || e));
+      flushIfDue().catch((e) => console.warn(`[email] digest flush failed (${errorDiagnostic(e)})`));
       if (gate.action === "queued") {
         return { queued: true, owner_digest_pending: gate.queuedCount } as any;
       }
@@ -245,7 +250,7 @@ async function sendEmailInternal(params: {
         return { silenced: true } as any;
       }
     } catch (e: any) {
-      console.warn(`[email] owner-digest gate error (failing open): ${e?.message}`);
+      console.warn(`[email] owner-digest gate error (failing open): ${errorDiagnostic(e)}`);
     }
   }
 
@@ -253,7 +258,7 @@ async function sendEmailInternal(params: {
   const actualInboxId = await getPrimaryInboxId();
   const bodyText = params.text || params.body || "";
   if (!bodyText && !params.html) {
-    console.warn(`[email] WARNING: sendEmail called with empty body. to=${params.to}, subject=${params.subject}`);
+    console.warn("[email] WARNING: sendEmail called with empty body");
   }
 
   // Task #161 — the R98.25 bounce gate, R125+138 quality gate, and R95
@@ -293,7 +298,7 @@ async function sendEmailInternal(params: {
     }
   } catch (e: any) {
     // Advisory stamp only — never block a send on ledger plumbing.
-    console.warn(`[email] ledger-key header stamp skipped: ${e?.message || e}`);
+    console.warn(`[email] ledger-key header stamp skipped (${errorDiagnostic(e)})`);
   }
   if (params.cc) sendParams.cc = params.cc;
   if (params.bcc) sendParams.bcc = params.bcc;
@@ -310,7 +315,7 @@ async function sendEmailInternal(params: {
       const isRetryable = err.status === 429
         || (params.retryAmbiguous !== false && (!err.status || err.status >= 500));
       if (attempt < MAX_RETRIES && isRetryable) {
-        console.warn(`[email] Send attempt ${attempt}/${MAX_RETRIES} failed (${err.message}), retrying in ${RETRY_DELAY}ms...`);
+        console.warn(`[email] Send attempt ${attempt}/${MAX_RETRIES} failed (${errorDiagnostic(err)}), retrying in ${RETRY_DELAY}ms...`);
         await new Promise((r) => setTimeout(r, RETRY_DELAY * attempt));
       } else {
         throw err;
@@ -363,7 +368,7 @@ export async function replyToEmail(params: {
     }
   } catch (e: any) {
     if (e?.message?.includes("outbound quality gate")) throw e;
-    console.warn(`[email] reply quality gate error (failing open): ${e?.message}`);
+    console.warn(`[email] reply quality gate error (failing open): ${errorDiagnostic(e)}`);
   }
 
   // R125+143 (architect HIGH closed) — replies also get the R95 outbound
@@ -420,7 +425,7 @@ export function startInboxPolling(intervalMs = 120000): void {
           const detail = await getMessage(inboxId, msgId);
           fullMsg = { ...m, ...detail };
         } catch (fetchErr: any) {
-          console.warn(`[email-poll] Could not fetch full message ${msgId}: ${fetchErr.message}`);
+          console.warn(`[email-poll] Could not fetch full message (${errorDiagnostic(fetchErr)})`);
         }
 
         const res = await storeEmail({
@@ -436,7 +441,7 @@ export function startInboxPolling(intervalMs = 120000): void {
         console.log(`[email-poll] Stored ${stored} new messages from shared inbox`);
       }
     } catch (err: any) {
-      console.warn(`[email-poll] Poll cycle error: ${err.message}`);
+      console.warn(`[email-poll] Poll cycle error (${errorDiagnostic(err)})`);
     }
   }
 
@@ -469,13 +474,13 @@ export async function backfillEmptyBodies(): Promise<void> {
         }
       } catch (err: any) {
         if (!err.message?.includes("not found")) {
-          console.warn(`[email-backfill] Failed to fetch message ${row.message_id}: ${err.message}`);
+          console.warn(`[email-backfill] Failed to fetch message (${errorDiagnostic(err)})`);
         }
       }
     }
     console.log(`[email-backfill] Filled content for ${filled}/${rows.length} emails`);
   } catch (err: any) {
-    console.warn(`[email-backfill] Error: ${err.message}`);
+    console.warn(`[email-backfill] Error (${errorDiagnostic(err)})`);
   }
 }
 
@@ -515,7 +520,7 @@ export async function storeEmail(payload: any): Promise<{ id: number; isNew: boo
         const found = ((rows as any).rows || rows)?.[0];
         if (found) tenantId = found.id;
       } catch (err: any) {
-        console.error(`[email] Tenant lookup failed for outbound from=${from}: ${err.message}`);
+        console.error(`[email] Tenant lookup failed for outbound message (${errorDiagnostic(err)})`);
       }
     }
     if (!tenantId) {
@@ -525,7 +530,7 @@ export async function storeEmail(payload: any): Promise<{ id: number; isNew: boo
       // agentmail_inbox_id / agentmail_email would land in tenant 1's
       // inbox_messages, leaking into the admin's view. Now we drop the
       // message with a high-priority log instead. Code-review FAIL fix.
-      console.error(`[email] SECURITY: refusing to store outbound email — tenant unresolved. from=${from} to=${rawTo} subject="${subject}" message_id=${messageId}`);
+      console.error("[email] SECURITY: refusing to store outbound email — tenant unresolved");
       return { id: 0, isNew: false };
     }
   } else {
@@ -538,7 +543,7 @@ export async function storeEmail(payload: any): Promise<{ id: number; isNew: boo
         const found = ((rows as any).rows || rows)?.[0];
         if (found) tenantId = found.id;
       } catch (err: any) {
-        console.error(`[email] Tenant lookup failed for inbound to=${rawTo}: ${err.message}`);
+        console.error(`[email] Tenant lookup failed for inbound message (${errorDiagnostic(err)})`);
       }
     }
     if (!tenantId) {
@@ -546,7 +551,7 @@ export async function storeEmail(payload: any): Promise<{ id: number; isNew: boo
       // Previous fallback caused inbound emails addressed to unknown/typo'd
       // recipients to land in admin tenant 1 — direct cross-tenant leak.
       // Now we drop the message with a high-priority log. Code-review FAIL fix.
-      console.error(`[email] SECURITY: refusing to store inbound email — tenant unresolved. from=${from} to=${rawTo} subject="${subject}" message_id=${messageId}`);
+      console.error("[email] SECURITY: refusing to store inbound email — tenant unresolved");
       return { id: 0, isNew: false };
     }
   }
@@ -564,12 +569,12 @@ export async function storeEmail(payload: any): Promise<{ id: number; isNew: boo
       const verdict = await isSenderApproved(tenantId, from);
       quarantined = !verdict.approved;
       if (quarantined) {
-        console.warn(`[inbox-quarantine] holding inbound msg from "${from}" (reason=${verdict.reason}) tenant=${tenantId}`);
+        console.warn(`[inbox-quarantine] holding inbound message (tenant=${tenantId})`);
       } else {
         await touchLastSeen(tenantId, from);
       }
     } catch (e: any) {
-      console.warn(`[inbox-quarantine] gate failed (fail-closed quarantining): ${e?.message || e}`);
+      console.warn(`[inbox-quarantine] gate failed (fail-closed quarantining): ${errorDiagnostic(e)}`);
       quarantined = true;
     }
   }
@@ -583,12 +588,12 @@ export async function storeEmail(payload: any): Promise<{ id: number; isNew: boo
     );
     const inserted = ((result as any).rows || result)?.[0];
     if (inserted) {
-      console.log(`[email] Stored ${direction}: id=${inserted.id} tenant=${tenantId} from=${from} to=${rawTo} subject="${subject}"${quarantined ? " QUARANTINED" : ""}`);
+      console.log(`[email] Stored ${direction}: id=${inserted.id} tenant=${tenantId}${quarantined ? " QUARANTINED" : ""}`);
       return { id: inserted.id, isNew: true };
     }
     return { id: 0, isNew: false };
   } catch (err: any) {
-    console.error(`[email] Failed to store email: ${err.message}`);
+    console.error(`[email] Failed to store email (${errorDiagnostic(err)})`);
     throw err;
   }
 }

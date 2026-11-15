@@ -11,8 +11,12 @@ import { getFelixExpertFailureReason } from "./felix-expert-route";
 export function invokeApiV1Process(
   process: typeof processMessage, tenantId: number, conversationId: number, message: string,
   instinctReadDraft?: true,
+  messagingOnly?: true,
+  delegatedWork?: true,
 ) {
-  const run = () => process(conversationId, message, { tenantId, source: "api-v1" });
+  const run = () => process(conversationId, message, { tenantId, source: "api-v1",
+    ...(messagingOnly ? {messagingOnly: true as const, skipOptionalPreflights:true as const, enableTools: false, toolFilter: []}
+      : delegatedWork ? {skipOptionalPreflights:true as const,enableTools:true} : {}) });
   return instinctReadDraft ? withInstinctReadDraft(run) : run();
 }
 
@@ -106,11 +110,11 @@ export async function dispatchApiV1Task(
 /** Queue an already-claimed API-v1 follow-up without blocking the HTTP form POST. */
 export function launchApiV1FollowUp(
   tenantId: number, conversationId: number, message: string,
-  options: { process?: typeof processMessage; onSettled?: (state: "complete" | "failed") => Promise<void>; instinctReadDraft?: true } = {},
+  options: { process?: typeof processMessage; onSettled?: (state: "complete" | "failed") => Promise<void>; instinctReadDraft?: true; messagingOnly?: true; delegatedWork?:true } = {},
 ) {
   const process = options.process || processMessage;
   queueMicrotask(() => {
-    void invokeApiV1Process(process, tenantId, conversationId, message, options.instinctReadDraft)
+    void invokeApiV1Process(process, tenantId, conversationId, message, options.instinctReadDraft, options.messagingOnly, options.delegatedWork)
       .then(async result => {
         if (!(await finishApiV1Turn(tenantId, conversationId, "complete", undefined, result)))
           throw new Error("API turn did not complete with a persisted reply");

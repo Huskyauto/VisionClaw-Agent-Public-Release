@@ -70,11 +70,20 @@ test("Felix expert routing is decided before optional model preflights and auto-
   const refinement = engine.indexOf("refinePromptViaJury({");
   const ensemble = engine.indexOf("shouldAutoInvokeEnsemble(content.trim()");
   assert.ok(gate > 0 && gate < refinement && refinement < ensemble);
-  assert.match(engine, /if \(!expertLanes && \(opts\?\.depth \?\? 0\) === 0 && !opts\?\.source\?\.startsWith\("subagent:"\) && !promptRefined\)/);
+  assert.match(engine, /if \(!opts\?\.messagingOnly && !opts\?\.skipOptionalPreflights && !expertLanes && \(opts\?\.depth \?\? 0\) === 0 && !opts\?\.source\?\.startsWith\("subagent:"\) && !promptRefined\)/);
   assert.match(engine, /if \(!expertLanes && conv\.model === "auto" && round > 0\)/);
   assert.match(engine, /const needsTitle = !expertLanes/);
   assert.match(engine, /const outcomeEnabled = !expertLanes &&/);
   assert.match(engine, /if \(!expertLanes && !retainedJuryPackage && cleanedResponse\.length > 100/);
+});
+
+test("Felix cooldown recovery wraps completion only and shares one allowance across tool rounds", () => {
+  const budget = engine.indexOf("const expertRateLimitBudget = { used: false }");
+  const loop = engine.indexOf("overflow_retry: for");
+  assert.ok(budget > 0 && budget < loop);
+  assert.match(engine, /withFelixReplitRateLimitRecovery\(\s*\(\) => requestWithModelToolRoster\(/);
+  assert.match(engine, /expertProviderLane === "replit" \? \{ maxRetries: 0 \} : undefined/);
+  assert.match(engine, /providerLane: expertProviderLane, budget: expertRateLimitBudget/);
 });
 
 test("A2A failures terminate durably without granting Spark follow-up authority", () => {

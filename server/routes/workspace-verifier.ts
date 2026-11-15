@@ -7,7 +7,7 @@ export interface WorkspaceVerifierRouteDependencies {
   enabled(): boolean;
   key(): string;
   now(): number;
-  claim(requestId: unknown): Promise<unknown>;
+  claim(requestId: unknown, contextSha256?: unknown): Promise<unknown>;
   settle(input: any): Promise<unknown>;
 }
 
@@ -16,7 +16,7 @@ export function registerWorkspaceVerifierRoutes(app: Express, deps: WorkspaceVer
   enabled: () => process.env.NODE_ENV === "production" && process.env.PROPOSAL_VERIFIER_WORKSPACE_ENABLED === "1",
   key: () => process.env.REPAIR_HANDOFF_HMAC_KEY ?? "",
   now: Date.now,
-  claim: async id => (await import("../lib/workspace-verifier-store")).claimWorkspaceVerification(id),
+  claim: async (id, context) => (await import("../lib/workspace-verifier-store")).claimWorkspaceVerification(id, context),
   settle: async body => (await import("../lib/workspace-verifier-store")).settleWorkspaceVerification(body),
 }): void {
   let active = 0;
@@ -40,7 +40,7 @@ export function registerWorkspaceVerifierRoutes(app: Express, deps: WorkspaceVer
       try {
         const body = JSON.parse(bytes.toString("utf8"));
         if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid body");
-        res.json(await (action === "claim" ? deps.claim(body.requestId) : deps.settle(body)));
+        res.json(await (action === "claim" ? deps.claim(body.requestId, body.contextSha256) : deps.settle(body)));
       } catch {
         // Never reflect DB/paths/proposal contents to the network or logs.
         res.status(409).json({ error: "Verification unavailable or fenced; queued work is retained" });

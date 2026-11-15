@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { runTenantAuditJob, type TenantAuditRunnerPorts } from "../../server/lib/tenant-audit-runner";
 import type { AgentJob } from "../../server/job-queue";
 import { TenantAuditLeaseLost } from "../../server/lib/tenant-audit-job-state";
+import { TenantAuditStop } from "../../server/lib/tenant-audit-job-state";
 import { readFileSync } from "node:fs";
 
 const sourceHash = "a".repeat(64);
@@ -11,13 +12,16 @@ const job = { id: 9, attempts: 1, tenantId: 1, kind: "tenant_isolation_audit",
     dedupeKey: `tenant-audit:2026-10-24:${sourceHash}` } } as AgentJob;
 function harness(code: number, report: any = { degraded: true }) {
   const calls: string[] = [];
+  let reads = 0;
   const ports: TenantAuditRunnerPorts = {
-    state: async () => ({ auditSlices: 1, auditReport: report }),
+    state: async () => ({ auditSlices: 1, auditReport: report,
+      auditCheckpoint: { completed: reads++ >= 2 && code === 7 ? { "0": [] } : {} } }),
     acquire: async () => async () => { calls.push("release"); },
     claimSlice: async () => { calls.push("claim"); },
     child: async () => { calls.push("child"); return { code, deadline: false }; },
     continue: async () => { calls.push("continue"); },
     outage: async () => { calls.push("backoff"); },
+    deadline: async () => { calls.push("deadline-stalled"); },
     recordFailure: async () => { calls.push("failure"); },
     command: () => ({ command: "offline-mock", args: [] }),
   };
@@ -93,16 +97,44 @@ test("exhausted provider ladder backs off on the same job without terminal failu
   assert.deepEqual(await runTenantAuditJob(job, h.ports), { status: "provider_backoff", continued: true });
   assert.deepEqual(h.calls, ["claim", "child", "backoff", "release"]);
 });
+test("a poison unit cannot masquerade as provider recovery forever without completed work", async () => {
+  const h = harness(8);
+  h.ports.state = async () => ({ auditSlices: 12, auditOutages: 11, auditReport: { degraded: true } });
+  await assert.rejects(() => runTenantAuditJob(job, h.ports), TenantAuditStop);
+  assert.deepEqual(h.calls, ["claim", "child", "release"]);
+});
+test("completed work resets the recovery streak even when a later unit hits an outage", async () => {
+  const h = harness(8);
+  let reads = 0, reset: boolean | undefined;
+  h.ports.state = async () => ({ auditSlices: 12, auditOutages: 11,
+    auditCheckpoint: { completed: reads++ >= 2 ? { "0": [] } : {} } });
+  h.ports.outage = async progress => { reset = progress; };
+  assert.equal((await runTenantAuditJob(job, h.ports)).status, "provider_backoff");
+  assert.equal(reset, true);
+});
 
-test("a stuck child hands off after its hard deadline rather than exhausting the old three-failure stop", async () => {
+test("a deadline with no completed work backs off through the dedicated stall gate, not prompt continuation", async () => {
   const h = harness(5);
   h.ports.child = async () => { h.calls.push("child"); return { code: 5, deadline: true }; };
   h.ports.outage = async () => { h.calls.push("backoff"); };
-  assert.equal((await runTenantAuditJob(job, h.ports)).status, "provider_backoff");
-  assert.deepEqual(h.calls, ["claim", "child", "backoff", "release"]);
+  assert.equal((await runTenantAuditJob(job, h.ports)).status, "incomplete");
+  assert.deepEqual(h.calls, ["claim", "child", "deadline-stalled", "release"]);
+});
+test("a graceful scheduling yield without completed work also uses the bounded stall gate", async () => {
+  const h = harness(7);
+  h.ports.state = async () => ({ auditSlices: 1, auditReport: { degraded: true } });
+  assert.equal((await runTenantAuditJob(job, h.ports)).status, "incomplete");
+  assert.deepEqual(h.calls, ["claim", "child", "deadline-stalled", "release"]);
 });
 
 test("scheduled child preserves an operator's explicit Profundo disable", () => {
   const source = readFileSync("server/lib/tenant-audit-runner.ts", "utf8");
   assert.match(source, /PROFUNDO_ENABLED: process\.env\.PROFUNDO_ENABLED === "0" \? "0" : "1"/);
+});
+
+test("already consumed daily batch never dispatches or completes the retained audit", async () => {
+  const h = harness(0);
+  h.ports.claimSlice = async () => { h.calls.push("daily-defer"); return false; };
+  assert.deepEqual(await runTenantAuditJob(job, h.ports), { status: "daily_batch_wait", continued: true });
+  assert.deepEqual(h.calls, ["daily-defer", "release"]);
 });

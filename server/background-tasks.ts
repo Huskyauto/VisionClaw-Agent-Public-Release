@@ -92,7 +92,10 @@ export function launchBackgroundTask(
         policyBlockReason = `Destructive-tool policy check failed for '${toolName}'. Refusing to execute.`;
       }
       if (policyBlockReason) throw new Error(policyBlockReason);
-      const result = await executeTool(toolName, { ...params, _tenantId: tenantId });
+      const result = await executeTool(toolName, params, {
+        tenantId, actor: "system", invokedVia: "background-task",
+        internalPurpose: "Execute an existing policy-checked background task",
+      });
       task.result = result;
       task.status = "completed";
       task.completedAt = Date.now();

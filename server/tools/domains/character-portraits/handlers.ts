@@ -92,7 +92,10 @@ async function initCharacterPortraitsHandler(
       tenantId: tid,
       characters,
       defaultViews,
-      executeTool: (n: string, p: any, t: number) => executeTool(n, { ...p, _tenantId: t }),
+      executeTool: (n: string, p: any, t: number) => executeTool(n, p, {
+        tenantId: t, actor: "system", invokedVia: "portrait-render",
+        internalPurpose: "Generate the requested tenant character portrait",
+      }),
     });
     return { success: true, ...r };
   } catch (e: any) { return { error: `init_character_portraits failed: ${e?.message || String(e)}` }; }

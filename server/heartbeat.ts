@@ -2895,6 +2895,9 @@ export async function delegateTaskFromChat(
             ...(wf || {}),
             _tenantId: tenantId,
             _personaId: fromPersona.id,
+          }, {
+            tenantId, actor: "persona", personaId: fromPersona.id,
+            invokedVia: "heartbeat",
           });
           if (redirected && !redirected.error) {
             return {

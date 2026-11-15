@@ -13,7 +13,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { dispatchTool } from "../../server/tools/dispatcher";
+import { dispatchTool as realDispatchTool } from "../../server/tools/dispatcher";
+import { withToolAuthority } from "../../server/tools/invocation-authority";
+const dispatchTool = (name: string, params: Record<string, any>) => withToolAuthority({
+  tenantId: 42, personaId: 7, conversationId: 99, rateLimitChecked: true,
+  actor: "persona", invokedVia: "offline-dispatch-fixture",
+}, () => realDispatchTool(name, params));
 import { registerTools } from "../../server/tools/registry";
 import { getLegacyExecutor, setLegacyExecutor } from "../../server/tools/legacy-switch";
 import { defineTool } from "../../server/tools/define-tool";

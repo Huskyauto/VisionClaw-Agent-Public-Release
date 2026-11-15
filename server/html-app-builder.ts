@@ -1,9 +1,8 @@
 // R98.12 — Felix Deliverable Reliability Plan W5: HTML app builder.
 // Generates a single-file index.html (embedded CSS+JS) for small downloadable
 // utilities (password generators, calculators, converters, timers, todo apps).
-// Smoke-tests the output with jsdom before declaring success — catches the
-// silent-broken-app failure mode where the LLM emits HTML that parses but the
-// JS throws on first user interaction.
+// Statically validates output DOM with jsdom before returning. Generated scripts
+// are never executed in this server process; this is not a browser behavior test.
 //
 // Lives under project-assets/html-apps/<slug>-<timestamp>/index.html so the
 // deliverable-verifier path-jail accepts it (project-assets is on the
@@ -11,8 +10,8 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { runLlmTask } from "./llm-task";
 import { logSilentCatch } from "./lib/silent-catch";
+import { demoProjectSchema, renderDemoHtml, type DemoProject } from "../shared/demo-studio";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd());
 const HTML_APPS_ROOT = path.resolve(WORKSPACE_ROOT, "project-assets", "html-apps");
@@ -27,6 +26,7 @@ export interface BuildHtmlAppInput {
   smoke_assertion?: HtmlSmokeAssertion; // R98.14 +sec-2 — STRUCTURED ONLY. Free-form JS expressions are REJECTED (eval sink). See HtmlSmokeAssertion.
   model?: string;
   timeoutMs?: number;
+  demo?: DemoProject;                  // deterministic walkthrough; skips model generation
 }
 
 export interface BuildHtmlAppResult {
@@ -40,6 +40,7 @@ export interface BuildHtmlAppResult {
   smokeWarnings?: string[];
   title?: string;
   error?: string;
+  verificationScope?: "static-dom-only";
 }
 
 function slugify(s: string): string {
@@ -245,6 +246,12 @@ export async function buildHtmlApp(input: BuildHtmlAppInput): Promise<BuildHtmlA
   if (!topic) return { success: false, error: "topic is required" };
   if (typeof input.tenantId !== "number" || input.tenantId <= 0) return { success: false, error: "tenantId is required" };
 
+  let html: string;
+  if (input.demo !== undefined) {
+    const parsed = demoProjectSchema.safeParse(input.demo);
+    if (!parsed.success) return { success: false, error: "Invalid demo project. Use version 1, a title and 1–12 valid steps." };
+    html = renderDemoHtml(parsed.data);
+  } else {
   const featureBullets = Array.isArray(input.features) && input.features.length > 0
     ? input.features.map((f) => `- ${String(f).slice(0, 200)}`).join("\n")
     : "- (no extra features specified — pick the obvious essentials yourself)";
@@ -268,7 +275,12 @@ HARD REQUIREMENTS — fail any of these and the deliverable is rejected:
 5. Wrap all event listeners in DOMContentLoaded or place the <script> at end of <body>.
 6. Do not use document.write, eval, or alert (alert is fine for confirms only — never for primary output).
 7. Mobile-friendly viewport meta tag included.
-8. Output ONLY the raw HTML document — no markdown fences, no commentary before or after.`;
+8. Use >=44px touch controls, visible keyboard focus, semantic labels, input text >=16px, and layouts that fit a 320px viewport. Wrap long unbroken values; give flex children min-width:0; preserve accessible full values when truncating.
+9. Design explicit empty, loading, invalid-input and error states with recovery actions. Never invent a successful save, payment, send or backend operation. Explain whether data is saved; no secrets in browser storage.
+10. Check long names (at least 47 characters), non-Latin text, zero/one/large counts, missing values and empty lists. Preserve keyboard/touch use without hover and do not change real data to test layout.
+11. Motion is optional: no automatic section fade-ins or delays on frequent actions. Honor prefers-reduced-motion and preserve all content without animation. Prefer transform/opacity, avoid perpetual timers and layout animation.
+12. If a reference recording or site is supplied, use only actually retrieved evidence. Separate observed layout, timing, states, assets and mobile behavior from inferences; use original or authorized assets. No private-backend claims.
+13. Output ONLY the raw HTML document — no markdown fences, no commentary before or after.`;
 
   // R98.25 — switched from runLlmTask (JSON-mode, returns {json}) to
   // runLlmTextTask. The previous wiring forced response_format=json_object
@@ -313,11 +325,12 @@ HARD REQUIREMENTS — fail any of these and the deliverable is rejected:
   const raw = String(llmRes.text || "").trim();
   if (!raw) return { success: false, error: "LLM returned empty output" };
 
-  const html = extractHtml(raw);
+  html = extractHtml(raw);
+  }
   if (html.length < 200) return { success: false, error: `extracted HTML too small (${html.length} bytes) — model likely refused or returned a stub` };
   if (!/<html[\s>]/i.test(html) || !/<\/html>/i.test(html)) return { success: false, error: "missing <html>...</html> wrapper after extraction" };
 
-  // Smoke-test BEFORE writing to disk — refuse to deliver broken apps.
+  // Static DOM check BEFORE writing; never claim this executes generated scripts.
   const smoke = await smokeTest(html, input.smoke_assertion);
   if (!smoke.passed) {
     return {
@@ -351,6 +364,7 @@ HARD REQUIREMENTS — fail any of these and the deliverable is rejected:
     smokePassed: true,
     smokeFailures: [],
     smokeWarnings: smoke.warnings,
+    verificationScope: "static-dom-only",
     title: smoke.title || topic,
   };
 }

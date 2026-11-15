@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { recoverSubscriptionSeats, runSubscriptionSynthesis, subscriptionRecoveryAllowed } from "../../server/lib/subscription-jury-recovery";
+import { recoverSubscriptionSeats, runSubscriptionSynthesis, subscriptionRecoveryAllowed, defaultJuryRecoveryAllowed } from "../../server/lib/subscription-jury-recovery";
+
+const withoutSkips = (rows: any[]) => rows.map(({ recoverySkips, ...row }) => row);
 
 test("a working MiniMax subscription seat can complete a jury without lowering its three-seat requirement", async () => {
   const specs = ["gpt-5.6-sol", "claude-sonnet-5", "moonshotai/kimi-k3"]
@@ -24,6 +26,51 @@ test("alternate-model recovery is confined to owner defaults, never explicit pin
   assert.equal(subscriptionRecoveryAllowed(true, true, "profundo"), false);
   assert.equal(subscriptionRecoveryAllowed(false, false, "profundo"), false);
   assert.equal(subscriptionRecoveryAllowed(true, false, "anthropic-api"), false);
+  assert.equal(defaultJuryRecoveryAllowed(true, false, "anthropic-api"), true);
+  assert.equal(defaultJuryRecoveryAllowed(false, false, "anthropic-api"), false);
+  assert.equal(defaultJuryRecoveryAllowed(true, true, "anthropic-api"), false);
+});
+
+test("owner default pinned seats recover across unused lanes even for investigative juries", async () => {
+  const specs = [
+    { modelId: "openference/deepseek-v4-pro", providerLane: "openference" as const },
+    { modelId: "gpt-5.4", providerLane: "openai-api" as const },
+    { modelId: "claude-sonnet-5-5", providerLane: "anthropic-api" as const },
+  ];
+  const original = specs.map((s, i) => ({ ...s, provider: s.providerLane,
+    ok: i === 1, answer: i === 1 ? "Keep GPT" : undefined, latencyMs: 1 }));
+  const calls: number[] = [];
+  const recovered = await recoverSubscriptionSeats({
+    specs, results: original, allowPaid: false, recoverPinnedSeats: true,
+    eligible: () => true,
+    call: async (s, seat) => {
+      assert.equal(s.noRetry, true);
+      calls.push(seat);
+      return { ...s, provider: s.providerLane!, ok: true, answer: `Fresh evidence for seat ${seat}`, latencyMs: 1 };
+    },
+  });
+  assert.deepEqual(withoutSkips(recovered.slice(0, 3)), original);
+  assert.deepEqual(calls, [0, 2]);
+  assert.equal(recovered.filter(r => r.ok).length, 3);
+  assert.equal(new Set(recovered.filter(r => r.ok).map(r => r.providerLane)).size, 3);
+});
+
+test("Profundo outage with only GPT and Claude available uses separately budgeted Meta for the third seat", async () => {
+  const specs = ["gpt-5.6-sol", "claude-sonnet-5", "moonshotai/kimi-k3"]
+    .map(modelId => ({ modelId, providerLane: "profundo" as const }));
+  const failed = specs.map(s => ({ ...s, provider: "profundo", ok: false, latencyMs: 1, error: "503" }));
+  const calls: string[] = [];
+  const recovered = await recoverSubscriptionSeats({
+    specs, results: failed, allowPaid: true,
+    eligible: s => ["replit", "anthropic-api", "meta-direct"].includes(s.providerLane!),
+    call: async s => {
+      calls.push(s.providerLane!);
+      assert.equal(s.noRetry, true);
+      return { ...s, provider: s.providerLane!, ok: true, answer: "Independent response", latencyMs: 1 };
+    },
+  });
+  assert.equal(recovered.filter(r => r.ok).length, 3);
+  assert.deepEqual(calls, ["replit", "anthropic-api", "meta-direct"]);
 });
 
 test("Standard Compute recovers a missing seat before any paid API while retaining successful work", async () => {
@@ -41,7 +88,7 @@ test("Standard Compute recovers a missing seat before any paid API while retaini
         answer: s.providerLane === "standard-compute" ? "Pinned Gemini recovery" : undefined, latencyMs: 1 };
     },
   });
-  assert.deepEqual(recovered.slice(0, 3), original);
+  assert.deepEqual(withoutSkips(recovered.slice(0, 3)), original);
   assert.deepEqual(calls, ["standard-compute"]);
   assert.equal(recovered.filter(r => r.ok).length, 3);
   assert.equal(recovered.at(-1)?.modelId, "gemini-3.1-pro-preview");
@@ -59,7 +106,7 @@ test("a total subscription outage recovers all seats without losing original fai
       return { ...spec, provider: spec.providerLane!, ok: true, answer: "A substantive independent answer.", latencyMs: 1 };
     },
   });
-  assert.deepEqual(results.slice(0, 3), original);
+  assert.deepEqual(withoutSkips(results.slice(0, 3)), original);
   assert.equal(results.filter(r => r.ok).length, 3);
   assert.equal(new Set(results.filter(r => r.ok).map(r => r.providerLane)).size, 3);
   assert.equal(calls.length, 3);
@@ -145,4 +192,24 @@ test("telemetry and one readiness failure cannot destroy a completed synthesis",
   assert.equal(outcome.result, "Completed");
   assert.equal(outcome.attempts.length, 1);
   assert.equal(outcome.attempts[0].ok, true);
+});
+
+test("skipped routes explain missing seats and recovery stops admitting work at its deadline", async () => {
+  const spec = { modelId: "gpt-5.6-sol", providerLane: "profundo" as const };
+  const original = { ...spec, provider: "profundo", ok: false, latencyMs: 0 };
+  let clock = 0;
+  let calls = 0;
+  const rows = await recoverSubscriptionSeats({
+    specs: [spec], results: [original], allowPaid: false, eligible: () => true,
+    now: () => clock, budgetMs: 20,
+    call: async s => {
+      calls++;
+      assert.equal(s.timeoutMs, 20);
+      clock = 21;
+      return { ...original, modelId: s.modelId, providerLane: s.providerLane, error: "timeout" };
+    },
+  });
+  assert.equal(calls, 1);
+  assert.ok(rows[0].recoverySkips?.some(s => s.reason === "recovery-deadline"));
+  assert.ok(rows[0].recoverySkips?.some(s => s.providerLane === "meta-direct" && s.reason === "paid-backup-not-authorized"));
 });

@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
+import { recordScopedTransaction } from "./lib/rls-observation";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -200,7 +201,9 @@ export async function withTenantTx<T>(
     throw new Error(`withTenantTx: invalid tenantId ${tenantId}`);
   }
   const { sql } = await import("drizzle-orm");
-  return await db.transaction(async (tx: any) => {
+  recordScopedTransaction("started");
+  try {
+  const result = await db.transaction(async (tx: any) => {
     // Fully parameterized: tenantId is bound as a SQL parameter via
     // Drizzle's ${} interpolation (set_config accepts text for value 2;
     // we cast the integer to text inside SQL). No sql.raw, no string
@@ -240,6 +243,12 @@ export async function withTenantTx<T>(
     }
     return await fn(tx);
   });
+  recordScopedTransaction("completed");
+  return result;
+  } catch (error) {
+    recordScopedTransaction("failed");
+    throw error;
+  }
 }
 
 export function getPoolStats() {

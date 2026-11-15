@@ -1,7 +1,6 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
-
-import { logSilentCatch } from "./lib/silent-catch";
+import { ADMIN_TENANT_ID } from "./storage-helpers/tenant-context";
 export interface ExportedPersona {
   format: "visionclaw-agent-v1";
   exportedAt: string;
@@ -30,15 +29,23 @@ export interface ExportedPersona {
 }
 
 export async function exportPersona(personaId: number, tenantId: number): Promise<ExportedPersona | null> {
+  // Personas and their internal instructions are platform-global. Customer
+  // tenant scoping of the supplementary rows does not authorize this export.
+  if (tenantId !== ADMIN_TENANT_ID) {
+    throw new Error("Platform-owner access required for persona exports");
+  }
+  if (!Number.isSafeInteger(personaId) || personaId < 1) {
+    throw new Error("A positive integer persona ID is required");
+  }
   const personaResult = await db.execute(sql`SELECT * FROM personas WHERE id = ${personaId}`);
   const persona = ((personaResult as any).rows || personaResult)[0];
   if (!persona) return null;
 
   const [trustResult, skillsResult, rulesResult, knowledgeResult] = await Promise.all([
     db.execute(sql`SELECT category, score FROM trust_scores WHERE persona_id = ${personaId} AND tenant_id = ${tenantId}`),
-    db.execute(sql`SELECT name, description, enabled FROM skills WHERE persona_id = ${personaId} OR persona_id IS NULL ORDER BY enabled DESC, name`).catch(() => ({ rows: [] })),
+    db.execute(sql`SELECT name, description, enabled FROM skills WHERE persona_id = ${personaId} OR persona_id IS NULL ORDER BY enabled DESC, name`),
     db.execute(sql`SELECT rule_name, category, priority, description FROM governance_rules WHERE tenant_id = ${tenantId} AND enabled = true ORDER BY category, id`),
-    db.execute(sql`SELECT DISTINCT category FROM agent_knowledge WHERE persona_id = ${personaId} AND tenant_id = ${tenantId}`).catch(() => ({ rows: [] })),
+    db.execute(sql`SELECT DISTINCT category FROM agent_knowledge WHERE persona_id = ${personaId} AND tenant_id = ${tenantId}`),
   ]);
 
   const trustRows = (trustResult as any).rows || trustResult;
@@ -56,27 +63,21 @@ export async function exportPersona(personaId: number, tenantId: number): Promis
   const knowledgeRows = (knowledgeResult as any).rows || knowledgeResult;
 
   const toolNames: string[] = [];
-  try {
-    const { getPersonaBlockedTools } = await import("./tool-router");
-    const personaRole = persona.role || persona.name || "";
-    const blockedSet = getPersonaBlockedTools(personaRole);
-    if (blockedSet.size > 0) {
-      toolNames.push(`All tools except blocked: ${[...blockedSet].join(", ")}`);
-    } else {
-      toolNames.push("All tools (no blocks)");
-    }
-  } catch {
-    toolNames.push("All tools (default routing)");
+  const { getPersonaBlockedTools } = await import("./tool-router");
+  const personaRole = persona.role || persona.name || "";
+  const blockedSet = getPersonaBlockedTools(personaRole);
+  if (blockedSet.size > 0) {
+    toolNames.push(`All tools except blocked: ${[...blockedSet].join(", ")}`);
+  } else {
+    toolNames.push("All tools (no blocks)");
   }
 
   const lanes: Array<{ from: string; to: string }> = [];
-  try {
-    const { findLanesForAgent } = await import("./express-lanes");
-    const agentLanes = findLanesForAgent(personaId);
-    for (const lane of agentLanes.outbound) {
-      lanes.push({ from: lane.fromName, to: lane.toName });
-    }
-  } catch (_silentErr) { logSilentCatch("server/persona-export.ts", _silentErr); }
+  const { findLanesForAgent } = await import("./express-lanes");
+  const agentLanes = findLanesForAgent(personaId);
+  for (const lane of agentLanes.outbound) {
+    lanes.push({ from: lane.fromName, to: lane.toName });
+  }
 
   return {
     format: "visionclaw-agent-v1",

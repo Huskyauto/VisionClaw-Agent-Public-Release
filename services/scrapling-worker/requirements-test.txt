@@ -1,0 +1,5 @@
+# Test-only dependencies for the pinned Starlette 1.x TestClient.
+# The production image continues to install requirements.txt only.
+-r requirements.txt
+pytest==9.2.0
+httpx2==2.16.0

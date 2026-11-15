@@ -119,7 +119,7 @@ async function main(): Promise<number> {
     } catch (e: any) {
       die(`refusing to deliver unsafe GitHub render ${outMp4}: ${e?.message || e}`);
     }
-    const videoValidation = validateRenderedVideo(videoSnapshot.filePath);
+    const videoValidation = await validateRenderedVideo(videoSnapshot.filePath);
     if (!videoValidation.ok) {
       videoSnapshot.cleanup();
       die(`refusing to deliver invalid GitHub render ${outMp4}: ${videoValidation.reason}`);
@@ -138,7 +138,7 @@ async function main(): Promise<number> {
         // retain their normal delivery email.
         mimeType: "video/mp4", sendEmail: !process.env.BWB_ORCHESTRATOR_RUN_ID,
         emailSubject: `${script.videoId} ready (GitHub render) — ${script.title}`,
-        metadata: { packagingReview: packaging },
+        metadata: { packagingReview: packaging, outputVerification: videoValidation.report },
         emailBody: `Rendered via the GitHub Actions farm (${chapters} parallel containers).\n\n${packaging.summary}\n\nPlay/Download links below.`,
         idempotencyKey: `bwb-weekly:${process.env.BWB_JOB_KEY || script.videoId}:delivery`,
       });
@@ -156,6 +156,7 @@ async function main(): Promise<number> {
         videoId: script.videoId,
         title: script.title,
         packagingReview: packaging,
+        outputVerification: videoValidation.report,
         playlist: script.playlist,
         description: script.youtubeDescription || `Built With Bob — ${script.title}.`,
         tags: Array.isArray(script.youtubeTags) ? script.youtubeTags : [],

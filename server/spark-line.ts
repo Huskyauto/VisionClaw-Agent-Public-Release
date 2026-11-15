@@ -30,7 +30,7 @@ export function validateSparkMessage(message: unknown): string {
   return text;
 }
 
-export async function sendSparkMessage(tenantId: number, personaId: number, message: string, conversationId?: number):
+export async function sendSparkMessage(tenantId: number, personaId: number, message: string, conversationId?: number, recipient: "spark" | "claude" = "spark"):
   Promise<{ outboxId: number; queuedAt: Date }> {
   if (!Number.isSafeInteger(tenantId) || tenantId <= 0 || personaId !== 2) {
     throw new SparkLineContentError();
@@ -39,6 +39,20 @@ export async function sendSparkMessage(tenantId: number, personaId: number, mess
   if (tenantId !== ownerTenantId()) throw new SparkLineContentError();
   const text = validateSparkMessage(message);
   return db.transaction(async (tx) => {
+    if (recipient !== "spark" && recipient !== "claude") throw new SparkLineContentError();
+    if (recipient === "claude") {
+      // Never broadcast to every OAuth client or guess among multiple threads.
+      // Prefer the current client's own thread; otherwise require one active destination.
+      const targets: any = await tx.execute(sql`SELECT l.conversation_id FROM felix_line_clients l
+        JOIN conversations c ON c.id=l.conversation_id
+        WHERE l.tenant_id=${tenantId} AND c.tenant_id=${tenantId} AND c.deleted_at IS NULL AND c.persona_id=2
+          AND EXISTS (SELECT 1 FROM felix_connector_records r WHERE r.tenant_id=${tenantId}
+            AND r.client_id=l.client_id AND r.kind IN ('access','refresh') AND r.expires_at > NOW())
+        ORDER BY l.created_at DESC LIMIT 100`);
+      const matching = targets.rows.find((r: any) => r.conversation_id === conversationId);
+      if (!matching && targets.rows.length !== 1) throw new SparkLineContentError();
+      conversationId = (matching ?? targets.rows[0]).conversation_id;
+    }
     if (conversationId !== undefined) {
       if (!Number.isSafeInteger(conversationId) || conversationId <= 0) throw new SparkLineContentError();
       const conv: any = await tx.execute(sql`
@@ -54,6 +68,7 @@ export async function sendSparkMessage(tenantId: number, personaId: number, mess
     const prior: any = await tx.execute(sql`
       SELECT id, created_at FROM spark_outbox
       WHERE tenant_id = ${tenantId} AND persona_id = ${personaId}
+        AND recipient = ${recipient}
         AND message = ${text} AND conversation_id IS NOT DISTINCT FROM ${conversationId ?? null}
         AND created_at > NOW() - INTERVAL '10 minutes'
       ORDER BY id DESC LIMIT 1
@@ -62,10 +77,10 @@ export async function sendSparkMessage(tenantId: number, personaId: number, mess
     if (priorRow) return { outboxId: priorRow.id as number, queuedAt: priorRow.created_at as Date };
     const countResult: any = await tx.execute(sql`
       SELECT count(*)::int AS total FROM spark_outbox
-      WHERE tenant_id = ${tenantId} AND created_at > NOW() - INTERVAL '1 hour'
+      WHERE tenant_id = ${tenantId} AND recipient = ${recipient} AND created_at > NOW() - INTERVAL '1 hour'
     `);
     if (Number((countResult.rows || countResult)[0]?.total) >= 20) throw new SparkLineRateLimitError();
-    const [row] = await tx.insert(sparkOutbox).values({ tenantId, personaId, message: text, conversationId }).returning({
+    const [row] = await tx.insert(sparkOutbox).values({ tenantId, personaId, message: text, conversationId, recipient }).returning({
       id: sparkOutbox.id, createdAt: sparkOutbox.createdAt,
     });
     return { outboxId: row.id, queuedAt: row.createdAt };
@@ -80,7 +95,7 @@ export async function listSparkMessages(tenantId: number, since: number) {
     agentName: personas.name, message: sparkOutbox.message,
     conversationId: sparkOutbox.conversationId, createdAt: sparkOutbox.createdAt,
   }).from(sparkOutbox).innerJoin(personas, eq(sparkOutbox.personaId, personas.id))
-    .where(and(eq(sparkOutbox.tenantId, tenantId), gt(sparkOutbox.id, since)))
+    .where(and(eq(sparkOutbox.tenantId, tenantId), eq(sparkOutbox.recipient, "spark"), gt(sparkOutbox.id, since)))
     .orderBy(sparkOutbox.id).limit(50);
   return { messages: rows, latestId: rows.at(-1)?.id ?? since };
 }

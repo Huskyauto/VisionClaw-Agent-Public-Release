@@ -59,6 +59,7 @@ export const MODEL_COST_PER_MILLION: Record<string, { input: number; output: num
   "claude-opus-5": { input: 5.00, output: 25.00 },
   "claude-fable-5": { input: 10.00, output: 50.00 },
   "claude-fable-5-1": { input: 10.00, output: 50.00 },
+  "claude-fable-5-2": { input: 8.00, output: 40.00 },
   "gemini-2.5-flash": { input: 0.30, output: 2.50 },
   "gemini-3-flash-preview": { input: 0.50, output: 3.00 },
   "gemini-3-pro-preview": { input: 1.25, output: 5.00 },

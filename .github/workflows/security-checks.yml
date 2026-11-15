@@ -1,0 +1,109 @@
+name: Bounded security checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "server/**"
+      - "scripts/lib/tenant-audit-*.ts"
+      - "scripts/run-tenant-isolation-audit-resumable.ts"
+      - "tests/security/**"
+      - "tests/lib/tenant-audit-*.test.ts"
+      - "services/scrapling-worker/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tests/deployment/**"
+      - ".github/workflows/security-checks.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "scripts/lib/tenant-audit-*.ts"
+      - "scripts/run-tenant-isolation-audit-resumable.ts"
+      - "tests/security/**"
+      - "tests/lib/tenant-audit-*.test.ts"
+      - "services/scrapling-worker/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tests/deployment/**"
+      - ".github/workflows/security-checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bounded-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-security:
+    name: Security ${{ matrix.lane }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - lane: boundaries
+            tests: >-
+              tests/security/ahb-regression.test.ts
+              tests/security/sql-raw-callsite-allowlist.test.ts
+              tests/security/csrf-token-cache-control.test.ts
+              tests/security/uploads-http-path.test.ts
+          - lane: privacy-and-deletion
+            tests: >-
+              tests/security/privacy-log-errors.test.ts
+              tests/security/tenant-file-delete-failure.test.ts
+              tests/security/redact-args.test.ts
+              tests/security/pii-redaction-guard.test.ts
+              tests/security/persona-export-access.test.ts
+          - lane: audit-controls
+            tests: >-
+              tests/lib/tenant-audit-fallback.test.ts
+              tests/lib/tenant-audit-recovery-controller.test.ts
+              tests/security/tenant-audit-call-timeout.test.ts
+              tests/security/tenant-audit-chunk-size.test.ts
+              tests/security/tenant-audit-checkpoint-jsonb.test.ts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Check public package download locations before installing
+        run: node --test tests/deployment/portable-install.test.cjs tests/deployment/portable-preflight.test.cjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Audit progress trigger regression
+        run: node --test tests/deployment/ci-audit-progress.test.cjs
+      # No production DB, model credentials or customer artifacts are provided.
+      - name: Run offline regression lane
+        run: >-
+          env -i PATH="$PATH" HOME="$HOME"
+          NODE_OPTIONS=--max-old-space-size=2048
+          OPENAI_API_KEY=offline-placeholder
+          AI_INTEGRATIONS_OPENAI_API_KEY=offline-placeholder
+          npx --no-install tsx --test ${{ matrix.tests }}
+
+  scraping-worker:
+    name: Scraping worker compatibility and security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            services/scrapling-worker/requirements.txt
+            services/scrapling-worker/requirements-test.txt
+      - name: Install the worker's declared dependencies
+        run: python -m pip install -r services/scrapling-worker/requirements-test.txt
+      - name: Run worker tests without live scraping
+        working-directory: services/scrapling-worker
+        run: python -m pytest -q tests

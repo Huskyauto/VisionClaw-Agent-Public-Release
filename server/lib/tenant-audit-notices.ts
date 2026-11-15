@@ -12,24 +12,28 @@ export async function recordAuditNotice(
       metadata=metadata || jsonb_build_object('resolvedAt',now()::text)
       WHERE tenant_id=1 AND category='security'
         AND metadata->>'auditScheduleKey' LIKE 'tenant-audit:%'
-        AND metadata->>'status' IN ('missing','incomplete','stalled','source_changed')
+        AND metadata->>'status' IN ('missing','incomplete','stalled','source_changed','batch_scheduled','overdue')
         AND metadata->>'resolvedAt' IS NULL`);
   }
   if (!decision.warning) return;
   const key = `tenant-audit:${decision.window}:${sourceHash}:${decision.warning}`;
-  const title = "Tenant audit coverage requires attention";
-  const message = `Audit status: ${decision.warning}. A quiet digest is not security clearance. Check the audit job for current coverage and failures.`;
+  const scheduled = decision.warning === "batch_scheduled";
+  const type = scheduled ? "info" : "warning";
+  const title = scheduled ? "Weekly tenant audit: next daily batch scheduled" : "Tenant audit coverage requires attention";
+  const message = scheduled
+    ? "Saved audit progress is waiting for the next bounded daily batch. Weekly coverage is not yet complete; this is not security clearance."
+    : `Audit status: ${decision.warning}. A quiet digest is not security clearance. Check the audit job for current coverage and failures.`;
   await store.transaction(async execute => {
     await execute(sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`);
     // If the same warning recurs, reopen its history rather than leaving a
     // resolved notice as the only record. Different source revisions use new keys.
-    await execute(sql`UPDATE notifications SET type='warning',title=${title},
+    await execute(sql`UPDATE notifications SET type=${type},title=${title},
       message=${message},is_read=false,metadata=metadata-'resolvedAt'
       WHERE tenant_id=1 AND category='security' AND metadata->>'auditScheduleKey'=${key}
         AND metadata->>'resolvedAt' IS NOT NULL`);
     await execute(sql`INSERT INTO notifications
       (tenant_id,type,title,message,category,metadata,action_url)
-      SELECT 1,'warning',${title},${message},'security',
+      SELECT 1,${type},${title},${message},'security',
         ${JSON.stringify({ auditScheduleKey: key, status: decision.warning })}::jsonb,'/operator'
       WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE tenant_id=1
         AND metadata->>'auditScheduleKey'=${key})`);

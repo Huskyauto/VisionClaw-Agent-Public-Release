@@ -344,7 +344,13 @@ async function runToolStep(plan: PlanRow, step: any, priorResults: StepResult[])
     }
     if (policyBlockReason) return endFail(policyBlockReason, `tool ${toolName} blocked`);
 
-    const result = await executeToolWithTimeout(toolName, args);
+    const result = await executeToolWithTimeout(toolName, args, {
+      tenantId: authTenant,
+      actor: typeof plan.planner_persona_id === "number" ? "persona" : "system",
+      personaId: typeof plan.planner_persona_id === "number" ? plan.planner_persona_id : undefined,
+      personaName: resolvePlanStepPolicyPersona(authTenant, ADMIN_TENANT_ID),
+      invokedVia: "plan-executor", internalPurpose: "Execute a persisted, policy-checked plan step",
+    });
     const endedIso = nowIso();
     const durationMs = Date.now() - t0;
     if (result && typeof result === "object" && (result as any).error) {

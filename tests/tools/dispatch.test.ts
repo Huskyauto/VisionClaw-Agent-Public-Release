@@ -1,5 +1,9 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
+const authority = {
+  tenantId: 1, actor: "system" as const, invokedVia: "offline-dispatch-fixture",
+  internalPurpose: "Verify structured unknown-tool behavior without side effects",
+};
 
 after(() => { setTimeout(() => process.exit(process.exitCode ?? 0), 50).unref(); });
 
@@ -35,7 +39,7 @@ test("tools module: executeToolWithTimeout is exported as a function", async () 
 
 test("executeTool: unknown tool returns structured error (does not throw)", async () => {
   const { executeTool } = await import("../../server/tools");
-  const result = await executeTool("__nonexistent_tool_for_dispatch_test__", {});
+  const result = await executeTool("__nonexistent_tool_for_dispatch_test__", {}, authority);
 
   assert.equal(typeof result, "object", "Should return a result object, not throw");
   assert.ok(result, "Result should not be null/undefined");
@@ -49,7 +53,7 @@ test("executeTool: unknown tool returns structured error (does not throw)", asyn
 
 test("executeTool: unknown-tool error names recovery options (create_tool / skill_seeker)", async () => {
   const { executeTool } = await import("../../server/tools");
-  const result = await executeTool("__definitely_not_a_real_tool__", {});
+  const result = await executeTool("__definitely_not_a_real_tool__", {}, authority);
 
   // The error string is the agent's only signal for what to do next when
   // it picks a tool that doesn't exist. It must point at the recovery
@@ -63,7 +67,7 @@ test("executeTool: unknown-tool error names recovery options (create_tool / skil
 
 test("executeToolWithTimeout: unknown tool returns structured error (does not throw)", async () => {
   const { executeToolWithTimeout } = await import("../../server/tools");
-  const result = await executeToolWithTimeout("__nonexistent_tool_for_dispatch_test__", {});
+  const result = await executeToolWithTimeout("__nonexistent_tool_for_dispatch_test__", {}, authority);
 
   assert.equal(typeof result, "object", "Should return a result object, not throw");
   assert.ok(result, "Result should not be null/undefined");
@@ -82,7 +86,7 @@ test("executeTool: handles params=null without crashing (R74.13f null-guard regr
   // the entire agent turn. The fix is a 1-line `if (params == null) params = {}`
   // at the top of executeTool. This test locks in that fix.
   const { executeTool } = await import("../../server/tools");
-  const result = await executeTool("__nonexistent_tool_null_params__", null as any);
+  const result = await executeTool("__nonexistent_tool_null_params__", null as any, authority);
 
   assert.equal(typeof result, "object", "Should return an object even with null params");
   assert.ok(result, "Result should not be null/undefined");
@@ -97,7 +101,7 @@ test("executeTool: handles params={} without crashing (LLM-emits-empty-object ca
   // guarantees an object; testing null would document a known dispatch
   // limitation rather than the contract we want to lock in.)
   const { executeTool } = await import("../../server/tools");
-  const result = await executeTool("__nonexistent_tool_empty_params__", {});
+  const result = await executeTool("__nonexistent_tool_empty_params__", {}, authority);
 
   assert.equal(typeof result, "object", "Should return an object even with empty params");
   assert.ok(result, "Result should not be null/undefined");

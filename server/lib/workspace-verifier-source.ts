@@ -75,11 +75,15 @@ export function captureVerifierSource(root = process.cwd()): { hash: string; fil
     if (error?.code !== "ENOENT") throw error;
   }
   if (readdirSync(base).includes("scripts")) walk("scripts");
+  return { hash: hashVerifierSourceFiles(files), files };
+}
+
+export function hashVerifierSourceFiles(files: Map<string, Buffer>): string {
   const hash = createHash("sha256");
   for (const [name, content] of [...files].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
     hash.update(`${Buffer.byteLength(name)}:${name}:${content.length}:`).update(content);
   }
-  return { hash: hash.digest("hex"), files };
+  return hash.digest("hex");
 }
 
 /** No live source writes; dependency install is trusted, source bytes are sealed. */

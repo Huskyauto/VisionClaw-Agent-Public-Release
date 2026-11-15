@@ -3,13 +3,14 @@ import { buildExperimentGuidance } from "./lib/build-experiment-guidance";
 import { observePreparedHistory } from "./lib/prompt-history-comparison";
 import { DEFAULT_CHAT_MODEL_ID, HIGH_END_WORK_MODEL_ID } from "./chat-model-default";
 import { selectOwnerWorkModel, getFelixExpertLanes } from "./felix-model-policy";
-import { resolveFelixExpertLane, withFelixExpertGrant, FelixExpertFailureHistory } from "./felix-expert-route";
+import { resolveFelixExpertLane, withFelixExpertGrant, FelixExpertFailureHistory, withFelixReplitRateLimitRecovery } from "./felix-expert-route";
 import { ownerTenantId } from "./agentic/autonomous-budget";
 import { withRootSpan } from "./lib/agent-trace";
 import { getClientForModel, MODEL_REGISTRY, normalizeModelId, getAvailableModels, markSubscriptionFailed, markProviderUnhealthy, markProviderUnhealthyOnce, getUnhealthyProviders, resetProviderHealth, resetProviderHealthForRoute, PROFUNDO_CLIENT_MARKER } from "./providers";
 import { getRoutedMaxOutputTokens } from "./model-registry";
 import { isUnfulfilledSystemAuditPromise } from "./chat-response-validation";
-import { replitOpenai } from "./providers";
+import { replitOpenai, getModelForTierAsync } from "./providers";
+import { metaTitleTokenLimit } from "./lib/meta";
 import { buildBrainContext, getOrCreateTaskState, recordToolExecution, extractIdentifiersFromToolResult, buildSelfReflectionPrompt, logDecision } from "./felix-brain";
 import { shouldPreemptivelyCompact, estimateTokens } from "./compaction";
 import { compactLadder } from "./lib/compaction-ladder";
@@ -37,7 +38,7 @@ import { PROVIDERS_SUPPORTING_TOOLS, getAllToolDefinitions } from "./tools";
 import { routeTools, filterSparkLineTools, MAX_ROUTED_TOOLS_PER_TURN } from "./tool-router";
 import { autoRouteModel, assessRoundComplexity, getModelForTier, parseTimeoutMs } from "./auto-router";
 import { buildAdaptiveHint, getRelevantLessons, saveLessonLearned, shouldEscalateToHuman } from "./adaptive-execution";
-import { getToolFailureRetryPolicy } from "./lib/tool-failure-retry-policy";
+import { getToolFailureRetryPolicy, recordToolFailureOutcome, copyToolFailureOutcome } from "./lib/tool-failure-retry-policy";
 import { ToolLoopDetector } from "./tool-loop-detection";
 import { createSupervisor, recordToolResult, checkExecutionBudget, validateToolOutput, validateAgentResponse, getFailbackSuggestion, generateSupervisorSummary } from "./execution-supervisor";
 import { tryWorkflowTemplate } from "./workflow-templates";
@@ -109,6 +110,10 @@ interface ChatEngineOptions {
   tenantId: number;
   source?: string;
   enableTools?: boolean;
+  /** Trusted communication adapter: no action tools or premium preflight fan-out. */
+  messagingOnly?: true;
+  /** Trusted connector turns avoid optional classifier/jury preflight fan-out. */
+  skipOptionalPreflights?: true;
   blockedTools?: Set<string>;
   depth?: number;
   toolFilter?: string[];
@@ -2171,7 +2176,7 @@ async function _processMessageImpl(
   // We pre-fetch the message history ONCE here and reuse it later in the main
   // chat path (search for `priorMessages || await storage.getMessages` below)
   // to avoid double full-history reads (R74.9 code-review fix).
-  if (!expertLanes && (opts?.depth ?? 0) === 0 && !opts?.source?.startsWith("subagent:")) {
+  if (!opts?.messagingOnly && !opts?.skipOptionalPreflights && !expertLanes && (opts?.depth ?? 0) === 0 && !opts?.source?.startsWith("subagent:")) {
     try {
       priorMessages ??= await storage.getMessages(conversationId, tenantId);
       const hasPriorContext = (priorMessages?.length ?? 0) > 1; // >1 because user msg already inserted
@@ -2221,7 +2226,7 @@ async function _processMessageImpl(
   // non-subagent only.
   let promptRefined = false;
   let promptRefinementResult: RefineResult | null = null;
-  if (!expertLanes && (opts?.depth ?? 0) === 0 && !opts?.source?.startsWith("subagent:")) {
+  if (!opts?.messagingOnly && !opts?.skipOptionalPreflights && !expertLanes && (opts?.depth ?? 0) === 0 && !opts?.source?.startsWith("subagent:")) {
     try {
       const {
         isRefinerEnabled, parseForceRefine, looksLikeRefinementInquiry,
@@ -2349,7 +2354,7 @@ async function _processMessageImpl(
   // `!promptRefined`: when the prompt-refinement jury already ran above, skip the
   // auto-ensemble answer/up-route path so the jury isn't charged twice — the main
   // agent loop executes the refined prompt and produces final output.
-  if (!expertLanes && (opts?.depth ?? 0) === 0 && !opts?.source?.startsWith("subagent:") && !promptRefined) {
+  if (!opts?.messagingOnly && !opts?.skipOptionalPreflights && !expertLanes && (opts?.depth ?? 0) === 0 && !opts?.source?.startsWith("subagent:") && !promptRefined) {
     try {
       const { shouldAutoInvokeEnsemble } = await import("./auto-ensemble");
       const decision = shouldAutoInvokeEnsemble(content.trim(), {
@@ -2858,7 +2863,7 @@ You are replying via WhatsApp. Adapt your style:
   const hasToolFilter = opts?.toolFilter && opts.toolFilter.length > 0;
   const LEAN_ALWAYS_INCLUDE = [
     "search_memory", "create_memory", "recall_context", "query_triples", "store_triple",
-    "project", "google_drive", "web_search",
+    "project", "google_drive", "web_search", "introspect_tools",
     // R74.13z-quint+2: shared brain primitives — every persona must be able to file/read
     // tensions and ADRs even on a lean tool filter, otherwise doctrine #10 silently breaks.
     "list_open_tensions", "create_tension", "resolve_tension",
@@ -2923,19 +2928,23 @@ You are replying via WhatsApp. Adapt your style:
       (!opts?.toolFilter || opts.toolFilter.includes("jury_triage")) ? [juryDefinition] : [];
   }
   const expertFailureHistory = expertLanes ? new FelixExpertFailureHistory() : null;
+  const expertRateLimitBudget = { used: false };
   const initialExpert = expertLanes
     ? await withFelixExpertGrant({ tenantId, personaId: conv.personaId ?? null, source: opts?.source },
         () => resolveFelixExpertLane(expertLanes, 0, (lane) =>
           getClientForModel(lane.modelId, tenantId, {
             providerLane: lane.providerLane, requiresTools: enableTools,
-            meteredOverride: lane.providerLane === "xai", forbidMeteredFallback: true,
+            meteredOverride: lane.providerLane === "xai",
+            // Only the explicitly approved, pinned Meta lane may reserve paid
+            // owner credits; legacy expert lanes still forbid paid substitution.
+            forbidMeteredFallback: lane.providerLane !== "meta-direct",
           })))
     : null;
   let { client: activeClient, actualModelId: activeModelId } = initialExpert
     ? { client: initialExpert.client, actualModelId: initialExpert.modelId }
     : await getClientForModel(model, tenantId, {
         requiresTools: enableTools,
-        costExemptLane: upRouteActive && model !== "gpt-6-astra" && model !== "claude-fable-5-1",
+        costExemptLane: upRouteActive && model !== "gpt-6-astra" && model !== "claude-fable-5-1" && model !== "claude-fable-5-2" && model !== "gemini-4-carbon",
         meteredOverride: ownerExplicitPaidOverride,
         explicitOwnerSelection: ownerExplicitPaidOverride,
         platformAdminVerified: false,
@@ -2946,7 +2955,8 @@ You are replying via WhatsApp. Adapt your style:
       model === HIGH_END_WORK_MODEL_ID && activeModelId !== model) {
     console.warn(`[felix-model] owner Felix conversation ${conversationId}: requested ${model}, provider routed ${activeModelId}`);
   }
-  let currentRegistryModelId = initialExpert?.registryModelId ?? model;
+  let currentRegistryModelId = initialExpert?.registryModelId ??
+    (/^muse-(spark-1\.3(?:-contributor)?|wonder-1\.0)$/.test(activeModelId) ? `meta-direct/${activeModelId}` : model);
 
   // R106 N4 (LuaN1aoAgent, Apache-2.0) — Pinned hypotheses survive context
   // compression. Inject any active pins into the system prompt so the
@@ -3361,10 +3371,17 @@ Never hide failures behind vague language. The user trusts you because you're tr
     const _bigCtxTried = new Set<string>();
     overflow_retry: for (let _ovTry = 0; _ovTry < 6; _ovTry++) {
     try {
-      resp = await requestWithModelToolRoster(
-        createParams,
-        (toolNames) => { modelRoundAllowedToolNames = toolNames; },
-        () => activeClient.chat.completions.create(createParams),
+      const expertProviderLane = expertLanes?.[expertLaneIndex]?.providerLane;
+      resp = await withFelixReplitRateLimitRecovery(
+        () => requestWithModelToolRoster(
+          createParams,
+          (toolNames) => { modelRoundAllowedToolNames = toolNames; },
+          // Preserve the original 429 headers instead of SDK retries replacing
+          // them with a short local admission-busy response.
+          () => activeClient.chat.completions.create(createParams,
+            expertProviderLane === "replit" ? { maxRetries: 0 } : undefined),
+        ),
+        { providerLane: expertProviderLane, budget: expertRateLimitBudget },
       );
       const activeProvider = MODEL_REGISTRY.find(m => m.id === currentRegistryModelId)?.provider;
       const actualProviderLane =
@@ -3393,6 +3410,9 @@ Never hide failures behind vague language. The user trusts you because you're tr
         actualProviderLane,
       );
     } catch (err: any) {
+      // Owner-funded Meta calls have already dispatched with SDK retries disabled.
+      // Never replay an uncertain paid completion through overflow/fallback loops.
+      if (currentRegistryModelId === "claude-fable-5-2" || currentRegistryModelId === "gemini-4-carbon" || currentRegistryModelId.startsWith("meta-direct/")) throw err;
       if (expertLanes) {
         const failedLane = expertLanes[expertLaneIndex];
         const { isOverflowError } = await import("./compaction");
@@ -3412,7 +3432,8 @@ Never hide failures behind vague language. The user trusts you because you're tr
             () => resolveFelixExpertLane(expertLanes, expertLaneIndex + 1, (lane) =>
               getClientForModel(lane.modelId, tenantId, {
                 providerLane: lane.providerLane, requiresTools: useTools,
-                meteredOverride: lane.providerLane === "xai", forbidMeteredFallback: true,
+                meteredOverride: lane.providerLane === "xai",
+                forbidMeteredFallback: lane.providerLane !== "meta-direct",
               })));
         } catch (resolutionError) {
           throw expertFailureHistory?.toExhaustedError() ?? resolutionError;
@@ -4168,7 +4189,12 @@ Never hide failures behind vague language. The user trusts you because you're tr
             conversationId, personaId: conv.personaId, userMessageId: persistedUserMessage.id }, dispatch);
         } else result = await dispatch();
       } catch (err: unknown) {
-        result = { error: errorMessage(err) || "Tool execution failed" };
+        result = {
+          error: errorMessage(err) || "Tool execution failed",
+          ...(err instanceof Error && (err as any).outcomeUnknown === true ? { outcomeUnknown: true } : {}),
+          ...(err instanceof Error && (err as any).outcomeCommitted === true ? { outcomeCommitted: true } : {}),
+        };
+        if (isRecord(result)) recordToolFailureOutcome(result, err);
       }
       // R64.B — PROMPT-INJECTION DEFENSE: strip ALL engine-reserved (`_`-
       // prefixed) keys from raw tool output BEFORE the engine writes its own.
@@ -4196,6 +4222,7 @@ Never hide failures behind vague language. The user trusts you because you're tr
             }
             try { cleaned[k] = Reflect.get(result, k); } catch (_silentErr) { logSilentCatch("server/chat-engine.ts", _silentErr); }
           }
+          copyToolFailureOutcome(result, cleaned);
           result = cleaned;
         } catch {
           // Worst case: replace with an opaque error envelope rather than
@@ -4263,7 +4290,11 @@ Never hide failures behind vague language. The user trusts you because you're tr
         const suppressAdaptiveRetry = failureRetryPolicy.suppressAdaptiveRetry;
         resultRecord._userFacingInstruction = `MANDATORY: You MUST tell the user that the "${toolName}" tool failed with this exact error: "${String(resultRecord.error).slice(0, 300)}". Do NOT hide this behind vague language. State the tool name and error clearly.`;
         if (suppressAdaptiveRetry) {
-          resultRecord._userFacingInstruction += ` ${failureRetryPolicy.userFacingInstruction}`;
+          // Do not prepend "failed" to a confirmed commit or an unknown
+          // outcome. The engine's classification is more precise than that.
+          if (resultRecord.outcomeUnknown === true || resultRecord.outcomeCommitted === true)
+            resultRecord._userFacingInstruction = failureRetryPolicy.userFacingInstruction;
+          else resultRecord._userFacingInstruction += ` ${failureRetryPolicy.userFacingInstruction}`;
           resultRecord._selfHealHint = failureRetryPolicy.selfHealHint;
           console.log(`[adaptive] automatic retry suppressed for terminal ${toolName} failure (${String(resultRecord.failureKind || "unknown")})`);
         }
@@ -4752,13 +4783,13 @@ Never hide failures behind vague language. The user trusts you because you're tr
       const contextSnippet = content.slice(0, 200);
       const responseSnippet = fullResponse.slice(0, 200);
       const { client: titleClient, actualModelId: titleModel } =
-        await getClientForModel(DEFAULT_CHAT_MODEL_ID, tenantIdForScope);
+        await getClientForModel(await getModelForTierAsync("fast", tenantIdForScope), tenantIdForScope);
       const titleResp = await titleClient.chat.completions.create({
         model: titleModel,
         messages: [
           { role: "user", content: `Generate a concise, descriptive 3-7 word title summarizing this conversation.\n\nUser said: "${contextSnippet}"\nAssistant replied about: "${responseSnippet}"\n\nReply with ONLY the title text, no quotes, no punctuation at the end.` }
         ],
-        max_completion_tokens: 30,
+        max_completion_tokens: metaTitleTokenLimit(titleModel),
       });
       let newTitle = titleResp.choices[0]?.message?.content?.trim().replace(/^["']|["']$/g, "").replace(/\.+$/, "") || "";
       if (!newTitle || newTitle.toLowerCase() === "new chat") {

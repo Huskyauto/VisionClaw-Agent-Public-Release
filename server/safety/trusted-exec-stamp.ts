@@ -14,6 +14,8 @@
 
 export interface TrustedExecCtx {
   invokedVia: string;
+  /** Authenticated conversation identity, never a model-authored tool argument. */
+  personaId?: number;
   /** Set true only by a caller that already ran its own approval flow (main_chat). */
   skipApprovalGate?: boolean;
 }
@@ -36,17 +38,22 @@ export function shouldSkipApprovalGate(ctx: TrustedExecCtx): boolean {
 /**
  * The trusted underscore flags stamped onto the inner tool's args. Spread this
  * AFTER the caller args (`{ ...args, ...trustedExecFlags(ctx, tenantId) }`) so
- * any model-forged `_tenantId` / `_invokedByModel` / `_invokedVia` / `_selfHeal`
+ * any model-forged `_tenantId` / `_personaId` / `_invokedByModel` / `_invokedVia` / `_selfHeal`
  * is deterministically clobbered with the trusted value.
  */
 export function trustedExecFlags(ctx: TrustedExecCtx, tenantId: number): {
   _tenantId: number;
+  _personaId: number | undefined;
   _invokedByModel: true;
   _invokedVia: string;
   _selfHeal: boolean;
 } {
   return {
     _tenantId: tenantId,
+    // Clear a forged arg even when trusted identity is absent or malformed.
+    // The inner tool's existing owner/persona allowlist remains authoritative.
+    _personaId: typeof ctx.personaId === "number" &&
+      Number.isSafeInteger(ctx.personaId) && ctx.personaId > 0 ? ctx.personaId : undefined,
     _invokedByModel: true,
     _invokedVia: ctx.invokedVia,
     _selfHeal: isSelfHealCtx(ctx),

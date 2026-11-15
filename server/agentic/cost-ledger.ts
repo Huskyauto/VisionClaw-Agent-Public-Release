@@ -5,6 +5,7 @@ import { eq, and, gte, sql } from "drizzle-orm";
 import { logSilentCatch } from "../lib/silent-catch";
 import { INCOME_CLAUDE_COST_PER_1K } from "../lib/income-claude-route";
 import { MODEL_REGISTRY, getCatalogModelPricing } from "../model-registry";
+import { carbonUsageCost } from "../lib/gemini-carbon";
 const MODEL_COST_PER_1K: Record<string, { in: number; out: number }> = {
   // OpenRouter live catalog, 2026-10-15. Report reservations use the higher
   // post-intro $4/$20/M ceiling, NOT this $2/$10/M usage estimate.
@@ -50,6 +51,7 @@ const MODEL_COST_PER_1K: Record<string, { in: number; out: number }> = {
   // Fable 5.1 standard rates verified from Anthropic's 2026-09-01 release.
   // Cache reads are $0.25/M, handled by the model-specific 2.5% factor below.
   "claude-fable-5-1": { in: 0.010, out: 0.050 },
+  "claude-fable-5-2": { in: 0.008, out: 0.040 },
   // R125+3.7+sec — pricing aligned with server/resource-predictor.ts after architect MEDIUM
   // finding flagged 2x drift (cost-ledger had $2.50/$10 per 1M, predictor had $1.25/$5 per 1M
   // which matches Google's published Gemini Pro / 3.5-Flash rates). Single source of truth
@@ -134,7 +136,7 @@ function cacheFactors(model: string): { read: number; write: number } {
   if (m === "gpt-6-luna" || m === "gpt-6-sol" || m === "gpt-6-astra" || m === "gpt-6-astra:flex") {
     return { read: 0.1, write: 1.25 };
   }
-  if (m === "claude-fable-5-1") return { read: 0.025, write: 1.25 };
+  if (m === "claude-fable-5-1" || m === "claude-fable-5-2") return { read: 0.025, write: 1.25 };
   if (m.startsWith("claude")) return { read: 0.1, write: 1.25 };
   if (m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4")) return { read: 0.25, write: 1.0 };
   if (m.startsWith("gemini")) return { read: 0.25, write: 1.0 };
@@ -148,6 +150,11 @@ export function estimateCostUsd(
   cachedTokensIn = 0,
   cacheWriteTokens = 0,
 ): number {
+  if (model === "gemini-4-carbon" && tokensIn === 0 && tokensOut === 0) return 0;
+  if (model === "gemini-4-carbon") return carbonUsageCost({
+    prompt_tokens: tokensIn, completion_tokens: tokensOut,
+    prompt_tokens_details: { cached_tokens: cachedTokensIn },
+  });
   const catalogPricing = getCatalogModelPricing(MODEL_REGISTRY.find(entry => entry.id === model));
   if (catalogPricing) {
     // No verified cache rate for this catalog family: conservatively bill all

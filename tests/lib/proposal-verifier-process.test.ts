@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, symlink } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -94,6 +94,7 @@ describe("verifyProposalIsolated", () => {
   it("the actual staged TypeScript process inherits its admitted 3 GiB heap", async () => {
     const root = await mkdtemp(join(tmpdir(), "visionclaw-verifier-"));
     try {
+      await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
       await mkdir(join(root, "scripts"));
       await writeFile(join(root, "scripts/proposal-verifier-child.ts"), `
         import { getHeapStatistics } from "node:v8";

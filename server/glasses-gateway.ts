@@ -302,6 +302,9 @@ export function registerGlassesGateway(app: Express): void {
       const result = await executeGuardedTool(name, params, {
         tenantId,
         invokedVia: "glasses_gateway",
+        actor: "system",
+        internalPurpose: "Execute an API-key-authenticated, voice-safe allowlisted tool",
+        allowedToolNames: [name],
       });
       const durationMs = Date.now() - startedAt;
       console.log(`[glasses-gateway] tenant=${tenantId} tool=${name} ok=${!result?.error} dur=${durationMs}ms`);

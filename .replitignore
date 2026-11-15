@@ -8,6 +8,8 @@ public-mirror/
 .local/aldon-assessment/
 .local/private-oauth/
 .local/testing-agent/
+.local/offline-verification/
+.local/release-checks/
 
 # Regenerable package download caches; installed tools/dependencies stay intact.
 .cache/uv/

@@ -70,6 +70,27 @@ test("selection is deduplicated and deterministic", () => {
   assert.deepEqual(classifyReleaseScope(["server/auth.ts", "server/auth.ts"]), classifyReleaseScope(["server/auth.ts"]));
 });
 
+test("weekly-video implementation changes select the full reviewed fixture coverage", () => {
+  const scope = classifyReleaseScope(["scripts/build-bwb-weekly.ts", "scripts/bwb-render-github.ts"]);
+  assert.deepEqual(scope.unknown, []);
+  for (const file of [
+    "tests/video/bwb-all-daily-clips.test.ts", "tests/video/bwb-weekly-coverage.test.ts",
+    "tests/video/bwb-voice-lock.test.ts", "tests/unit/bwb-weekly-weight-guard.test.ts",
+    "tests/video/bwb-delivery-verification-flow.test.ts", "tests/unit/media-output-verification.test.ts",
+  ]) assert.ok(scope.tests.includes(file), file);
+});
+
+test("shared media changes select measured validation and delivery retry checks", () => {
+  const scope = classifyReleaseScope(["server/lib/video-output-snapshot.ts", "server/video-job-runner.ts"]);
+  assert.deepEqual(scope.unknown, []);
+  for (const file of ["tests/unit/media-output-verification.test.ts",
+    "tests/unit/video-finalize-gate.test.ts"]) assert.ok(scope.tests.includes(file), file);
+  assert.ok(classifyReleaseScope(["scripts/lib/bwb-verification-profile.ts"]).areas.includes("bwb"));
+  const runner = readFileSync("scripts/targeted-release-check.ts", "utf8");
+  assert.match(runner, /name === "regressions"/);
+  assert.match(runner, /buildOfflineVerificationEnv\(process\.env, home\)/);
+});
+
 test("source identity is ordered by path and binds exact bytes and deletions", () => {
   const a = [{ path: "server/a.ts", content: "a" }, { path: "server/b.ts", content: "b" }];
   assert.equal(digestReleaseInputs(a), digestReleaseInputs([...a].reverse()));

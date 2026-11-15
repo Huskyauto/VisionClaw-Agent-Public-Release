@@ -53,7 +53,10 @@ export async function deleteTenantFile(
   if (!storageKey.startsWith(tenantPrefix(tenantId) + "/")) {
     throw new Error("Access denied: file does not belong to this tenant");
   }
-  await client.delete(storageKey);
+  // The SDK resolves an error Result instead of rejecting on provider failure.
+  // Missing objects are already deleted; retries after a DB failure are safe.
+  const result = await client.delete(storageKey, { ignoreNotFound: true });
+  if (!result.ok) throw new Error("Unable to delete stored file");
 }
 
 export async function listTenantFiles(

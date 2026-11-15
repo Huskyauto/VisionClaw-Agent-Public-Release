@@ -24,6 +24,7 @@ export const introspectToolsDefinition: ToolDefinition = {
       properties: {
         action: { type: "string", enum: ["list", "inspect", "search"], description: "'list' = all tools, 'inspect' = full schema for one tool, 'search' = find tools by capability" },
         tool_name: { type: "string", description: "Tool name to inspect (required for 'inspect' action)" },
+        name: { type: "string", description: "Compatibility alias for tool_name when inspecting. If both are supplied they must match." },
         query: { type: "string", description: "Capability search query (required for 'search' action), e.g. 'create presentation slides'" },
       },
       required: ["action"],

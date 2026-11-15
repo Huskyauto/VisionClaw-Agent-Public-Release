@@ -85,12 +85,18 @@ async function introspectToolsHandler(
   const { introspectTool, searchTools, listToolSummaries } = await import("../../../self-reflection");
   const isVisible = await buildToolVisibilityFilter(ctx);
   if (params.action === "inspect") {
-    if (!params.tool_name) return { error: "tool_name is required for 'inspect' action" };
+    if (params.tool_name !== undefined && params.name !== undefined && params.tool_name !== params.name) {
+      return { error: "tool_name and name must match when both are supplied" };
+    }
+    const toolName = params.tool_name ?? params.name;
+    if (typeof toolName !== "string" || !/^[a-z][a-z0-9_]*$/.test(toolName) || toolName.length > 200) {
+      return { error: "A valid tool_name is required for 'inspect' action" };
+    }
     // Restricted tools are indistinguishable from nonexistent ones to
     // non-trusted callers (no oracle for probing the restricted set).
-    if (!isVisible(params.tool_name)) return { error: `Tool "${params.tool_name}" not found. Use action "search" to find it.` };
-    const schema = introspectTool(params.tool_name);
-    if (!schema) return { error: `Tool "${params.tool_name}" not found. Use action "search" to find it.` };
+    if (!isVisible(toolName)) return { error: `Tool "${toolName}" not found. Use action "search" to find it.` };
+    const schema = introspectTool(toolName);
+    if (!schema) return { error: `Tool "${toolName}" not found. Use action "search" to find it.` };
     return { tool: schema };
   }
   if (params.action === "search") {
