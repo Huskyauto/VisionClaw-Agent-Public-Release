@@ -47,13 +47,13 @@ export function createStableVideoSnapshot(filePath: string, snapshotParent = pat
     };
   } catch (error) {
     if (sourceFd !== undefined) {
-      try { fs.closeSync(sourceFd); } catch { /* preserve original failure */ }
+      try { fs.closeSync(sourceFd); } catch { console.warn("[video-verification] source descriptor cleanup failed; preserving original failure"); }
     }
     if (snapshotFd !== undefined) {
-      try { fs.closeSync(snapshotFd); } catch { /* preserve original failure */ }
+      try { fs.closeSync(snapshotFd); } catch { console.warn("[video-verification] snapshot descriptor cleanup failed; preserving original failure"); }
     }
     if (tempDir) {
-      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* preserve original failure */ }
+      try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { console.warn("[video-verification] failed-snapshot cleanup failed; preserving original failure"); }
     }
     throw error;
   }

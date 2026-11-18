@@ -28,6 +28,7 @@ import {
 import { HeavyWorkDeferred } from "./lib/heavy-work-lane";
 import { webVerifierQueueScope } from "./lib/verifier-job-scope";
 import { TenantAuditStop, deferAuditCapacity } from "./lib/tenant-audit-job-state";
+import { LEGION_RUNBOOK_JOB, SURFACE_RULE_JOB, LegionJobWaiting, LegionJobRejected } from "./legion/nightly-policy";
 
 export type WeeklyJobContext = {
   assertLeaseOwned(): Promise<void>;
@@ -228,6 +229,16 @@ async function runOneJob(job: AgentJob): Promise<void> {
         console.warn(`[job-worker] Job #${job.id} (${job.kind}) completion fenced; live lease no longer owned`);
       }
     } catch (err: unknown) {
+      if ([LEGION_RUNBOOK_JOB, SURFACE_RULE_JOB].includes(job.kind) && err instanceof LegionJobWaiting) {
+        const { deferLegionRunbookJob } = await import("./legion/nightly");
+        const deferred = await deferLegionRunbookJob(job);
+        console.log(`[legion-nightly] local job ${job.id} ${deferred ? "retained pending for capacity; no model dispatched" : "claim no longer owned"}`);
+        return;
+      }
+      if ([LEGION_RUNBOOK_JOB, SURFACE_RULE_JOB].includes(job.kind) && err instanceof LegionJobRejected) {
+        await failJob(job.id, job.attempts, err.message, job.tenantId, { stopRetry: true, failureClass: "unknown" });
+        return;
+      }
       if (err instanceof TenantAuditLeaseLost) {
         // An old claim must neither complete nor fail the replacement claim.
         console.warn(`[job-worker] Job #${job.id} (${job.kind}) lease lost; stopping old claim`);
@@ -482,6 +493,16 @@ registerJobHandler("astra_report_batch", async (job) => {
     });
   }
   return { ...fulfillment, usedAstra: advanced.usedAstra, batch: advanced.record };
+});
+
+registerJobHandler(LEGION_RUNBOOK_JOB, async job => {
+  const { handleLegionRunbookJob } = await import("./legion/nightly");
+  return handleLegionRunbookJob(job);
+});
+
+registerJobHandler(SURFACE_RULE_JOB, async job => {
+  const { handleLegionRunbookJob } = await import("./legion/nightly");
+  return handleLegionRunbookJob(job);
 });
 
 registerJobHandler("tenant_isolation_audit", async job => {

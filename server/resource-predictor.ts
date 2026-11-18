@@ -87,6 +87,7 @@ export const MODEL_COST_PER_MILLION: Record<string, { input: number; output: num
   "moonshotai/kimi-k2.6": { input: 0.95, output: 4.00 },
   "moonshotai/kimi-k3": { input: 3.00, output: 15.00 },
   "moonshotai/kimi-k3.1-pro": { input: 2, output: 10 },
+  "qwen/qwen4-max": { input: 1.5, output: 4.5 },
   "mistralai/mistral-large-4-0": { input: 1.36, output: 4.18 },
   "meta-llama/llama-4-maverick": { input: 0.20, output: 0.696 },
   "meta/muse-spark-1.1": { input: 1.25, output: 4.25 },

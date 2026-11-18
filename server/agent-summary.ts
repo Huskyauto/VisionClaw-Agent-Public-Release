@@ -1,5 +1,4 @@
 import { emitDelegationEvent, subscribeToDelegation } from "./delegation-events";
-import { getClientForModel } from "./providers";
 
 
 interface SummarizerEntry {
@@ -10,48 +9,15 @@ interface SummarizerEntry {
 
 const activeSummarizers = new Map<number, SummarizerEntry>();
 
-const SUMMARY_MODEL = "gpt-5";
-
-async function generateStatusSummary(agentName: string, taskName: string, recentContext: string): Promise<string | null> {
-  try {
-    const { client, actualModelId } = await getClientForModel(SUMMARY_MODEL);
-    const resp = await client.chat.completions.create({
-      model: actualModelId,
-      messages: [
-        {
-          role: "system",
-          content: `Generate a 3-5 word present-tense status summary for what agent "${agentName}" is currently doing on task "${taskName}".
-
-Rules:
-- Present tense only (e.g., "Analyzing market data")
-- 3-5 words maximum
-- Name the specific action, not vague descriptions
-- No past tense ("Analyzed" is wrong, "Analyzing" is right)
-- No vague language ("Working on it" is wrong, "Drafting proposal intro" is right)
-- No punctuation at the end
-- Capitalize first word only
-
-Respond with ONLY the status summary, nothing else.`,
-        },
-        {
-          role: "user",
-          content: `Recent activity:\n${recentContext.slice(0, 500)}`,
-        },
-      ],
-      max_completion_tokens: 30,
-      // gpt-5 is a reasoning model — without this, hidden reasoning tokens eat the
-      // tiny 30-token budget and content comes back empty (finish_reason "length").
-      reasoning_effort: "minimal",
-    } as any);
-
-    const summary = resp.choices[0]?.message?.content?.trim();
-    if (!summary || summary.length > 60 || summary.length < 5) return null;
-    const wordCount = summary.split(/\s+/).length;
-    if (wordCount < 3 || wordCount > 5) return null;
-    return summary;
-  } catch {
-    return null;
-  }
+// A cosmetic progress label does not need any model, local or hosted.
+// Static outputs never echo names, tool arguments or customer activity values.
+export function generateStatusSummary(recentContext: string): string {
+  const recent = recentContext.slice(-500).toLowerCase();
+  if (/\b(search|research|fetch|browse)\w*/.test(recent)) return "Researching task details";
+  if (/\b(test|validat|verif)\w*/.test(recent)) return "Checking task results";
+  if (/\b(review|analyz|inspect)\w*/.test(recent)) return "Reviewing task details";
+  if (/\b(write|writ|draft|compil|generat)\w*/.test(recent)) return "Preparing task output";
+  return "Processing delegated task";
 }
 
 export function startDelegationSummarizer(
@@ -73,6 +39,7 @@ export function startDelegationSummarizer(
   });
 
   let isGenerating = false;
+  let lastSummary = "";
   const entry: SummarizerEntry = { timer: null as unknown as ReturnType<typeof setInterval>, unsub, cancelled: false };
 
   entry.timer = setInterval(async () => {
@@ -80,14 +47,13 @@ export function startDelegationSummarizer(
 
     isGenerating = true;
     try {
-    if (recentActivity.length === 0) {
-      recentActivity.push(`Working on: ${taskName}`);
-    }
-
+    if (recentActivity.length === 0) return;
     const context = recentActivity.join("\n");
-    const summary = await generateStatusSummary(agentName, taskName, context);
+    recentActivity = [];
+    const summary = generateStatusSummary(context);
 
-    if (summary && !entry.cancelled) {
+    if (summary !== lastSummary && !entry.cancelled) {
+      lastSummary = summary;
       emitDelegationEvent({
         conversationId,
         tenantId,

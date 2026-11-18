@@ -3,7 +3,8 @@ import crypto from "crypto";
 import { storage } from "./storage";
 import { db } from "./db";
 import { tenants, apiKeys } from "@shared/schema";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, isNull } from "drizzle-orm";
+import { ownerOnlyAccess, tenantAccessAllowed, PRIVATE_ACCESS_ERROR } from "./lib/owner-only-access";
 
 import { logSilentCatch } from "./lib/silent-catch";
 import { normalizeAdminPin, requireNormalizedAdminPin } from "./lib/admin-pin-normalization";
@@ -36,7 +37,8 @@ if (!PIN_PEPPER && process.env.NODE_ENV === "production") {
   throw new Error("[auth] FATAL: PIN_PEPPER is required in production. Without it, admin PIN hashing falls back to the public static salt (in an open-source repo), so anyone with DB read access can brute-force the PIN keyspace offline. Set PIN_PEPPER (a long random secret). Refusing to boot.");
 }
 
-export const ADMIN_TENANT_ID = 1;
+import { ADMIN_TENANT_ID } from "./tenant-constants";
+export { ADMIN_TENANT_ID } from "./tenant-constants";
 
 // ─── Admin semantics (Task 124, 2026-08-01) ───────────────────────────────
 // There are exactly TWO tiers of admin, and they must derive identically on
@@ -200,6 +202,7 @@ async function validateApiKey(rawKey: string, req: any): Promise<boolean> {
       .where(and(eq(apiKeys.keyHash, keyHash), eq(apiKeys.isRevoked, false)));
     if (rows.length === 0) return false;
     const key = rows[0];
+    if (!tenantAccessAllowed(key.tenantId)) return false;
     if (key.expiresAt && new Date(key.expiresAt) < new Date()) return false;
     const [tenant] = await db.select().from(tenants).where(eq(tenants.id, key.tenantId));
     if (!tenant?.isActive) return false;
@@ -276,6 +279,7 @@ async function isTenantSessionActive(tenantId: number): Promise<boolean> {
 }
 
 async function createSession(tenantId: number, isAdmin: boolean): Promise<string> {
+  if (!tenantAccessAllowed(tenantId) || (ownerOnlyAccess() && !isAdmin)) throw new Error("Owner sign-in required");
   const token = generateSessionToken();
   const tokenHash = hashSessionToken(token);
   const now = Date.now();
@@ -293,6 +297,7 @@ async function createSession(tenantId: number, isAdmin: boolean): Promise<string
 export async function getSession(token: string): Promise<{ tenantId: number; isAdmin: boolean } | null> {
   const cached = sessionCache.get(token);
   if (cached) {
+    if (!tenantAccessAllowed(cached.tenantId) || (ownerOnlyAccess() && !cached.isAdmin)) return null;
     if (Date.now() > cached.expiresAt) {
       sessionCache.delete(token);
       db.execute(sql`DELETE FROM auth_sessions WHERE token = ${hashSessionToken(token)}`).catch(() => {});
@@ -320,6 +325,7 @@ export async function getSession(token: string): Promise<{ tenantId: number; isA
   }
 
   const data = { tenantId: Number(row.tenant_id), isAdmin: Boolean(row.is_admin), expiresAt };
+  if (!tenantAccessAllowed(data.tenantId) || (ownerOnlyAccess() && !data.isAdmin)) return null;
   if (!await isTenantSessionActive(data.tenantId)) {
     await deleteSession(token);
     return null;
@@ -377,6 +383,25 @@ export function ownerRebindAllowed(boundReplitUserId: string | null | undefined,
 }
 
 export async function getOrCreateTenantForReplitUser(replitUserId: string, email?: string | null, name?: string | null, provider: "replit" | "agentid" = "replit"): Promise<number> {
+  if (ownerOnlyAccess()) {
+    if (provider !== "replit" || !replitUserId || replitUserId.startsWith("agentid:")) throw new Error("Owner sign-in required");
+    const [owner] = await db.select().from(tenants).where(eq(tenants.id, ADMIN_TENANT_ID));
+    if (!owner?.isActive) throw new Error("Owner workspace is unavailable");
+    if (owner.replitUserId) {
+      if (owner.replitUserId !== replitUserId) throw new Error("Owner sign-in required");
+    } else {
+      // Preserve initial owner binding, never bind an arbitrary new account.
+      const configured = [process.env.OWNER_EMAILS, process.env.OWNER_EMAIL, process.env.REPL_OWNER]
+        .filter(Boolean).join(",").split(",").map(v => v.trim().toLowerCase()).filter(Boolean);
+      if (!configured.includes(replitUserId.toLowerCase())
+        && !(email && configured.includes(email.trim().toLowerCase()))) throw new Error("Owner sign-in required");
+      const bound = await db.update(tenants).set({ replitUserId })
+        .where(and(eq(tenants.id, ADMIN_TENANT_ID), eq(tenants.isActive, true), isNull(tenants.replitUserId))).returning();
+      if (!bound.length) throw new Error("Owner binding changed; sign in again");
+    }
+    tenantCacheByReplitUser.set(replitUserId, { tenantId: ADMIN_TENANT_ID, isAdmin: true });
+    return ADMIN_TENANT_ID;
+  }
   if (provider === "agentid") {
     if (!agentIdEnabled() || !/^agentid:[a-f0-9]{64}$/.test(replitUserId)) {
       throw new Error("Invalid or disabled AgentID identity");
@@ -586,6 +611,53 @@ export function requirePlatformAdmin(req: Request, res: Response): boolean {
 // for hard-gate routes that always 403 non-admins.
 export function isPlatformAdmin(req: Request): boolean {
   return getTenantFromRequest(req) === ADMIN_TENANT_ID && isAdminRequest(req);
+}
+
+/** Additional private-access gate, never a substitute for scopes/route auth. */
+export async function isVerifiedOwnerRequest(req: Request): Promise<boolean> {
+  const bearer = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (bearer?.startsWith("vc_")) {
+    return await validateApiKey(bearer, req) && (req as any).tenantId === ADMIN_TENANT_ID;
+  }
+  if (bearer) {
+    const session = await getSession(bearer);
+    if (session?.tenantId === ADMIN_TENANT_ID && session.isAdmin) return true;
+  }
+  const user = getReplitAuthUser(req);
+  if (user?.provider === "replit") {
+    return await getOrCreateTenantForReplitUser(user.sub, user.email) === ADMIN_TENANT_ID;
+  }
+  // PIN sign-in gets an HttpOnly credential for read-only media navigation.
+  // Never authenticate API operations from this cookie or widen API CSRF scope.
+  const mediaPath = decodeURIComponent((req.originalUrl || req.url).split("?")[0]);
+  if ((req.method === "GET" || req.method === "HEAD")
+    && /^\/(?:uploads|deliverables|v|watch|play)\//.test(mediaPath)) {
+    const cookies = String(req.headers.cookie || "").split(";").map(v => v.trim())
+      .filter(v => v.startsWith("vc_owner_media="));
+    const token = cookies.length === 1 ? cookies[0].slice("vc_owner_media=".length) : "";
+    if (/^[a-f0-9]{64}$/.test(token)) {
+      const session = await getSession(token);
+      if (session?.tenantId === ADMIN_TENANT_ID && session.isAdmin) {
+        // Existing upload handlers still perform their own ownership checks.
+        req.headers.authorization = `Bearer ${token}`;
+        return true;
+      }
+    }
+  }
+  // Media elements and native download links cannot carry the SPA bearer.
+  // Only existing, cryptographically verified owner-scoped links can pass.
+  const url = new URL(req.originalUrl || req.url, "http://request.invalid");
+  const path = decodeURIComponent(url.pathname);
+  const one = (key: string) => url.searchParams.getAll(key).length === 1
+    ? url.searchParams.get(key)! : "";
+  if (one("tid") !== String(ADMIN_TENANT_ID)) return false;
+  const { verifyUploadSig, verifyVideoDownloadSig } = await import("./upload-signing");
+  if ((req.method === "GET" || req.method === "HEAD") && /^\/uploads\/[^/]+$/.test(path)) {
+    return verifyUploadSig(path.slice("/uploads/".length), ADMIN_TENANT_ID, Number(one("exp")), one("sig"));
+  }
+  const video = path.match(/^\/api\/video-jobs\/([^/]+)\/download$/);
+  return !!video && (req.method === "GET" || req.method === "HEAD")
+    && verifyVideoDownloadSig(video[1], ADMIN_TENANT_ID, one("mode"), Number(one("exp")), one("sig"));
 }
 
 export type ApiScope = "chat" | "read" | "tools" | "admin";
@@ -912,10 +984,24 @@ export async function handleLogin(req: Request, res: Response) {
 
   const token = await createSession(ADMIN_TENANT_ID, true);
 
+  if (ownerOnlyAccess()) res.cookie("vc_owner_media", token, {
+    httpOnly: true, secure: process.env.NODE_ENV === "production",
+    sameSite: "strict", path: "/", maxAge: SESSION_MAX_AGE,
+  });
   res.json({ token, expiresIn: SESSION_MAX_AGE, tenantId: ADMIN_TENANT_ID, isAdmin: true });
 }
 
+export async function handleOwnerLogout(req: Request, res: Response) {
+  const token = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (token) await deleteSession(token);
+  res.clearCookie("vc_owner_media", {
+    httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/",
+  });
+  res.json({ ok: true });
+}
+
 export async function handleTenantRegister(req: Request, res: Response) {
+  if (ownerOnlyAccess()) return res.status(403).json(PRIVATE_ACCESS_ERROR);
   const { email, password, name } = req.body;
 
   if (!email || !password || !name) {
@@ -980,6 +1066,7 @@ export async function handleTenantRegister(req: Request, res: Response) {
 }
 
 export async function handleTenantLogin(req: Request, res: Response) {
+  if (ownerOnlyAccess()) return res.status(403).json(PRIVATE_ACCESS_ERROR);
   const clientIp = req.ip || req.socket.remoteAddress || "unknown";
   const attempt = loginAttempts.get(clientIp);
   if (attempt && attempt.count >= MAX_LOGIN_ATTEMPTS) {
@@ -1337,8 +1424,9 @@ export async function handleResetPassword(req: Request, res: Response) {
 export async function handleAuthStatus(_req: Request, res: Response) {
   const settings = await storage.getSettings();
   res.json({
-    authRequired: !!settings?.accessPin,
+    authRequired: ownerOnlyAccess() || !!settings?.accessPin,
     configured: !!settings?.accessPin,
+    ownerOnly: ownerOnlyAccess(),
   });
 }
 

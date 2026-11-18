@@ -1,5 +1,19 @@
 [
   {
+    "version": "R137.3+sec2",
+    "date": "November 17, 2026",
+    "title": "Credential revocation, logout cleanup and private-mode website review",
+    "type": "security",
+    "highlights": [
+      { "icon": "ShieldCheck", "text": "Conditional HIGH closed: the optional legacy MCP endpoint rechecks current account activity for remembered tenant keys and the compatibility owner key. Disabled accounts are refused; authorization-store failures return unavailable instead of reusing a cached grant. The legacy endpoint remains disabled by default." },
+      { "icon": "Shield", "text": "MEDIUM: remote logout failure no longer prevents local identity, stored PIN token and private query-cache cleanup. Replit sign-out redirects only after local cleanup; remote revocation is not claimed when its request fails." },
+      { "icon": "Settings", "text": "MEDIUM: authenticated Skills navigation reaches the workspace instead of being shadowed by the public skills catalog. Public skill discovery remains available to visitors." },
+      { "icon": "BookOpen", "text": "Private-mode landing actions identify owner sign-in. Anonymous visitors see closed-checkout/contact notices instead of inaccessible forms; successful contact storage is not described as confirmed email delivery. Owner-only enforcement was not relaxed." },
+      { "icon": "FileCheck", "text": "Fresh development inventory and both READMEs cover source additions, bounded parallel laptop maintenance and the agent-ready website package. Shared landing, dashboard, sidebar and SEO summaries consume the same release facts." },
+      { "icon": "AlertTriangle", "text": "Review combined an application/page inventory, independent risk-based inspection and bounded local checks, not whole-platform certification, manual inspection of every line or acceptance of every live integration. Source synchronization does not publish the application or change production settings." }
+    ]
+  },
+  {
     "version": "R137.3+sec",
     "date": "November 14, 2026",
     "title": "Subscription, memory and video integrity review",

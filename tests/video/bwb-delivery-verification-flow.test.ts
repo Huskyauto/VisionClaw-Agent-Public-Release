@@ -17,7 +17,7 @@ const source = path.resolve("data/youtube/video-01-origin-story-v2.mp4");
 const probe = getFfprobePath();
 const wrapper = path.resolve("scripts/bwb-render-github.ts");
 
-async function runFlow(mode: "success" | "corrupt" | "soft-fail" | "throw") {
+async function runFlow(mode: "success" | "corrupt" | "soft-fail" | "throw" | "backup-fail") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bwb-delivery-flow-"));
   try {
     fs.mkdirSync(path.join(dir, "data/youtube/scripts"), { recursive: true });
@@ -32,12 +32,20 @@ async function runFlow(mode: "success" | "corrupt" | "soft-fail" | "throw") {
       plugins: [{
         name: "offline-boundaries",
         setup(b) {
-          b.onResolve({ filter: /github-render-farm$|bwb-job-progress$|server\/delivery-pipeline$|replit_integrations\/image\/client$|ffmpeg-paths$/ },
+          b.onResolve({ filter: /github-render-farm$|bwb-drive-recovery$|bwb-job-progress$|server\/delivery-pipeline$|replit_integrations\/image\/client$|ffmpeg-paths$/ },
             a => ({ path: a.path, namespace: "offline-boundaries" }));
           b.onLoad({ filter: /.*/, namespace: "offline-boundaries" }, a => ({
-            contents: a.path.endsWith("github-render-farm") ? `
+            contents: a.path.endsWith("bwb-drive-recovery") ? `
+              export function createBwbRecovery(){return {
+                async json(){if(process.env.FIXTURE_MODE==="backup-fail")throw new Error("BWB recovery paused: offline refusal")},
+                async file(){},async save(){}
+              }}
+            ` : a.path.endsWith("github-render-farm") ? `
               import fs from "node:fs";
               export async function renderOnGithubFarm(o) {
+                if(o.toolAuthority?.tenantId!==1 || o.toolAuthority?.actor!=="system" ||
+                  o.toolAuthority?.invokedVia!=="video-render" || !o.toolAuthority?.internalPurpose)
+                  throw new Error("missing tenant-scoped narration authority");
                 if(o.voiceProvider!=="fish" || o.voice!==${JSON.stringify(FISH_VOICE_BOB_DIRECT)} || !o.strictVoice ||
                   o.width!==1920 || o.height!==1080 || o.fps!==30) throw new Error("brand render contract changed");
                 fs.writeFileSync("farm-options.json",JSON.stringify({voiceLocked:true,formatLocked:true}));
@@ -85,9 +93,11 @@ async function runFlow(mode: "success" | "corrupt" | "soft-fail" | "throw") {
       ? JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")) : null;
     const delivery = read("delivery-request.json");
     const sidecar = read("data/youtube/scripts/weekly-offline-fixture.result.json");
-    assert.deepEqual(read("farm-options.json"), { voiceLocked: true, formatLocked: true });
-    assert.equal(fs.existsSync(path.join(dir, "data/youtube/weekly-offline-fixture-github-render.mp4")), true,
-      "accepted farm output must survive verification or transport failure");
+    if (mode !== "backup-fail") {
+      assert.deepEqual(read("farm-options.json"), { voiceLocked: true, formatLocked: true });
+      assert.equal(fs.existsSync(path.join(dir, "data/youtube/weekly-offline-fixture-github-render.mp4")), true,
+        "accepted farm output must survive verification or transport failure");
+    } else assert.equal(read("farm-options.json"), null, "backup failure must precede any farm spend");
     if (delivery) assert.equal(fs.existsSync(delivery.path), false, "private delivery snapshot must be cleaned");
     return { status: child.status, log: child.stdout + child.stderr, delivery, sidecar };
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
@@ -119,5 +129,12 @@ test("weekly wrapper records failed delivery rather than falsely completing the 
 test("weekly wrapper preserves the farm output and cleans its copy when delivery throws", async () => {
   const result = await runFlow("throw");
   assert.equal(result.status, 2, result.log);
+  assert.equal(result.sidecar, null);
+});
+
+test("weekly wrapper stops before rendering when its mandatory recovery backup fails", async () => {
+  const result = await runFlow("backup-fail");
+  assert.equal(result.status, 2, result.log);
+  assert.equal(result.delivery, null);
   assert.equal(result.sidecar, null);
 });

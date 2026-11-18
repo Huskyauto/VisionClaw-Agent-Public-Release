@@ -82,6 +82,7 @@ const MODEL_COST_PER_1K: Record<string, { in: number; out: number }> = {
   "moonshotai/kimi-k3": { in: 0.003, out: 0.015 },
   // OpenRouter catalog verified 2026-10-24; USD per 1K tokens.
   "moonshotai/kimi-k3.1-pro": { in: 0.002, out: 0.010 },
+  "qwen/qwen4-max": { in: 0.0015, out: 0.0045 },
   "mistralai/mistral-large-4-0": { in: 0.00136, out: 0.00418 },
   "meta/muse-spark-1.3": { in: 0.00125, out: 0.00425 },
   "meta/muse-spark-1.1": { in: 0.00125, out: 0.00425 },
@@ -130,6 +131,7 @@ const MODEL_COST_PER_1K: Record<string, { in: number; out: number }> = {
 //   Gemini cached ≈ 25%. Unknown families fall back to a conservative 50% read.
 function cacheFactors(model: string): { read: number; write: number } {
   const m = (model || "").toLowerCase();
+  if (m === "qwen/qwen4-max") return { read: 0.075 / 1.5, write: 1.875 / 1.5 };
   if (m === "moonshotai/kimi-k3.1-pro") return { read: 0.20 / 2, write: 1.0 };
   if (m === "mistralai/mistral-large-4-0") return { read: 0.14 / 1.36, write: 1.0 };
   if (m === "grok-4.7") return { read: 0.25, write: 1.0 };

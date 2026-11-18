@@ -243,6 +243,7 @@ const MODEL_ROUTING: CapabilityRecord[] = [
 
 /** All static capabilities except `event` (events come from event-bus at runtime). */
 export const STATIC_CAPABILITIES: CapabilityRecord[] = [
+  { kind: "route", name: "agent_ready_website_package", category: "business", description: "Owner-only Website Audit companion: deterministic confirmed-public-facts Poppy website-only discovery, llms.txt, business JSON-LD and ZIP installation instructions; explicit scoped before/after comparisons. No chat tool, AI calls, storage, installation, payment or customer delivery. Does not replace the comprehensive DFY fix kit. Runbook: docs/agent-ready-package.md.", codePath: "server/routes/agent-ready-package.ts", codeSymbol: "registerAgentReadyRoutes" },
   ...AGENTS,
   ...WEBHOOKS,
   ...INTEGRATIONS,

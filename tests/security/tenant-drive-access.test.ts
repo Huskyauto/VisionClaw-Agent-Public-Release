@@ -5,6 +5,14 @@ import vm from "node:vm";
 import test from "node:test";
 import { transformSync } from "esbuild";
 import { authorizeTenantDriveFile, driveParentQuery, tenantDriveDownloadPath } from "../../server/lib/tenant-drive-access";
+import { ADMIN_DRIVE_ARTIFACT_RE } from "../../server/lib/tenant-drive-access";
+
+test("historical unmarked system backups remain excluded from generic Drive access", () => {
+  for (const name of ["visionclaw-backup-2026-11-16T03-01-13.json",
+    "memory-snapshot-2026-11-16T03-01-13.json", "VisionClaw Backups", "Memory Snapshots",
+    "__admin-memory-backup-2026.json"]) assert.equal(ADMIN_DRIVE_ARTIFACT_RE.test(name), true, name);
+  assert.equal(ADMIN_DRIVE_ARTIFACT_RE.test("my-backup-notes.txt"), false);
+});
 
 function loadHandler(drive: Record<string, unknown>) {
   const source = readFileSync("server/tools/domains/files/handlers.ts", "utf8");

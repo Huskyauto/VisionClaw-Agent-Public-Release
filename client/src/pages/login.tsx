@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth";
 
 export default function LoginPage() {
-  const { login, loginTenant, loginWithReplit } = useAuth();
+  const { login, loginTenant, loginWithReplit, ownerOnly } = useAuth();
   const [, navigate] = useLocation();
   const [mode, setMode] = useState<"main" | "email" | "admin">("main");
   const [pin, setPin] = useState("");
@@ -120,7 +120,7 @@ export default function LoginPage() {
             </div>
             <CardTitle data-testid="text-login-title">Welcome to VisionClaw Agent</CardTitle>
             <CardDescription>
-              Sign in to your account
+              {ownerOnly ? "Private workspace. Owner sign-in only." : "Sign in to your account"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -185,7 +185,7 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <Button
+                {!ownerOnly && <Button
                   variant="outline"
                   className="w-full h-11"
                   onClick={() => { setMode("email"); setError(""); }}
@@ -193,9 +193,9 @@ export default function LoginPage() {
                 >
                   <Mail className="w-4 h-4 mr-2" />
                   Sign in with Email
-                </Button>
+                </Button>}
 
-                <p className="text-xs text-center text-muted-foreground">
+                {!ownerOnly && <p className="text-xs text-center text-muted-foreground">
                   Don't have an account?{" "}
                   <button
                     type="button"
@@ -205,7 +205,7 @@ export default function LoginPage() {
                   >
                     Sign up free
                   </button>
-                </p>
+                </p>}
 
                 <button
                   type="button"
@@ -273,7 +273,7 @@ export default function LoginPage() {
                 >
                   Forgot your password?
                 </button>
-                <p className="text-xs text-center text-muted-foreground">
+                {!ownerOnly && <p className="text-xs text-center text-muted-foreground">
                   Don't have an account?{" "}
                   <button
                     type="button"
@@ -283,7 +283,7 @@ export default function LoginPage() {
                   >
                     Sign up free
                   </button>
-                </p>
+                </p>}
                 <button
                   type="button"
                   onClick={() => { setMode("main"); setError(""); }}

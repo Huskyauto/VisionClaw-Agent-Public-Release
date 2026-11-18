@@ -20,7 +20,7 @@ interface ExecConfig {
   workdir: string;
 }
 
-const ADMIN_TENANT_ID = Number(process.env.ADMIN_TENANT_ID) || 1;
+import { ADMIN_TENANT_ID } from "./tenant-constants";
 
 const DEFAULT_CONFIG: ExecConfig = {
   enabled: true,

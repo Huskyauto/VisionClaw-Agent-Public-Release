@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { ownerOnlyAccess } from "./lib/owner-only-access";
 import * as oidc from "openid-client";
 import rateLimit from "express-rate-limit";
 import { sql } from "drizzle-orm";
@@ -98,6 +99,7 @@ export function registerAgentIdRoutes(app: Express): void {
 
   app.get("/api/auth/agentid/config", (req, res) => {
     res.set("Cache-Control", "no-store");
+    if (ownerOnlyAccess()) return res.json({ enabled: false, available: false, reason: "owner-only" });
     res.json({ enabled: agentIdEnabled(), ...availability(req) });
   });
 

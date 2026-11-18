@@ -1,5 +1,6 @@
 import { hashReportBytes, reportDigestForWire, type CompiledReport, type ReportEvidence } from "./business-report-evidence";
 import { isDeepStrictEqual } from "node:util";
+import { assertReportSourceIdentities } from "./report-writing-plan";
 
 type Entry = { id: string; kind: "source" | "limitation"; sourceId: string; text: string };
 export type CompilationCatalog = { id: string; entries: Entry[]; evidence: ReportEvidence };
@@ -13,6 +14,7 @@ export function compilationReferenceError(issues: CompilationIssue[]): Error {
 /** Deterministic, bounded excerpts; no model writes quotations or provenance.
  * IDs bind source identity, text and position, not just a mutable list index. */
 export function buildCompilationCatalog(evidence: ReportEvidence): CompilationCatalog {
+  assertReportSourceIdentities(evidence);
   const sources = evidence.sources.map(source => ({ ...source }));
   if (sources.some(source => source.sha256 !== hashReportBytes(source.text)) ||
       new Set(sources.map(s => s.id)).size !== sources.length)

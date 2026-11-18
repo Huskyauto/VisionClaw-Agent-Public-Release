@@ -31,6 +31,10 @@ test("a jury-requested evidence-limiting heading repair stays bound to the origi
   const report = { sections: [{ heading: title, blocks: [{ type: "recommendation",
     text: "Use a measured pilot and verify the evidence before stating competitive results. ".repeat(4), sourceIds: [] }] }], unknowns: [] };
   assert.equal(buildMuseReportRequest(scoped, state).draftSections[0].heading, title);
+  const request = buildMuseReportRequest(scoped, state);
+  assert.equal(request.writingPlan.sections[0].heading, title);
+  assert.deepEqual(request.writingPlan.sourceRegister, [{ sourceIds: ["S1"], kind: "public" }]);
+  assert.match(request.instruction, /A real source or matching title does not establish claim support/);
   assert.doesNotThrow(() => validateMuseReportReply(scoped, state,
     { requestId: state.requestId, digest: state.digest, report }));
   assert.throws(() => validateMuseReportReply(scoped, { ...state, correctionChecklist: [] },

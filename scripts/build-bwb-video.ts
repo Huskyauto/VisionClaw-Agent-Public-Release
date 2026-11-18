@@ -26,6 +26,7 @@ import { pool } from "../server/db";
 import { validateBwbScript, assertRenderableFormat, assertBobVoice, resolveBwbVoice } from "./lib/bwb-validate";
 import { reviewBwbPackaging } from "./lib/bwb-packaging";
 import { openCheckpoints } from "../server/agentic/pipeline-checkpoint";
+import { createBwbRecovery } from "./lib/bwb-drive-recovery";
 import { imageMatchesPrompt, writeScenePromptSidecar, pruneStaleSceneImages } from "./lib/bwb-scene-fingerprint";
 
 // generateImage always returns "data:<mime>;base64,<b64>" — never a file path.
@@ -88,6 +89,8 @@ async function main() {
   console.log(`[build-bwb-video] ${packaging.summary}`);
   assertRenderableFormat(script, fail);
   assertBobVoice(VOICE, fail);
+  const recovery = createBwbRecovery(script.videoId);
+  await recovery.json("original-script.json", script);
   console.log(`[build-bwb-video] Validation OK — ${script.scenes.length} scenes, voice=${VOICE}`);
   const sceneDir = `data/youtube/scenes/${script.videoId}`;
   fs.mkdirSync(sceneDir, { recursive: true });
@@ -121,6 +124,7 @@ async function main() {
         fail(`scene ${i + 1}: imagePath "${s.imagePath}" is declared but missing on disk — fetch/place the file before rendering (e.g. PHOTO_NAME=<name> npx tsx scripts/fetch-bwb-photo.ts). Refusing to silently substitute a generated image.`);
       }
       console.log(`  scene ${i + 1}: using existing imagePath ${s.imagePath}`);
+      await recovery.file(s.imagePath);
       continue;
     }
     const dest = `${sceneDir}/scene-${i + 1}.png`;
@@ -160,6 +164,8 @@ async function main() {
       },
     );
     s.imagePath = result.imagePath;
+    await recovery.file(result.imagePath);
+    if (s.imagePrompt) await recovery.file(`${result.imagePath}.prompt`);
     if (reused) console.log(`  scene ${i + 1}: reused ${result.imagePath} (checkpoint)`);
   }
   // Stage-level marker so firstIncompleteStage()/run reporting sees image_bake
@@ -185,6 +191,7 @@ async function main() {
     );
   }
 
+  if (thumbnailPath) await recovery.file(thumbnailPath);
   // 3. Render via produceVideoParallel — split scenes into chapters of 3 each,
   // rendered in parallel then stream-copy concatenated at the end.
   // Concurrency is sized ADAPTIVELY by the engine to available RAM (os.freemem):
@@ -225,6 +232,7 @@ async function main() {
         voice: VOICE,
         voiceProvider: "fish",
         strictVoice: true, // brand-voice lock: fail the render rather than silently substitute a non-Bob voice on Fish failure
+        onRecoveryArtifact: async file => { await recovery.file(file); },
         resolution: "1080p", // mpeg-engine "1080p" === 1920x1080 16:9 (locked format)
         fps: 30,
         crossfadeMs: 0,
@@ -260,6 +268,7 @@ async function main() {
     },
   );
   const finalMp4 = renderInfo.finalMp4;
+  await recovery.file(finalMp4);
   const sizeMB = renderInfo.sizeMB;
   if (renderReused) console.log(`[build-bwb-video] Reusing rendered MP4: ${finalMp4} (${sizeMB} MB) — skipping re-render`);
 
@@ -347,6 +356,7 @@ async function main() {
   console.log(`Video ID:        ${script.videoId}`);
   console.log(`Playlist:        ${script.playlist}`);
   console.log(`Title:           ${script.title}`);
+  await recovery.file(path.join("data/youtube/scripts", `${script.videoId}.result.json`));
   console.log(`MP4 path:        ${finalMp4}`);
   console.log(`Size:            ${sizeMB} MB`);
   console.log(`Duration (est):  ${(renderInfo.durationSeconds || 0).toFixed(1)}s`);

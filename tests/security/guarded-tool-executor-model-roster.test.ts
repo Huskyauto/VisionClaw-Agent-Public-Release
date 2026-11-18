@@ -7,6 +7,7 @@ import ts from "typescript";
 import { requestWithModelToolRoster } from "../../server/lib/model-tool-authorization";
 import { trustedExecFlags } from "../../server/safety/trusted-exec-stamp";
 import { parseToolCallsFromContent } from "../../server/tool-call-fallback-parser";
+import { resolveToolPersonaId } from "../../server/tools/invocation-authority";
 
 function loadGuardedExecutor(dispatches: Array<{ toolName: string; args: Record<string, unknown> }>) {
   const source = fs.readFileSync("server/guarded-tool-executor.ts", "utf8");
@@ -16,6 +17,7 @@ function loadGuardedExecutor(dispatches: Array<{ toolName: string; args: Record<
   const module = { exports: {} as Record<string, any> };
 
   const loadModule = (specifier: string): any => {
+    if (specifier === "./tools/invocation-authority") return { resolveToolPersonaId };
     if (specifier === "./tools") {
       return {
         executeToolWithTimeout: async (toolName: string, args: Record<string, unknown>) => {
@@ -183,9 +185,14 @@ test("forged owner and engineer identities cannot survive guarded dispatch", asy
   ]) {
     const dispatches: Array<{ toolName: string; args: Record<string, unknown> }> = [];
     const executeGuardedTool = loadGuardedExecutor(dispatches);
-    await executeGuardedTool("run_command", { _personaId: 2, _tenantId: 1 }, {
+    const result = await executeGuardedTool("run_command", { _personaId: 2, _tenantId: 1 }, {
       ...ctx, invokedVia: "main_chat", skipApprovalGate: true, allowedToolNames: ["run_command"],
     });
+    if (ctx.personaId !== undefined && (!Number.isSafeInteger(ctx.personaId) || Number(ctx.personaId) <= 0)) {
+      assert.equal(dispatches.length, 0, "malformed trusted persona identity must fail closed");
+      assert.match(result.error, /persona|identity/i);
+      continue;
+    }
     assert.equal(dispatches.length, 1);
     const stamped = dispatches[0].args;
     assert.equal(stamped._tenantId, ctx.tenantId);

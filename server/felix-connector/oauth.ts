@@ -5,6 +5,7 @@ import type { OAuthClientInformationFull, OAuthTokens, OAuthTokenRevocationReque
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { InvalidGrantError, InvalidScopeError, InvalidClientMetadataError, InvalidTokenError } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import { connectorScopes, validConnectorRedirect } from "./policy";
+import { tenantAccessAllowed } from "../lib/owner-only-access";
 
 export type OAuthRecord = {
   id: string; kind: "client" | "pending" | "code" | "access" | "refresh";
@@ -158,7 +159,7 @@ export class FelixOAuthProvider implements OAuthServerProvider {
     return this.store.transaction(async tx => {
       let row: OAuthRecord;
       try { row = await this.read(tx, "access", token); } catch { throw new InvalidTokenError("invalid or expired token"); }
-      if (row.data.tenantId !== this.owner()) throw new InvalidTokenError("invalid owner");
+      if (row.data.tenantId !== this.owner() || !tenantAccessAllowed(row.data.tenantId)) throw new InvalidTokenError("invalid owner");
       return {token, clientId: row.clientId, scopes: row.data.scopes, expiresAt: row.expiresAt,
         resource: new URL(row.data.resource), extra: {tenantId: row.data.tenantId}};
     });

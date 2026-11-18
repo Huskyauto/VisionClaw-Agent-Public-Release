@@ -8,6 +8,7 @@
 import { type Express, type Request, type Response } from "express";
 import {
   handleLogin,
+  handleOwnerLogout,
   handleAuthStatus,
   handleForgotPassword,
   handleResetPassword,
@@ -57,6 +58,9 @@ type AuthMonitoringHelpers = {
 
 export function registerAuthMonitoringRoutes(app: Express, helpers: AuthMonitoringHelpers) {
   const { authMiddleware } = helpers;
+
+  // This registration is after the global CSRF middleware, unlike login.
+  app.post("/api/auth/logout", authMiddleware, handleOwnerLogout);
 
   // ─── Auth Monitoring ──────────────────────────────────────
   app.get("/api/auth/health", authMiddleware, async (req, res) => {

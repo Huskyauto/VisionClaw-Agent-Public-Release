@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { submitOperatorJobAction, type OperatorJobAction } from "@/lib/operator-job-action";
+import { LocalMaintenancePanel } from "@/components/local-maintenance-panel";
 import {
   Activity, RefreshCw, RotateCcw, Ban, ChevronRight, AlertTriangle,
   CheckCircle2, Clock, PlayCircle, XCircle, Inbox, Loader2,
@@ -340,6 +341,8 @@ export default function OperatorInboxPage() {
             Refresh
           </Button>
         </div>
+
+        <LocalMaintenancePanel />
 
         {/* Stats */}
         {statsQuery.isLoading ? (

@@ -461,7 +461,6 @@ function AuthGate() {
         <Route path="/refund" component={RefundPage} />
         <Route path="/gallery" component={GalleryPage} />
         <Route path="/trust" component={TrustPage} />
-        <Route path="/skills" component={SkillsCatalogPage} />
         <Route path="/audit" component={AuditPage} />
         <Route path="/dfy-intake/:token" component={DfyIntakePage} />
         <Route path="/enrichment" component={EnrichmentPage} />

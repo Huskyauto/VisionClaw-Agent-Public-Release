@@ -399,12 +399,20 @@ async function downloadDriveFile(fileId: string, destPath: string): Promise<void
  */
 export async function extractWeeklyDriveTranscripts(
   clips: DiscoveredDriveClip[],
+  onTranscript?: (transcript: YouTubeTranscript) => Promise<void>,
+  cachedTranscript?: (url: string) => YouTubeTranscript | undefined,
 ): Promise<{ transcripts: YouTubeTranscript[]; failures: { url: string; error: string }[] }> {
   const transcripts: YouTubeTranscript[] = [];
   const failures: { url: string; error: string }[] = [];
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "bwb-drive-"));
   try {
     for (const c of clips) {
+      const cached = cachedTranscript?.(`https://drive.google.com/file/d/${c.fileId}/view`);
+      if (cached?.videoId === c.fileId && cached.transcript?.trim()) {
+        transcripts.push(cached);
+        await onTranscript?.(cached);
+        continue;
+      }
       try {
         if (!SAFE_DRIVE_ID.test(c.fileId)) throw new Error(`unexpected Drive fileId format: "${String(c.fileId).slice(0, 40)}"`);
         console.log(`[drive-transcript] downloading "${c.name}" …`);
@@ -431,12 +439,16 @@ export async function extractWeeklyDriveTranscripts(
           transcript: text,
           language: (r as any).language,
         });
+        // Backup errors are not transcription failures and must not trigger a
+        // second purchase or advance to the next clip.
         try { fs.rmSync(videoPath, { force: true }); fs.rmSync(audioPath, { force: true }); } catch { /* best effort */ }
       } catch (e: any) {
         const error = e?.message || String(e);
         console.warn(`[drive-transcript]   ✗ ${c.name} — ${error}`);
         failures.push({ url: c.name, error });
       }
+      const completed = transcripts.find(t => t.videoId === c.fileId);
+      if (completed) await onTranscript?.(completed);
     }
   } finally {
     try { fs.rmSync(workDir, { recursive: true, force: true }); } catch { /* best effort */ }

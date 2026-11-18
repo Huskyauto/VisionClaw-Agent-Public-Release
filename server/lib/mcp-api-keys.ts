@@ -21,6 +21,7 @@
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { randomBytes, createHash, timingSafeEqual } from "crypto";
+import { tenantAccessAllowed } from "./owner-only-access";
 
 export interface McpApiKeyRow {
   id: number;
@@ -172,6 +173,7 @@ export async function verifyApiKey(presented: string): Promise<VerifiedKey | nul
     const row = ((r as any).rows || r)[0];
     if (!row) return null;
     if (row.revoked_at) return null;
+    if (!tenantAccessAllowed(row.tenant_id)) return null;
 
     const storedHash = String(row.key_hash);
     if (storedHash.length !== expectedHash.length) return null;

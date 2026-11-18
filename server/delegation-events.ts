@@ -73,7 +73,7 @@ export function clearOldEvents() {
   }
 }
 
-setInterval(clearOldEvents, 60_000);
+setInterval(clearOldEvents, 60_000).unref();
 
 export function generateNarration(event: DelegationEvent): string {
   switch (event.type) {

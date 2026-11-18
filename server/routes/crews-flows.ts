@@ -36,7 +36,7 @@ export function registerCrewsFlowsRoutes(app: Express, helpers: CrewsFlowsHelper
       const { createCrew } = await import("../crews-engine");
       const tenantId = getTenantFromRequest(req);
       if (!tenantId) return res.status(403).json({ error: "Tenant required" });
-      const result = await createCrew({ tenantId, ...req.body });
+      const result = await createCrew({ ...req.body, tenantId });
       res.json(result);
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
@@ -90,7 +90,7 @@ export function registerCrewsFlowsRoutes(app: Express, helpers: CrewsFlowsHelper
       const { addCrewAgent } = await import("../crews-engine");
       const tenantId = getTenantFromRequest(req);
       if (!tenantId) return res.status(403).json({ error: "Tenant required" });
-      const result = await addCrewAgent({ crewId: parseInt(req.params.id as string), tenantId, ...req.body });
+      const result = await addCrewAgent({ ...req.body, crewId: parseInt(req.params.id as string), tenantId });
       res.json(result);
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
@@ -112,7 +112,7 @@ export function registerCrewsFlowsRoutes(app: Express, helpers: CrewsFlowsHelper
       const { addCrewTask } = await import("../crews-engine");
       const tenantId = getTenantFromRequest(req);
       if (!tenantId) return res.status(403).json({ error: "Tenant required" });
-      const result = await addCrewTask({ crewId: parseInt(req.params.id as string), tenantId, ...req.body });
+      const result = await addCrewTask({ ...req.body, crewId: parseInt(req.params.id as string), tenantId });
       res.json(result);
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
@@ -166,7 +166,7 @@ export function registerCrewsFlowsRoutes(app: Express, helpers: CrewsFlowsHelper
       const { createFlow } = await import("../crews-engine");
       const tenantId = getTenantFromRequest(req);
       if (!tenantId) return res.status(403).json({ error: "Tenant required" });
-      const result = await createFlow({ tenantId, ...req.body });
+      const result = await createFlow({ ...req.body, tenantId });
       res.json(result);
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
@@ -187,7 +187,7 @@ export function registerCrewsFlowsRoutes(app: Express, helpers: CrewsFlowsHelper
       const { addFlowStep } = await import("../crews-engine");
       const tenantId = getTenantFromRequest(req);
       if (!tenantId) return res.status(403).json({ error: "Tenant required" });
-      const result = await addFlowStep({ flowId: parseInt(req.params.id as string), tenantId, ...req.body });
+      const result = await addFlowStep({ ...req.body, flowId: parseInt(req.params.id as string), tenantId });
       res.json(result);
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZsNbs5oJve6lBBfFJR7PgO6teE5Jn0EOwyWUrBlP1YkgJ024KTBG2Kd1vLVGlOa
+\restrict EoENq6fDdX8ljEZcafNv37I4vnPH8A9Pe1BHGepzRsDpuFyyA3Xbg7EfWUWPzFZ
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -5906,6 +5906,22 @@ CREATE SEQUENCE public.legal_risk_reviews_id_seq
 --
 
 ALTER SEQUENCE public.legal_risk_reviews_id_seq OWNED BY public.legal_risk_reviews.id;
+
+
+--
+-- Name: legion_node_states; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.legion_node_states (
+    tenant_id integer NOT NULL,
+    environment text NOT NULL,
+    payload text,
+    holder text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT legion_node_encrypted CHECK (((payload IS NULL) OR (payload ~~ 'legion:v1:%'::text))),
+    CONSTRAINT legion_node_environment CHECK ((environment = ANY (ARRAY['development'::text, 'production'::text]))),
+    CONSTRAINT legion_node_owner_only CHECK ((tenant_id = 1))
+);
 
 
 --
@@ -15163,6 +15179,14 @@ ALTER TABLE ONLY public.legal_risk_reviews
 
 
 --
+-- Name: legion_node_states legion_node_states_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legion_node_states
+    ADD CONSTRAINT legion_node_states_pkey PRIMARY KEY (tenant_id, environment);
+
+
+--
 -- Name: loop_graph_edges loop_graph_edges_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -21927,6 +21951,14 @@ ALTER TABLE ONLY public.legal_risk_reviews
 
 
 --
+-- Name: legion_node_states legion_node_states_tenant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.legion_node_states
+    ADD CONSTRAINT legion_node_states_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id);
+
+
+--
 -- Name: memory_categories memory_categories_persona_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -22888,5 +22920,5 @@ ALTER TABLE public.skill_optimization_versions ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZsNbs5oJve6lBBfFJR7PgO6teE5Jn0EOwyWUrBlP1YkgJ024KTBG2Kd1vLVGlOa
+\unrestrict EoENq6fDdX8ljEZcafNv37I4vnPH8A9Pe1BHGepzRsDpuFyyA3Xbg7EfWUWPzFZ
 

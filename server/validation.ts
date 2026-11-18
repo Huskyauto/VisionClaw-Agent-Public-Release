@@ -320,11 +320,9 @@ export function createCsrfMiddleware(
     // routes like `verify-email` and `resend-verification` from CSRF. Those
     // are cookie-authenticated and must be CSRF-protected. Only truly
     // unauthenticated / bootstrap auth endpoints stay on the allowlist.
-    // R125+13.16+sec2 architect HIGH: `/api/auth/logout` removed — no such
-    // POST route exists (frontend uses GET `/api/logout` via Replit-auth) AND
-    // even if it did, allowing CSRF-free POST to logout enables CSRF-logout
-    // attacks (malicious site force-terminates a victim session). Keep
-    // logout endpoints CSRF-protected.
+    // The owner-only PIN logout route also requires CSRF. Allowing CSRF-free
+    // logout lets another site terminate a victim's session; keep it out of
+    // this unauthenticated bootstrap list.
     const authExactAllowlist = new Set<string>([
       "/api/auth/login",
       "/api/auth/callback",

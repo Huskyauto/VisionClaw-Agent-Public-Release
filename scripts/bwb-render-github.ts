@@ -30,6 +30,7 @@ import { readFileSyncEIO, existsSyncEIO, writeFileSyncEIO } from "./lib/eio-read
 import { createStableVideoSnapshot, validateRenderedVideo } from "./lib/video-output-validation";
 import { setBwbPhase, updateBwbChapters } from "../server/lib/bwb-job-progress";
 import { ADMIN_TENANT_ID } from "../server/tenant-constants";
+import { createBwbRecovery } from "./lib/bwb-drive-recovery";
 
 const VOICE = resolveBwbVoice(process.env.BWB_VOICE);
 
@@ -57,9 +58,16 @@ async function main(): Promise<number> {
   console.log(`[gh-render] ${packaging.summary}`);
   assertRenderableFormat(script, die);
   assertBobVoice(VOICE, die);
+  const recovery = createBwbRecovery(script.videoId);
+  await recovery.json("original-script.json", script);
 
   const outMp4 = `data/youtube/${script.videoId}-github-render.mp4`;
   const { chapters } = await renderOnGithubFarm({
+    recovery,
+    toolAuthority: {
+      tenantId: ADMIN_TENANT_ID, actor: "system", invokedVia: "video-render",
+      internalPurpose: "Render the requested Built With Bob video",
+    },
     videoId: script.videoId,
     scenes: script.scenes as FarmScene[],
     voice: VOICE,
@@ -111,6 +119,7 @@ async function main(): Promise<number> {
       } catch (e: any) {
         console.warn(`[gh-render] thumbnail bake failed (${e?.message || e}) — continuing without one`);
       }
+      if (thumbnailPath) await recovery.file(thumbnailPath);
     }
 
     let videoSnapshot: ReturnType<typeof createStableVideoSnapshot>;
@@ -186,6 +195,12 @@ async function main(): Promise<number> {
       console.error(`[gh-render] delivery failed for #${delivery.deliveryId}; refusing to report render success`);
       return 4;
     }
+    await recovery.json("delivery-receipt.json", {
+      videoId: script.videoId, deliveryId: delivery.deliveryId,
+      driveUrl: delivery.shareableLink, driveFileId: (delivery as any).driveFileId ?? null,
+      success: delivery.success,
+    });
+    await recovery.file(path.join("data/youtube/scripts", `${script.videoId}.result.json`));
   } else {
     console.log(`[gh-render] (set DELIVER=true to ship via deliverDigitalProduct)`);
   }

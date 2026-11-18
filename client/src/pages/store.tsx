@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ShoppingCart, CheckCircle2, ArrowLeft, FileText, Package, Mail, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
+import { useAuth } from "@/lib/auth";
 
 interface IntakeField {
   key: string;
@@ -544,6 +545,8 @@ function CatalogView() {
 
 export default function StorePage() {
   const [location, navigate] = useLocation();
+  const { ownerOnly, tenant } = useAuth();
+  const salesClosed = ownerOnly && tenant?.isAdmin !== true;
   const isSuccess = location.startsWith("/store/success");
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const sku = params.get("sku");
@@ -553,16 +556,29 @@ export default function StorePage() {
   // permanent order page (/orders/:sessionId). That page is bookmarkable
   // and re-downloadable, which the legacy success view was not.
   useEffect(() => {
-    if (isSuccess && sessionId && /^cs_[A-Za-z0-9_]+$/.test(sessionId)) {
+    if (!salesClosed && isSuccess && sessionId && /^cs_[A-Za-z0-9_]+$/.test(sessionId)) {
       navigate(`/orders/${sessionId}`, { replace: true });
     }
-  }, [isSuccess, sessionId, navigate]);
+  }, [salesClosed, isSuccess, sessionId, navigate]);
 
   useEffect(() => {
-    document.title = isSuccess
-      ? "Order Confirmed — VisionClaw Store"
+    document.title = salesClosed
+      ? "Private Workspace — VisionClaw Store"
+      : isSuccess ? "Order Confirmed — VisionClaw Store"
       : "VisionClaw Store — Offline-First Productivity Tools";
-  }, [isSuccess]);
+  }, [salesClosed, isSuccess]);
+
+  if (salesClosed) return (
+    <div className="min-h-screen bg-background text-foreground px-4 py-12">
+      <Card className="max-w-xl mx-auto" data-testid="notice-private-store">
+        <CardHeader><CardTitle>Online checkout is closed</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <p>This is a private owner workspace. Public purchases and account creation are not available on this installation.</p>
+          <Link href="/landing" className="text-primary underline">View platform information</Link>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">

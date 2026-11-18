@@ -639,32 +639,51 @@ async function main() {
       clampMaxSources, COMPILE_SOURCE, COMPILE_CATEGORY, CONCEPT_TITLE_PREFIX,
       COMPLETION_MAX_TOKENS,
     } = await import("../server/lib/knowledge-compile");
+    const { legionBackgroundEnabled } = await import("../server/legion/runtime");
+    // Retry selected local runbooks every refresh, even if their source rows
+    // were already indexed before a prior offline/invalid local completion.
+    const localRunbooks = legionBackgroundEnabled()
+      ? walkAgentSkills().filter(src => !!src.reflectionSourcePath) : [];
     if (isCompileDisabled()) {
       console.log(`[agent-knowledge-refresh] compile: SKIPPED (KNOWLEDGE_COMPILE_DISABLED=1)`);
-    } else if (changedSources.length === 0) {
+    } else if (changedSources.length === 0 && localRunbooks.length === 0) {
       console.log(`[agent-knowledge-refresh] compile: no changed sources this run`);
     } else {
       const maxSources = clampMaxSources(process.env.KNOWLEDGE_COMPILE_MAX_SOURCES);
-      let batch = changedSources.slice(0, maxSources);
+      let batch = [...localRunbooks, ...changedSources.filter(src =>
+        !localRunbooks.some(local => local.reflectionSourcePath === src.reflectionSourcePath))].slice(0, maxSources);
       // R125+143 review fix — atomic claim-before-spend for the compile fan-out
       // (memory: autonomous-loop-claim-before-spend / loop-contract-spend-proof).
       // A fixed work-set bounds ONE run, but overlapping workflow runs could
       // spend outside the autonomous daily cap without a reservation.
       const { claimAutonomousBudget } = await import("../server/agentic/autonomous-budget");
-      const compileClaim = await claimAutonomousBudget({
+      const hostedCount = batch.filter(src => !(legionBackgroundEnabled() && src.reflectionSourcePath)).length;
+      const compileClaim = hostedCount === 0 ? { ok: true, reason: "" } : await claimAutonomousBudget({
         tenantId: ADMIN_TENANT_ID,
-        estimatedUsd: Math.max(0.01, batch.length * 0.02), // conservative per-source ceiling on the fast tier
+        estimatedUsd: Math.max(0.01, hostedCount * 0.02), // local-first compiler reserves separately only if hosted recovery is needed
         label: "agent-knowledge-refresh:compile",
       });
       if (!compileClaim.ok) {
         console.warn(`[agent-knowledge-refresh] compile: BLOCKED by autonomous budget (${compileClaim.reason || "cap reached"}) — skipping LLM compilation this run (deterministic sync already complete).`);
-        batch = [];
+        batch = batch.filter(src => legionBackgroundEnabled() && src.reflectionSourcePath);
       }
-      const { getClientForModel, getModelForTier } = await import("../server/providers");
-      const modelId = getModelForTier("fast");
       let compiledRows = 0, degraded = 0;
       for (const src of batch) {
         try {
+          if (src.reflectionSourcePath && legionBackgroundEnabled()) {
+            const { compileLegionRunbook } = await import("../server/legion/runbook");
+            const { withLocalPriority } = await import("../server/legion/local-slots");
+            const local = await withLocalPriority("overnight", () => compileLegionRunbook(src.reflectionSourcePath!));
+            if (local.concepts.length) {
+              const result = await upsertIndexables(local.concepts.map(c => ({
+                title: conceptTitle(c.key), category: COMPILE_CATEGORY, priority: 2,
+                content: `${c.title}\n\nSource quotations (not independent verification):\n${c.quotes.join("\n\n")}\n\n(last compiled from: ${src.title})`,
+              })), COMPILE_SOURCE, activeTenantIds);
+              compiledRows += result.inserted + result.updated;
+            }
+            console.log(`[agent-knowledge-refresh] Runbook compile validated: ${src.title}; ${local.concepts.length} extractive concepts; model=${local.model}; hostedFallback=${local.hostedFallback}`);
+            continue;
+          }
           if (src.reflectionSourcePath && process.env.REFLECTION_OWNER_WORK_ENABLED === "1") {
             // The helper reads its own allowlisted source: no existing DB concepts,
             // caller prompts, customer data or arbitrary content enter Reflection.
@@ -702,7 +721,8 @@ async function main() {
             sourceContent: src.content,
             existing,
           });
-          const { client, actualModelId } = await getClientForModel(modelId, ADMIN_TENANT_ID);
+          const { getClientForModel, getModelForTier } = await import("../server/providers");
+          const { client, actualModelId } = await getClientForModel(getModelForTier("fast"), ADMIN_TENANT_ID);
           const call = client.chat.completions.create({
             model: actualModelId,
             max_tokens: COMPLETION_MAX_TOKENS,

@@ -1,5 +1,24 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { encryptApiKey, decryptApiKey, isEncrypted } from "./crypto";
+import { validateMcpServerUrl, fetchMcpEndpoint } from "./lib/mcp-network-boundary";
+
+// PLATFORM-GLOBAL administration. All HTTP callers require platform-admin
+// authority; never expose these functions as tenant tools without ownership.
+async function mcpAuthHeaders(server: any): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (!server.auth_token) return headers;
+  const token = decryptApiKey(server.auth_token);
+  if (!isEncrypted(server.auth_token)) {
+    const encrypted = encryptApiKey(token);
+    if (!isEncrypted(encrypted)) throw new Error("MCP credential encryption unavailable; configure SESSION_SECRET before using authenticated MCP servers");
+    await db.execute(sql`UPDATE mcp_servers SET auth_token = ${encrypted}
+      WHERE id = ${server.id} AND auth_token = ${server.auth_token}`);
+  }
+  if (server.auth_type === "bearer") headers.Authorization = `Bearer ${token}`;
+  else if (server.auth_type === "api_key") headers["X-API-Key"] = token;
+  return headers;
+}
 
 import { logSilentCatch } from "./lib/silent-catch";
 export interface McpServerConfig {
@@ -67,10 +86,14 @@ export async function addMcpServer(config: {
   authType?: string;
   authToken?: string;
 }): Promise<McpServerConfig> {
+  const target = await validateMcpServerUrl(config.serverUrl);
+  if (!["none", "bearer", "api_key"].includes(config.authType || "none")) throw new Error("Invalid MCP authentication type");
+  const storedToken = config.authToken ? encryptApiKey(config.authToken) : null;
+  if (storedToken && !isEncrypted(storedToken)) throw new Error("MCP credential encryption unavailable; configure SESSION_SECRET before using authenticated MCP servers");
   await ensureMcpTables();
   const result = await db.execute(sql`
     INSERT INTO mcp_servers (name, description, server_url, auth_type, auth_token)
-    VALUES (${config.name}, ${config.description || ""}, ${config.serverUrl}, ${config.authType || "none"}, ${config.authToken || null})
+    VALUES (${config.name}, ${config.description || ""}, ${target.url}, ${config.authType || "none"}, ${storedToken})
     RETURNING *
   `);
   const rows = (result as any).rows || result;
@@ -108,17 +131,8 @@ export async function discoverMcpTools(serverId: number): Promise<McpTool[]> {
   if (!server) throw new Error("MCP server not found");
 
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (server.auth_type === "bearer" && server.auth_token) {
-      headers["Authorization"] = `Bearer ${server.auth_token}`;
-    } else if (server.auth_type === "api_key" && server.auth_token) {
-      headers["X-API-Key"] = server.auth_token;
-    }
-
-    const response = await fetch(`${server.server_url}/tools/list`, {
+    const headers = await mcpAuthHeaders(server);
+    const response = await fetchMcpEndpoint(server.server_url, "tools/list", {
       method: "POST",
       headers,
       body: JSON.stringify({ jsonrpc: "2.0", method: "tools/list", id: 1 }),
@@ -161,17 +175,8 @@ export async function callMcpTool(serverId: number, toolName: string, args: Reco
   const server = rows?.[0];
   if (!server) throw new Error("MCP server not found or disabled");
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (server.auth_type === "bearer" && server.auth_token) {
-    headers["Authorization"] = `Bearer ${server.auth_token}`;
-  } else if (server.auth_type === "api_key" && server.auth_token) {
-    headers["X-API-Key"] = server.auth_token;
-  }
-
-  const response = await fetch(`${server.server_url}/tools/call`, {
+  const headers = await mcpAuthHeaders(server);
+  const response = await fetchMcpEndpoint(server.server_url, "tools/call", {
     method: "POST",
     headers,
     body: JSON.stringify({

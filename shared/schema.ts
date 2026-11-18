@@ -75,6 +75,24 @@ export type OwnerAlertLog = typeof ownerAlertLogs.$inferSelect;
 export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 
+// Dedicated owner control-plane identity. Never a generic file or agent source.
+// A non-expiring holder prevents crash/partition takeover of a live node.
+export const legionNodeStates = pgTable("legion_node_states", {
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  environment: text("environment").notNull(),
+  payload: text("payload"),
+  holder: text("holder"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => ({
+  ownerEnvironment: primaryKey({ columns: [t.tenantId, t.environment] }),
+  ownerOnly: check("legion_node_owner_only", sql`${t.tenantId} = 1`),
+  validEnvironment: check("legion_node_environment", sql`${t.environment} IN ('development', 'production')`),
+  encryptedPayload: check("legion_node_encrypted", sql`${t.payload} IS NULL OR ${t.payload} LIKE 'legion:v1:%'`),
+}));
+export const insertLegionNodeStateSchema = createInsertSchema(legionNodeStates).omit({ updatedAt: true });
+export type InsertLegionNodeState = z.infer<typeof insertLegionNodeStateSchema>;
+export type LegionNodeState = typeof legionNodeStates.$inferSelect;
+
 export const browserWorkspaceControls = pgTable("browser_workspace_controls", {
   tenantId: integer("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
   state: jsonb("state").notNull(),

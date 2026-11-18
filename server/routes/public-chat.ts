@@ -261,7 +261,7 @@ export function registerPublicChatRoutes(app: Express, helpers: PublicChatHelper
 
       let releaseQueue: (() => void) | null = null;
       try {
-        releaseQueue = await acquireConversationLock(convId);
+        releaseQueue = await acquireConversationLock(convId, tenant.id, { publicAccess: true });
       } catch (queueErr: any) {
         return res.status(429).json({ error: "Please wait for the current response to finish" });
       }

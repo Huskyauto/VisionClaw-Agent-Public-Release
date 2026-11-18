@@ -1,4 +1,5 @@
 tests/lib/paid-stream-interruption.test.ts
+tests/unit/report-writing-plan.test.ts
 tests/lib/paid-stream-recovery-policy.test.ts
 tests/lib/stream-progress-retry-boundary.test.ts
 tests/providers/cheaper-inference-automatic.test.ts

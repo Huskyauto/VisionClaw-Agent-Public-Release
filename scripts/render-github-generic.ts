@@ -74,6 +74,10 @@ async function main(): Promise<number> {
   const outMp4 = `data/youtube/${script.videoId}-github-render.mp4`;
 
   const { chapters, outMp4: finalMp4, runUrl } = await renderOnGithubFarm({
+    toolAuthority: {
+      tenantId, actor: "system", invokedVia: "video-render",
+      internalPurpose: "Render the requested tenant video",
+    },
     videoId: script.videoId,
     scenes: script.scenes as FarmScene[],
     // Generic path: honor the caller's resolved voice/provider (NOT Bob's clone).

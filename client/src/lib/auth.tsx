@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { invalidateAuthRequestIdentity, queryClient, setAuthToken } from "./queryClient";
+import { apiRequest, invalidateAuthRequestIdentity, queryClient, setAuthToken } from "./queryClient";
 
 interface ReplitUser {
   id: string;
@@ -22,6 +22,7 @@ interface TenantInfo {
 interface AuthContextType {
   token: string | null;
   authRequired: boolean;
+  ownerOnly: boolean;
   isChecking: boolean;
   tenant: TenantInfo | null;
   replitUser: ReplitUser | null;
@@ -37,6 +38,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   token: null,
   authRequired: false,
+  ownerOnly: true,
   isChecking: true,
   tenant: null,
   replitUser: null,
@@ -112,6 +114,7 @@ export async function transitionTenantIdentity(nextToken: string | null) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("vc_token"));
   const [authRequired, setAuthRequired] = useState(true);
+  const [ownerOnly, setOwnerOnly] = useState(true);
   const [isChecking, setIsChecking] = useState(true);
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [replitUser, setReplitUser] = useState<ReplitUser | null>(null);
@@ -190,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       bootstrapPhase = "/api/auth/status";
       const statusRequest = beginAuthIdentityRequest();
-      let data: { authRequired: boolean };
+      let data: { authRequired: boolean; ownerOnly?: boolean };
       try {
         const res = await fetch("/api/auth/status", { signal: statusRequest.signal });
         if (!statusRequest.isCurrent() || !isCurrentAuthIdentityGeneration(bootstrapGeneration)) return;
@@ -200,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         statusRequest.dispose();
       }
       setAuthRequired(data.authRequired);
+      setOwnerOnly(data.ownerOnly !== false);
 
       if (token) {
         if (!isCurrentAuthIdentityGeneration(bootstrapGeneration)) return;
@@ -211,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             signal: request.signal,
           });
           if (!request.isCurrent() || !isCurrentAuthIdentityGeneration(bootstrapGeneration)) return;
-          if (verify.status === 401) {
+          if (verify.status === 401 || verify.status === 403) {
             const generation = await transitionTenantIdentity(null);
             if (!isCurrentAuthIdentityGeneration(generation)) return;
             setToken(null);
@@ -345,18 +349,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    try {
+      if (token) await apiRequest("POST", "/api/auth/logout", {});
+    } catch {
+      // A network failure cannot keep local identity or private query data open.
+      // Server revocation remains unconfirmed; never claim it succeeded.
+      console.warn("[auth] Remote logout unconfirmed; clearing local session");
+    }
     const generation = await transitionTenantIdentity(null);
     if (!isCurrentAuthIdentityGeneration(generation)) return;
-    if (isReplitAuth) {
-      window.location.href = "/api/logout";
-      return;
-    }
     setToken(null);
     setTenant(null);
     setReplitUser(null);
     setIsReplitAuth(false);
     localStorage.removeItem("vc_token");
-  }, [isReplitAuth]);
+    if (isReplitAuth) window.location.href = "/api/logout";
+  }, [isReplitAuth, token]);
 
   const refreshTenant = useCallback(async () => {
     const refreshGeneration = currentAuthIdentityGeneration();
@@ -368,7 +376,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, isReplitAuth, fetchTenantInfo, checkReplitAuth]);
 
   return (
-    <AuthContext.Provider value={{ token, authRequired, isChecking, tenant, replitUser, isReplitAuth, login, loginTenant, registerTenant, loginWithReplit, logout, refreshTenant }}>
+    <AuthContext.Provider value={{ token, authRequired, ownerOnly, isChecking, tenant, replitUser, isReplitAuth, login, loginTenant, registerTenant, loginWithReplit, logout, refreshTenant }}>
       {children}
     </AuthContext.Provider>
   );

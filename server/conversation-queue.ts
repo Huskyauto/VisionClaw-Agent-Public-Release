@@ -1,102 +1,79 @@
-const MAX_GLOBAL_CONCURRENT = 10;
-const QUEUE_TIMEOUT_MS = 120_000;
+import { ADMIN_TENANT_ID } from "./tenant-constants";
 
-interface QueueEntry {
-  conversationId: number;
-  resolve: () => void;
-  reject: (err: Error) => void;
-  enqueuedAt: number;
-  timer: ReturnType<typeof setTimeout>;
-}
+type Entry = {
+  key: string; tenantId: number; owner: boolean;
+  resolve: (release: () => void) => void;
+  reject: (error: Error) => void;
+  timer?: ReturnType<typeof setTimeout>;
+};
 
-const activeProcessing = new Set<number>();
-const waitingQueues = new Map<number, QueueEntry[]>();
-let globalActiveCount = 0;
-
-function tryDequeue(conversationId: number): void {
-  const queue = waitingQueues.get(conversationId);
-  if (!queue || queue.length === 0) {
-    waitingQueues.delete(conversationId);
-    return;
+/**
+ * Admission only, never authorization. Call after verifying conversation
+ * ownership. Public widgets always use secondary capacity, including Bob's.
+ * State is deliberately process-local; no claim of distributed preemption.
+ */
+export function createConversationQueue(options: {
+  maxConcurrent?: number; maxSecondary?: number; timeoutMs?: number;
+} = {}) {
+  const maxGlobal = options.maxConcurrent ?? 10;
+  const maxSecondary = options.maxSecondary ?? 2;
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  if (!Number.isSafeInteger(maxGlobal) || maxGlobal < 1 ||
+      !Number.isSafeInteger(maxSecondary) || maxSecondary < 0 || maxSecondary >= maxGlobal ||
+      !Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("Invalid conversation capacity");
+  const active = new Map<string, Entry>();
+  const waiting: Entry[] = [];
+  const secondaryActive = () => [...active.values()].filter(e => !e.owner);
+  function drain() {
+    while (active.size < maxGlobal) {
+      const eligible = (e: Entry) => !active.has(e.key) && (e.owner ||
+        (secondaryActive().length < maxSecondary && !secondaryActive().some(a => a.tenantId === e.tenantId)));
+      let idx = waiting.findIndex(e => e.owner && eligible(e));
+      if (idx < 0) idx = waiting.findIndex(eligible);
+      if (idx < 0) return;
+      const [entry] = waiting.splice(idx, 1);
+      clearTimeout(entry.timer);
+      active.set(entry.key, entry);
+      let released = false;
+      entry.resolve(() => {
+        if (released) return;
+        released = true;
+        active.delete(entry.key);
+        drain();
+      });
+    }
   }
-
-  if (globalActiveCount >= MAX_GLOBAL_CONCURRENT) return;
-  if (activeProcessing.has(conversationId)) return;
-
-  const entry = queue.shift()!;
-  if (queue.length === 0) waitingQueues.delete(conversationId);
-
-  clearTimeout(entry.timer);
-  activeProcessing.add(conversationId);
-  globalActiveCount++;
-  entry.resolve();
-}
-
-export async function acquireConversationLock(conversationId: number): Promise<() => void> {
-  if (!activeProcessing.has(conversationId) && globalActiveCount < MAX_GLOBAL_CONCURRENT) {
-    activeProcessing.add(conversationId);
-    globalActiveCount++;
-    return createRelease(conversationId);
+  async function acquire(conversationId: number, tenantId: number, opts: { publicAccess?: boolean } = {}) {
+    if (!Number.isSafeInteger(tenantId) || tenantId <= 0) throw new Error("A trusted tenant is required");
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) throw new Error("Invalid conversation");
+    const owner = tenantId === ADMIN_TENANT_ID && opts.publicAccess !== true;
+    if (waiting.filter(e => e.owner === owner).length >= 100 ||
+        (!owner && waiting.filter(e => !e.owner && e.tenantId === tenantId).length >= 10)) {
+      throw new Error("Conversation queue full; please retry later");
+    }
+    return new Promise<() => void>((resolve, reject) => {
+      const entry: Entry = { key: `${tenantId}:${conversationId}`, tenantId, owner, resolve, reject };
+      entry.timer = setTimeout(() => {
+        const idx = waiting.indexOf(entry);
+        if (idx >= 0) waiting.splice(idx, 1);
+        reject(new Error(`Conversation ${conversationId} queue timeout — another message is still processing`));
+        drain();
+      }, timeoutMs);
+      waiting.push(entry);
+      drain();
+    });
   }
-
-  return new Promise<() => void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      const queue = waitingQueues.get(conversationId);
-      if (queue) {
-        const idx = queue.findIndex(e => e.resolve === wrappedResolve);
-        if (idx !== -1) queue.splice(idx, 1);
-        if (queue.length === 0) waitingQueues.delete(conversationId);
-      }
-      reject(new Error(`Conversation ${conversationId} queue timeout — another message is still processing`));
-    }, QUEUE_TIMEOUT_MS);
-
-    const wrappedResolve = () => resolve(createRelease(conversationId));
-
-    const entry: QueueEntry = {
-      conversationId,
-      resolve: wrappedResolve,
-      reject,
-      enqueuedAt: Date.now(),
-      timer,
+  function stats() {
+    return {
+      globalActive: active.size, maxGlobal, conversationsProcessing: active.size,
+      conversationsWaiting: new Set(waiting.map(e => e.key)).size,
+      totalWaiting: waiting.length, secondaryActive: secondaryActive().length,
+      maxSecondary, reservedOwnerCapacity: maxGlobal - maxSecondary,
     };
-
-    if (!waitingQueues.has(conversationId)) {
-      waitingQueues.set(conversationId, []);
-    }
-    waitingQueues.get(conversationId)!.push(entry);
-  });
+  }
+  return { acquire, stats };
 }
 
-function createRelease(conversationId: number): () => void {
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    activeProcessing.delete(conversationId);
-    globalActiveCount--;
-    tryDequeue(conversationId);
-
-    for (const [cid] of waitingQueues) {
-      if (cid !== conversationId) tryDequeue(cid);
-    }
-  };
-}
-
-export function getQueueStats(): {
-  globalActive: number;
-  maxGlobal: number;
-  conversationsProcessing: number;
-  conversationsWaiting: number;
-  totalWaiting: number;
-} {
-  let totalWaiting = 0;
-  for (const [, queue] of waitingQueues) totalWaiting += queue.length;
-
-  return {
-    globalActive: globalActiveCount,
-    maxGlobal: MAX_GLOBAL_CONCURRENT,
-    conversationsProcessing: activeProcessing.size,
-    conversationsWaiting: waitingQueues.size,
-    totalWaiting,
-  };
-}
+const queue = createConversationQueue();
+export const acquireConversationLock = queue.acquire;
+export const getQueueStats = queue.stats;

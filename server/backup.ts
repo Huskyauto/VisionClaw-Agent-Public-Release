@@ -1,30 +1,12 @@
 import { storage, ALL_TENANTS } from "./storage";
-import { driveRequest, driveJson } from "./google-drive";
+import { driveRequest, driveJson, ensureConfidentialBackupFolder, verifyConfidentialBackupAccess } from "./google-drive";
 
 const BACKUP_FOLDER_NAME = "VisionClaw Backups";
 const MEMORY_SUBFOLDER_NAME = "Memory Snapshots";
 const DRIVE_API = "https://www.googleapis.com";
 
 async function findOrCreateFolder(name: string, parentId?: string): Promise<string> {
-  const parentClause = parentId ? ` and '${parentId}' in parents` : "";
-  const data = await driveJson(
-    `/drive/v3/files?q=name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false${parentClause}&fields=files(id,name)`
-  );
-
-  if (data.files && data.files.length > 0) {
-    return data.files[0].id;
-  }
-
-  const body: any = { name, mimeType: "application/vnd.google-apps.folder" };
-  if (parentId) body.parents = [parentId];
-
-  const folderData = await driveJson("/drive/v3/files?fields=id", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  return folderData.id;
+  return ensureConfidentialBackupFolder(name, parentId);
 }
 
 async function cleanOldFiles(folderId: string, keepCount: number = 30) {
@@ -46,6 +28,7 @@ async function cleanOldFiles(folderId: string, keepCount: number = 30) {
 }
 
 async function uploadJsonToDrive(folderId: string, fileName: string, data: any): Promise<{ id: string; name: string; size: string }> {
+  await verifyConfidentialBackupAccess(folderId);
   const jsonContent = JSON.stringify(data, null, 2);
   const jsonBuffer = Buffer.from(jsonContent, "utf-8");
 
@@ -65,7 +48,7 @@ async function uploadJsonToDrive(folderId: string, fileName: string, data: any):
   const body = Buffer.concat(parts);
 
   const resp = await driveRequest(
-    `${DRIVE_API}/upload/drive/v3/files?uploadType=multipart&fields=id,name,size`,
+    `${DRIVE_API}/upload/drive/v3/files?uploadType=multipart&fields=id,name,size&ignoreDefaultVisibility=true`,
     {
       method: "POST",
       headers: { "Content-Type": `multipart/related; boundary=${boundary}` },
@@ -79,6 +62,13 @@ async function uploadJsonToDrive(folderId: string, fileName: string, data: any):
   }
 
   const uploadData = (await resp.json()) as any;
+  if (typeof uploadData?.id !== "string" || !uploadData.id) throw new Error("Backup upload ID missing");
+  try {
+    await verifyConfidentialBackupAccess(uploadData.id);
+    await verifyConfidentialBackupAccess(folderId);
+  } catch {
+    throw new Error("Backup uploaded but owner-only Drive access is unverified; operator reconciliation required");
+  }
   const sizeMB = (jsonBuffer.length / (1024 * 1024)).toFixed(2);
 
   return { id: uploadData.id, name: fileName, size: `${sizeMB} MB` };
@@ -88,6 +78,7 @@ export async function runBackupToGoogleDrive(): Promise<string> {
   const startTime = Date.now();
   console.log("[backup] Starting full system backup to Google Drive...");
 
+  const folderId = await findOrCreateFolder(BACKUP_FOLDER_NAME);
   const exportData = await storage.getAllDataForExport();
 
   const backupData = {
@@ -96,11 +87,9 @@ export async function runBackupToGoogleDrive(): Promise<string> {
     backupTimestamp: new Date().toISOString(),
   };
 
-  const folderId = await findOrCreateFolder(BACKUP_FOLDER_NAME);
-
   const now = new Date();
   const dateStr = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const fileName = `visionclaw-backup-${dateStr}.json`;
+  const fileName = `__admin-visionclaw-backup-${dateStr}.json`;
 
   const result = await uploadJsonToDrive(folderId, fileName, backupData);
   await cleanOldFiles(folderId);
@@ -115,6 +104,8 @@ export async function runMemoryBackupToGoogleDrive(): Promise<string> {
   const startTime = Date.now();
   console.log("[backup] Starting memory snapshot backup to Google Drive...");
 
+  const backupFolderId = await findOrCreateFolder(BACKUP_FOLDER_NAME);
+  const memoryFolderId = await findOrCreateFolder(MEMORY_SUBFOLDER_NAME, backupFolderId);
   const allMemories = await storage.getAllMemoriesForBackup();
   const memoryStats = await storage.getMemoryStats(undefined, ALL_TENANTS);
 
@@ -155,12 +146,9 @@ export async function runMemoryBackupToGoogleDrive(): Promise<string> {
     recentChanges: await getRecentMemoryChanges(),
   };
 
-  const backupFolderId = await findOrCreateFolder(BACKUP_FOLDER_NAME);
-  const memoryFolderId = await findOrCreateFolder(MEMORY_SUBFOLDER_NAME, backupFolderId);
-
   const now = new Date();
   const dateStr = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const fileName = `memory-snapshot-${dateStr}.json`;
+  const fileName = `__admin-memory-snapshot-${dateStr}.json`;
 
   const result = await uploadJsonToDrive(memoryFolderId, fileName, memoryExport);
   await cleanOldFiles(memoryFolderId, 60);

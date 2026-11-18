@@ -22,6 +22,8 @@ export const BWB_VERIFICATION_TESTS = [
   "tests/video/bwb-all-daily-clips.test.ts",
   "tests/video/bwb-brief-scene.test.ts",
   "tests/video/bwb-delivery-verification-flow.test.ts",
+  "tests/video/github-render-authority.test.ts",
+  "tests/video/bwb-drive-recovery.test.ts",
   "tests/video/bwb-recap-routing.test.ts",
   "tests/video/bwb-voice-lock.test.ts",
   "tests/video/bwb-web-chat-launch.test.ts",
@@ -32,6 +34,8 @@ export const BWB_VERIFICATION_INPUTS = [
   "scripts/build-bwb-video.ts", "scripts/build-bwb-weekly.ts",
   "scripts/bwb-weekly-orchestrator.ts", "scripts/bwb-render-github.ts",
   "scripts/bwb-recap-preflight.ts",
+  "scripts/bwb-recovery-watch.ts", "scripts/bwb-recovery-restore.ts",
+  "scripts/lib/bwb-drive-recovery.ts", "scripts/lib/bwb-drive-recovery-transport.ts",
   "scripts/lib/bwb-audio-fingerprint.ts", "scripts/lib/bwb-first-person-guard.ts",
   "scripts/lib/bwb-narration-timing.ts", "scripts/lib/bwb-packaging.ts",
   "scripts/lib/bwb-photo-fetch.ts", "scripts/lib/bwb-photo-match.ts",
@@ -44,6 +48,7 @@ export const BWB_VERIFICATION_INPUTS = [
   "server/lib/bwb-job-progress.ts", "server/lib/bwb-oversight-shadow.ts",
   "server/lib/bwb-web-chat-launch.ts", "server/lib/bwb-web-chat-tool-executor.ts",
   "server/lib/bwb-weight.ts",
+  "server/mpeg-engine.ts", "server/lib/video-recovery-guard.ts",
 ] as const;
 
 export const MEDIA_VERIFICATION_TESTS = [

@@ -140,10 +140,18 @@ export async function extractYouTubeTranscript(url: string): Promise<YouTubeTran
  */
 export async function extractWeeklyTranscripts(
   urls: string[],
+  onTranscript?: (transcript: YouTubeTranscript) => Promise<void>,
+  cachedTranscript?: (url: string) => YouTubeTranscript | undefined,
 ): Promise<{ transcripts: YouTubeTranscript[]; failures: { url: string; error: string }[] }> {
   const transcripts: YouTubeTranscript[] = [];
   const failures: { url: string; error: string }[] = [];
   for (const url of urls) {
+    const cached = cachedTranscript?.(url);
+    if (cached?.url === url && cached.transcript?.trim()) {
+      transcripts.push(cached);
+      await onTranscript?.(cached);
+      continue;
+    }
     try {
       console.log(`[yt-transcript] extracting ${url} …`);
       const t = await extractYouTubeTranscript(url);
@@ -154,6 +162,8 @@ export async function extractWeeklyTranscripts(
       console.warn(`[yt-transcript]   ✗ ${url} — ${error}`);
       failures.push({ url, error });
     }
+    const completed = transcripts.find(t => t.url === url);
+    if (completed) await onTranscript?.(completed);
   }
   return { transcripts, failures };
 }

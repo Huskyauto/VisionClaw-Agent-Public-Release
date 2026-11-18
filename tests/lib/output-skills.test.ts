@@ -122,9 +122,20 @@ test("every registry entry's SHA-256 matches the file on disk (drift guard)", ()
   }
 });
 
+const offlineAuthority = {
+  tenantId: 42, actor: "system" as const, invokedVia: "security-fixture",
+  internalPurpose: "Verify offline output-skill dispatch", rateLimitChecked: true, skipTracking: true,
+};
+
+test("dispatcher: lookup_output_skill refuses missing host authority", async () => {
+  const { executeTool } = await import("../../server/tools");
+  const result = await executeTool("lookup_output_skill", { topic: "investor-update" });
+  assert.match(result.error, /trusted.*authority/i);
+});
+
 test("dispatcher: lookup_output_skill returns content for topic mode", async () => {
   const { executeTool } = await import("../../server/tools");
-  const res: any = await executeTool("lookup_output_skill", { topic: "investor-update" });
+  const res: any = await executeTool("lookup_output_skill", { topic: "investor-update" }, offlineAuthority);
   assert.equal(res.ok, true);
   assert.equal(res.topic, "investor-update");
   assert.equal(res.department, "Communications");
@@ -133,7 +144,7 @@ test("dispatcher: lookup_output_skill returns content for topic mode", async () 
 
 test("dispatcher: lookup_output_skill list mode by department", async () => {
   const { executeTool } = await import("../../server/tools");
-  const res: any = await executeTool("lookup_output_skill", { department: "Legal" });
+  const res: any = await executeTool("lookup_output_skill", { department: "Legal" }, offlineAuthority);
   assert.equal(res.ok, true);
   assert.ok(Array.isArray(res.topics));
   assert.ok(res.topics.length >= 3);
@@ -142,20 +153,20 @@ test("dispatcher: lookup_output_skill list mode by department", async () => {
 
 test("dispatcher: lookup_output_skill rejects path traversal at the tool boundary", async () => {
   const { executeTool } = await import("../../server/tools");
-  const res: any = await executeTool("lookup_output_skill", { topic: "../etc/passwd" });
+  const res: any = await executeTool("lookup_output_skill", { topic: "../etc/passwd" }, offlineAuthority);
   assert.equal(res.ok, false);
 });
 
 test("dispatcher: lookup_output_skill rejects mixed-mode args (topic + department)", async () => {
   const { executeTool } = await import("../../server/tools");
-  const res: any = await executeTool("lookup_output_skill", { topic: "investor-update", department: "Legal" });
+  const res: any = await executeTool("lookup_output_skill", { topic: "investor-update", department: "Legal" }, offlineAuthority);
   assert.equal(res.ok, false);
   assert.match(String(res.error), /EITHER|both/i);
 });
 
 test("dispatcher: lookup_output_skill rejects empty args", async () => {
   const { executeTool } = await import("../../server/tools");
-  const res: any = await executeTool("lookup_output_skill", {});
+  const res: any = await executeTool("lookup_output_skill", {}, offlineAuthority);
   assert.equal(res.ok, false);
   assert.match(String(res.error), /topic|department|persona/i);
 });

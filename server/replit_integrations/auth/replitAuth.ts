@@ -53,6 +53,13 @@ function updateUserSession(
 }
 
 async function upsertUser(claims: any) {
+  const { ownerOnlyAccess } = await import("../../lib/owner-only-access");
+  if (ownerOnlyAccess()) {
+    const { getOrCreateTenantForReplitUser } = await import("../../auth");
+    // OIDC verifies the claims before this callback; reject a non-owner before
+    // issuing a Passport session or writing a new users record.
+    await getOrCreateTenantForReplitUser(claims["sub"], claims["email"]);
+  }
   await authStorage.upsertUser({
     id: claims["sub"],
     email: claims["email"],

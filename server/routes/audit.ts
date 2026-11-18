@@ -17,6 +17,7 @@ import { createQuickAuditPdf } from "../quick-audit-pdf";
 import { agentJourneySchema, auditChecksForStorage } from "../lib/agent-journey-schema";
 import { registerReportRecoveryRoute } from "./report-recovery";
 import { registerCompanyReportPackages } from "./company-report-packages";
+import { registerAgentReadyRoutes } from "./agent-ready-package";
 
 const AUDIT_TENANT_ID = 1; // platform-owner storefront
 
@@ -356,7 +357,10 @@ export function registerAuditRoutes(app: Express) {
 // comprehensive PDF deliverable manually (no Stripe checkout required).
 // ---------------------------------------------------------------------------
 
+import { operatorJobMatchesTenant } from "../lib/operator-job-ownership";
+
 interface FullAuditJob {
+  tenantId?: number;
   id: string;
   /** "audit" (default, AI Readiness Audit), "exec-report" (Executive Opportunity Report), or "smart-leads" (Smart Leads dossier batch). */
   kind?: "audit" | "exec-report" | "smart-leads";
@@ -541,6 +545,7 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
     },
   });
   registerCompanyReportPackages(app, { authMiddleware, requireAdmin });
+  registerAgentReadyRoutes(app, { authMiddleware, requireAdmin });
 
   // Instant audit (same engine as the public /audit page, no Turnstile /
   // public rate limits — operator is authenticated).
@@ -1095,7 +1100,7 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
     const customerCompany = (d.customerCompany || "").trim();
     const jobId = crypto.randomUUID();
     const job: FullAuditJob = {
-      id: jobId, kind: "smart-leads", status: "running", startedAt: Date.now(),
+      id: jobId, tenantId, kind: "smart-leads", status: "running", startedAt: Date.now(),
       company: customerCompany || undefined,
       website: leads.map((l) => l.domain || l.email || l.name).filter(Boolean).slice(0, 3).join(", "),
       customerEmail: customerEmail || undefined, customerName: customerCompany || undefined,
@@ -1169,7 +1174,7 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
     const tenantId = await requireAdmin(req, res);
     if (tenantId === null) return;
     const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
-    if (!job || job.kind !== "smart-leads") return res.status(404).json({ error: "Job not found (jobs are kept for 24h)." });
+    if (!job || !operatorJobMatchesTenant(job, tenantId) || job.kind !== "smart-leads") return res.status(404).json({ error: "Job not found (jobs are kept for 24h)." });
     res.json({
       jobId: job.id,
       status: job.status,
@@ -1189,7 +1194,7 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
     const tenantId = await requireAdmin(req, res);
     if (tenantId === null) return;
     const job = FULL_AUDIT_JOBS.get(String(req.params.jobId));
-    if (!job || job.kind !== "smart-leads" || job.status !== "done" || !job.filePath) {
+    if (!job || !operatorJobMatchesTenant(job, tenantId) || job.kind !== "smart-leads" || job.status !== "done" || !job.filePath) {
       return res.status(404).json({ error: "PDF not ready or job not found." });
     }
     // Path confinement — identical to the audit download route.

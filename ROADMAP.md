@@ -12,6 +12,14 @@ where we're going (so you can decide whether to fork, contribute, or wait).
 
 ---
 
+## R137.3+sec2 — November 17, 2026 cross-app source review
+
+Current source rechecks legacy MCP account activity, clears local identity after
+failed remote logout, restores signed-in Skills navigation and makes private-mode
+sales/contact screens explicit. Both landing modes, dashboard, sidebar and SEO
+share current release facts. This is source maintenance, not an application
+publication, production change or whole-platform security certificate.
+
 ## R137.2+sec — November 4, 2026 source reconciliation
 
 Webhook follow-ups preserve tenant-bound context; read-only run confirmation links
@@ -111,7 +119,7 @@ evidence required before deferred ideas become active work.
 
 ## Current platform totals
 
-**428 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 147 active capabilities · 201 declared / 282 live development tables · 904 platform indexes · 41 governance rules · 99 curated AI models in the core registry plus daily OpenRouter catalog discovery.** ([authoritative release facts](docs/release-facts.json), November 14 development snapshot). R137.3+sec adds subscription, memory and video integrity repairs and current source documentation. Demo Studio is documented in [its contract](docs/demo-studio.md); app publication and production readiness remain separate. See the [current review](docs/app-review-2026-11-14.md).
+**428 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 148 active capabilities · 202 declared / 283 live development tables · 905 platform indexes · 41 governance rules · 100 curated AI models in the core registry plus daily OpenRouter catalog discovery.** ([authoritative release facts](docs/release-facts.json), November 17 development snapshot). R137.3+sec2 includes the reviewed credential, navigation and private-mode website repairs, owner-only access preparation, bounded parallel local maintenance and the agent-ready website package. Demo Studio is documented in [its contract](docs/demo-studio.md); app publication and production readiness remain separate. The [prior review](docs/app-review-2026-11-14.md) retains its original evidence and limits.
 
 Machine-readable source: [docs/release-facts.json](docs/release-facts.json).
 

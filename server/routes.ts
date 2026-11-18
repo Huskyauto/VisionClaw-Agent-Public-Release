@@ -95,6 +95,7 @@ import { registerApiV1Routes } from "./routes/api-v1";
 import { registerInstinctWebChannel } from "./instinct-web-channel";
 import { registerAgencyRoutes } from "./routes/agency";
 import { registerAgentJobsRoutes } from "./routes/agent-jobs";
+import { registerLocalMaintenanceRoutes } from "./routes/local-maintenance";
 import { getTypeSafeJevStatus } from "./typesafe-jev";
 import { registerProjectsRoutes } from "./routes/projects";
 import { registerPersonasRoutes } from "./routes/personas";
@@ -3578,7 +3579,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
     let releaseQueue: (() => void) | null = null;
     try {
-      releaseQueue = await acquireConversationLock(conversationId);
+      releaseQueue = await acquireConversationLock(conversationId, tenantId);
     } catch (queueErr: unknown) {
       return res.status(429).json({ error: errorMessage(queueErr) || "Conversation is busy — please wait for the current message to finish" });
     }
@@ -4780,7 +4781,10 @@ ${buildFelixProtocol()}`
             }
 
             try {
-              const projIdResult = await db.execute(sql`SELECT project_id FROM conversations WHERE id = ${conversationId} AND tenant_id = ${tenantId} AND project_id IS NOT NULL`);
+              const projIdResult = await db.execute(sql`
+                SELECT c.project_id FROM conversations c
+                JOIN projects p ON p.id = c.project_id AND p.tenant_id = ${tenantId}
+                WHERE c.id = ${conversationId} AND c.tenant_id = ${tenantId}`);
               const projIdRows = (projIdResult as any).rows || projIdResult;
               if (Array.isArray(projIdRows) && projIdRows.length > 0 && projIdRows[0].project_id) {
                 const projId = projIdRows[0].project_id;
@@ -4788,7 +4792,10 @@ ${buildFelixProtocol()}`
                 if (snapshot) {
                   await db.execute(sql`
                     INSERT INTO project_notes (project_id, note, author)
-                    VALUES (${projId}, ${snapshot.slice(0, 5000)}, ${'system:context-guard'})
+                    SELECT p.id, ${snapshot.slice(0, 5000)}, ${'system:context-guard'}
+                    FROM projects p JOIN conversations c ON c.project_id = p.id
+                    WHERE p.id = ${projId} AND p.tenant_id = ${tenantId}
+                      AND c.id = ${conversationId} AND c.tenant_id = ${tenantId}
                   `);
                 }
               }
@@ -7487,6 +7494,7 @@ ${buildFelixProtocol()}`
   registerApiV1Routes(app, { authMiddleware, getTenantFromRequest });
   registerAgencyRoutes(app, { authMiddleware, getTenantFromRequest, isAdminRequest, requirePlatformAdmin });
   registerAgentJobsRoutes(app, { authMiddleware, requirePlatformAdmin });
+  registerLocalMaintenanceRoutes(app, { authMiddleware, requirePlatformAdmin });
   // R74.13l Stage 7 — admin routes (24 handlers) extracted to server/routes/admin.ts
   // Covers: health-audit, claude-runner, service-orders policy + review queue,
   // replay-research-proposals, cost-audit, stuck diagnostics, tenants CRUD,

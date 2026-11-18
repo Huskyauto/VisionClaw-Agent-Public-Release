@@ -40,6 +40,7 @@ import { create as tarCreate } from "tar";
 import AdmZip from "adm-zip";
 import { generateImage } from "../../server/replit_integrations/image/client";
 import { executeTool } from "../../server/tools";
+import { snapshotToolAuthority, type ToolAuthority } from "../../server/tools/invocation-authority";
 import { checkDailyCap, resolveDailyCap, DAILY_CAP_FILE, MAX_CHAPTERS_PER_RENDER } from "./render-farm-cap";
 
 export { MAX_CHAPTERS_PER_RENDER } from "./render-farm-cap";
@@ -53,6 +54,8 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
 export interface FarmScene { narration: string; imagePrompt?: string; imagePath?: string; }
 
 export interface RenderFarmOptions {
+  /** Supplied by the host wrapper, never read from script JSON or scene data. */
+  toolAuthority: ToolAuthority;
   /** Stable id for this video; used for scene dir, job id, output filename. */
   videoId: string;
   /** Ordered scenes (narration + image). At least one required. */
@@ -76,6 +79,8 @@ export interface RenderFarmOptions {
   repoSpec?: string;
   /** Directory to reuse/persist pre-baked scene images. */
   sceneDir?: string;
+  /** Host-owned BWB checkpoint service; generic customer tenants do not use owner Drive. */
+  recovery?: import("./bwb-drive-recovery").BwbRecovery;
   /** Label threaded into generateImage for cost telemetry. */
   callerLabel?: string;
   /** generateImage purpose (cost-aware cascade). */
@@ -274,6 +279,8 @@ async function genSceneAudio(
   filename: string,
   cfg: { provider: string; voice: string; strictVoice: boolean },
   fail: (msg: string) => never,
+  toolAuthority: ToolAuthority,
+  recovery?: import("./bwb-drive-recovery").BwbRecovery,
 ): Promise<string> {
   // The handler sanitizes the filename and writes project-assets/<sanitized>.<ext>.
   const sanitized = filename.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -290,11 +297,14 @@ async function genSceneAudio(
   for (const existing of [mp3, wav]) {
     if (audioMatchesInputs(existing, cfg.provider, cfg.voice, text)) {
       console.log(`[gh-render] reusing narration audio (fingerprint match, no TTS spend): ${path.basename(existing)}`);
+      await recovery?.file(existing);
+      await recovery?.file(`${existing}.voice`);
       return existing;
     }
   }
 
-  const res = await executeTool("generate_audio", { provider: cfg.provider, text, voice: cfg.voice, strictVoice: cfg.strictVoice, filename });
+  const res = await executeTool("generate_audio", { provider: cfg.provider, text, voice: cfg.voice, strictVoice: cfg.strictVoice, filename }, toolAuthority);
+  if (res?.blocked || res?.error) fail(`Narration generation refused: ${res.error || "tool execution blocked"}`);
   const candidates = [
     (res && (res.audioPath || res.path || res.filePath || res.file)) as string | undefined,
     mp3,
@@ -304,6 +314,8 @@ async function genSceneAudio(
     if (c && existsSyncEIO(c)) {
       // Drop the fingerprint sidecar so the next attempt can reuse this clip.
       writeAudioSidecar(c, cfg.provider, cfg.voice, text);
+      await recovery?.file(c);
+      await recovery?.file(`${c}.voice`);
       return c;
     }
   }
@@ -402,6 +414,8 @@ async function assertPrivateRepo(token: string, owner: string, repo: string, fai
  * Brand-agnostic: callers do their own validation + delivery.
  */
 export async function renderOnGithubFarm(opts: RenderFarmOptions): Promise<RenderFarmResult> {
+  // Validate before paid asset preparation or any GitHub request.
+  const toolAuthority = snapshotToolAuthority(opts.toolAuthority);
   const fail = opts.fail || defaultDie;
   const log = opts.log || ((m: string) => console.log(m));
   // Best-effort progress sink — NEVER let a progress write break the render.
@@ -424,6 +438,10 @@ export async function renderOnGithubFarm(opts: RenderFarmOptions): Promise<Rende
   const isCustomerFacing = opts.isCustomerFacing ?? true;
   const pollTimeout = opts.pollTimeoutMs ?? POLL_TIMEOUT_MS;
   const sceneDir = opts.sceneDir || `data/youtube/scenes/${opts.videoId}`;
+  await opts.recovery?.json("farm-request.json", {
+    videoId: opts.videoId, scenes: opts.scenes, voiceProvider, voice: opts.voice,
+    strictVoice, width, height, fps, crf, chapterSize,
+  });
 
   const { owner, repo } = resolveRepo(fail, opts.repoSpec);
   // Customer/generic path: refuse to stage customer media on a public repo.
@@ -463,16 +481,24 @@ export async function renderOnGithubFarm(opts: RenderFarmOptions): Promise<Rende
       if (!existsSyncEIO(s.imagePath)) {
         fail(`scene ${i + 1}: imagePath "${s.imagePath}" is declared but missing on disk — fetch/place the file before rendering (e.g. PHOTO_NAME=<name> npx tsx scripts/fetch-bwb-photo.ts). Refusing to silently substitute a generated image.`);
       }
+      await opts.recovery?.file(s.imagePath);
       continue;
     }
     const dest = `${sceneDir}/scene-${i + 1}.png`;
-    if (existsSyncEIO(dest) && (!s.imagePrompt || imageMatchesPrompt(dest, s.imagePrompt))) { s.imagePath = dest; continue; }
+    if (existsSyncEIO(dest) && (!s.imagePrompt || imageMatchesPrompt(dest, s.imagePrompt))) {
+      s.imagePath = dest;
+      await opts.recovery?.file(dest);
+      if (s.imagePrompt) await opts.recovery?.file(`${dest}.prompt`);
+      continue;
+    }
     if (!s.imagePrompt) fail(`scene ${i + 1}: no imagePath and no imagePrompt`);
     report({ phase: `Baking scene images (${i + 1}/${opts.scenes.length})` });
     process.stdout.write(`[gh-render] baking scene ${i + 1}... `);
     await bakeImage(s.imagePrompt!, dest, { callerLabel, purpose: imagePurpose, isCustomerFacing }, fail);
     writeScenePromptSidecar(dest, s.imagePrompt!);
     s.imagePath = dest;
+    await opts.recovery?.file(dest);
+    await opts.recovery?.file(`${dest}.prompt`);
     log("OK");
   }
 
@@ -485,7 +511,7 @@ export async function renderOnGithubFarm(opts: RenderFarmOptions): Promise<Rende
   for (let i = 0; i < opts.scenes.length; i++) {
     const s = opts.scenes[i];
     report({ phase: `Generating narration (${i + 1}/${opts.scenes.length})` });
-    const audioSrc = await genSceneAudio(s.narration, `${opts.videoId}_scene_${i + 1}`, { provider: voiceProvider, voice: opts.voice, strictVoice }, fail);
+    const audioSrc = await genSceneAudio(s.narration, `${opts.videoId}_scene_${i + 1}`, { provider: voiceProvider, voice: opts.voice, strictVoice }, fail, toolAuthority, opts.recovery);
     const audioDur = ffprobeDuration(audioSrc);
     if (!Number.isFinite(audioDur) || audioDur <= 0) {
       fail(`scene ${i + 1}: could not probe narration audio duration for ${audioSrc} (ffprobe failed or returned 0) — refusing to substitute a fake fixed scene length, which would desync audio/video.`);
@@ -545,6 +571,8 @@ export async function renderOnGithubFarm(opts: RenderFarmOptions): Promise<Rende
   }
   if (!existsSyncEIO(tarball)) fail(`bundle tar.gz missing after creation at ${tarball}`);
   const tarBytes = readFileSyncEIO(tarball);
+  await opts.recovery?.json("farm-manifest.json", manifest);
+  await opts.recovery?.save("farm-input-bundle.tar.gz", tarBytes);
   log(`[gh-render] bundle: ${chapters.length} chapters, ${(tarBytes.length / 1024 / 1024).toFixed(1)} MB`);
 
   let releaseId: number | null = null;
@@ -588,7 +616,9 @@ export async function renderOnGithubFarm(opts: RenderFarmOptions): Promise<Rende
     }
     if (runId === null) fail(`could not locate dispatched workflow run "${expectedRunName}" after 90s`);
     const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
+    await opts.recovery?.json("github-run.json", { runId, runUrl, owner, repo, jobId });
     log(`[gh-render] run ${runId} — ${runUrl}`);
+    const backedChapterArtifacts = new Set<number>();
 
     const startedAt = Date.now();
     let conclusion = "";
@@ -639,6 +669,27 @@ export async function renderOnGithubFarm(opts: RenderFarmOptions): Promise<Rende
         }
       } catch { /* per-chapter view is best-effort; overall run status below is authoritative */ }
 
+      // Outside the best-effort progress catch: recovery failures must stop
+      // advancement, never be mistaken for cosmetic polling failures.
+      if (opts.recovery) {
+        const artifacts = await gh(token, "GET", `/repos/${owner}/${repo}/actions/runs/${runId}/artifacts?per_page=100`)
+          .catch(() => { throw new Error("BWB recovery paused: chapter artifact listing transport failed"); });
+        if (!artifacts.ok) throw new Error(`BWB recovery paused: chapter artifact listing failed (HTTP ${artifacts.status})`);
+        const listed: { artifacts: { id: number; name: string; expired: boolean; size_in_bytes: number }[] } = await artifacts.json() as any;
+        if (!Array.isArray(listed.artifacts)) throw new Error("BWB recovery paused: malformed chapter artifact listing");
+        for (const artifact of listed.artifacts) {
+          if (!/^chapter-\d+$/.test(artifact.name) || artifact.expired || backedChapterArtifacts.has(artifact.id)) continue;
+          if (artifact.size_in_bytes > 512 * 1024 * 1024) throw new Error("BWB recovery paused: chapter archive exceeds recovery limit");
+          const archive = await gh(token, "GET", `/repos/${owner}/${repo}/actions/artifacts/${artifact.id}/zip`)
+            .catch(() => { throw new Error("BWB recovery paused: chapter archive transport failed"); });
+          if (!archive.ok) throw new Error(`BWB recovery paused: chapter archive download failed (HTTP ${archive.status})`);
+          await opts.recovery.save(`github-artifacts/${artifact.name}.zip`, Buffer.from(await archive.arrayBuffer()));
+          backedChapterArtifacts.add(artifact.id);
+        }
+        if (run.status === "completed" && run.conclusion === "success" && backedChapterArtifacts.size !== chapters.length) {
+          throw new Error("BWB recovery paused: not every completed chapter archive is verified");
+        }
+      }
       process.stdout.write(`\r[gh-render] run ${runId}: ${run.status}${run.conclusion ? ` (${run.conclusion})` : ""}${chapterLine}    `);
       if (run.status === "completed") { conclusion = run.conclusion || "unknown"; break; }
     }
@@ -680,6 +731,8 @@ export async function renderOnGithubFarm(opts: RenderFarmOptions): Promise<Rende
     try { sizeMB = (fs.statSync(outMp4).size / 1024 / 1024).toFixed(2); } catch { /* eio-safe: cosmetic size log */ }
     log(`\n[gh-render] DONE — ${outMp4} (${sizeMB} MB), ${chapters.length} chapters rendered in parallel containers.`);
 
+    await opts.recovery?.file(outMp4);
+    await opts.recovery?.json("render-completed.json", { outMp4, chapters: chapters.length, runUrl, jobId });
     return { outMp4, chapters: chapters.length, runUrl, jobId };
   } finally {
     if (releaseId !== null) {

@@ -783,6 +783,7 @@ function ViewToggle({ mode, setMode }: { mode: LandingMode; setMode: (m: Landing
 
 function BusinessHero({ navigate }: { navigate: (path: string) => void }) {
   const { config } = useSiteConfig();
+  const { ownerOnly } = useAuth();
   const pn = config.platformName;
   return (
     <section className="relative overflow-hidden py-20 sm:py-28 px-6">
@@ -815,8 +816,8 @@ function BusinessHero({ navigate }: { navigate: (path: string) => void }) {
             </RevealOnScroll>
             <RevealOnScroll delay={300}>
               <div className="flex flex-wrap gap-3">
-                <Button size="lg" onClick={() => navigate("/signup")} className="gap-2 shadow-lg shadow-primary/25" data-testid="button-business-signup">
-                  Start Free — No Credit Card <ArrowRight className="w-4 h-4" />
+                <Button size="lg" onClick={() => navigate(ownerOnly ? "/login" : "/signup")} className="gap-2 shadow-lg shadow-primary/25" data-testid="button-business-signup">
+                  {ownerOnly ? "Owner sign in" : "Start Free — No Credit Card"} <ArrowRight className="w-4 h-4" />
                 </Button>
                 <Button variant="outline" size="lg" onClick={() => navigate("/store")} className="gap-2" data-testid="button-business-shop">
                   Shop Bob's Store <ArrowRight className="w-4 h-4" />
@@ -1478,6 +1479,7 @@ function BusinessFaqSection() {
 
 function BusinessCtaSection({ navigate }: { navigate: (path: string) => void }) {
   const { config } = useSiteConfig();
+  const { ownerOnly } = useAuth();
   const pn = config.platformName;
   return (
     <section className="relative py-24 px-6 border-t border-border overflow-hidden" data-testid="section-biz-cta">
@@ -1492,8 +1494,8 @@ function BusinessCtaSection({ navigate }: { navigate: (path: string) => void }) 
                 <p className="text-muted-foreground max-w-lg">See how {pn} handles your real workflows — research, reporting, outreach, and ops — with a live walkthrough tailored to your business. The store is open for listed products; any AI Task Fit audit offered there still requires owner review before fulfillment.</p>
               </div>
               <div className="flex flex-wrap gap-3 shrink-0">
-                <Button size="lg" onClick={() => navigate("/signup")} className="gap-2 shadow-lg shadow-primary/25" data-testid="button-biz-cta-signup">
-                  Start Free Now <ArrowRight className="w-4 h-4" />
+                <Button size="lg" onClick={() => navigate(ownerOnly ? "/login" : "/signup")} className="gap-2 shadow-lg shadow-primary/25" data-testid="button-biz-cta-signup">
+                  {ownerOnly ? "Owner sign in" : "Start Free Now"} <ArrowRight className="w-4 h-4" />
                 </Button>
                 <Button variant="outline" size="lg" onClick={() => navigate("/audit")} className="gap-2" data-testid="button-biz-cta-audit">
                   Run a Free AI Audit <ArrowRight className="w-4 h-4" />
@@ -2006,7 +2008,7 @@ function TenantAuthorityClosureSection() {
 export default function LandingPage() {
   const [, navigate] = useLocation();
   const { config } = useSiteConfig();
-  const { tenant } = useAuth();
+  const { tenant, ownerOnly } = useAuth();
   const isPlatformAdmin = tenant?.isAdmin === true;
   const pn = config.platformName;
   const [viewMode, setViewMode] = useState<LandingMode>(() => {
@@ -2105,15 +2107,20 @@ export default function LandingPage() {
             </Button>
             <Button
               className="px-2 text-xs sm:px-4 sm:text-sm"
-              onClick={() => navigate("/signup")}
+              onClick={() => navigate(ownerOnly ? "/login" : "/signup")}
               data-testid="button-landing-signup"
             >
-              Sign Up<span className="hidden sm:inline"> Free</span>
+              {ownerOnly ? "Owner sign in" : <>Sign Up<span className="hidden sm:inline"> Free</span></>}
             </Button>
           </div>
         </div>
       </nav>
 
+      {ownerOnly && (
+        <p className="mx-auto max-w-6xl px-6 py-4 text-sm text-muted-foreground" role="status" data-testid="notice-private-landing">
+          Private owner workspace. Public pages are informational; account creation and public checkout are closed.
+        </p>
+      )}
       {viewMode === "business" ? (
         <>
           <BusinessHero navigate={navigate} />
@@ -2169,11 +2176,11 @@ export default function LandingPage() {
                         variant="outline"
                         size="sm"
                         className="gap-1.5"
-                        onClick={() => navigate("/signup")}
+                        onClick={() => navigate(ownerOnly ? "/login" : "/signup")}
                         data-testid="button-founder-waitlist"
                       >
                         <Sparkles className="w-4 h-4 text-emerald-500" />
-                        Join the wellness companion waitlist
+                        {ownerOnly ? "Owner workspace" : "Join the wellness companion waitlist"}
                       </Button>
                     </div>
                   </CardContent>
@@ -2231,11 +2238,11 @@ export default function LandingPage() {
             <div className="flex flex-wrap justify-center gap-3 pt-3">
               <Button
                 size="lg"
-                onClick={() => navigate("/signup")}
+                onClick={() => navigate(ownerOnly ? "/login" : "/signup")}
                 className="gap-2 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-shadow"
                 data-testid="button-hero-get-started"
               >
-                Start Free — No Credit Card
+                {ownerOnly ? "Owner sign in" : "Start Free — No Credit Card"}
                 <ArrowRight className="w-4 h-4" />
               </Button>
               <Button
@@ -2564,8 +2571,8 @@ export default function LandingPage() {
                 <p className="text-sm text-muted-foreground">Try 5 conversations with no credit card.</p>
               </CardHeader>
               <CardContent>
-                <Button className="w-full" onClick={() => navigate("/signup")} data-testid="button-pricing-free-trial">
-                  Start Free
+                <Button className="w-full" onClick={() => navigate(ownerOnly ? "/login" : "/signup")} data-testid="button-pricing-free-trial">
+                  {ownerOnly ? "Owner sign in" : "Start Free"}
                 </Button>
               </CardContent>
             </Card>
@@ -2597,11 +2604,11 @@ export default function LandingPage() {
             <div className="flex flex-wrap justify-center gap-3">
               <Button
                 size="lg"
-                onClick={() => navigate("/signup")}
+                onClick={() => navigate(ownerOnly ? "/login" : "/signup")}
                 className="gap-2 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-shadow"
                 data-testid="button-cta-signup"
               >
-                Start Free Now
+                {ownerOnly ? "Owner sign in" : "Start Free Now"}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>

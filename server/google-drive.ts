@@ -1,4 +1,5 @@
 import fs from "fs";
+import { assertOwnerOnlyDriveAccess } from "./lib/backup-confidentiality";
 import path from "path";
 import { db } from "./db";
 import { providerKeys } from "@shared/schema";
@@ -468,6 +469,29 @@ async function listAllDrivePermissions(fileId: string): Promise<DrivePermission[
     if (!pageToken) return permissions;
   }
   throw new Error("Drive permissions list exceeded the safe pagination limit");
+}
+
+/** No permission mutation: unsafe or unverifiable existing backups fail closed. */
+export async function verifyConfidentialBackupAccess(fileId: string): Promise<void> {
+  await assertOwnerOnlyDriveAccess(fileId, listAllDrivePermissions);
+}
+
+export async function ensureConfidentialBackupFolder(name: string, parentId = "root"): Promise<string> {
+  if (parentId !== "root") await verifyConfidentialBackupAccess(parentId);
+  const escape = (value: string) => value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const q = `name='${escape(name)}' and '${escape(parentId)}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const listing = await driveJsonStrict(`/drive/v3/files?${new URLSearchParams({ q, fields: "files(id),nextPageToken", pageSize: "100" })}`);
+  if (!Array.isArray(listing?.files) || listing.nextPageToken || listing.files.length > 1) {
+    throw new Error("Confidential backup folder lookup is ambiguous or incomplete");
+  }
+  const folder = listing.files[0] ?? await driveJsonStrict("/drive/v3/files?fields=id&ignoreDefaultVisibility=true", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] }),
+  });
+  if (typeof folder?.id !== "string" || !folder.id) throw new Error("Confidential backup folder ID missing");
+  await verifyConfidentialBackupAccess(folder.id);
+  return folder.id;
 }
 
 async function listMarkedCustomerDeliveryRoots(): Promise<DriveFileSummary[]> {
@@ -960,11 +984,18 @@ export async function uploadToDrive(params: {
   skipSubfolder?: boolean;
   /** Customer reports must never inherit the configured workspace root's sharing policy. */
   customerDelivery?: boolean;
+  /** Internal all-tenant backups: direct My Drive, verified owner-only, never shared. */
+  confidentialBackup?: boolean;
   /** Server-issued artifact identity used to recover a provider-success/local-crash gap. */
   durableArtifactKey?: string;
   _retryCount?: number;
 }): Promise<{ success: boolean; fileId?: string; webViewLink?: string; webContentLink?: string; shareableLink?: string; directDownloadLink?: string; customerFolderId?: string; customerFolderLink?: string; completionUncertain?: boolean; error?: string }> {
   try {
+    if (params.confidentialBackup) {
+      if (params.share !== false || params.durableArtifactKey || params.customerDelivery || params.parentFolderId) {
+        throw new Error("Confidential backups cannot use public sharing, recovery or external parent folders");
+      }
+    }
     if (params.durableArtifactKey) {
       const recovered = await findDriveFileByDurableArtifactKey(params.durableArtifactKey);
       if (recovered) {
@@ -995,7 +1026,9 @@ export async function uploadToDrive(params: {
         };
       }
     }
-    let rootFolderId = params.parentFolderId
+    let rootFolderId = params.confidentialBackup
+      ? await ensureConfidentialBackupFolder("__admin-confidential-backups")
+      : params.parentFolderId
       || (params.customerDelivery ? await ensurePrivateCustomerDeliveryRoot() : getVisionClawFolderId());
     let useRequestedParent = Boolean(params.parentFolderId);
     if (params.customerDelivery) {
@@ -1024,7 +1057,9 @@ export async function uploadToDrive(params: {
 
     let subfolder: { id: string; webViewLink: string };
 
-    if (params.skipSubfolder && useRequestedParent) {
+    if (params.confidentialBackup) {
+      subfolder = { id: rootFolderId, webViewLink: `https://drive.google.com/drive/folders/${rootFolderId}` };
+    } else if (params.skipSubfolder && useRequestedParent) {
       // Bundle mode: drop the file directly into the supplied parent folder
       // (which is already a per-customer dated subfolder created by an
       // earlier upload in the same batch).
@@ -1068,6 +1103,8 @@ export async function uploadToDrive(params: {
       ...(params.durableArtifactKey ? { appProperties: { visionclawArtifactKey: driveArtifactPropertyValue(params.durableArtifactKey) } } : {}),
     };
 
+    if (params.confidentialBackup) await verifyConfidentialBackupAccess(subfolder.id);
+
     const boundary = "visionclaw_boundary_" + Date.now();
     const body = buildDriveMultipartUploadBody({
       boundary,
@@ -1079,7 +1116,7 @@ export async function uploadToDrive(params: {
     const token = await getAccessToken();
     let response: Response;
     try {
-      response = await fetchWithTimeout(`${DRIVE_API}/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink`, {
+      response = await fetchWithTimeout(`${DRIVE_API}/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink${params.confidentialBackup ? "&ignoreDefaultVisibility=true" : ""}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1153,6 +1190,16 @@ export async function uploadToDrive(params: {
         completionUncertain: true,
         error: "Drive upload response did not include a valid file ID; outcome is uncertain",
       };
+    }
+
+    if (params.confidentialBackup) {
+      try {
+        await verifyConfidentialBackupAccess(result.id);
+        await verifyConfidentialBackupAccess(subfolder.id);
+      } catch {
+        return { success: false, completionUncertain: true, fileId: result.id,
+          error: "Backup uploaded but owner-only Drive access could not be verified; operator reconciliation required" };
+      }
     }
 
     let shareableLink: string | undefined;
@@ -1433,6 +1480,7 @@ export async function uploadAndShare(params: {
   customerName?: string;
   folderLabel?: string;
   share?: boolean;
+  confidentialBackup?: boolean;
   parentFolderId?: string;
   /** Internal scoped tool destinations can avoid an extra delivery subfolder. */
   skipSubfolder?: boolean;
@@ -1456,6 +1504,9 @@ export async function uploadAndShare(params: {
     metadata?: Record<string, unknown>;
   };
 }): Promise<ShareableLinkResult> {
+  if (params.confidentialBackup && (params.tenantId !== 1 || params.share !== false || params.projectId || params.generatedArtifact || params.parentFolderId)) {
+    return { success: false, error: "Confidential backups require unshared, non-project, non-delivery uploads" };
+  }
   if (!isDriveConfigured()) {
     return { success: false, error: "Google Drive is not configured. Set GOOGLE_DRIVE_ROOT_FOLDER_ID environment variable." };
   }
@@ -1635,6 +1686,7 @@ export async function uploadAndShare(params: {
     parentFolderId: resolvedParentFolderId,
     skipSubfolder: resolvedSkipSubfolder,
     durableArtifactKey: artifactRecoveryKey,
+    confidentialBackup: params.confidentialBackup,
   });
 
   if (!result.success || !result.fileId) {

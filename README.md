@@ -1,6 +1,38 @@
 # VisionClaw Agent
 
-## Latest source update — R137.3+sec (November 14, 2026)
+## Latest source update — R137.3+sec2 (November 17, 2026)
+
+- **Cross-application review:** source and page inventories include public
+  landing pages, authenticated dashboards, shared navigation and backend
+  services. Risk-based deep inspection and bounded regressions are not
+  whole-platform security certification or live-service acceptance.
+- **Review repairs:** the optional legacy MCP endpoint rechecks current account
+  activity even for cached or compatibility-owner keys; authorization-store
+  failure does not reuse an old grant. Remote logout failures no longer retain
+  local identity and private query data. Skills navigation and private-mode
+  public contact/purchase guidance were corrected without widening access.
+- **Owner-only deployment option:** private-owner access preparation preserves
+  informational pages and explicitly authenticated callbacks without deleting
+  tenant records or claiming completed multi-tenant/RLS verification.
+  [Operating boundaries](docs/security/owner-only-access.md).
+- **Optional local maintenance:** bounded development-only runbook work can use
+  independent local devices, with daytime controls, strict source checks and
+  budgeted recovery. Local-model quality remains task-dependent; measured
+  production savings and reliable unattended throughput are not claimed.
+  [Scope and evidence](docs/parallel-local-maintenance.md).
+- **Agent-ready website package:** deterministic public-facts discovery and
+  structured-data exports with explicit before/after verification; incomplete
+  fetches remain unknown. No automatic installation or customer delivery.
+  [Contract and limits](docs/agent-ready-package.md).
+- **Snapshot policy:** eligible new files, changed folders and deletions are
+  synchronized from source. Credentials, private operational records, ignored
+  runtime state, customer uploads and proprietary surfaces remain excluded.
+
+Source publication is distinct from application deployment; this update does
+not publish the app or change production settings.
+See the [review findings, coverage and evidence](docs/app-review-2026-11-17.md).
+
+## Previous source update — November 14, 2026
 
 This snapshot includes the latest eligible files and folders from the private
 source, with private records, credentials, uploads and proprietary surfaces
@@ -88,8 +120,8 @@ excluded by the existing export policy.
   See the [November source reconciliation](docs/platform-update-2026-11-04.md).
 
 **428 registered tools · 386 publicly documented tools · 18 personas · 68 platform
-skills · 147 active capabilities · 201 declared / 282 live development tables ·
-904 platform indexes · 99 curated models · 41 governance rules.**
+skills · 148 active capabilities · 202 declared / 283 live development tables ·
+905 platform indexes · 100 curated models · 41 governance rules.**
 These are dated development measurements, not production telemetry.
 
 Recent source additions include an eight-document **AI Stack Decision Review**
@@ -160,7 +192,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **Earlier source update — R137+sec (October 19, 2026): Business pilots, company report packages and evidence-first operations.** Owner-only health/re-scan, release, governance and cost/routing pilots; read-only website readiness; sourced company reports with required audio; private alert logs; receipt-backed delivery checks, outcome-first briefings and video packaging. Private report packages are excluded from generic tenant file access. [Feature/access matrix](docs/platform-update-2026-10-19.md). Forks need their own credentials, entitlements and configuration. Focused live pilot verification is not universal certification; GitHub synchronization is not website publication.
 
-Roughly 320k lines of TypeScript across 1,100+ files. 40+ pages. **428 total registered tools · 386 public documented tools · 68 total skills · 147 active capabilities · 18 personas · 201 declared / 282 live development tables · 41 governance rules · 904 platform indexes · 99 curated AI models · 6 AI providers · 6 deployment targets.** These are a November 14 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+The November 17 application inventory covers 1,634 source modules in `client/src`, `server` and `shared`, including 115 page components and one page-data module. Not every component is a standalone route. **428 total registered tools · 386 public documented tools · 68 total skills · 148 active capabilities · 18 personas · 202 declared / 283 live development tables · 41 governance rules · 905 platform indexes · 100 curated AI models · 6 AI providers · 6 deployment targets.** These are a November 17 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 ### October 9–14 source updates
 
@@ -418,26 +450,26 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 
 ---
 
-## Platform at a Glance — October 19 Development Evidence
+## Platform at a Glance — November 17 Development Evidence
 
-> This is the dated development snapshot, not live production telemetry. Counts agree with [docs/release-facts.json](docs/release-facts.json) and [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md); documentation was reconciled October 19.
+> This is the dated development snapshot, not live production telemetry. Evidence date: November 17. Counts agree with [docs/release-facts.json](docs/release-facts.json) and [docs/CURRENT_PLATFORM_TOTALS.md](docs/CURRENT_PLATFORM_TOTALS.md).
 
 | Metric | Count |
 |--------|-------|
 | AI Agents (Personas) | 18 |
 | Tools (total registered) | 428 |
 | Tools (public documented) | 386 |
-| AI Models in Core Registry | 99 curated |
+| AI Models in Core Registry | 100 curated |
 | Daily Catalog Discovery | 1000+ models scanned on OpenRouter |
 | AI Providers | 6 (OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity) |
 | Governance Rules | 41 |
 | Corporate Operation Scaffolds | 75 |
 | Corporate Departments | 12 |
 | Skills | 68 total (63 DB-seeded skills + 5 platform agent skills) |
-| Frontend Pages | 40+ |
+| Frontend Page Components | 115 (plus one page-data module; not all standalone routes) |
 | API Endpoints | 300+ |
-| Database Tables | 201 declared / 282 live development |
-| Platform Indexes | 904 (628 non-PK) |
+| Database Tables | 202 declared / 283 live development |
+| Platform Indexes | 905 (628 non-PK) |
 
 ---
 
@@ -471,7 +503,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
         ┌────────────┐   ┌────────────┐   ┌────────────┐
         │ PostgreSQL │   │ Google     │   │ 6 AI       │
         │ + pgvector │   │ Drive      │   │ providers  │
-        │ D201/L282  │   │ storage    │   │ 99 curated │
+        │ D202/L283  │   │ storage    │   │100 curated │
         └────────────┘   └────────────┘   └────────────┘
 ```
 
@@ -517,7 +549,7 @@ Every agent has a defined role, personality, skill set, and operating rules. The
 
 ### AI & Intelligence
 
-- **93 Curated AI Models in the Development Registry** with configured routing across supported providers. Bring your own provider credentials — availability and billing are governed by provider and account terms, not a promise of universally free inference.
+- **100 Curated AI Models in the Development Registry** with configured routing across supported providers. Bring your own provider credentials — availability and billing are governed by provider and account terms, not a promise of universally free inference.
 - **Adaptive Model Discovery (R73)** — a daily background task scans OpenRouter's full catalog of 1000+ models, tier-classifies each by completion price (reasoning / powerful / balanced / fast), probes the Replit gateway for new releases, and emails the owner a ranked digest of new models worth adding to the registry. Hard caps prevent inbox spam (10 alerts/run max), lifetime dedupe prevents re-alerts, and silent days mean nothing changed.
 - **Streaming Responses** via Server-Sent Events (SSE) — real-time token-by-token output
 - **Thinking Mode** — explainable reasoning with decision traces for complex problems

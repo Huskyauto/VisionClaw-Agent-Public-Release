@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { readCurrentRelease } from "../scripts/lib/release-round";
 
 const read = (file: string) => readFileSync(file, "utf8");
 const isPrivateSource = JSON.parse(read("package.json")).private === true;
@@ -11,9 +12,14 @@ const updates = JSON.parse(read("client/src/data/updates.json"));
 const release = /CURRENT_SOURCE_RELEASE = "([^"]+)"/.exec(notice)?.[1];
 
 test("current release agrees across shared summary, dashboard data and both READMEs", () => {
-  assert.equal(release, "R137.3+sec");
+  assert.equal(release, "R137.3+sec2");
+  if (isPrivateSource) {
+    const published = readCurrentRelease("replit.md");
+    assert.equal(published.round, release);
+    assert.equal(published.date, "November 17, 2026");
+  }
   assert.equal(updates[0].version, release);
-  assert.equal(updates[0].date, "November 14, 2026");
+  assert.equal(updates[0].date, "November 17, 2026");
   const readmes = isPrivateSource ? ["README.md", "README.md"] : ["README.md"];
   for (const file of [...readmes, "ROADMAP.md"]) {
     assert.ok(read(file).slice(0, 18000).includes(release!));
@@ -55,7 +61,7 @@ test("retained November changes stay documented while current summaries use the 
     assert.ok(current.toLowerCase().includes(term.toLowerCase()), `landing missing ${term}`);
     assert.ok(latest.toLowerCase().includes(term.toLowerCase()), `release feed missing ${term}`);
   }
-  assert.match(notice, /November 14, 2026/);
+  assert.match(notice, /November 17, 2026/);
   assert.match(notice, /audit remains degraded and incomplete/);
   assert.match(latest, /not certification/i);
   assert.match(latest, /does not replay/i);

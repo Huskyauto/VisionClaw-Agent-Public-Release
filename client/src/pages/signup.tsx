@@ -27,7 +27,7 @@ function validatePasswordClient(password: string): string | null {
 
 export default function SignupPage() {
   const [, navigate] = useLocation();
-  const { loginWithReplit, registerTenant } = useAuth();
+  const { loginWithReplit, registerTenant, ownerOnly } = useAuth();
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -41,6 +41,21 @@ export default function SignupPage() {
   const [pendingTenantId, setPendingTenantId] = useState<number | null>(null);
   const [pendingEmail, setPendingEmail] = useState("");
   const [resending, setResending] = useState(false);
+
+  if (ownerOnly) return (
+    <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+      <SeoHead title="Private Workspace — VisionClaw Agent" description="This workspace is reserved for its owner." canonical="" />
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>Private workspace</CardTitle>
+          <CardDescription>New accounts are not available. Only the owner can use this application.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button className="w-full" onClick={() => navigate("/login")}>Owner sign-in</Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
 
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();

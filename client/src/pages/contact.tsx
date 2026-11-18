@@ -12,17 +12,21 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 import { useToast } from "@/hooks/use-toast";
 import { useSiteConfig } from "@/hooks/use-site-config";
+import { useAuth } from "@/lib/auth";
 
 export default function ContactPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { config } = useSiteConfig();
+  const { ownerOnly, tenant } = useAuth();
+  const contactClosed = ownerOnly && tenant?.isAdmin !== true;
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", subject: "general", message: "" });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (contactClosed) return;
     if (!form.name || !form.email || !form.message) {
       toast({ title: "Please fill in all required fields", variant: "destructive" });
       return;
@@ -71,12 +75,20 @@ export default function ContactPage() {
 
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2">
-            {submitted ? (
+            {contactClosed ? (
+              <Card data-testid="notice-private-contact">
+                <CardHeader><CardTitle>Private owner workspace</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <p>The online contact form is closed on this private installation.</p>
+                  {config.contactEmail && <a className="text-primary underline" href={`mailto:${config.contactEmail}`}>Email the owner directly</a>}
+                </CardContent>
+              </Card>
+            ) : submitted ? (
               <Card>
                 <CardContent className="p-8 text-center">
                   <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
                   <h2 className="text-xl font-semibold mb-2" data-testid="text-contact-success">Message Received</h2>
-                  <p className="text-muted-foreground mb-6">Thank you for reaching out. We typically respond within 24 hours.</p>
+                  <p className="text-muted-foreground mb-6">Your message was recorded. This confirms storage, not email delivery or a response deadline. You can also use the contact email on this page.</p>
                   <Button variant="outline" onClick={() => { setSubmitted(false); setForm({ name: "", email: "", subject: "general", message: "" }); }} data-testid="button-send-another">
                     Send Another Message
                   </Button>

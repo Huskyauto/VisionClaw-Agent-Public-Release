@@ -2,6 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { classifyTransientFailure } from "../../scripts/lib/bwb-transient-classify";
 
+test("explicit tool-authority refusal is never retried despite unrelated network noise", () => {
+  assert.equal(classifyTransientFailure({
+    stdout: "optional enrichment: fetch failed",
+    stderr: 'generate_audio: Missing trusted tool authority; no execution.',
+  }), null);
+  assert.equal(classifyTransientFailure({
+    stdout: "github returned 503 during optional health probe",
+    stderr: "Narration generation refused: policy blocked this tool",
+  }), null);
+});
+
 /**
  * The transient-vs-deterministic boundary is the safety property of the weekly
  * recap auto-retry: a DETERMINISTIC content/config fail-closed guard must NEVER

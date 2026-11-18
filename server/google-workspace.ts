@@ -1,4 +1,5 @@
 import path from "path";
+import { ADMIN_TENANT_ID } from "./tenant-constants";
 import { getAccessToken as getDriveConnectorToken } from "./google-drive";
 import { getSubscriptionAccessToken } from "./oauth-subscriptions";
 import { getGmailDirectAccessToken, loadGmailDirectRefreshToken } from "./lib/gmail-direct-token";
@@ -79,7 +80,7 @@ export function hasDirectGmailSendAndReadScopes(scope: string | undefined): bool
 }
 
 async function getGmailConnectorToken(tenantId: number): Promise<string> {
-  const adminTenantId = Number(process.env.ADMIN_TENANT_ID) || 1;
+  const adminTenantId = ADMIN_TENANT_ID;
   if (tenantId !== adminTenantId) {
     throw new Error(`Direct Gmail connector delivery is restricted to the admin tenant (${adminTenantId}).`);
   }
@@ -112,7 +113,6 @@ export async function getGoogleToken(tenantId: number, service?: string, op: "re
   const oauthToken = await getSubscriptionAccessToken("google-workspace", tenantId);
   if (oauthToken) return oauthToken;
 
-  const ADMIN_TENANT_ID = Number(process.env.ADMIN_TENANT_ID) || 1;
   if (!isPlatformGoogleConnectorTenant(tenantId)) {
     console.warn(`[google_workspace] Tenant ${tenantId} has no subscription token — connector fallback only available for admin tenant (${ADMIN_TENANT_ID})`);
     throw new Error("Google account not connected for this tenant. Please connect Google in Settings.");

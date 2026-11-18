@@ -1,5 +1,19 @@
 # Bounded security audit operations
 
+## Production database enforcement hold
+
+Bob approved preparing [owner-only app access](security/owner-only-access.md)
+instead of continuing production SQL provisioning. That implementation is
+staged, not published, and does not clear the database enforcement hold.
+
+See [production RLS readiness](security/production-rls-readiness.md) for the
+November 16 read-only evidence, supported owner-controlled SQL-console path,
+opted-in transaction inventory and required pooled read/write acceptance.
+The replica still lacks the enforcement role. It also reports NULL USING and
+WITH CHECK expressions on all 14 policies; confirm writer definitions before
+provisioning. Neither the inspection role nor a policy-name availability receipt
+proves application enforcement. No production changes or activation authorized.
+
 ## Source-current recovery
 
 See `docs/tenant-audit-convergence-repair.md` for the Fable-assisted diagnosis,

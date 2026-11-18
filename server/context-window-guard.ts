@@ -35,6 +35,7 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   "moonshotai/kimi-k2.6": 262_144,
   "moonshotai/kimi-k3": 1_048_576,
   "moonshotai/kimi-k3.1-pro": 1_048_576,
+  "qwen/qwen4-max": 1_000_000,
   "mistralai/mistral-large-4-0": 1_048_576,
   "xiaomi/mimo-v2-flash": 256_000,
   "xiaomi/mimo-v2-omni": 256_000,

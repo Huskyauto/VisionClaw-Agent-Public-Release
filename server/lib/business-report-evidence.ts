@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { logSilentCatch } from "./silent-catch";
 import { isReviewBearingPublicText } from "./report-customer-feedback";
 import { hypothesisBackup, HYPOTHESIS_OMISSION_WARNING, type HypothesisPlan } from "./report-hypothesis-backup";
+import { assertReportSourceIdentities } from "./report-writing-plan";
 
 export type EvidenceSource = {
   id: string; title: string; url?: string; text: string;
@@ -94,6 +95,7 @@ export function validateCompiledReport(
       report.unknowns.some(item => typeof item !== "string" || !item.trim() || item.length > 1000)) {
     throw new Error("Invalid complete report section/unknowns contract");
   }
+  assertReportSourceIdentities(evidence);
   const sources = new Map(evidence.sources.map(source => [source.id, source]));
   // Link presence is not destination retrieval. Only this compilation profile
   // may discuss an exact link already present in public captures or measured

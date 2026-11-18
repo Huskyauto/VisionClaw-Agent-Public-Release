@@ -8,7 +8,8 @@ export type DriveAccessMetadata = {
   trashed?: boolean;
   error?: unknown;
 };
-export const ADMIN_DRIVE_ARTIFACT_RE = /^__(admin[-_]|VisionClaw-Admin[-_])/i;
+// Include historical system-backup names from before admin markers were added.
+export const ADMIN_DRIVE_ARTIFACT_RE = /^(?:__(?:admin[-_]|VisionClaw-Admin[-_])|(?:visionclaw-backup|memory-snapshot)-\d{4}-\d{2}-\d{2}.*\.json$|VisionClaw Backups$|Memory Snapshots$)/i;
 const DRIVE_ID_RE = /^[A-Za-z0-9_-]{1,180}$/;
 
 export function assertDriveTenant(tenantId: unknown): asserts tenantId is number {

@@ -11,9 +11,10 @@ import { getAvailableModels, getClientForModel } from "../../server/providers";
 const additions = [
   { id: "moonshotai/kimi-k3.1-pro", label: "Kimi K3.1 Pro" },
   { id: "mistralai/mistral-large-4-0", label: "Mistral Large 4" },
+  { id: "qwen/qwen4-max", label: "Qwen4 Max" },
 ];
 
-test("Kimi K3.1 Pro and Mistral Large 4 are distinct selectable paid high-end models", () => {
+test("frontier additions are distinct selectable paid high-end models", () => {
   for (const expected of additions) {
     const matches = MODEL_REGISTRY.filter(model => model.id === expected.id);
     assert.equal(matches.length, 1, `${expected.label} must be registered exactly once`);
@@ -32,14 +33,15 @@ test("Kimi K3.1 Pro and Mistral Large 4 are distinct selectable paid high-end mo
   assert.ok(MODEL_REGISTRY.some(model => model.id === "mistralai/mistral-large"));
 });
 
-test("Both high-end additions have verified context and consistent paid usage estimates", () => {
+test("high-end additions have verified context and consistent paid usage estimates", () => {
   const cases = [
-    { id: "moonshotai/kimi-k3.1-pro", input: 2, output: 10, cached: 0.20 },
-    { id: "mistralai/mistral-large-4-0", input: 1.36, output: 4.18, cached: 0.14 },
+    { id: "moonshotai/kimi-k3.1-pro", input: 2, output: 10, cached: 0.20, context: 1_048_576 },
+    { id: "mistralai/mistral-large-4-0", input: 1.36, output: 4.18, cached: 0.14, context: 1_048_576 },
+    { id: "qwen/qwen4-max", input: 1.5, output: 4.5, cached: 0.075, context: 1_000_000 },
   ];
   const insightsSource = readFileSync(new URL("../../server/insights-engine.ts", import.meta.url), "utf8");
   for (const model of cases) {
-    assert.equal(getContextWindow(model.id), 1_048_576);
+    assert.equal(getContextWindow(model.id), model.context);
     assert.deepEqual(MODEL_COST_PER_MILLION[model.id], { input: model.input, output: model.output });
     assert.ok(Math.abs(estimateCostUsd(model.id, 1_000_000, 1_000_000) - model.input - model.output) < 1e-10);
     assert.ok(Math.abs(estimateCostUsd(model.id, 1_000_000, 0, 1_000_000) - model.cached) < 1e-10);
@@ -51,6 +53,13 @@ test("Both high-end additions have verified context and consistent paid usage es
     insightsSource.indexOf('["moonshotai/kimi-k3.1-pro"') < insightsSource.indexOf('["moonshotai/kimi-k3"'),
     "more specific K3.1 price must precede the K3 prefix",
   );
+});
+
+test("Qwen4 video and cache-write pricing match the verified catalog without jury promotion", () => {
+  assert.ok(MODEL_REGISTRY.find(m => m.id === "qwen/qwen4-max")?.capabilities?.includes("video"));
+  assert.ok(Math.abs(estimateCostUsd("qwen/qwen4-max", 1_000_000, 0, 0, 1_000_000) - 1.875) < 1e-10);
+  const moaSource = readFileSync(new URL("../../server/moa.ts", import.meta.url), "utf8");
+  assert.ok(!moaSource.includes('"qwen/qwen4-max"'), "Qwen4 must not enter standing jury/reserve lists implicitly");
 });
 
 test("Discovery and resolver preserve exact identities without bypassing free-only policy", async (t) => {

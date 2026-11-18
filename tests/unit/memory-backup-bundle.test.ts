@@ -31,6 +31,7 @@ test("the actual backup entry runs under plain Node with isolated transports and
               import assert from 'node:assert/strict';
               export async function uploadAndShare(options) {
                 assert.equal(options.share,false);
+                assert.equal(options.confidentialBackup,true);
                 assert.equal(options.tenantId,1);
                 assert.equal(options.folderLabel,'__VisionClaw-Admin-Backups__/');
                 assert.ok(options.fileName.startsWith('__admin-memory-backup-'));
@@ -50,8 +51,18 @@ test("the actual backup entry runs under plain Node with isolated transports and
                   {id:'fixture-old',name:'__admin-memory-backup-old.json',createdTime:'2000-01-01'},
                   {id:'unrelated',name:'unrelated.json',createdTime:'2000-01-01'}]};
               }
-              export async function deleteDriveFile(id) {
-                assert.equal(id,'fixture-old');return {success:true};
+              export async function verifyConfidentialBackupAccess(id) {
+                assert.ok(['fixture-old','fixture-folder'].includes(id));
+              }
+              export async function driveJson(endpoint) {
+                assert.ok(endpoint.startsWith('/drive/v3/files/fixture-old?'));
+                return {id:'fixture-old',name:'__admin-memory-backup-old.json',createdTime:'2000-01-01',
+                  parents:[process.env.BACKUP_FIXTURE_CASE==='retention_denied'?'foreign-folder':'fixture-folder']};
+              }
+              export async function driveRequest(endpoint, options) {
+                assert.notEqual(process.env.BACKUP_FIXTURE_CASE,'retention_denied');
+                assert.equal(endpoint,'/drive/v3/files/fixture-old');assert.equal(options.method,'DELETE');
+                return {ok:true,status:204};
               }
             `,
             loader: "js",
@@ -81,6 +92,10 @@ test("the actual backup entry runs under plain Node with isolated transports and
         assert.equal(summary.driveFileId, "fixture-new");
       }
     }
+    const denied = spawnSync(runner.command, ["--require", denyNetwork, ...runner.args], {
+      timeout: 10_000, env: { NODE_ENV: "production", BACKUP_FIXTURE_CASE: "retention_denied" }, encoding: "utf8",
+    });
+    assert.equal(denied.status, 4, "a stale/foreign retention candidate must not be deleted");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

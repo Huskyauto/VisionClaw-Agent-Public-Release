@@ -117,6 +117,20 @@ export function wrapClientWithParamAdaptation<
     let working = normalizedModel === params?.model
       ? params
       : { ...params, model: normalizedModel };
+    // OpenRouter's Qwen4 catalog supports none/low/high/xhigh, not the generic
+    // medium/minimal/max levels. Preserve request ownership and output bounds.
+    if (normalizedModel === "qwen/qwen4-max") {
+      const effort = (value: unknown) => value === "medium" ? "high"
+        : value === "minimal" ? "low" : value === "max" ? "xhigh" : value;
+      const top = effort(working.reasoning_effort);
+      const nested = effort(working.reasoning?.effort);
+      if (top !== working.reasoning_effort || nested !== working.reasoning?.effort) {
+        working = { ...working,
+          ...(top !== undefined ? { reasoning_effort: top } : {}),
+          ...(nested !== undefined ? { reasoning: { ...working.reasoning, effort: nested } } : {}),
+        };
+      }
+    }
     // Copy-on-first-strip so we never mutate the caller's params object.
     for (let attempt = 0; ; attempt++) {
       try {

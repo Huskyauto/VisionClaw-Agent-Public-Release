@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { acceptCompilation, COMPANY_HEADINGS } from "../../server/lib/company-compilation-content";
+import { acceptCompilation, compilationMessages, COMPANY_HEADINGS } from "../../server/lib/company-compilation-content";
 import { compilationOperations, advanceCompilationMatrix, newCompilationMatrix } from "../../server/lib/company-compilation-matrix";
 import { initialPackage } from "../../server/lib/company-report-package-core";
 import { hashReportBytes } from "../../server/lib/business-report-evidence";
@@ -27,6 +27,48 @@ function fixture() {
   const raw = (content: string) => ({ model: op.model, choices: [{ finish_reason: "stop", message: { content } }] });
   return { state, report, op, raw };
 }
+
+test("authors and syntheses receive evidence planning in legacy and reference contracts without changing retained research", () => {
+  for (const outputContract of [undefined, 2]) {
+    const f = fixture();
+    const original = JSON.stringify(f.state);
+    for (const op of [f.op, compilationOperations().find(operation => operation.stage === "synthesis")!]) {
+      const state: any = structuredClone(f.state);
+      if (outputContract) state.compilation = { slots: { [op.key]: { outputContract } } };
+      const before = JSON.stringify(state);
+      const messages = compilationMessages(state, op, []);
+      const packet = JSON.parse(messages[1].content);
+      assert.deepEqual(packet.writingPlan.sections.map((section: any) => section.heading), COMPANY_HEADINGS[op.kind]);
+      assert.deepEqual(packet.writingPlan.sourceRegister, [{ sourceIds: ["S1"], kind: "public" }]);
+      assert.match(messages[0].content, /no citation-count quota/);
+      assert.match(messages[0].content, /higher reviewer score.*never overrides failed source checks/);
+      assert.match(messages[0].content, /conceptual illustrations are labeled illustrative/);
+      assert.equal(JSON.stringify(state), before, "preparation is pure and cannot change retained receipts");
+      assert.ok(JSON.stringify(messages).length < 200_000);
+    }
+    assert.equal(JSON.stringify(f.state), original);
+  }
+});
+
+test("an altered-result candidate is rejected without replacing retained accepted output or purchasing a retry", async () => {
+  const f = fixture();
+  const matrix = newCompilationMatrix("writing-plan-offline-fixture");
+  const previous = compilationOperations()[0];
+  matrix.slots[previous.key] = { phase: "complete", text: "Previous verified report remains retained." };
+  f.report.sections[0].blocks[0].text = "A measured 50% conversion increase was achieved.";
+  const raw = f.raw(JSON.stringify(f.report));
+  matrix.slots[f.op.key] = { phase: "received", raw };
+  let calls = 0;
+  await assert.rejects(advanceCompilationMatrix(matrix, {
+    checkpoint: async () => {},
+    request: async () => { calls++; throw new Error("No repeat purchase"); },
+    accept: (operation, response) => acceptCompilation(f.state, operation, response),
+  }), /quotation/i);
+  assert.equal(calls, 0);
+  assert.equal(matrix.slots[previous.key].text, "Previous verified report remains retained.");
+  assert.equal(matrix.slots[f.op.key].phase, "received");
+  assert.equal(matrix.slots[f.op.key].raw, raw);
+});
 
 test("omitted advisory citation arrays are empty, without inventing factual citations", () => {
   const f = fixture();

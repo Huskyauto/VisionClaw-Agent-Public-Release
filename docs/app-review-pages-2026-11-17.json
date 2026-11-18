@@ -1,0 +1,937 @@
+{
+  "schemaVersion": 1,
+  "release": "R137.3+sec2",
+  "evidenceDate": "2026-11-17",
+  "environment": "development source",
+  "scope": "Static syntax and page/route inventory; not manual or browser certification of each module. Conditional/fallback/child components may lack direct route matches.",
+  "applicationSourceModules": 1634,
+  "pageComponents": 115,
+  "pageDataModules": 1,
+  "jsxRouteRegistrations": 168,
+  "uniqueLiteralRoutePaths": 114,
+  "pages": [
+    {
+      "file": "client/src/pages/ab-runs.tsx",
+      "sourceLines": 139,
+      "routePaths": [
+        "/admin/ab-runs"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/about.tsx",
+      "sourceLines": 270,
+      "routePaths": [
+        "/about"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/account.tsx",
+      "sourceLines": 232,
+      "routePaths": [
+        "/account"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/activity.tsx",
+      "sourceLines": 185,
+      "routePaths": [
+        "/activity"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin/archive-rescue.tsx",
+      "sourceLines": 145,
+      "routePaths": [
+        "/admin/archive-rescue"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-ai-stack-decision-review.tsx",
+      "sourceLines": 432,
+      "routePaths": [
+        "/income-opportunities/ai-stack-decision-review"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-ai-task-fit-audit.tsx",
+      "sourceLines": 193,
+      "routePaths": [
+        "/income-opportunities/ai-task-fit-audit"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-cmmc.tsx",
+      "sourceLines": 159,
+      "routePaths": [
+        "/admin/cmmc"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-demo-studio.tsx",
+      "sourceLines": 274,
+      "routePaths": [
+        "/admin/demo-studio"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-digital-products.tsx",
+      "sourceLines": 94,
+      "routePaths": [
+        "/admin/digital-products"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-ecosystem-health.tsx",
+      "sourceLines": 1184,
+      "routePaths": [
+        "/admin/ecosystem-health"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-engineering-reference.tsx",
+      "sourceLines": 293,
+      "routePaths": [
+        "/admin/engineering-reference"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-felix-spark-offers.tsx",
+      "sourceLines": 78,
+      "routePaths": [
+        "/admin/felix-spark-offers"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-goal-ledger.tsx",
+      "sourceLines": 308,
+      "routePaths": [
+        "/admin/goal-ledger"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-human-ai-synergy-trial.tsx",
+      "sourceLines": 144,
+      "routePaths": [
+        "/admin/human-ai-synergy-trial"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-income-opportunities.tsx",
+      "sourceLines": 253,
+      "routePaths": [
+        "/admin/income-opportunities"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-instinct-recovery.tsx",
+      "sourceLines": 280,
+      "routePaths": [
+        "/admin/instinct-recovery"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-missed-call-recovery.tsx",
+      "sourceLines": 66,
+      "routePaths": [
+        "/admin/missed-call-recovery"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-payment-links.tsx",
+      "sourceLines": 334,
+      "routePaths": [
+        "/admin/payment-links"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-persona-cost.tsx",
+      "sourceLines": 227,
+      "routePaths": [
+        "/admin/persona-cost"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-pilot-tools.tsx",
+      "sourceLines": 6,
+      "routePaths": [
+        "/admin/pilot-tools"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-repair-ledger.tsx",
+      "sourceLines": 330,
+      "routePaths": [
+        "/admin/repair-ledger"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-research-frontier.tsx",
+      "sourceLines": 237,
+      "routePaths": [
+        "/admin/research-frontier"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-research-report.tsx",
+      "sourceLines": 147,
+      "routePaths": [
+        "/admin/research-report"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-revenue-missions.tsx",
+      "sourceLines": 299,
+      "routePaths": [
+        "/admin/revenue-missions"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-sandbox.tsx",
+      "sourceLines": 341,
+      "routePaths": [
+        "/admin/sandbox"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-service-orders.tsx",
+      "sourceLines": 662,
+      "routePaths": [
+        "/admin/service-orders"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-tools.tsx",
+      "sourceLines": 764,
+      "routePaths": [
+        "/admin/tools"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-wedges.tsx",
+      "sourceLines": 222,
+      "routePaths": [
+        "/admin/wedges"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/admin-zombie-detector.tsx",
+      "sourceLines": 250,
+      "routePaths": [
+        "/admin/zombie-detector"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/agent-board.tsx",
+      "sourceLines": 333,
+      "routePaths": [
+        "/agent-board"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/agent-diagram.tsx",
+      "sourceLines": 625,
+      "routePaths": [
+        "/agent-diagram"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/agent-scorecards.tsx",
+      "sourceLines": 190,
+      "routePaths": [
+        "/agent-scorecards"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/agentic.tsx",
+      "sourceLines": 939,
+      "routePaths": [
+        "/agentic"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/alert-logs.tsx",
+      "sourceLines": 327,
+      "routePaths": [
+        "/admin/alert-logs"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/analytics.tsx",
+      "sourceLines": 232,
+      "routePaths": [
+        "/analytics"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/api-keys.tsx",
+      "sourceLines": 355,
+      "routePaths": [
+        "/api-keys"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/architecture.tsx",
+      "sourceLines": 595,
+      "routePaths": [
+        "/architecture"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/archive-rescue.tsx",
+      "sourceLines": 273,
+      "routePaths": [
+        "/archive-rescue"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/audit.tsx",
+      "sourceLines": 1344,
+      "routePaths": [
+        "/audit"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/browser-workbench-files.tsx",
+      "sourceLines": 226,
+      "routePaths": [
+        "/browser-workbench/files"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/browser-workbench.tsx",
+      "sourceLines": 65,
+      "routePaths": [
+        "/browser-workbench"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/browser-workspace.tsx",
+      "sourceLines": 623,
+      "routePaths": [
+        "/browser-workspace"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/capability-map.tsx",
+      "sourceLines": 194,
+      "routePaths": [
+        "/capability-map"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/channel-routing.tsx",
+      "sourceLines": 166,
+      "routePaths": [
+        "/channel-routing"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/chat.tsx",
+      "sourceLines": 3482,
+      "routePaths": [
+        "/chat",
+        "/chat/:id"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/claude-import.tsx",
+      "sourceLines": 311,
+      "routePaths": [
+        "/claude-import"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/cmmc-assessment.tsx",
+      "sourceLines": 325,
+      "routePaths": [
+        "/cmmc/assessment/:token"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/cmmc-questionnaire-preview.tsx",
+      "sourceLines": 57,
+      "routePaths": [
+        "/cmmc/questionnaire-preview"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/code-health.tsx",
+      "sourceLines": 151,
+      "routePaths": [
+        "/code-health"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/code-proposals.tsx",
+      "sourceLines": 337,
+      "routePaths": [
+        "/code-proposals"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/compare.tsx",
+      "sourceLines": 544,
+      "routePaths": [
+        "/compare"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/contact.tsx",
+      "sourceLines": 221,
+      "routePaths": [
+        "/contact"
+      ],
+      "coverage": "Selected behavior/source inspection plus static inventory"
+    },
+    {
+      "file": "client/src/pages/content-writing.tsx",
+      "sourceLines": 384,
+      "routePaths": [
+        "/content-writing"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/dfy-intake.tsx",
+      "sourceLines": 166,
+      "routePaths": [
+        "/dfy-intake/:token"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/documents.tsx",
+      "sourceLines": 504,
+      "routePaths": [
+        "/documents"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/email.tsx",
+      "sourceLines": 425,
+      "routePaths": [
+        "/email"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/enrichment.tsx",
+      "sourceLines": 298,
+      "routePaths": [
+        "/enrichment"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/executive-report.tsx",
+      "sourceLines": 311,
+      "routePaths": [
+        "/admin/executive-report"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/felix-connector.tsx",
+      "sourceLines": 569,
+      "routePaths": [
+        "/felix-connector"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/files.tsx",
+      "sourceLines": 733,
+      "routePaths": [
+        "/files"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/forgot-password.tsx",
+      "sourceLines": 135,
+      "routePaths": [
+        "/forgot-password"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/gallery.tsx",
+      "sourceLines": 205,
+      "routePaths": [
+        "/gallery"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/graph-explorer.tsx",
+      "sourceLines": 395,
+      "routePaths": [
+        "/graph-explorer"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/heartbeat.tsx",
+      "sourceLines": 1023,
+      "routePaths": [
+        "/heartbeat"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/home.tsx",
+      "sourceLines": 1292,
+      "routePaths": [
+        "/"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/inbox.tsx",
+      "sourceLines": 432,
+      "routePaths": [
+        "/inbox"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/insights.tsx",
+      "sourceLines": 670,
+      "routePaths": [
+        "/insights"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/jobs.tsx",
+      "sourceLines": 336,
+      "routePaths": [
+        "/jobs",
+        "/jobs/:jobId"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/knowledge.tsx",
+      "sourceLines": 421,
+      "routePaths": [
+        "/knowledge"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/landing-data.ts",
+      "sourceLines": 28,
+      "routePaths": [],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/landing-recipe-gallery.tsx",
+      "sourceLines": 120,
+      "routePaths": [],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/landing.tsx",
+      "sourceLines": 2688,
+      "routePaths": [
+        "/landing"
+      ],
+      "coverage": "Selected behavior/source inspection plus static inventory"
+    },
+    {
+      "file": "client/src/pages/login.tsx",
+      "sourceLines": 341,
+      "routePaths": [
+        "/login"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/mcp-keys.tsx",
+      "sourceLines": 285,
+      "routePaths": [
+        "/mcp-keys"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/mcp.tsx",
+      "sourceLines": 243,
+      "routePaths": [
+        "/mcp"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/memory.tsx",
+      "sourceLines": 703,
+      "routePaths": [
+        "/memory"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/not-found.tsx",
+      "sourceLines": 22,
+      "routePaths": [],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/operator.tsx",
+      "sourceLines": 479,
+      "routePaths": [
+        "/operator"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/order.tsx",
+      "sourceLines": 268,
+      "routePaths": [
+        "/orders/:sessionId"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/payments.tsx",
+      "sourceLines": 411,
+      "routePaths": [
+        "/payments"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/personality-files.tsx",
+      "sourceLines": 293,
+      "routePaths": [
+        "/personality-files"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/personas.tsx",
+      "sourceLines": 415,
+      "routePaths": [
+        "/personas"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/presenter.tsx",
+      "sourceLines": 523,
+      "routePaths": [
+        "/present/:id"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/pricing.tsx",
+      "sourceLines": 262,
+      "routePaths": [
+        "/pricing"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/privacy.tsx",
+      "sourceLines": 198,
+      "routePaths": [
+        "/privacy"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/procedure-edits.tsx",
+      "sourceLines": 486,
+      "routePaths": [
+        "/procedure-edits"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/projects.tsx",
+      "sourceLines": 2023,
+      "routePaths": [
+        "/projects"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/proposed-skills.tsx",
+      "sourceLines": 128,
+      "routePaths": [
+        "/admin/proposed-skills"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/public-chat.tsx",
+      "sourceLines": 315,
+      "routePaths": [],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/refund.tsx",
+      "sourceLines": 127,
+      "routePaths": [
+        "/refund"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/research.tsx",
+      "sourceLines": 1287,
+      "routePaths": [
+        "/research"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/reset-password.tsx",
+      "sourceLines": 206,
+      "routePaths": [
+        "/reset-password"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/scheduled-tasks.tsx",
+      "sourceLines": 741,
+      "routePaths": [
+        "/scheduled-tasks"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/settings.tsx",
+      "sourceLines": 4227,
+      "routePaths": [
+        "/settings"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/setup.tsx",
+      "sourceLines": 235,
+      "routePaths": [
+        "/setup"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/signup.tsx",
+      "sourceLines": 406,
+      "routePaths": [
+        "/signup"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/skills-catalog.tsx",
+      "sourceLines": 211,
+      "routePaths": [
+        "/skills"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/skills-marketplace.tsx",
+      "sourceLines": 214,
+      "routePaths": [
+        "/skills-marketplace"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/skills.tsx",
+      "sourceLines": 198,
+      "routePaths": [
+        "/skills"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/smart-leads.tsx",
+      "sourceLines": 400,
+      "routePaths": [
+        "/admin/smart-leads"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/social-calendar.tsx",
+      "sourceLines": 326,
+      "routePaths": [
+        "/social-calendar"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/store.tsx",
+      "sourceLines": 592,
+      "routePaths": [
+        "/store",
+        "/store/success"
+      ],
+      "coverage": "Selected behavior/source inspection plus static inventory"
+    },
+    {
+      "file": "client/src/pages/team.tsx",
+      "sourceLines": 310,
+      "routePaths": [
+        "/team"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/telegram.tsx",
+      "sourceLines": 316,
+      "routePaths": [
+        "/telegram"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/terms.tsx",
+      "sourceLines": 210,
+      "routePaths": [
+        "/terms"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/treasury.tsx",
+      "sourceLines": 172,
+      "routePaths": [
+        "/treasury"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/trust.tsx",
+      "sourceLines": 212,
+      "routePaths": [
+        "/trust"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/typesafe-jev.tsx",
+      "sourceLines": 59,
+      "routePaths": [
+        "/admin/tools/typesafe-jev"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/updates.tsx",
+      "sourceLines": 201,
+      "routePaths": [
+        "/updates"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/vault.tsx",
+      "sourceLines": 353,
+      "routePaths": [
+        "/vault"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/webhook-triggers.tsx",
+      "sourceLines": 246,
+      "routePaths": [
+        "/webhook-triggers"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/website-audit.tsx",
+      "sourceLines": 633,
+      "routePaths": [
+        "/admin/website-audit"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/whatsapp-approval.tsx",
+      "sourceLines": 328,
+      "routePaths": [
+        "/whatsapp-approval"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/whatsapp.tsx",
+      "sourceLines": 439,
+      "routePaths": [
+        "/whatsapp"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    },
+    {
+      "file": "client/src/pages/workflow-replay.tsx",
+      "sourceLines": 385,
+      "routePaths": [
+        "/replay"
+      ],
+      "coverage": "Static inventory and shared route/auth/release checks; no individual journey certification"
+    }
+  ]
+}

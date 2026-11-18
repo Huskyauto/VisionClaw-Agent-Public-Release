@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import { ownerOnlyAccess, tenantAccessAllowed } from "./lib/owner-only-access";
 import { buildExperimentGuidance } from "./lib/build-experiment-guidance";
 import { observePreparedHistory } from "./lib/prompt-history-comparison";
 import { DEFAULT_CHAT_MODEL_ID, HIGH_END_WORK_MODEL_ID } from "./chat-model-default";
@@ -770,6 +771,9 @@ export async function buildSystemPrompt(
   const parts: string[] = [];
   const dynamicParts: string[] = [];
   const citations: Citation[] = [];
+  if (ownerOnlyAccess()) parts.push(
+    "## APPLICATION ACCESS POLICY\nThis installation is owner-only. Do not offer app signup, customer accounts or anonymous agent access. Existing customer records are retained, not authority to admit users. Owner-authorized external product delivery and signed service integrations remain subject to their existing gates. Never disable tenant filters, safety, approvals or database protections to work around private access.",
+  );
 
   const { siteConfig: _scPlatform } = await import("./site-config");
   const platformName = _scPlatform.platformName;
@@ -1956,6 +1960,7 @@ export async function processMessage(
   if (!Number.isInteger(tenantId) || tenantId <= 0) {
     throw new Error("chat-engine:processMessage requires a positive caller tenantId");
   }
+  if (!tenantAccessAllowed(tenantId)) throw new Error("This application is reserved for its owner");
   const conv = await storage.getConversation(conversationId, tenantId);
   if (!conv) throw new Error("Conversation not found");
   // R74.13g — single tenant-context resolution per turn, then thread the

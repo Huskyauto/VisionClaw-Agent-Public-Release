@@ -64,7 +64,13 @@ test("executeTool dispatches generate_design_doc (not 'Unknown tool')", async ()
   const { executeTool } = await import("../../server/tools");
   // Internal IP so the SSRF jail returns the tool's own structured error before
   // any network call — we only assert the dispatch did not fall through.
-  const r = await executeTool("generate_design_doc", { url: "https://10.0.0.1/" });
+  const denied = await executeTool("generate_design_doc", { url: "https://10.0.0.1/" });
+  assert.match(denied.error, /trusted.*authority/i, "missing host authority must be denied");
+  const r = await executeTool("generate_design_doc", { url: "https://10.0.0.1/" }, {
+    tenantId: 42, actor: "system", invokedVia: "security-fixture",
+    internalPurpose: "Verify offline design-tool dispatch",
+    rateLimitChecked: true, skipTracking: true,
+  });
   assert.equal(typeof r, "object");
   assert.equal(r.ok, false);
   assert.ok(!/[Uu]nknown tool/.test(r?.error || ""), "must route to the real handler, not the unknown-tool default");

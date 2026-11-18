@@ -35,6 +35,7 @@ import { readFileSyncEIO, existsSyncEIO, writeFileSyncEIO } from "./lib/eio-read
 import { bwbScriptCommand } from "./lib/bwb-script-runner";
 import { BWB_PACKAGING_INSTRUCTIONS } from "./lib/bwb-packaging";
 import { renderFailureReason } from "./lib/bwb-render-failure";
+import { classifyTransientFailure } from "./lib/bwb-transient-classify";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
@@ -42,6 +43,7 @@ import { fetchBwbPhotos, parseExtraPhotosEnv } from "./lib/bwb-photo-fetch";
 import { summarizeScenesTiming } from "./lib/bwb-narration-timing";
 import { assertCompleteDriveTranscripts, weeklySourceKey, weeklyVideoId } from "./lib/bwb-weekly-coverage";
 import { extractWeeklyTranscripts } from "./lib/youtube-transcript";
+import { createBwbRecovery } from "./lib/bwb-drive-recovery";
 import { discoverWeeklyShorts } from "./lib/youtube-discover";
 import { autoPinWindowYmd, discoverWeeklyDriveClips, extractWeeklyDriveTranscripts, type DiscoveredDriveClip } from "./lib/drive-discover";
 import { findWeightViolations } from "./lib/bwb-weight-guard";
@@ -728,6 +730,16 @@ async function main() {
   });
 
   const driveSourceKey = cfg.source === "drive" ? weeklySourceKey(cfg.driveClips ?? []) : "";
+  const inputRecovery = createBwbRecovery(`week-${createHash("sha256").update(jobKey + driveSourceKey).digest("hex").slice(0, 32)}`);
+  const inputReceipt = await inputRecovery.json("selected-inputs.json", {
+    jobKey, driveSourceKey, driveClips: cfg.driveClips, urls: cfg.urls,
+  });
+  const backupTranscript = async (transcript: import("./lib/youtube-transcript").YouTubeTranscript) => {
+    await ck.stage({ stage: "transcript_unit", unitKey: `${driveSourceKey}:${transcript.url}` }, async () => transcript);
+    await inputRecovery.json(`transcript-${createHash("sha256").update(transcript.videoId).digest("hex").slice(0, 24)}.json`, transcript);
+  };
+  const cachedTranscript = (url: string) =>
+    ck.artifact<import("./lib/youtube-transcript").YouTubeTranscript>("transcript_unit", `${driveSourceKey}:${url}`);
   await setBwbPhase(`Transcribing all ${sourceCount} clip(s)`);
   // STAGE: transcription — checkpointed as a whole. On a clean retry every clip
   // is reused; only a run that never reached a successful transcription set
@@ -748,8 +760,8 @@ async function main() {
     async () => {
       const { transcripts, failures } =
         cfg.source === "drive"
-          ? await extractWeeklyDriveTranscripts(cfg.driveClips ?? [])
-          : await extractWeeklyTranscripts(cfg.urls);
+          ? await extractWeeklyDriveTranscripts(cfg.driveClips ?? [], backupTranscript, cachedTranscript)
+          : await extractWeeklyTranscripts(cfg.urls, backupTranscript, cachedTranscript);
       if (transcripts.length === 0) {
         fail(`No transcripts extracted. Failures:\n${failures.map((f) => `  - ${f.url}: ${f.error}`).join("\n")}`);
       }
@@ -774,6 +786,7 @@ async function main() {
   ).then((r) => r.result);
   // Validate again after cache reuse, before any synthesis or render work.
   if (cfg.source === "drive") assertCompleteDriveTranscripts(cfg.driveClips ?? [], transcripts);
+  await inputRecovery.json("all-transcripts.json", { transcripts });
 
   // Attach each transcript's clip date + time-of-day slot (for drive clips,
   // transcript.videoId === clip.fileId) and order them chronologically
@@ -866,6 +879,11 @@ async function main() {
       return s;
     },
   ).then((r) => r.result);
+
+  const recovery = createBwbRecovery(script.videoId);
+  await recovery.json("original-script.json", script);
+  await recovery.json("all-transcripts.json", { transcripts });
+  await recovery.json("input-recovery-folder.json", { folderId: inputReceipt.folderId, jobKey, driveSourceKey });
 
   // Now that the script exists we know the real title + scene count → seed the
   // live progress card with the chapter glyph row the farm will fan out to.
@@ -1017,7 +1035,7 @@ async function main() {
     // Preserve the FARM's real reason — it is the primary failure. Losing it is
     // why every alert used to read "render failed — Node.js vX" with no cause.
     farmReason = renderFailureReason(out) || `farm backend exited ${code}`;
-    if (inProd) {
+    if (inProd && classifyTransientFailure({ stderr: farmReason })) {
       console.error(
         `[build-bwb-weekly] GitHub render farm failed (exit ${code}) — ${farmReason}; ` +
           `retrying the farm once (prod: the local fallback is disabled — it would die on the Reserved VM and strand a zombie card).`,
@@ -1025,7 +1043,7 @@ async function main() {
       await setBwbPhase("Render farm failed — retrying the farm");
       ({ code, out } = runRender(renderScript));
       if (code !== 0) farmReason = renderFailureReason(out) || farmReason;
-    } else if (process.env.BWB_NO_LOCAL_FALLBACK !== "1") {
+    } else if (!inProd && process.env.BWB_NO_LOCAL_FALLBACK !== "1" && !farmReason.includes("BWB recovery paused:")) {
       console.error(
         `[build-bwb-weekly] GitHub render farm failed (exit ${code}) — ${farmReason}; ` +
           `falling back to the LOCAL in-process builder (dev workspace).`,
@@ -1047,7 +1065,7 @@ async function main() {
     if (farmReason && renderScript.includes("bwb-render-github")) {
       // We stayed on the farm (prod retried it once; or BWB_NO_LOCAL_FALLBACK).
       // The farm reason IS the cause — do NOT mislabel it as a "local fallback".
-      reason = `GitHub render farm failed${inProd ? " twice (after one retry)" : ""}: ${farmReason}`;
+      reason = `GitHub render preparation or execution failed: ${farmReason}`;
     } else if (farmReason) {
       // Dev path: the farm failed, then the local fallback builder failed too.
       reason = `GitHub render farm: ${farmReason}  ||  local fallback (${renderScript}): ${localWhy}`;

@@ -1,4 +1,5 @@
 import { executeToolWithTimeout } from "./tools";
+import { tenantAccessAllowed } from "./lib/owner-only-access";
 import { checkToolRateLimitPaced, recordToolUsage, rateLimitAlternatesHint } from "./tool-rate-limiter";
 import { getPersonaBlockedTools } from "./tool-router";
 
@@ -169,6 +170,9 @@ export async function executeGuardedTool(
     }
   }
 
+  if (!tenantAccessAllowed(tenantId)) {
+    return { error: "This application is reserved for its owner", blocked: true, reason: "owner_only" };
+  }
   const requiredCmmcTool = ctx.authoritativeSourceLock ? CMMC_MODE_TOOL[ctx.authoritativeSourceLock] : undefined;
   const wrongCmmcMode = requiredCmmcTool
     && ["lookup_sam_exact_company", "lookup_sam_company_cage", "discover_cmmc_prospects"].includes(toolName)

@@ -43,11 +43,13 @@ const TRANSIENT: Array<[RegExp, string]> = [
 ];
 
 export function classifyTransientFailure(b: BuildOutcome): string | null {
+  const hay = `${b.stderr ? String(b.stderr) : ""}\n${b.stdout ? String(b.stdout) : ""}`;
+  // Explicit pre-dispatch denials dominate unrelated startup/network warnings.
+  if (/Missing trusted tool authority|Tool authority or policy enforcement unavailable|Narration generation refused:|BWB recovery paused:/i.test(hay)) return null;
   const spawnCode = b.error?.code;
   if (spawnCode && ["EIO", "EAGAIN", "ETIMEDOUT", "ENOMEM"].includes(spawnCode)) {
     return `builder spawn ${spawnCode}`;
   }
-  const hay = `${b.stderr ? String(b.stderr) : ""}\n${b.stdout ? String(b.stdout) : ""}`;
   for (const [re, label] of TRANSIENT) if (re.test(hay)) return label;
   return null;
 }

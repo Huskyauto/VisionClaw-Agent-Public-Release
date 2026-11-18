@@ -1,6 +1,7 @@
 import { execFileSync, execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import { assertVideoRecoveryBatch } from "./lib/video-recovery-guard";
 
 import { logSilentCatch } from "./lib/silent-catch";
 import {
@@ -235,6 +236,8 @@ export interface MpegScene {
 }
 
 export interface MpegJobOptions {
+  /** Internal host callback only; awaited outside paid TTS retry loops. */
+  onRecoveryArtifact?: (filePath: string) => Promise<void>;
   title: string;
   scenes: MpegScene[];
   voice?: string;
@@ -442,7 +445,11 @@ export async function produceVideo(options: MpegJobOptions): Promise<MpegJobResu
   const ttsResults: { audioPath: string; duration: number; failed: boolean; reason?: string }[] = new Array(scenes.length);
   for (let batch = 0; batch < scenes.length; batch += MAX_PARALLEL_TTS) {
     const batchSlice = scenes.slice(batch, batch + MAX_PARALLEL_TTS);
-    const batchPromises = batchSlice.map((scene, i) => generateTTSForScene(scene, batch + i));
+    const batchPromises = batchSlice.map(async (scene, i) => {
+      const result = await generateTTSForScene(scene, batch + i);
+      if (result.audioPath) await options.onRecoveryArtifact?.(result.audioPath);
+      return result;
+    });
     const results = await Promise.all(batchPromises);
     results.forEach((r, i) => {
       ttsResults[batch + i] = r;
@@ -1328,6 +1335,7 @@ export async function produceVideoParallel(options: ParallelVideoOptions): Promi
         voice: options.voice,
         voiceProvider: options.voiceProvider,
         strictVoice: options.strictVoice,
+        onRecoveryArtifact: options.onRecoveryArtifact,
         resolution: options.resolution,
         fps: options.fps,
         transition: options.transition,
@@ -1337,6 +1345,9 @@ export async function produceVideoParallel(options: ParallelVideoOptions): Promi
         tenantId: options.tenantId,
         uploadToDrive: false,
       }));
+      if (chapterResult.success && chapterResult.filePath) {
+        await options.onRecoveryArtifact?.(chapterResult.filePath);
+      }
 
       const elapsed = ((Date.now() - chapterStart) / 1000).toFixed(1);
       console.log(`[mpeg-parallel] Chapter ${chapterIdx + 1}: ${chapterResult.success ? "SUCCESS" : "FAILED"} in ${elapsed}s (${chapterResult.scenesProcessed} scenes)`);
@@ -1344,6 +1355,7 @@ export async function produceVideoParallel(options: ParallelVideoOptions): Promi
     });
 
     const batchResults = await Promise.allSettled(batchPromises);
+    if (options.onRecoveryArtifact) assertVideoRecoveryBatch(batchResults);
     for (const r of batchResults) {
       if (r.status === "fulfilled") {
         chapterResults.push(r.value);

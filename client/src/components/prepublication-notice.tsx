@@ -1,7 +1,7 @@
 import facts from "../../../docs/release-facts.json";
 
-export const CURRENT_SOURCE_RELEASE = "R137.3+sec";
-export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 14, 2026 subscription, memory and video integrity repairs, dependency maintenance and updated source documentation.`;
+export const CURRENT_SOURCE_RELEASE = "R137.3+sec2";
+export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 17, 2026 legacy credential revocation checks, offline logout cleanup, Skills navigation, private-mode website guidance and current repository documentation.`;
 export const DEVELOPMENT_PLATFORM_SUMMARY =
   `${facts.metrics.registeredTools} total registered tools; ` +
   `${facts.metrics.declaredTables} declared / ${facts.metrics.liveTables} live development tables; ` +
@@ -12,6 +12,9 @@ export const DEVELOPMENT_PLATFORM_SUMMARY =
 export const CURRENT_PLATFORM_DESCRIPTION =
   `${SOURCE_UPDATE_SUMMARY} ${DEVELOPMENT_PLATFORM_SUMMARY} ` +
   "Scoped evidence is not whole-platform certification. " +
+  "The optional legacy MCP path now checks current account activity for cached and global owner keys and refuses authorization-store failures. " +
+  "Failed remote logout no longer retains local identity or private query data; remote session revocation still requires server confirmation. " +
+  "Authenticated Skills navigation reaches the workspace; private-mode public pages do not offer inaccessible contact or purchase forms. " +
   "November 6 corrections tighten tenant-scoped insight recovery, channel writes, research references and agent-run ownership. " +
   "Settings model selection and Memory navigation received focused repairs; provider health is platform-admin-only. " +
   "Engineering Q&A provides 19 source-linked comparisons and private owner notes; reference text grants no tool authority. " +

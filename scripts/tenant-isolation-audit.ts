@@ -3,8 +3,8 @@
  * scripts/tenant-isolation-audit.ts — READ-ONLY whole-codebase tenant-isolation audit.
  *
  * VisionClaw enforces tenant isolation with APP-LEVEL `WHERE tenant_id = $tenant`
- * clauses on every query against a tenant-scoped table — there is NO Postgres RLS
- * and NO FK cascade doing it for us. That makes the single forgotten WHERE clause
+ * clauses on tenant-scoped queries — partial opt-in RLS is not universal
+ * enforcement. Schema shape and authenticated caller authority matter: a missing WHERE clause
  * (or the single caller-supplied foreign id that's INSERTed without an ownership
  * check) a cross-tenant data leak. It is the scariest invariant in the platform.
  *
@@ -551,7 +551,7 @@ async function clearCheckpoint(): Promise<void> {
 const SYSTEM_PROMPT = `You are a senior application-security auditor reviewing a multi-tenant TypeScript/Express + Drizzle codebase named VisionClaw.
 
 THE INVARIANT YOU ARE VERIFYING:
-Tenant isolation is enforced ONLY by application-level SQL filters. Every read or write against a tenant-scoped table MUST be constrained to the caller's tenant via "WHERE tenant_id = <caller tenant>" (or an equivalent Drizzle .where(eq(table.tenantId, tenantId))). There is NO Postgres row-level security and NO foreign-key cascade enforcing this. Every INSERT must pass tenantId explicitly (columns are NOT NULL with no default).
+Application-level authorization remains required; partial opt-in RLS does not establish application-wide enforcement. For tenant-bearing tables, trace the authenticated tenant into reads and writes, including mutation-time ownership checks. Verify the actual schema before alleging a missing tenant_id column/value: some tables are global; others are children scoped through owned parents. Do not assume all columns are NOT NULL without defaults. A missing direct predicate is a candidate weakness, not proof of customer-reachable disclosure. Distinguish global admin control-plane operations from ordinary customer access; verify the actual gate and callers rather than trusting comments or function names. If the batch lacks sufficient evidence, describe the missing evidence explicitly instead of inventing an exploit or calling the path safe.
 
 REPORT a finding when you see any of these:
 1. A SELECT/UPDATE/DELETE against a tenant-scoped table with NO tenant_id constraint in its WHERE clause.
@@ -1054,7 +1054,7 @@ const TRIAGE_SYSTEM_PROMPT = `You are a SENIOR application-security auditor perf
 The first pass has HIGH RECALL but LOW PRECISION: it flags many patterns that are isolated by design because it only saw one file window. For EACH finding you decide: is it a GENUINE cross-tenant data-isolation risk (KEEP) or a confirmed FALSE POSITIVE explained by one of the platform's known-benign patterns (SUPPRESS)?
 
 KNOWN-BENIGN PATTERNS — SUPPRESS only when the code + schema AFFIRMATIVELY match one:
-- "fk-transitive": the target table has NO tenant_id column and is a child/line-item of a tenant-scoped parent, isolated transitively through a foreign key whose parent row IS tenant-scoped (e.g. invoice_items→invoices, project_notes/project_files/project_conversations→projects). An INSERT into such a table WITHOUT tenant_id is CORRECT by design. Use the "Referenced tables" schema note: if the flagged table shows "tenant_id column: NO", this pattern very likely applies.
+- "fk-transitive": the target table has NO tenant_id column and is a child/line-item of a tenant-scoped parent. Verify the actual parent FK and authenticated ownership gate in the same reachable path. The absence of tenant_id ONLY disproves a missing-column allegation; it does NOT prove safe foreign IDs, joins, inserts or delivery. For multi-parent children, verify EVERY referenced parent belongs to the authorized tenant. Never suppress merely because the schema note says "tenant_id column: NO".
 - "internal-worker-pk": an internal, server-invoked worker function that reads/updates a row by a globally-unique serial primary key generated server-side (e.g. agent_runs state transitions in server/agentic/*), where the id is NOT taken from an untrusted cross-tenant request boundary (not req.params/req.body/tool args).
 - "global-table": a genuinely platform-global table intentionally NOT tenant-scoped (heartbeat / pace-gate throttle logs, model registries, system config, capability/governance registries, public landing content).
 - "signed-url": a delivery/upload asset authorized by a signed URL where the signature IS the access control and any embedded tenant id is telemetry only.

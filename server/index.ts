@@ -10,6 +10,8 @@ import { logSilentCatch } from "./lib/silent-catch";
 import { isProductionRuntime } from "./lib/runtime-env";
 import { installConsoleRedactor } from "./log-redactor";
 import { logger, runWithRequestId, newRequestId, sanitizeRequestId } from "./lib/logger";
+import { createOwnerOnlyGate, ownerOnlyAccess } from "./lib/owner-only-access";
+import { isVerifiedOwnerRequest } from "./auth";
 
 // R84 — Wrap console.* with the secret redactor BEFORE anything logs.
 installConsoleRedactor();
@@ -467,6 +469,11 @@ app.use((req, res, next) => {
   // but perform it after the production socket and warm-up page are available.
   const { setupAuth, registerAuthRoutes } = await import("./replit_integrations/auth");
   await setupAuth(app);
+  // Before all application/auth-public handlers, including routes that bypass
+  // the historical /api authMiddleware. Payment raw-body webhooks above retain
+  // their signature checks and settlement semantics.
+  app.use(createOwnerOnlyGate(isVerifiedOwnerRequest));
+  console.info(`[access-policy] mode=${ownerOnlyAccess() ? "owner-only" : "multi-tenant"}`);
   const { registerAgentIdRoutes } = await import("./agentid-auth");
   registerAgentIdRoutes(app);
   registerAuthRoutes(app);
@@ -566,7 +573,7 @@ app.use((req, res, next) => {
   // The new Streamable HTTP MCP at POST /mcp (server/routes/mcp-server.ts) is
   // always enabled and is the supported integration surface for external
   // clients (Claude Desktop, Cursor, custom agents).
-  if (process.env.LEGACY_MCP_ENABLED === "1") {
+  if (!ownerOnlyAccess() && process.env.LEGACY_MCP_ENABLED === "1") {
     try {
       const { registerMcpRoutes } = await import("./mcp-server");
       registerMcpRoutes(app);
@@ -945,11 +952,31 @@ app.use((req, res, next) => {
   }
   }
 
+  // Non-blocking, explicitly enabled owner-only local inference connection.
+  // Never delays HTTP readiness or repairs production schema at startup.
+  try {
+    const { startLegionSupervisor } = await import("./legion/runtime");
+    startLegionSupervisor();
+    const { startLegionNightlyScheduler } = await import("./legion/nightly");
+    startLegionNightlyScheduler();
+  } catch {
+    log("Legion supervisor unavailable; local optional work remains unavailable", "startup");
+  }
+
   let shuttingDown = false;
   async function gracefulShutdown(signal: string) {
     if (shuttingDown) return;
     shuttingDown = true;
     log(`${signal} received — starting graceful shutdown`, "shutdown");
+
+    try {
+      const { stopLegionSupervisor } = await import("./legion/runtime");
+      const { stopLegionNightlyScheduler } = await import("./legion/nightly");
+      stopLegionNightlyScheduler();
+      await stopLegionSupervisor();
+    } catch {
+      log("Legion shutdown uncertain; identity ownership is retained", "shutdown");
+    }
 
     try {
       const { stopHeartbeat } = await import("./heartbeat");

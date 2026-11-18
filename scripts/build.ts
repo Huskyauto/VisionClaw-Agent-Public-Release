@@ -3,6 +3,7 @@ import { build as viteBuild } from "vite";
 import { rm, readFile, mkdir, copyFile, writeFile } from "fs/promises";
 import { execSync } from "child_process";
 import { stageTypeScriptStandardLibraries } from "./package-typescript-libs";
+import { stageLegionBinaries, stageLegionRunbooks } from "./stage-legion-binaries";
 import { buildDataPolicy } from "./lib/build-data-policy";
 import { buildGraph } from "./build-codebase-graph";
 import { captureVerifierSource } from "../server/lib/workspace-verifier-source";
@@ -107,6 +108,8 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+  await stageLegionBinaries();
+  await stageLegionRunbooks();
 
   // Proposal verification runs in a memory-capped child process in production.
   // Ship a plain Node bundle; the production caller intentionally fails closed
@@ -171,6 +174,8 @@ async function buildAll() {
     "scripts/bwb-weekly-orchestrator.ts",
     "scripts/build-bwb-weekly.ts",
     "scripts/bwb-render-github.ts",
+    "scripts/bwb-recovery-watch.ts",
+    "scripts/bwb-recovery-restore.ts",
     "scripts/build-bwb-video.ts",
     // Heartbeat maintenance crons spawned as children in prod share the same
     // tsx-loader breakage — bundle each bundle-safe (top-level main, no
@@ -208,7 +213,8 @@ async function buildAll() {
         "process.env.NODE_ENV": '"production"',
       },
       minify: false,
-      external: externals,
+      // The audit's schema parser uses the compiler API at runtime.
+      external: entry === "scripts/tenant-isolation-audit.ts" ? childExternals : externals,
       logLevel: "info",
     });
   }

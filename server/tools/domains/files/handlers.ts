@@ -616,7 +616,7 @@ export async function googleDriveHandler(
   // through the agent-facing google_drive tool surface. Naming convention:
   // double-underscore prefix + "admin" or "VisionClaw-Admin" segment.
   // (Architect HIGH finding 2026-05-20: cross-tenant data leak via Drive.)
-  const ADMIN_DRIVE_ARTIFACT_RE = /^__(admin[-_]|VisionClaw-Admin[-_])/i;
+  const ADMIN_DRIVE_ARTIFACT_RE = /^(?:__(?:admin[-_]|VisionClaw-Admin[-_])|(?:visionclaw-backup|memory-snapshot)-\d{4}-\d{2}-\d{2}.*\.json$|VisionClaw Backups$|Memory Snapshots$)/i;
   // R98 hardening: resolve project context from the TRUSTED ToolContext
   // (`ctx.projectId`), never from LLM-controlled `params.projectId`. If the
   // LLM tries to override the runtime context with a different projectId,
@@ -783,6 +783,7 @@ export async function writeFileHandler(
   params: Record<string, any>,
   ctx: ToolContext,
 ): Promise<ToolResult> {
+  if (typeof ctx.tenantId !== "number" || !Number.isSafeInteger(ctx.tenantId) || ctx.tenantId <= 0) return { error: "A trusted tenant is required" };
   const fs = await import("node:fs");
   const path = await import("node:path");
   const { logSilentCatch } = await import("../../../lib/silent-catch");
@@ -986,19 +987,25 @@ export async function writeFileHandler(
       const convRes = await db.execute(sql`
         SELECT c.project_id FROM conversations c
         JOIN projects p ON p.id = c.project_id AND p.tenant_id = ${tenantId}
-        WHERE c.id = ${ctx.conversationId} AND c.project_id IS NOT NULL
+        WHERE c.id = ${ctx.conversationId} AND c.tenant_id = ${tenantId} AND c.project_id IS NOT NULL
       `);
       const convRow = (convRes as any).rows?.[0];
       if (convRow?.project_id) {
         const projId = convRow.project_id;
         const fileName = path.basename(safeParts);
         const fileType = ext.replace(".", "") || "file";
-        await db.execute(sql`
+        const inserted: any = await db.execute(sql`
           INSERT INTO project_files (project_id, file_name, file_path, file_url, file_type, file_size, uploaded_by)
-          VALUES (${projId}, ${fileName}, ${absPath}, ${driveUrl || null}, ${fileType}, ${stat.size}, ${"agent"})
+          SELECT p.id, ${fileName}, ${absPath}, ${driveUrl || null}, ${fileType}, ${stat.size}, ${"agent"}
+          FROM projects p JOIN conversations c ON c.project_id = p.id
+          WHERE p.id = ${projId} AND p.tenant_id = ${tenantId}
+            AND c.id = ${ctx.conversationId} AND c.tenant_id = ${tenantId}
+          RETURNING id
         `);
-        await db.execute(sql`UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ${projId}`);
-        linkedProjectId = projId;
+        if ((inserted.rows || inserted).length) {
+          await db.execute(sql`UPDATE projects SET updated_at = CURRENT_TIMESTAMP WHERE id = ${projId} AND tenant_id = ${tenantId}`);
+          linkedProjectId = projId;
+        }
         console.log(`[write_file] Auto-linked to project ${projId} (tenant ${tenantId})`);
       }
     }

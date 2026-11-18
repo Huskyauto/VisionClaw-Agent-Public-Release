@@ -85,11 +85,17 @@ const KNOWN_TENANT_KEYS_MAX = 256;
 type LookupResult = { kind: "hit"; tenantId: number } | { kind: "miss" } | { kind: "infra_error"; message: string };
 
 async function lookupTenantForKey(key: string): Promise<LookupResult> {
-  if (_knownTenantKeys.has(key)) return { kind: "hit", tenantId: _knownTenantKeys.get(key)! };
+  const cachedTenant = _knownTenantKeys.get(key);
   try {
     const { db } = await import("./db");
     const { tenants } = await import("@shared/schema");
-    const rows = await db.select({ id: tenants.id }).from(tenants);
+    const { and, eq } = await import("drizzle-orm");
+    // A remembered key is an identity hint, never a grant that outlives disable.
+    // Store failure returns infra_error even for a previously cached identity.
+    const rows = await db.select({ id: tenants.id }).from(tenants).where(
+      cachedTenant === undefined ? eq(tenants.isActive, true) :
+        and(eq(tenants.id, cachedTenant), eq(tenants.isActive, true)),
+    );
     for (const r of rows) {
       const candidate = deriveMcpTenantKey(r.id);
       if (timingSafeEqual(candidate, key)) {
@@ -101,6 +107,7 @@ async function lookupTenantForKey(key: string): Promise<LookupResult> {
         return { kind: "hit", tenantId: r.id };
       }
     }
+    _knownTenantKeys.delete(key);
     return { kind: "miss" };
   } catch (err: any) {
     console.warn(`[mcp-auth] Tenant key lookup failed: ${err?.message}`);
@@ -185,26 +192,21 @@ function mcpAuthMiddleware(req: Request, res: Response, next: NextFunction): voi
     console.warn("[mcp-auth] DEPRECATION: a client authenticated via ?api_key= query string. This works but the key can leak into access logs, browser history, and Referer headers. Migrate to Authorization: Bearer <key> when possible. (This warning fires once per process.)");
   }
 
-  if (timingSafeEqual(providedKey, MCP_API_KEY)) {
+  const globalKey = timingSafeEqual(providedKey, MCP_API_KEY);
+  if (globalKey) {
     if (!_warnedGlobalKeyAuth) {
       _warnedGlobalKeyAuth = true;
       console.warn(`[mcp-auth] NOTICE: a client authenticated with the global MCP key, which grants admin tenant (${ADMIN_TENANT_ID}) access. This is the documented back-compat path. For SaaS / multi-tenant deployments, prefer per-tenant derived keys via deriveMcpTenantKey(tenantId). (This notice fires once per process.)`);
     }
-    (req as any)._mcpTenantId = ADMIN_TENANT_ID;
-    // R94 SECURITY — wrap in AsyncLocalStorage tenant context so downstream
-    // tool LLM calls bill the right tenant (here: ADMIN for the global key).
-    import("./lib/tenant-context").then(({ runWithTenant }) =>
-      runWithTenant(ADMIN_TENANT_ID, "api-key", () => next())
-    );
-    return;
   }
 
-  if (isCachedInvalid(providedKey)) {
+  if (!globalKey && isCachedInvalid(providedKey)) {
     res.status(401).json({ error: "Invalid MCP API key" });
     return;
   }
 
-  lookupTenantForKey(providedKey).then(result => {
+  // The compatibility owner key must pass the same live account-status check.
+  lookupTenantForKey(globalKey ? deriveMcpTenantKey(ADMIN_TENANT_ID) : providedKey).then(result => {
     if (result.kind === "hit") {
       (req as any)._mcpTenantId = result.tenantId;
       // R94 SECURITY — see comment above. Per-tenant derived MCP key path.

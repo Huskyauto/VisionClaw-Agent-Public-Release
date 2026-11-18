@@ -16,6 +16,7 @@ import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { classifyFailure, retryPolicyFor, type FailureClass } from "./lib/failure-taxonomy";
 import { ALL_TENANTS, type TenantScope } from "./storage-helpers/tenant-scope";
+import { ADMIN_TENANT_ID } from "./tenant-constants";
 
 export type JobStatus =
   | "pending"
@@ -197,7 +198,11 @@ export async function claimDueJobs(
       WHERE status = 'pending'
         AND next_run_at <= NOW()
         ${kindScope}
-      ORDER BY next_run_at ASC
+      ORDER BY CASE WHEN tenant_id = ${ADMIN_TENANT_ID} THEN 0 ELSE 1 END,
+               CASE WHEN tenant_id = ${ADMIN_TENANT_ID}
+                 AND kind IN ('legion_runbook_compile','surface_runbook_rule')
+                 AND payload->>'priority'='daytime' THEN 0 ELSE 1 END,
+               next_run_at ASC, id ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
     )

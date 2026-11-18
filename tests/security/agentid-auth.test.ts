@@ -21,7 +21,8 @@ function declaration(file: string, name: string) {
 function load(source: string, globals: Record<string, unknown>) {
   const module = { exports: {} as any };
   vm.runInNewContext(transformSync(source, { loader: "ts", format: "cjs", target: "node22" }).code,
-    { module, exports: module.exports, URL, URLSearchParams, console, ...globals });
+    { module, exports: module.exports, URL, URLSearchParams, console,
+      ownerOnlyAccess: () => false, tenantAccessAllowed: () => true, ...globals });
   return module.exports;
 }
 

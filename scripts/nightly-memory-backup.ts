@@ -23,7 +23,7 @@
 
 import { db } from "../server/db";
 import { memoryEntries } from "../shared/schema";
-import { uploadAndShare, listDriveFiles, deleteDriveFile } from "../server/google-drive";
+import { uploadAndShare, listDriveFiles, driveJson, driveRequest, verifyConfidentialBackupAccess } from "../server/google-drive";
 
 const RETENTION_DAYS = 30;
 // Admin-marker prefix on both folder + filename so the google_drive agent tool
@@ -99,6 +99,7 @@ async function main(): Promise<BackupSummary> {
       folderLabel: BACKUP_FOLDER_LABEL,
       description: `Memory backup — ${summary.rowCount} rows, ${summary.bytes} bytes — ${summary.generatedAt}`,
       share: false,
+      confidentialBackup: true,
       tenantId: 1,
     });
     if (!result.success) {
@@ -150,11 +151,22 @@ async function main(): Promise<BackupSummary> {
           if (f.id === summary.driveFileId) continue; // never the file we just uploaded
           const created = f.createdTime ? Date.parse(f.createdTime) : NaN;
           if (Number.isFinite(created) && created < cutoff) {
-            const del = await deleteDriveFile(f.id);
-            if (del.success) {
+            // The tenant-facing delete helper intentionally refuses admin
+            // aggregates. Internal retention instead binds the exact verified
+            // backup parent/name before its fixed DELETE; never weaken that guard.
+            await verifyConfidentialBackupAccess(backupFolderId);
+            await verifyConfidentialBackupAccess(f.id);
+            const meta = await driveJson(`/drive/v3/files/${encodeURIComponent(f.id)}?fields=id,name,parents,createdTime`);
+            if (meta?.error || meta?.id !== f.id || meta?.name !== f.name
+              || !Array.isArray(meta.parents) || meta.parents.length !== 1 || meta.parents[0] !== backupFolderId
+              || !Number.isFinite(Date.parse(meta.createdTime)) || Date.parse(meta.createdTime) >= cutoff) {
+              throw new Error("Backup retention candidate identity or parent changed; refusing deletion");
+            }
+            const del = await driveRequest(`/drive/v3/files/${encodeURIComponent(f.id)}`, { method: "DELETE" });
+            if (del.ok) {
               summary.prunedCount++;
             } else {
-              deleteErrors.push(`${f.name}: ${del.error || "unknown"}`);
+              deleteErrors.push(`${f.name}: HTTP ${del.status}`);
             }
           }
         }
