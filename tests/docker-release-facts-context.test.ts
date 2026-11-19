@@ -53,6 +53,15 @@ test("Docker context bundles the actual prepublication notice without exposing o
   }
 });
 
+test("Docker context includes the Markdown procedure imported by the billing workbench", () => {
+  const source = readFileSync("client/src/pages/admin-finished-not-billed.tsx", "utf8");
+  const procedure = source.match(/from "\.\.\/\.\.\/\.\.\/(docs\/[^"]+\.md)\?raw"/)?.[1];
+  assert.equal(procedure, "docs/finished-but-not-billed.md");
+  assert.equal(included(procedure), true, "the Vite raw import must survive Docker context filtering");
+  assert.ok(readFileSync(procedure, "utf8").includes("Finished but Not Billed"));
+  assert.equal(included("docs/app-review-2026-11-19.md"), false);
+});
+
 test("Docker context stages exactly the three screened Legion runbooks, not private agent state", async () => {
   const required = new Set<string>(LEGION_RUNBOOKS);
   function checkTree(directory: string) {

@@ -52,3 +52,7 @@ result in production configuration changes, or authorize a website deployment.
 - The read-only development census confirmed 428 registered tools, 386 public
   documented tools, 149 active capabilities and 102 curated models. This does
   not establish available subscriptions, production traffic, or model quality.
+- The first GitHub Docker smoke build found that the ignored documentation
+  directory hid the workbench's Markdown import. The build context now admits
+  that exact file and retains the exclusions for unrelated reports and private
+  documentation. A regression checks the actual import against the allowlist.
