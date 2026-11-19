@@ -53,7 +53,13 @@ test("spoolJob writes an atomic JSON file the drainer can read back", async () =
   assert.ok(typeof rec.spooledAt === "string");
 });
 
-test("drainSpool deletes files on successful enqueue and preserves payload", async () => {
+test("drainSpool preserves enqueue order even when the clock does not advance", async (t) => {
+  const instant = Date.now();
+  t.mock.method(Date, "now", () => instant);
+  // Force the random suffixes to sort in the opposite order.
+  let suffix = 255;
+  const crypto = (await import("node:crypto")).default;
+  t.mock.method(crypto, "randomBytes", (size: number) => Buffer.alloc(size, suffix--));
   await spoolJob("k1", { a: 1 }, {});
   await spoolJob("k2", { b: 2 }, { delayMs: 500 });
 
@@ -98,6 +104,19 @@ test("drainSpool keeps file on enqueue failure and stops early", async () => {
 
   const remaining = (await fs.readdir(SPOOL_DIR)).filter((e) => e.endsWith(".json"));
   assert.equal(remaining.length, 3, "all files preserved for retry next pass");
+});
+
+test("drainSpool retains the spool until the queue confirms a valid job ID", async () => {
+  const first = await spoolJob("first", {});
+  const later = await spoolJob("later", {});
+  for (const ack of [0, -1, NaN, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    const seen: string[] = [];
+    const result = await drainSpool(async (kind) => { seen.push(kind); return ack; });
+    assert.deepEqual(result, { drained: 0, remaining: 2, errors: 1 });
+    assert.deepEqual(seen, ["first"]);
+    assert.deepEqual((await fs.readdir(SPOOL_DIR)).filter(name => name.endsWith(".json")).sort(), [first, later]);
+  }
+  assert.deepEqual(await drainSpool(async () => 42), { drained: 2, remaining: 0, errors: 0 });
 });
 
 test("drainSpool recovers partial: succeeds until first failure, keeps rest", async () => {

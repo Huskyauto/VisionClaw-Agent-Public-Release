@@ -243,6 +243,10 @@ const MODEL_ROUTING: CapabilityRecord[] = [
 
 /** All static capabilities except `event` (events come from event-bus at runtime). */
 export const STATIC_CAPABILITIES: CapabilityRecord[] = [
+  { kind: "fulfillment", name: "agent_working_context", category: "memory",
+    description: "Automatic source-backed working briefs for scoped chat. Existing extraction selects exact message spans; PostgreSQL stores pointers; dreaming compacts them. Optional owner-only laptop assistance adds grounded source fallback, category selection, REM digests and advisory deep proposals; stronger extraction coverage, corrections and independent consequential review remain intact. No extra hosted extraction request or execution grants. Runbooks: docs/agent-working-context.md and docs/laptop-memory-work.md.",
+    codePath: "server/working-context.ts + server/working-context-store.ts + server/lib/agent-working-context.ts",
+    codeSymbol: "createWorkingContextService + compileWorkingContext + hydrateWorkingContext" },
   { kind: "route", name: "agent_ready_website_package", category: "business", description: "Owner-only Website Audit companion: deterministic confirmed-public-facts Poppy website-only discovery, llms.txt, business JSON-LD and ZIP installation instructions; explicit scoped before/after comparisons. No chat tool, AI calls, storage, installation, payment or customer delivery. Does not replace the comprehensive DFY fix kit. Runbook: docs/agent-ready-package.md.", codePath: "server/routes/agent-ready-package.ts", codeSymbol: "registerAgentReadyRoutes" },
   ...AGENTS,
   ...WEBHOOKS,

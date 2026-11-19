@@ -1,3 +1,5 @@
+import { isFinishedNotBilledEnabled } from "../site-config";
+
 /**
  * Read-only guide to service pages in the owner's Income Products navigation.
  * These are NOT checkout SKUs or evidence of sales. Actual registered/built-in
@@ -30,6 +32,12 @@ export const OWNER_SERVICE_OFFERINGS = [
     availability: "Feature-gated proposal workspace; no sending, calling, integrations or payments are performed here.",
   },
   {
+    name: "Finished but Not Billed",
+    path: "/admin/finished-not-billed",
+    summary: "Manual $175 HVAC pilot: reconcile up to 30 coded completed jobs with invoice records, ask the office to verify exceptions, and export a CSV. Open through Income Products or Business Pilot Tools.",
+    availability: "Owner workspace with a downloadable procedure. Not a checkout SKU; do not ask for customer details in chat, send invoices, or promise recovered revenue.",
+  },
+  {
     name: "Smart Leads",
     path: "/admin/smart-leads",
     summary: "Lead enrichment and research-dossier service workspace.",
@@ -54,3 +62,8 @@ export const OWNER_SERVICE_OFFERINGS = [
     availability: "Public offer page; this directory does not include the private order queue or verify current pricing.",
   },
 ] as const;
+
+export function getOwnerServiceOfferings() {
+  return OWNER_SERVICE_OFFERINGS.filter(offer =>
+    offer.path !== "/admin/finished-not-billed" || isFinishedNotBilledEnabled());
+}

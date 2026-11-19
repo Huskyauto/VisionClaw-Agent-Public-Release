@@ -94,13 +94,13 @@ test("Surface results use the same queued source-grounding gate, not a weaker ac
     read: async () => ({ sha256: "a".repeat(64), text: quote }),
     health: async () => ({}),
     compile: async () => ({ sourceSha256: "a".repeat(64),
-      model: "surface-local:qwen2.5-7b-instruct-qnn-npu:3",
+      model: "surface-local:qwen2.5-7b-instruct-generic-gpu:4",
       concepts: [{ key: "caller-check", title: "Caller check", quotes: [quote] }] }) };
   const result = await runLocalRunbookJob(job, deps);
   assert.equal(result.status, "compiled");
   assert.equal(result.advisoryOnly, true);
   deps.compile = async () => ({ sourceSha256: "a".repeat(64),
-    model: "surface-local:qwen2.5-7b-instruct-qnn-npu:3",
+    model: "surface-local:qwen2.5-7b-instruct-generic-gpu:4",
     concepts: [{ key: "caller-check", title: "Caller check", quotes: ["Invented ungrounded source excerpt"] }] });
   await assert.rejects(runLocalRunbookJob(job, deps));
 });

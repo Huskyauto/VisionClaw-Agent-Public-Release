@@ -18,9 +18,11 @@
  */
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { isPublicMirror } from "./lib/build-data-policy";
 
 const ROOT = process.cwd();
 const FACTS = "docs/release-facts.json";
+const PUBLIC_MIRROR = isPublicMirror(ROOT);
 
 /**
  * Metrics with a single canonical public value. Each entry maps the SoT table
@@ -48,8 +50,7 @@ const METRICS: Metric[] = [
 ];
 
 // Public-facing docs to scan. EVIDENCE.md (historical archive) is excluded.
-const SCAN = [
-  "README.md",
+const SCAN_COMMON = [
   "README.md",
   "ROADMAP.md",
   "FORK-SETUP.md",
@@ -59,6 +60,9 @@ const SCAN = [
   "QUICKSTART_DOCKER.md",
   "client/src/components/seo-head.tsx",
   "client/src/pages/landing.tsx",
+];
+const SCAN = PUBLIC_MIRROR ? SCAN_COMMON : [...SCAN_COMMON,
+  "README-PUBLIC.md",
   "replit.md",
   "scripts/build-features-doc.ts",
 ];
@@ -109,12 +113,12 @@ function main() {
     // CLEAN (393 tools)") are historical facts, not current-state claims.
     // Blank them out (preserving line numbers) so only live prose is gated,
     // consistent with the EVIDENCE.md exclusion above. Scoped to
-    // README.md only — the sole scanned doc with a release-history
+    // README-PUBLIC.md only — the sole scanned doc with a release-history
     // table — so a future doc can't accidentally exempt live claims by
     // formatting them as | **R...** | rows.
     const raw = readFileSync(path, "utf8");
     let text = raw;
-    if (rel === "README.md") {
+    if (rel === "README.md" && !PUBLIC_MIRROR) {
       // The primary README interleaves current overview copy with frozen
       // release narratives. Scan only the explicitly dated current sections
       // state, including the architecture table that previously drifted.
@@ -134,7 +138,7 @@ function main() {
           return raw.slice(start, end);
         })
         .join("\n");
-    } else if (rel === "README.md") {
+    } else if (rel === "README-PUBLIC.md" || (rel === "README.md" && PUBLIC_MIRROR)) {
       text = raw
         .split("\n")
         .map((l) => (/^\|\s*\*\*R\d/.test(l) ? "" : l))

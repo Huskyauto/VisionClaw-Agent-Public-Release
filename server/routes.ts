@@ -5910,7 +5910,7 @@ ${buildFelixProtocol()}`
           }, 8000);
           try {
             const { executeGuardedTool } = await import("./guarded-tool-executor");
-            result = await executeGuardedTool(tc.name, parsedArgs, {
+            const dispatch = () => executeGuardedTool(tc.name, parsedArgs, {
               tenantId,
               conversationId,
               personaId: persona?.id,
@@ -5929,6 +5929,11 @@ ${buildFelixProtocol()}`
               // so we don't double-prompt on the same call.
               skipApprovalGate: true,
             });
+            if (isPlatformAdmin(req) && ["jury_triage", "ensemble_query"].includes(tc.name)) {
+              const { withOwnerFrontierTurn, explicitlyRequestsFrontierJury } = await import("./lib/owner-frontier-refresh");
+              result = await withOwnerFrontierTurn(tenantId, explicitlyRequestsFrontierJury(content),
+                dispatch, streamAbortController.signal);
+            } else result = await dispatch();
           } catch (err: unknown) {
             result = { error: errorMessage(err) || "Tool execution failed" };
           }
@@ -6169,7 +6174,8 @@ ${buildFelixProtocol()}`
         await storage.updateConversation(conversationId, {}, conv.tenantId ?? ADMIN_TENANT_ID);
       }
 
-      intelligentExtractMemory(fullResponse, content.trim(), persona?.id, conv.tenantId ?? ADMIN_TENANT_ID).catch(() => {});
+      intelligentExtractMemory(fullResponse, content.trim(), persona?.id, tenantId,
+        savedUserMsg.id, { conversationId, assistantMessageId: __asstMsg.id }).catch(() => {});
       updateDailyLog(titleForLog, persona?.id, undefined, conv.tenantId).catch(() => {});
 
       captureToolChainMemory(

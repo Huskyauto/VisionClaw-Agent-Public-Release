@@ -46,6 +46,8 @@ export async function recoverSubscriptionSeats(args: {
   allowPaid: boolean;
   /** Server-owned owner/default-roster decision, never a model argument. */
   recoverPinnedSeats?: boolean;
+  /** Do not purchase a second call on a newly upgraded provider after uncertain completion. */
+  avoidPaidLanes?: ReadonlySet<ProposerCallSpec["providerLane"]>;
   /** Overall admission window; each admitted dispatch also gets its remaining timeout. */
   budgetMs?: number;
   now?: () => number;
@@ -70,6 +72,7 @@ export async function recoverSubscriptionSeats(args: {
       const reason = attempted.has(key) ? "already-attempted" :
         usedLanes.has(backup.providerLane) ? "provider-lane-occupied" :
         usedModels.has(backup.modelId) ? "model-identity-occupied" :
+        args.avoidPaidLanes?.has(backup.providerLane) ? "premium-provider-already-selected" :
         isPaidJuryBackup(backup) && !args.allowPaid ? "paid-backup-not-authorized" :
         !available(args.eligible, backup) ? "route-unsupported-or-not-locally-ready" :
         now() >= deadline ? "recovery-deadline" : undefined;

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Cpu, ArrowLeft, Users, Target, Lightbulb, Rocket, Bot, Crown, Wrench, PenTool, Shield, Search, BarChart3, Brain, Globe, Workflow } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useSiteConfig } from "@/hooks/use-site-config";
+import { CURRENT_SOURCE_RELEASE, DEVELOPMENT_PLATFORM_SUMMARY } from "@/components/prepublication-notice";
 
 const LEADERSHIP: { name: string; role: string; description: string }[] = [];
 
@@ -66,7 +67,7 @@ const CURRENT_MILESTONES = [
   { year: "2024", event: "VisionClaw platform development begins." },
   { year: "2025", event: "The platform expands into a governed AI corporation with shared tools, memory, and Model Context Protocol support." },
   { year: "2026", event: "VisionClaw reaches 18 specialist personas, including Robert as the personal and emotional-life specialist, with tenant isolation, human approvals, durable job recovery, and cost-aware model routing." },
-  { year: "R133", event: "Current release: 420 registered tools, including governed Scrapling and staggered multi-source collection; 138 active capabilities, 68 total skills, 178 declared / 258 live tables, 825 platform indexes, and 41 governance rules." },
+  { year: CURRENT_SOURCE_RELEASE, event: DEVELOPMENT_PLATFORM_SUMMARY },
 ];
 
 const PERSONAS = [

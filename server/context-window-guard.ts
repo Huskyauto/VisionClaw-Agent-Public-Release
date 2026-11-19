@@ -4,6 +4,8 @@ const CHARS_PER_TOKEN_ESTIMATE = 3.5;
 
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   "gpt-5.4": 1_000_000,
+  "gpt-6.2-sol": 1_050_000,
+  "gpt-6.2-astra": 1_050_000,
   "gpt-5-mini": 1_000_000,
   "gpt-5": 400_000,
   "gpt-4.1": 1_000_000,

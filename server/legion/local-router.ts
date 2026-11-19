@@ -1,5 +1,5 @@
 import { LocalAdmissionDeferred } from "./local-slots";
-export const SURFACE_MODEL = "qwen2.5-7b-instruct-qnn-npu:3";
+export const SURFACE_MODEL = "qwen2.5-7b-instruct-generic-gpu:4";
 export type LocalProvider = "surface-local" | "legion-local";
 export class SurfaceModelUnavailable extends Error {}
 export interface LocalDispatch {

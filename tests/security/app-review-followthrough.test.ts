@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { createHash, timingSafeEqual } from "node:crypto";
 import ts from "typescript";
 import { transformSync } from "esbuild";
 import { PgDialect, pgTable, integer, boolean } from "drizzle-orm/pg-core";
@@ -27,6 +28,62 @@ function closure(file: string, name: string, context: Record<string, unknown>) {
     module: { exports: {} }, Fragment: "Fragment", console: { warn() {}, error() {} }, ...context,
   });
 }
+
+test("modern MCP key verification requires a currently active owning account", async () => {
+  const key = `mcp_${"k".repeat(8)}_${"s".repeat(32)}`;
+  const row = { id: 5, tenant_id: 7, key_hash: createHash("sha256").update(key).digest("hex"), scopes: ["read"], revoked_at: null };
+  const dialect = new PgDialect();
+  for (const state of ["active", "disabled", "unavailable"]) {
+    let touches = 0;
+    const verify = closure("server/lib/mcp-api-keys.ts", "verifyApiKey", {
+      createHash, timingSafeEqual, Buffer, sql: orm.sql, tenantAccessAllowed: (id: number) => id === 7,
+      db: { execute: async (query: orm.SQL) => {
+        const { sql } = dialect.sqlToQuery(query);
+        if (sql.includes("UPDATE mcp_api_keys")) { touches++; return { rows: [] }; }
+        if (state === "unavailable") throw Error("fixture store offline");
+        const checksCurrentOwner = /JOIN tenants t ON t\.id = k\.tenant_id\s+AND t\.is_active IS TRUE/i.test(sql);
+        return { rows: state === "disabled" && checksCurrentOwner ? [] : [row] };
+      } },
+    });
+    const result = await verify(key);
+    assert.equal(result?.tenantId ?? null, state === "active" ? 7 : null, state);
+    assert.equal(touches, state === "active" ? 1 : 0, state);
+  }
+});
+
+test("working-context extraction saves valid hosted excerpts before a local fallback", async () => {
+  const local = [{ quote: "local fallback" }];
+  const hosted = [{ quote: "hosted excerpt one" }, { quote: "hosted excerpt two" }];
+  for (const response of ["good", "invalid", "empty", "error"]) {
+    let immutable: unknown;
+    let hostedAttempts = 0;
+    const extract = closure("server/memory-intelligence.ts", "intelligentExtractMemory", {
+      MAX_FACTS_PER_TURN: 4,
+      require: (name: string) => name === "./working-context" ? {
+        workingContextEnabled: () => true,
+        WORKING_CONTEXT_EXTRACTION_INSTRUCTIONS: "capture",
+        workingContextExtractionInput: () => "fixture",
+        getWorkingContextService: async () => ({
+          prepareCapture: async () => ({}),
+          commitCapture: async (_capture: unknown, candidate: unknown) => {
+            if (!Array.isArray(candidate) || !candidate.length) return 0;
+            immutable ??= candidate;
+            return candidate.length;
+          },
+        }),
+      } : { localMemoryTasks: { workingContext: async () => ({ status: "accepted", value: local }) } },
+      replitOpenai: { chat: { completions: { create: async () => {
+        hostedAttempts++;
+        if (response === "error") throw Error("fixture provider offline");
+        return { choices: [{ message: { content: response === "empty" ? null :
+          JSON.stringify({ facts: [], working_context: response === "good" ? hosted : [] }) } }] };
+      } } } },
+    });
+    await extract("user", "assistant", 2, 7, 3, { conversationId: 4, assistantMessageId: 5 });
+    assert.equal(hostedAttempts, 1);
+    assert.equal(JSON.stringify(immutable), JSON.stringify(response === "good" ? hosted : local), response);
+  }
+});
 
 test("logout removes local identity and cached data even when remote revocation fails", async () => {
   const cleared: string[] = [];

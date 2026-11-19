@@ -35,5 +35,6 @@ jobs:
       - run: npm ci
       - name: Counts agree with docs/CURRENT_PLATFORM_TOTALS.md
         # Use the lockfile's tsx rather than resolving a floating package at CI
-        # time. In the public mirror this script is rewritten to read README.md.
+        # time. The verifier recognizes the exported mirror and checks the
+        # promoted README and shared docs without requiring private sources.
         run: npx --no-install tsx scripts/verify-counts.ts

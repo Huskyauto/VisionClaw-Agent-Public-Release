@@ -66,6 +66,8 @@ const PRICING_PER_M_TOKENS: Array<[string, { in: number; out: number }]> = [
   ["gpt-5.6-sol", { in: 2, out: 10 }],
   ["gpt-6-luna", { in: 0.1, out: 0.5 }],
   ["gpt-6-sol", { in: 2, out: 10 }],
+  ["gpt-6.2-sol", { in: 2, out: 10 }],
+  ["gpt-6.2-astra", { in: 8, out: 40 }],
   ["gpt-5-mini", { in: 0.25, out: 2 }],
   // -mini must sit ABOVE the generic gpt-4.1 prefix (first-match-wins) — caught
   // by the prefix-shadowing guard in tests/cost/model-pricing-drift.test.ts.

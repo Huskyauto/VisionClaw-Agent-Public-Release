@@ -77,7 +77,10 @@ export function createOwnerOnlyGate(
     res.setHeader("Cache-Control", "no-store");
     if (access === "invalid") return res.status(400).json({ error: "Invalid request path" });
     if (access !== "closed") {
-      try { if (await verifyOwner(req)) return next(); } catch { /* fail closed, no private errors */ }
+      try { if (await verifyOwner(req)) return next(); } catch {
+        // Keep verifier failures private and deny access without exposing errors.
+        return res.status(403).json(PRIVATE_ACCESS_ERROR);
+      }
     }
     return res.status(403).json(PRIVATE_ACCESS_ERROR);
   };

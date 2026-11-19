@@ -130,7 +130,10 @@ export function createSurfaceTransport(send: typeof http.request = http.request)
                 const message = JSON.parse(errorBody)?.error?.message;
                 unavailable = typeof message === "string" &&
                   /\bmodel\b[^.\n]{0,120}\bnot (?:currently )?loaded\b/i.test(message);
-              } catch { /* No generic HTTP error can assert no generation occurred. */ }
+              } catch {
+                // Malformed provider content cannot authorize a paid retry.
+                unavailable = false;
+              }
               finish(unavailable ? new SurfaceModelUnavailable("Surface model not loaded") : Error(`Surface HTTP ${status}`));
             });
           } else {

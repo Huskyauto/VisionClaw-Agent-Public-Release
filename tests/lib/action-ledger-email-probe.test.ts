@@ -155,7 +155,7 @@ test("S4 seam: fetchWithTimeout adopts ALS signal only when no explicit signal",
 test("S4 seam: executeToolWithTimeout wraps executeTool in runWithToolAbortSignal", () => {
   const toolsSrc = readFileSync(path.join(process.cwd(), "server/tools.ts"), "utf8");
   assert.ok(
-    toolsSrc.includes("runWithToolAbortSignal(controller.signal, () => executeTool(name, params))"),
+    toolsSrc.includes("runWithToolAbortSignal(controller.signal, () => executeTool(name, params, context))"),
     "the dispatch inside the Promise.race must run under the abort ALS context",
   );
 });

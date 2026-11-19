@@ -8,6 +8,7 @@ export interface PublicSiteConfig {
   platformTagline: string;
   contactEmail: string;
   hvacMissedCallRecoveryEnabled: boolean;
+  finishedNotBilledEnabled: boolean;
   researchFrontierEnabled: boolean;
 }
 
@@ -19,6 +20,7 @@ const DEFAULTS: PublicSiteConfig = {
   platformTagline: "Autonomous AI Corporation Platform",
   contactEmail: "",
   hvacMissedCallRecoveryEnabled: false,
+  finishedNotBilledEnabled: false,
   researchFrontierEnabled: false,
 };
 
