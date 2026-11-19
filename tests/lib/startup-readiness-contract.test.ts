@@ -46,7 +46,7 @@ test("production binds the warm-up page before awaiting network-dependent auth d
   );
 });
 
-test("the production warm-up page keeps the VM root readiness probe healthy", { timeout: 30_000 }, async () => {
+test("the production warm-up page keeps the VM root readiness probe healthy", { timeout: 40_000 }, async () => {
   const port = await unusedPort();
   let output = "";
   const child = spawn(process.execPath, ["dist/index.cjs"], {
@@ -82,7 +82,10 @@ test("the production warm-up page keeps the VM root readiness probe healthy", { 
 
   try {
     let response: Response | undefined;
-    const deadline = Date.now() + 15_000;
+    // Use the existing 30-second Docker liveness budget rather than a
+    // shorter test-only cutoff. Cold public bundles can need longer to
+    // load modules on a shared worker before the early bind executes.
+    const deadline = Date.now() + 29_000;
     while (Date.now() < deadline) {
       if (child.exitCode !== null) {
         assert.fail(`production server exited before readiness probe: ${output}`);
