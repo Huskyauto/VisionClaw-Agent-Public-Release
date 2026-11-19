@@ -4,16 +4,18 @@ import fs from "node:fs";
 import vm from "node:vm";
 import crypto from "node:crypto";
 import ts from "typescript";
+import { ownerOnlyAccess, tenantAccessAllowed } from "../../server/lib/owner-only-access";
 
 // Execute the real auth functions with an isolated in-memory query adapter.
 // No application imports, database, sessions or live credentials.
-function harness() {
+function harness(privateMode = false) {
   const text = fs.readFileSync("server/auth.ts", "utf8");
   const source = ts.createSourceFile("auth.ts", text, ts.ScriptTarget.Latest, true);
   const names = new Set(["validateApiKey", "getOrCreateTenantForReplitUser", "ownerRebindAllowed", "isPublicPath"]);
   const functions = source.statements.filter((node) => ts.isFunctionDeclaration(node) && names.has(node.name?.text ?? ""));
   let active = true;
   let failed = false;
+  let tenantReads = 0;
   const tenant = { id: 7, isActive: true, isAdmin: false, replitUserId: "test-user" };
   const tenants = { id: "id", isActive: "isActive", replitUserId: "replitUserId" };
   const apiKeys = { keyHash: "keyHash", isRevoked: "isRevoked", id: "keyId" };
@@ -21,6 +23,7 @@ function harness() {
   const db = {
     select: () => ({ from: (table: unknown) => ({ where: async () => {
       if (failed) throw new Error("synthetic DB outage");
+      if (table === tenants) tenantReads++;
       return table === tenants ? [{ ...tenant, isActive: active }] : [{ id: 3, tenantId: 7, scopes: ["read"] }];
     } }) }),
     update: () => ({ set: () => ({ where: () => ({ execute: async () => undefined }) }) }),
@@ -28,6 +31,8 @@ function harness() {
   const sandbox = {
     exports: {}, db, tenants, apiKeys, crypto, ADMIN_TENANT_ID: 1,
     tenantCacheByReplitUser: cache, agentIdEnabled: () => false,
+    ownerOnlyAccess: () => ownerOnlyAccess({ APP_ACCESS_MODE: privateMode ? "owner-only" : "multi-tenant" }),
+    tenantAccessAllowed: (id: unknown) => tenantAccessAllowed(id, privateMode),
     eq: (...args: unknown[]) => args, and: (...args: unknown[]) => args,
     PUBLIC_EXACT_PATHS: new Set(), PUBLIC_PATH_PREFIXES: ["/api/public/"],
     PUBLIC_CHAT_OWNER_SUBPATHS: new Set(),
@@ -41,6 +46,7 @@ function harness() {
   return {
     auth: sandbox.exports as { validate: (key: string, req: Record<string, unknown>) => Promise<boolean>; resolve: (sub: string) => Promise<number>; isPublic: (path: string) => boolean },
     disable: () => { active = false; }, outage: () => { failed = true; }, clear: () => cache.clear(),
+    tenantReads: () => tenantReads,
   };
 }
 
@@ -53,6 +59,14 @@ test("API keys stop authenticating immediately when their tenant is disabled", a
   assert.equal(req.tenantId, undefined);
   h.outage();
   assert.equal(await h.auth.validate("vc_test", {}), false);
+});
+
+test("private mode rejects a non-owner API key before reading its tenant", async () => {
+  const h = harness(true);
+  const req: Record<string, unknown> = {};
+  assert.equal(await h.auth.validate("vc_test", req), false);
+  assert.equal(req.tenantId, undefined);
+  assert.equal(h.tenantReads(), 0);
 });
 
 test("cached and uncached identity mappings reject disabled tenants", async () => {

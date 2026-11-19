@@ -67,7 +67,7 @@ test("timed-out waiting work is removed without releasing the active conversatio
 
 test("durable claims prefer owner jobs without rewriting tenant identity or removing lease locks", () => {
   const source = fs.readFileSync("server/job-queue.ts", "utf8");
-  assert.match(source, /ORDER BY CASE WHEN tenant_id = \$\{ADMIN_TENANT_ID\} THEN 0 ELSE 1 END,\s*next_run_at ASC, id ASC/);
+  assert.match(source, /ORDER BY CASE WHEN tenant_id = \$\{ADMIN_TENANT_ID\} THEN 0 ELSE 1 END,\s*CASE WHEN tenant_id = \$\{ADMIN_TENANT_ID\}\s*AND kind IN \('legion_runbook_compile','surface_runbook_rule'\)\s*AND payload->>'priority'='daytime' THEN 0 ELSE 1 END,\s*next_run_at ASC, id ASC/);
   assert.match(source, /FOR UPDATE SKIP LOCKED/);
   assert.doesNotMatch(source, /SET\s+tenant_id\s*=/i);
 });

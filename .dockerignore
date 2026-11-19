@@ -11,7 +11,13 @@ dist
 .replit
 replit.nix
 attached_assets
-.agents
+# Build-time inputs for stageLegionRunbooks only. Descendant exclusions (rather
+# than a bare parent exclusion) let Docker traverse for these exact exceptions.
+# Memory, user profiles, other skills and sibling runbook files stay excluded.
+.agents/**
+!.agents/skills/tdd/SKILL.md
+!.agents/skills/zoom-out/SKILL.md
+!.agents/skills/module-girth-guard/SKILL.md
 .config
 .upm
 uploads/*

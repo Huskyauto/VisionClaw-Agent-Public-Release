@@ -15,7 +15,7 @@ test("Surface gets a direct question and returns one exact server-read instructi
       assert.ok(work.messages.reduce((n, m) => n + m.content.length, 0) <= 2400);
       assert.doesNotMatch(work.messages[1].content, /Other text/);
       work.validateContent!('{"lineStart":2}');
-      return { content: '{"lineStart":2}', model: "surface-local:qwen2.5-7b-instruct-qnn-npu:3", latencyMs: 1 };
+      return { content: '{"lineStart":2}', model: "surface-local:qwen2.5-7b-instruct-generic-gpu:4", latencyMs: 1 };
     },
     hosted: async () => { throw Error("must not spend"); },
     hostedEnabled: () => false,
@@ -32,7 +32,7 @@ test("extra references, metadata, unrelated text and malformed answers are not r
     '{"lineStart":3}', '{"lineStart":999}', "not json"]) {
     const compile = createSimpleRuleCompiler({
       read: async () => ({ text: "---\nWatch the test fail before implementation.\nUnrelated source text.", sha256: "a".repeat(64) }),
-      local: async () => ({ content, model: "surface-local:qwen2.5-7b-instruct-qnn-npu:3", latencyMs: 1 }),
+      local: async () => ({ content, model: "surface-local:qwen2.5-7b-instruct-generic-gpu:4", latencyMs: 1 }),
       hosted: async () => { throw Error("must not spend"); }, hostedEnabled: () => false, assertActive: () => {},
     });
     await assert.rejects(compile(".agents/skills/tdd/SKILL.md"));

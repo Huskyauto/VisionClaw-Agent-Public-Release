@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { readFileSync, mkdtempSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, copyFileSync, rmSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { minimatch } from "minimatch";
 import { build } from "esbuild";
+import { LEGION_RUNBOOKS } from "../server/legion/runbook-source";
+import { stageLegionRunbooks } from "../scripts/stage-legion-binaries";
 
 // Evaluate ordered Docker patterns against a file and its parent directories.
 // These cases exercise the docs allowlist, not Git's different ignore rules.
@@ -47,6 +49,41 @@ test("Docker context bundles the actual prepublication notice without exposing o
       logLevel: "silent",
     });
   } finally {
+    rmSync(stage, { recursive: true, force: true });
+  }
+});
+
+test("Docker context stages exactly the three screened Legion runbooks, not private agent state", async () => {
+  const required = new Set<string>(LEGION_RUNBOOKS);
+  function checkTree(directory: string) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) checkTree(path);
+      else assert.equal(included(path), required.has(path), `Docker agent-file allowlist drift: ${path}`);
+    }
+  }
+  checkTree(".agents/skills");
+  for (const path of [".agents/memory/MEMORY.md", ".agents/users/owner/profile.md",
+    ".agents/skills/tdd/private.json", ".agents/skills/zoom-out/references/private.md",
+    ".agents/skills/module-girth-guard/SKILL.md.bak"]) {
+    assert.equal(included(path), false, `private or unapproved agent data must remain excluded: ${path}`);
+  }
+  const original = process.cwd();
+  const stage = mkdtempSync(join(tmpdir(), "legion-context-"));
+  try {
+    for (const path of LEGION_RUNBOOKS) {
+      assert.equal(included(path), true, `required runbook missing from Docker context: ${path}`);
+      mkdirSync(dirname(join(stage, path)), { recursive: true });
+      copyFileSync(path, join(stage, path));
+    }
+    process.chdir(stage);
+    await stageLegionRunbooks();
+    for (const [index, path] of LEGION_RUNBOOKS.entries()) {
+      assert.equal(readFileSync(join(stage, "dist/legion/runbooks", `${index}.md`), "utf8"),
+        readFileSync(join(original, path), "utf8"));
+    }
+  } finally {
+    process.chdir(original);
     rmSync(stage, { recursive: true, force: true });
   }
 });

@@ -153,7 +153,8 @@ export interface VerifiedKey {
 /**
  * Verify a presented bearer token. Returns the tenantId + scopes if valid.
  * Returns null for any failure (invalid format, unknown prefix, hash mismatch,
- * revoked). Constant-time hash comparison; touches last_used_at best-effort.
+ * revoked, inactive owner, or unavailable authorization store).
+ * Constant-time hash comparison; touches last_used_at best-effort.
  */
 export async function verifyApiKey(presented: string): Promise<VerifiedKey | null> {
   if (typeof presented !== "string") return null;
@@ -165,9 +166,10 @@ export async function verifyApiKey(presented: string): Promise<VerifiedKey | nul
 
   try {
     const r = await db.execute(sql`
-      SELECT id, tenant_id, key_hash, scopes, revoked_at
-        FROM mcp_api_keys
-       WHERE key_prefix = ${prefix}
+      SELECT k.id, k.tenant_id, k.key_hash, k.scopes, k.revoked_at
+        FROM mcp_api_keys k
+        JOIN tenants t ON t.id = k.tenant_id AND t.is_active IS TRUE
+       WHERE k.key_prefix = ${prefix}
        LIMIT 1
     `);
     const row = ((r as any).rows || r)[0];

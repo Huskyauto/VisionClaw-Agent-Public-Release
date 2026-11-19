@@ -39,6 +39,7 @@ const AdminToolsPage = lazy(() => import("@/pages/admin-tools"));
 const TypeSafeJevPage = lazy(() => import("@/pages/typesafe-jev"));
 const WebsiteAuditPage = lazy(() => import("@/pages/website-audit"));
 const AdminPilotToolsPage = lazy(() => import("@/pages/admin-pilot-tools"));
+const AdminFinishedNotBilledPage = lazy(() => import("@/pages/admin-finished-not-billed"));
 const ExecutiveReportPage = lazy(() => import("@/pages/executive-report"));
 const SmartLeadsPage = lazy(() => import("@/pages/smart-leads"));
 const AdminResearchReportPage = lazy(() => import("@/pages/admin-research-report"));
@@ -242,6 +243,7 @@ function PageRouter() {
         {isAdmin && <Route path="/admin/tools/typesafe-jev" component={TypeSafeJevPage} />}
         {isAdmin && <Route path="/admin/website-audit" component={WebsiteAuditPage} />}
         {isPlatformAdmin && <Route path="/admin/pilot-tools" component={AdminPilotToolsPage} />}
+        {isPlatformAdmin && config.finishedNotBilledEnabled && <Route path="/admin/finished-not-billed" component={AdminFinishedNotBilledPage} />}
         {isAdmin && <Route path="/admin/executive-report" component={ExecutiveReportPage} />}
         {isAdmin && <Route path="/admin/smart-leads" component={SmartLeadsPage} />}
         {isAdmin && <Route path="/admin/research-report" component={AdminResearchReportPage} />}

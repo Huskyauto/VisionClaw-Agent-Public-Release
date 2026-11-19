@@ -22,6 +22,10 @@ import { observeFinalOutput } from "./lib/evidence-bound-runtime";
 import type { EvidenceObservation, EvidenceSource } from "./lib/evidence-bound-observation";
 import type { SecondOpinionResult } from "./second-opinion";
 import { incomeClaudeApiEnabled, reportedJuryUsage, withIncomeClaudeApiGrant, type IncomeClaudeRoute, type IncomeClaudeBudget } from "./lib/income-claude-route";
+import {
+  assertOwnerFrontierDispatch, claimOwnerFrontierPanel, FRONTIER_FABLE, FRONTIER_SOL,
+  isOwnerFrontierSeat, ownerFrontierSignal, type FrontierReadiness,
+} from "./lib/owner-frontier-refresh";
 
 // The default frontier quorum deliberately uses three separate account and
 // transport identities. A model name alone is insufficient here: generic
@@ -666,6 +670,10 @@ export async function executeBoundedReportSeat(
 }
 
 export async function callProposer(specOrId: string | ProposerCallSpec, question: string, tenantId: number, meteredOverride = false): Promise<ProposerResult> {
+  return dispatchProposer(specOrId, question, tenantId, meteredOverride, false);
+}
+
+async function dispatchProposer(specOrId: string | ProposerCallSpec, question: string, tenantId: number, meteredOverride: boolean, ownerFrontierPrimary: boolean): Promise<ProposerResult> {
   const spec: ProposerCallSpec = typeof specOrId === "string" ? { modelId: specOrId } : specOrId;
   meteredOverride = ownerJuryMeteredOverrideAllowed(tenantId, meteredOverride, spec) ||
     meteredOverride && tenantId === ADMIN_TENANT_ID &&
@@ -680,7 +688,19 @@ export async function callProposer(specOrId: string | ProposerCallSpec, question
   let usageReported = false, usagePersisted = false;
   try {
     const lane = spec.providerLane;
-    if (meteredOverride && ownerJuryDirectApiEnabled() &&
+    if (ownerFrontierPrimary) {
+      assertOwnerFrontierDispatch(tenantId, modelId, lane);
+      // The old jury ceiling is in addition to the durable provider reservation.
+      const input = Buffer.byteLength((spec.systemPrompt || DEFAULT_PROPOSER_SYSTEM_PROMPT) + question);
+      const maximumUsd = estimateCostUsd(modelId, input * 2 + 16_384, proposerTokenBudget(spec),
+        0, modelId === FRONTIER_SOL ? input * 2 + 16_384 : 0);
+      const budget = ownerJuryCeiling();
+      if (!Number.isFinite(budget.ceiling) || maximumUsd + budget.spent > budget.ceiling) {
+        throw new Error("Owner frontier jury daily ceiling exceeded");
+      }
+      noteOwnerJurySpend(maximumUsd);
+    }
+    if (!ownerFrontierPrimary && meteredOverride && ownerJuryDirectApiEnabled() &&
         (lane === "openai-api" || lane === "anthropic-api") &&
         !hasOwnerJuryApiGrant(tenantId, lane, modelId) &&
         !(lane === "openai-api" ? hasIncomeOpenaiApiGrant(tenantId, modelId) : hasIncomeClaudeApiGrant(tenantId, modelId))) {
@@ -694,7 +714,10 @@ export async function callProposer(specOrId: string | ProposerCallSpec, question
             spec.beforeDispatch?.();
           } }, question, tenantId, true));
     }
-    const resolvingClient = getClientForModel(modelId, tenantId, {
+    const resolvingClient = getClientForModel(modelId, tenantId, ownerFrontierPrimary ? {
+      meteredOverride: true, explicitOwnerSelection: true, platformAdminVerified: true,
+      beforeRestrictedDispatch: () => assertOwnerFrontierDispatch(tenantId, modelId, lane),
+    } : {
       juryLane: shouldUseJuryProviderMarker(spec.providerLane),
       meteredOverride,
       providerLane: spec.providerLane,
@@ -703,6 +726,7 @@ export async function callProposer(specOrId: string | ProposerCallSpec, question
       ? withTimeout(resolvingClient, spec.clientTimeoutMs, `client resolution ${modelId}`)
       : resolvingClient);
     const abort = new AbortController();
+    if (ownerFrontierPrimary) assertOwnerFrontierDispatch(tenantId, modelId, lane);
     spec.signal?.throwIfAborted();
     await spec.beforeDispatch?.();
     spec.signal?.throwIfAborted();
@@ -717,13 +741,13 @@ export async function callProposer(specOrId: string | ProposerCallSpec, question
           { role: "user", content: question },
         ],
       }, { signal: spec.signal ? AbortSignal.any([abort.signal, spec.signal]) : abort.signal, ...(spec.noRetry ? { maxRetries: 0 } : {}),
+        ...(ownerFrontierPrimary && modelId === FRONTIER_FABLE ? { timeout: 180_000 } : {}),
         ...(spec.providerLane === "profundo" && spec.profundoRetry === true ? { profundoRetry: true } : {}),
       }) as Promise<any>,
       spec.timeoutMs ?? proposerTimeoutForLane(spec.providerLane),
       `proposer ${modelId}${spec.label ? `[${spec.label}]` : ""}`,
       () => abort.abort(),
     );
-    await spec.checkpointResponse?.(resp);
     reportedModel = (await import("./lib/jury-evidence")).responseModelIdentity(resp);
     const answer = (resp?.choices?.[0]?.message?.content || "").trim();
     const usage = resp?.usage;
@@ -732,6 +756,11 @@ export async function callProposer(specOrId: string | ProposerCallSpec, question
     reportedTokensIn = observed.input;
     reportedTokensOut = observed.output;
     usageReported = reportedTokensIn !== undefined || reportedTokensOut !== undefined;
+    if (ownerFrontierPrimary && (reportedModel !== modelId || !usageReported || !usagePersisted ||
+        resp?.choices?.[0]?.finish_reason !== "stop")) {
+      throw new Error("Owner frontier seat returned no complete, exact and accounted ballot");
+    }
+    await spec.checkpointResponse?.(resp);
     tokensIn = reportedTokensIn ??
       estimatePromptInputTokens(spec.systemPrompt || DEFAULT_PROPOSER_SYSTEM_PROMPT, question);
     tokensOut = reportedTokensOut ?? Math.ceil(answer.length / 4);
@@ -1028,7 +1057,7 @@ function getFrontierLaneSpecs(): FrontierLaneSpec[] {
 // R125+13.18 — resolve a pool to full ProposerCallSpecs. For polarity, each
 // spec carries its tradition system prompt + label. For other pools, the spec
 // is bare (modelId only) so behavior is identical to pre-R125+13.18.
-export function resolveProposerSpecs(pool: ProposerPool | undefined, explicitIds: string[] | undefined, tenantId?: number): ProposerCallSpec[] {
+export function resolveProposerSpecs(pool: ProposerPool | undefined, explicitIds: string[] | undefined, tenantId?: number, refreshed?: FrontierReadiness): ProposerCallSpec[] {
   if (explicitIds && explicitIds.length > 0) {
     // R125+52.33 — dedupe (case-insensitive, order-preserving) + drop blanks
     // BEFORE the specs reach the quorum/κ computation. Duplicate ids would
@@ -1072,6 +1101,15 @@ export function resolveProposerSpecs(pool: ProposerPool | undefined, explicitIds
     if (tenantId === ADMIN_TENANT_ID && process.env.PROFUNDO_ENABLED === "1") {
       return ["gpt-5.6-sol", "claude-sonnet-5", "moonshotai/kimi-k3"]
         .map(modelId => ({ modelId, providerLane: "profundo" as const }));
+    }
+    if (tenantId === ADMIN_TENANT_ID && (refreshed?.sol || refreshed?.fable)) {
+      return DEFAULT_FRONTIER_LANES.map(spec => {
+        if (spec.providerLane === "openai-api" && refreshed.sol)
+          return { modelId: FRONTIER_SOL, providerLane: "openai-api", maxTokens: 8192, timeoutMs: 120_000, clientTimeoutMs: 6000, noRetry: true };
+        if (spec.providerLane === "anthropic-api" && refreshed.fable)
+          return { modelId: FRONTIER_FABLE, providerLane: "anthropic-api", maxTokens: 16_384, timeoutMs: 120_000, clientTimeoutMs: 6000, noRetry: true };
+        return { ...spec };
+      });
     }
     return getFrontierLaneSpecs().map((spec) => ({ ...spec }));
   }
@@ -1374,7 +1412,10 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
   // cheap / mixed / polarity) > default (FRONTIER_PROPOSERS, pre-R125+1).
   const poolChoice: ProposerPool | undefined = opts.pool;
   const explicitProposerIds = !!(opts.proposerIds && opts.proposerIds.length > 0);
-  const baseSpecs = resolveProposerSpecs(poolChoice, opts.proposerIds, opts.tenantId).slice(0, MAX_PROPOSERS);
+  const refreshed = claimOwnerFrontierPanel(opts.tenantId, opts.meteredOverride === true &&
+    !explicitProposerIds && !opts.aggregatorId && !opts.forbidMeteredAggregatorFallback &&
+    (poolChoice === undefined || poolChoice === "frontier"));
+  const baseSpecs = resolveProposerSpecs(poolChoice, opts.proposerIds, opts.tenantId, refreshed).slice(0, MAX_PROPOSERS);
   const mode = inferMode(question, opts.mode);
   // R125+13.18 — KisMATH rebalancing operates on model IDs (training regime).
   // For the polarity pool, the tradition-prompt ↔ model pairing IS the feature
@@ -1408,9 +1449,8 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
   let meteredRecoveryActive = false;
   let ceilingForcedFree = false;
   let reservedJuryUsd = 0;
-  // The default roster is entirely flat/subscription-backed. Do not reserve a
-  // fictional metered budget merely because the owner supplied an override;
-  // only a caller-selected generic proposer or aggregator can spend it.
+  // The refreshed seats have separate per-call reservations. Keep the legacy
+  // run-wide reservation for any other paid proposer or explicit synthesizer.
   const hasPotentialMeteredSeat = proposerSpecs.some((spec) =>
     !spec.providerLane || spec.providerLane === "openai-api" || spec.providerLane === "anthropic-api" || spec.providerLane === "zai" || spec.providerLane === "openrouter",
   ) || !!opts.aggregatorId;
@@ -1421,7 +1461,8 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
   const ownerOverride = opts.meteredOverride === true && opts.tenantId === ADMIN_TENANT_ID;
   const ownerMeteredRecoveryEligible = ownerOverride && ownerJuryMeteredEnabled();
   const hasAuthorizedMeteredSeat = proposerSpecs.some(spec =>
-    ownerJuryMeteredOverrideAllowed(opts.tenantId, true, spec)) ||
+    !(refreshed && isOwnerFrontierSeat(spec.modelId, spec.providerLane)) &&
+      ownerJuryMeteredOverrideAllowed(opts.tenantId, true, spec)) ||
     !!opts.aggregatorId && ownerJuryMeteredOverrideAllowed(opts.tenantId, true, pinJuryModel({ modelId: opts.aggregatorId }));
   if (ownerOverride && hasAuthorizedMeteredSeat && hasPotentialMeteredSeat) {
     const ceiling = ownerJuryCeiling();
@@ -1488,7 +1529,8 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
   } = { divergence: null, ambiguous: false };
   if (opts.restateGate) {
     try {
-      const r = await runRestateGate(proposerSpecs, question, opts.tenantId, useMetered);
+      const r = await runRestateGate(refreshed ? resolveProposerSpecs(poolChoice, undefined, opts.tenantId) : proposerSpecs,
+        question, opts.tenantId, useMetered);
       restateInfo = r;
       if (r.ambiguous) {
         console.log(`[moa] tenant=${opts.tenantId} restate-gate AMBIGUOUS — divergence=${r.divergence?.toFixed(3)} (threshold ${RESTATE_AMBIGUITY_THRESHOLD})`);
@@ -1505,7 +1547,9 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
     // a verdict. Investigated seats have one bounded call, never a paid retry.
     const callSpec = evidence ? { ...spec, maxTokens: spec.maxTokens ?? 8192,
       timeoutMs: spec.timeoutMs ?? 90_000 } : spec;
-    const result = await callProposer(callSpec, question + (evidence ? juryEvidencePrompt(evidence, opts.evidenceFormat) : ""), opts.tenantId, useMetered);
+    const premium = !!refreshed && isOwnerFrontierSeat(callSpec.modelId, callSpec.providerLane);
+    const result = await dispatchProposer(premium ? { ...callSpec, signal: ownerFrontierSignal() } : callSpec,
+      question + (evidence ? juryEvidencePrompt(evidence, opts.evidenceFormat) : ""), opts.tenantId, useMetered, premium);
     return { ...result, evidence };
   }));
   let proposers: ProposerResult[] = settled.map((s, i) =>
@@ -1539,6 +1583,8 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
     proposers = await recoverSubscriptionSeats({
       specs: proposerSpecs, results: proposers, allowPaid: allowPaidSubscriptionBackup,
       recoverPinnedSeats: defaultSeatRecovery,
+      avoidPaidLanes: refreshed ? new Set(proposerSpecs.filter(s =>
+        isOwnerFrontierSeat(s.modelId, s.providerLane)).map(s => s.providerLane)) : undefined,
       eligible: backupEligible,
       call: async (spec, seatIndex) => {
         // An investigative replacement must own fresh evidence; it cannot adopt
@@ -1891,6 +1937,7 @@ export async function executeMoA(opts: MoAOptions): Promise<MoAResult> {
     try {
       let runCost = 0;
       for (const p of proposers) {
+        if (refreshed && isOwnerFrontierSeat(p.modelId, p.providerLane)) continue; // Already reserved above.
         if (p.tokensIn || p.tokensOut) {
           runCost += juryLaneMarginalCostUsd(p.providerLane) ?? estimateCostUsd(p.modelId, p.tokensIn || 0, p.tokensOut || 0);
         }

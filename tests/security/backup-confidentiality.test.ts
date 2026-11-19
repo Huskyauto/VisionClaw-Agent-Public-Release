@@ -6,6 +6,28 @@ import vm from "node:vm";
 import ts from "typescript";
 import { transformSync } from "esbuild";
 
+test("backup access accepts inherited lower access belonging to the same direct owner", async () => {
+  const owner = { type: "user", role: "owner", deleted: false,
+    permissionDetails: [
+      { inherited: true, permissionType: "file", role: "writer" },
+      { inherited: false, permissionType: "file", role: "owner" },
+    ] };
+  await assert.doesNotReject(assertOwnerOnlyDriveAccess("fixture", async () => [owner]));
+  for (const permissions of [
+    [owner, { type: "user", role: "writer" }],
+    [owner, { type: "anyone", role: "reader" }],
+    [{ ...owner, permissionDetails: [null] }],
+    [{ ...owner, permissionDetails: [
+      { inherited: true, role: "writer" }, { inherited: true, role: "owner" },
+    ] }],
+    [{ ...owner, permissionDetails: [
+      { inherited: true, role: "organizer" }, { inherited: false, role: "owner" },
+    ] }],
+  ]) {
+    await assert.rejects(assertOwnerOnlyDriveAccess("fixture", async () => permissions), /owner-only/);
+  }
+});
+
 test("backup access rejects effective public, group, domain and inherited writer grants", async () => {
   const owner = { type: "user", role: "owner" };
   for (const permissions of [
@@ -24,7 +46,7 @@ test("backup access rejects effective public, group, domain and inherited writer
   }), /permission transport unavailable/);
 });
 
-function loadUploadFixture(options: { parentUnsafe?: boolean; fileUnsafe?: boolean; permissionFailure?: boolean; paginatedUnsafe?: boolean } = {}) {
+function loadUploadFixture(options: { parentUnsafe?: boolean; fileUnsafe?: boolean; permissionFailure?: boolean; paginatedUnsafe?: boolean; ownerInheritedAccess?: boolean; folderListing?: unknown } = {}) {
   const source = readFileSync("server/google-drive.ts", "utf8");
   const ast = ts.createSourceFile("drive.ts", source, ts.ScriptTarget.Latest, true);
   const names = new Set(["driveJsonStrict", "listAllDrivePermissions", "verifyConfidentialBackupAccess",
@@ -33,7 +55,11 @@ function loadUploadFixture(options: { parentUnsafe?: boolean; fileUnsafe?: boole
     ts.isFunctionDeclaration(node) && !!node.name && names.has(node.name.text)).map(node => node.getText(ast)).join("\n");
   let uploads = 0;
   const requests: string[] = [];
-  const owner = { type: "user", role: "owner" };
+  const owner = { type: "user", role: "owner",
+    ...(options.ownerInheritedAccess ? { permissionDetails: [
+      { inherited: true, permissionType: "file", role: "writer" },
+      { inherited: false, permissionType: "file", role: "owner" },
+    ] } : {}) };
   const driveRequest = async (endpoint: string) => {
     requests.push(endpoint);
     if (endpoint.includes("/permissions?")) {
@@ -46,7 +72,7 @@ function loadUploadFixture(options: { parentUnsafe?: boolean; fileUnsafe?: boole
         ? [owner, { type: "anyone", role: "writer", permissionDetails: [{ inherited: true, role: "writer" }] }]
         : [owner] });
     }
-    return Response.json({ files: [{ id: "fixture-folder" }] });
+    return Response.json(options.folderListing ?? { files: [{ id: "fixture-folder" }] });
   };
   const module = { exports: {} as any };
   vm.runInNewContext(transformSync(functions, { loader: "ts", format: "cjs" }).code, {
@@ -66,8 +92,31 @@ function loadUploadFixture(options: { parentUnsafe?: boolean; fileUnsafe?: boole
     warn: () => {},
     log: () => {},
   });
-  return { upload: module.exports.uploadToDrive, requests, get uploads() { return uploads; } };
+  return { upload: module.exports.uploadToDrive, folder: module.exports.ensureConfidentialBackupFolder,
+    requests, get uploads() { return uploads; } };
 }
+
+test("existing backup folder resolves read-only with the observed direct-owner permission shape", async () => {
+  const f = loadUploadFixture({ ownerInheritedAccess: true });
+  assert.equal(await f.folder("VisionClaw Backups"), "fixture-folder");
+  assert.equal(f.requests.length, 2);
+  assert.ok(f.requests[0].startsWith("/drive/v3/files?"));
+  assert.ok(f.requests[1].includes("/fixture-folder/permissions?"));
+  assert.equal(f.uploads, 0);
+});
+
+test("backup folder ambiguity and incomplete listings still fail before permissions or upload", async () => {
+  for (const folderListing of [
+    { files: [{ id: "old" }, { id: "current" }] },
+    { files: [{ id: "current" }], nextPageToken: "more" },
+    {},
+  ]) {
+    const f = loadUploadFixture({ folderListing });
+    await assert.rejects(f.folder("VisionClaw Backups"), /ambiguous or incomplete/);
+    assert.equal(f.requests.length, 1);
+    assert.equal(f.uploads, 0);
+  }
+});
 
 test("actual backup upload refuses unsafe or unreadable inherited permissions before sending bytes", async () => {
   for (const options of [{ parentUnsafe: true }, { permissionFailure: true }, { paginatedUnsafe: true }]) {

@@ -1,3 +1,5 @@
+import { GPT_62_TIMEOUT_MS, isGpt62Model } from "./gpt-6-2";
+
 /**
  * Bounded stream-creation guard.
  *
@@ -38,6 +40,7 @@ export class StreamCreateTimeoutError extends Error {
  * Free transports retain the existing bounded recovery behavior.
  */
 export function paidStreamRecoveryPolicy(modelId: string, defaultTimeoutMs: number) {
+  if (isGpt62Model(modelId)) return { creationTimeoutMs: GPT_62_TIMEOUT_MS + 5_000, allowRecovery: false };
   if (modelId === "gemini-4-carbon") return { creationTimeoutMs: 185_000, allowRecovery: false };
   const paid = modelId === "claude-fable-5-2" || modelId.startsWith("cheaperinference/") || modelId.startsWith("mammouth/") ||
     modelId.startsWith("meta-direct/") || /^muse-(spark-1\.3(?:-contributor)?|wonder-1\.0)$/.test(modelId);

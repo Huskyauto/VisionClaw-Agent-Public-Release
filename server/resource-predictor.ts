@@ -41,6 +41,8 @@ export const MODEL_COST_PER_MILLION: Record<string, { input: number; output: num
   "gpt-5.6-sol": { input: 2.00, output: 10.00 },
   "gpt-6-luna": { input: 0.10, output: 0.50 },
   "gpt-6-sol": { input: 2.00, output: 10.00 },
+  "gpt-6.2-sol": { input: 2.00, output: 10.00 },
+  "gpt-6.2-astra": { input: 8.00, output: 40.00 },
   "gpt-4.1": { input: 2.00, output: 8.00 },
   // Task 72 — gpt-5 upgrade; live OpenAI rate $1.25/$10 per M. Keep in sync with
   // cost-ledger + insights-engine (tests/cost/model-pricing-drift.test.ts).

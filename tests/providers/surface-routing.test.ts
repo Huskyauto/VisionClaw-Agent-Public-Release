@@ -57,7 +57,7 @@ test("Surface is used only after Lenovo is offline, with Foundry-compatible back
     surfaceHealth: async () => { calls.push("surface-health"); },
     surfaceGenerate: async value => {
       calls.push("surface-generate");
-      assert.deepEqual(value, { model: "qwen2.5-7b-instruct-qnn-npu:3", stream: true,
+      assert.deepEqual(value, { model: "qwen2.5-7b-instruct-generic-gpu:4", stream: true,
         temperature: 0, messages: body.messages });
       return { model: value.model };
     },

@@ -1,7 +1,7 @@
 import facts from "../../../docs/release-facts.json";
 
-export const CURRENT_SOURCE_RELEASE = "R137.3+sec2";
-export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 17, 2026 legacy credential revocation checks, offline logout cleanup, Skills navigation, private-mode website guidance and current repository documentation.`;
+export const CURRENT_SOURCE_RELEASE = "R137.4+sec";
+export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 19, 2026 source update: HVAC billing review, source-backed working context, owner model options and operational reliability.`;
 export const DEVELOPMENT_PLATFORM_SUMMARY =
   `${facts.metrics.registeredTools} total registered tools; ` +
   `${facts.metrics.declaredTables} declared / ${facts.metrics.liveTables} live development tables; ` +
@@ -12,6 +12,10 @@ export const DEVELOPMENT_PLATFORM_SUMMARY =
 export const CURRENT_PLATFORM_DESCRIPTION =
   `${SOURCE_UPDATE_SUMMARY} ${DEVELOPMENT_PLATFORM_SUMMARY} ` +
   "Scoped evidence is not whole-platform certification. " +
+  "Modern MCP key authentication also requires the owning account to remain active. " +
+  "The Finished but Not Billed workbench compares coded HVAC records in the browser for office review; it does not issue invoices or collect payment. " +
+  "Working context recalls exact, authorized excerpts from saved conversations, not new instructions or approvals. " +
+  "Explicit owner model options and separate, opt-in jury routing retain the existing budget and authorization rules. " +
   "The optional legacy MCP path now checks current account activity for cached and global owner keys and refuses authorization-store failures. " +
   "Failed remote logout no longer retains local identity or private query data; remote session revocation still requires server confirmation. " +
   "Authenticated Skills navigation reaches the workspace; private-mode public pages do not offer inaccessible contact or purchase forms. " +

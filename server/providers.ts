@@ -36,6 +36,7 @@ import { META_BASE_URL, META_MODEL_ID, metaReady, metaPrimaryAllowed, metaUsageC
 import { createMetaClient } from "./lib/meta-client";
 import { FABLE_52_MODEL, createFable52Completion, fable52Timeout } from "./lib/fable-5-2";
 import { CARBON_MODEL, CARBON_TIMEOUT_MS, carbonReady, createCarbonCompletion } from "./lib/gemini-carbon";
+import { GPT_62_TIMEOUT_MS, createGpt62Completion, gpt62Ready, isGpt62Model } from "./lib/gpt-6-2";
 // R94 SECURITY — static import (tsx/ESM does NOT define `require`; the previous
 // dynamic require() silently threw and made every cost lookup fall back to ADMIN).
 import { currentTenantId } from "./lib/tenant-context";
@@ -1675,6 +1676,8 @@ export async function getClientForModel(
     meteredOverride?: boolean;
     explicitOwnerSelection?: boolean;
     platformAdminVerified?: boolean;
+    /** Host-only extra deny gate for a restricted route. Never grants access. */
+    beforeRestrictedDispatch?: () => void;
     providerLane?: ProviderLane;
     // Per-call deny floor for an unsupported Replit model. Applied after a
     // pinned flat lane but before any OAuth/API-key fallback, so a caller can
@@ -1683,6 +1686,39 @@ export async function getClientForModel(
     allowMeteredFallback?: boolean;
   },
 ): Promise<{ client: OpenAI; actualModelId: string }> {
+  if (isGpt62Model(modelId)) {
+    const admin = (await import("./auth")).ADMIN_TENANT_ID;
+    if (tenantId !== admin || options?.explicitOwnerSelection !== true ||
+        options?.platformAdminVerified !== true || options?.meteredOverride !== true ||
+        options?.providerLane || options?.costExemptLane || options?.forbidMeteredFallback ||
+        options?.allowMeteredFallback === false ||
+        (currentTenantId() !== null && currentTenantId() !== tenantId)) {
+      throw new Error("GPT-6.2 requires explicit owner selection and paid access");
+    }
+    if (!gpt62Ready()) throw new Error("GPT-6.2 is disabled or its direct OpenAI credential is unavailable");
+    const [budget, ledger] = await Promise.all([
+      import("./agentic/aggregate-ai-spend-budget"), import("./agentic/cost-ledger"),
+    ]);
+    const sdk = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY!.trim(), baseURL: "https://api.openai.com/v1",
+      maxRetries: 0, timeout: GPT_62_TIMEOUT_MS,
+    });
+    const create = createGpt62Completion(modelId, tenantId, {
+      checkAccess: () => {
+        if (currentTenantId() !== tenantId || !gpt62Ready()) {
+          throw new Error("GPT-6.2 requires the current owner tenant and enabled direct OpenAI access");
+        }
+        options.beforeRestrictedDispatch?.();
+      },
+      create: sdk.chat.completions.create.bind(sdk.chat.completions),
+      reserve: budget.reserveAggregateAiSpend,
+      settle: budget.settleAggregateAiSpend,
+      observeOverrun: budget.retainAggregateAiObservedOverrun,
+      estimate: ledger.estimateCostUsd,
+      record: ledger.recordCost,
+    });
+    return { client: { chat: { completions: { create } } } as unknown as OpenAI, actualModelId: modelId };
+  }
   if (modelId === CARBON_MODEL) {
     const admin = (await import("./auth")).ADMIN_TENANT_ID;
     if (tenantId !== admin || options?.explicitOwnerSelection !== true
@@ -1729,6 +1765,7 @@ export async function getClientForModel(
       if (process.env.FABLE_52_DISABLED === "1" || currentTenantId() !== tenantId || !isProviderHealthy("anthropic")) {
         throw new Error("Fable 5.2 requires the current owner tenant and healthy Anthropic provider");
       }
+      options.beforeRestrictedDispatch?.();
     }, tenantId, async () => {
       const { reserveAggregateAiSpend, settleAggregateAiSpend } = await import("./agentic/aggregate-ai-spend-budget");
       return { reserve: reserveAggregateAiSpend, settle: settleAggregateAiSpend };
@@ -2689,9 +2726,13 @@ export async function getAvailableModelsForTenant(tenantId: number, isAdmin: boo
     } catch (_silentErr) { logSilentCatch("server/providers.ts", _silentErr); }
   }
 
+  const fable52Ready = tenantId === 1 && isAdmin && process.env.FABLE_52_DISABLED !== "1" &&
+    (userKeyProviders.has("anthropic") || !!process.env.ANTHROPIC_API_KEY?.startsWith("sk-ant-") ||
+      !!(await storage.getTenantProviderKey(tenantId, "anthropic"))?.api_key);
   const models = MODEL_REGISTRY.filter(
     (m) =>
-      enabledProviders.has(m.provider) &&
+      (isGpt62Model(m.id) ? tenantId === 1 && isAdmin && gpt62Ready() :
+        m.id === FABLE_52_MODEL ? fable52Ready : enabledProviders.has(m.provider)) &&
       (!["cheaperinference", "mammouth", "meta-direct"].includes(m.provider) || (tenantId === 1 && isAdmin)) &&
       !RETIRED_MODEL_IDS.has(m.id) &&
       !isSyntheticEvaluationModel(m.id) &&

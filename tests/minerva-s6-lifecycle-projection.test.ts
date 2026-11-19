@@ -3,6 +3,18 @@ import assert from "node:assert/strict";
 import { derivePlanLifecycle } from "../server/minerva-planner";
 import { readFileSync } from "node:fs";
 
+test("recent activity ages out old failures before limiting without deleting history", () => {
+  const source = readFileSync("server/minerva-planner.ts", "utf8");
+  const start = source.indexOf("const r: any = args.activity");
+  const end = source.indexOf(": args.status", start);
+  const activity = source.slice(start, end);
+  assert.match(activity, /AND \(status <> 'failed' OR updated_at >= NOW\(\) - INTERVAL '30 days'\)/);
+  assert.ok(activity.indexOf("INTERVAL '30 days'") < activity.indexOf("LIMIT ${limit}"));
+  assert.doesNotMatch(activity, /DELETE FROM|UPDATE plans/);
+  const history = source.slice(end, source.indexOf("const rows = r.rows", end));
+  assert.doesNotMatch(history, /INTERVAL '30 days'/);
+});
+
 const event = (type: string, extra: Record<string, unknown> = {}) => ({ type, ...extra });
 
 test("recovery blocked and ordinary failed repairs remain blocked with bounded reasons", () => {
@@ -90,7 +102,8 @@ test("dedup-suppressed rows are archived and not actionable", () => {
 
 test("activity query preserves tenant scope and puts unresolved originals first", () => {
   const source = readFileSync("server/minerva-planner.ts", "utf8");
-  const activity = source.slice(source.indexOf("args.activity"), source.indexOf("args.activity") + 1300);
+  const start = source.indexOf("const r: any = args.activity");
+  const activity = source.slice(start, source.indexOf(": args.status", start));
   assert.match(activity, /tenant_id = \$\{tenantId\}/);
   assert.match(activity, /status IN \('approved', 'executing', 'completed', 'failed', 'handoff_pending', 'publish_required'\)/);
   assert.match(activity, /WHEN status IN \('publish_required', 'handoff_pending', 'executing', 'approved'\) THEN 0/);

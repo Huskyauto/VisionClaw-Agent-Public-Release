@@ -207,8 +207,14 @@ test("global provider health denies ordinary tenants before importing or probing
   let checks = 0;
   const register = loadFunction("server/routes/auth-extra.ts", "registerAuthMonitoringRoutes", {
     requirePlatformAdmin: () => { checks++; return false; },
+    handleOwnerLogout: () => { throw Error("Logout must not run during route registration"); },
   });
-  await register({ get: (_path: string, ...callbacks: any[]) => handlers.push(callbacks.at(-1)) }, { authMiddleware: () => {} });
+  const posts: string[] = [];
+  await register({
+    get: (_path: string, ...callbacks: any[]) => handlers.push(callbacks.at(-1)),
+    post: (path: string) => posts.push(path),
+  }, { authMiddleware: () => {} });
+  assert.deepEqual(posts, ["/api/auth/logout"]);
   assert.equal(handlers.length, 2);
   for (const handler of handlers) {
     await assert.doesNotReject(() => handler({ tenantId: 2, query: { refresh: "true" } }, {}));

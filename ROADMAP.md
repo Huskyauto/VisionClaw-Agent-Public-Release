@@ -119,7 +119,7 @@ evidence required before deferred ideas become active work.
 
 ## Current platform totals
 
-**428 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 148 active capabilities · 202 declared / 283 live development tables · 905 platform indexes · 41 governance rules · 100 curated AI models in the core registry plus daily OpenRouter catalog discovery.** ([authoritative release facts](docs/release-facts.json), November 17 development snapshot). R137.3+sec2 includes the reviewed credential, navigation and private-mode website repairs, owner-only access preparation, bounded parallel local maintenance and the agent-ready website package. Demo Studio is documented in [its contract](docs/demo-studio.md); app publication and production readiness remain separate. The [prior review](docs/app-review-2026-11-14.md) retains its original evidence and limits.
+**428 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 149 active capabilities · 202 declared / 283 live development tables · 905 platform indexes · 41 governance rules · 102 curated AI models in the core registry plus daily OpenRouter catalog discovery.** ([authoritative release facts](docs/release-facts.json), November 19 development snapshot). R137.4+sec includes HVAC billing review, source-backed working context, explicit owner model choices and current-account MCP key verification. App publication and production readiness remain separate. The [current source review](docs/app-review-2026-11-19.md) records coverage and limits.
 
 Machine-readable source: [docs/release-facts.json](docs/release-facts.json).
 

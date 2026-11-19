@@ -15,10 +15,12 @@ try {
     await reclaimExpiredLeases(scope);
     assert.equal(queries.length, 3);
     for (const query of queries) {
-      if (scope === "all") assert.doesNotMatch(query, /AND kind (?:NOT )?IN/);
+      // Scope restricts eligibility, not ORDER BY's owner/daytime priority CASE.
+      const eligibility = query.split(/\bORDER BY\b/i)[0];
+      if (scope === "all") assert.doesNotMatch(eligibility, /AND kind (?:NOT )?IN/);
       else {
-        assert.match(query, scope === "only-verifier" ? /AND kind IN/ : /AND kind NOT IN/);
-        assert.match(query, /'research_proposal_verification', 'source_repair_verification'/);
+        assert.match(eligibility, scope === "only-verifier" ? /AND kind IN/ : /AND kind NOT IN/);
+        assert.match(eligibility, /'research_proposal_verification', 'source_repair_verification'/);
       }
     }
   }
