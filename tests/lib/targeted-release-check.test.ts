@@ -158,6 +158,7 @@ test("check builds neither export database records nor preserve old snapshots", 
     assert.deepEqual(buildDataPolicy(true, skipSync), { syncDevData: false, preserveDevSnapshot: false });
   }
   assert.equal(buildDataPolicy(false, false).syncDevData, true);
+  assert.deepEqual(buildDataPolicy(false, false, true), { syncDevData: false, preserveDevSnapshot: false });
   const build = readFileSync("scripts/build.ts", "utf8");
   const runner = readFileSync("scripts/targeted-release-check.ts", "utf8");
   assert.match(build, /process\.argv\.includes\("--release-check"\)/);

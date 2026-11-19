@@ -23,14 +23,16 @@ function read(rel: string): string {
 
 test("Reviewer Bias Guard: MoA callProposer builds a fresh messages array (no prior history)", () => {
   const src = read("server/moa.ts");
-  const proposerBlock = src.match(/async function callProposer[\s\S]*?\n\}/);
-  assert.ok(proposerBlock, "callProposer not found");
-  const body = proposerBlock![0];
-  assert.ok(body.includes('role: "system"'));
-  assert.ok(body.includes('role: "user"'));
-  assert.ok(body.includes("content: question"));
-  assert.doesNotMatch(body, /\.\.\.\s*(history|prior|priorMessages|conversation)/);
-  assert.doesNotMatch(body, /messages:\s*\[\s*\.\.\./);
+  const entry = src.match(/async function callProposer[\s\S]*?\n\}/)?.[0];
+  assert.ok(entry, "callProposer not found");
+  assert.match(entry, /return dispatchProposer\(specOrId, question, tenantId, meteredOverride, false\);/);
+  const dispatch = src.match(/async function dispatchProposer[\s\S]*?\n\}/)?.[0];
+  assert.ok(dispatch, "dispatchProposer not found");
+  const payload = dispatch.match(/client\.chat\.completions\.create\(\{[\s\S]*?\n\s*\}, \{/)?.[0];
+  assert.ok(payload, "proposer client request not found");
+  assert.match(payload, /messages:\s*\[\s*\{\s*role: "system",\s*content:\s*spec\.systemPrompt\s*\|\|\s*DEFAULT_PROPOSER_SYSTEM_PROMPT\s*\},\s*\{\s*role: "user",\s*content:\s*question\s*\},?\s*\]/);
+  assert.equal((payload.match(/\bmessages\s*:/g) ?? []).length, 1, "a later property must not replace the isolated messages");
+  assert.doesNotMatch(dispatch, /\.\.\.\s*(history|prior|priorMessages|conversation)/);
 });
 
 test("Reviewer Bias Guard: MoA callAggregator builds a fresh messages array with ONLY the synthesized prompt", () => {

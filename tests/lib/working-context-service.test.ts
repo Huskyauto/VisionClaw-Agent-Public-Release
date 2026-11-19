@@ -71,10 +71,11 @@ test("deleted or reassigned conversations cannot commit a prepared capture", asy
   assert.equal(artifacts.length, 0);
 });
 
-test("unavailable, hanging and throwing-observer paths fall back without blocking", async () => {
+test("unavailable, hanging and throwing-observer paths fall back without blocking", async (t) => {
   const { repo } = fixture();
   repo.loadArtifacts = async () => { throw new Error("offline"); };
   assert.equal(await createWorkingContextService(repo).prompt(scope), "");
+  t.mock.method(console, "warn", () => { throw new Error("diagnostic sink unavailable"); });
   repo.resolveScope = () => new Promise(() => {});
   const start = Date.now();
   const service = createWorkingContextService(repo, { deadlineMs: 20, onEvent: () => { throw new Error("logger failed"); } });

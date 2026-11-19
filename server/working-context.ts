@@ -3,6 +3,7 @@ import {
   type HydratedWorkingContext, type WorkingContextArtifact, type WorkingContextScope, type WorkingContextSource,
 } from "./lib/agent-working-context";
 import { detectSuspiciousPatterns } from "./external-content-security";
+import { logSilentCatch } from "./lib/silent-catch";
 
 export interface WorkingContextRepository {
   resolveScope(tenantId: number, conversationId: number): Promise<WorkingContextScope | null>;
@@ -40,7 +41,15 @@ export function createWorkingContextService(repo: WorkingContextRepository, opti
   onEvent?: (event: string) => void; deadlineMs?: number;
 } = {}) {
   const enabled = options.enabled || workingContextEnabled;
-  const event = (name: string) => { try { options.onEvent?.(name); } catch { /* Logging cannot gate memory. */ } };
+  const event = (name: string) => {
+    try {
+      options.onEvent?.(name);
+    } catch {
+      // Count the observer failure without reaching a logging sink or
+      // retaining anything from the observer's error.
+      logSilentCatch("server/working-context.ts:onEvent", undefined, "expected");
+    }
+  };
   const deadline = Math.max(20, Math.min(options.deadlineMs || 900, 1500));
   async function scopeFor(request: Request) {
     if (!Number.isSafeInteger(request.tenantId) || request.tenantId <= 0

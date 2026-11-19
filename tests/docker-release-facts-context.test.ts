@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, mkdtempSync, mkdirSync, copyFileSync, rmSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, mkdtempSync, mkdirSync, copyFileSync, rmSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -7,6 +7,7 @@ import { minimatch } from "minimatch";
 import { build } from "esbuild";
 import { LEGION_RUNBOOKS } from "../server/legion/runbook-source";
 import { stageLegionRunbooks } from "../scripts/stage-legion-binaries";
+import { isPublicMirror } from "../scripts/lib/build-data-policy";
 
 // Evaluate ordered Docker patterns against a file and its parent directories.
 // These cases exercise the docs allowlist, not Git's different ignore rules.
@@ -63,6 +64,11 @@ test("Docker context includes the Markdown procedure imported by the billing wor
 });
 
 test("Docker context stages exactly the three screened Legion runbooks, not private agent state", async () => {
+  if (isPublicMirror()) {
+    assert.equal(included("tests/public-test-manifest.json"), true, "Docker must detect the sanitized edition");
+    assert.equal(existsSync(".agents"), false, "the mirror must not contain private workspace sources");
+    return;
+  }
   const required = new Set<string>(LEGION_RUNBOOKS);
   function checkTree(directory: string) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
