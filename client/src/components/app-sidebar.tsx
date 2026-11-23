@@ -672,7 +672,7 @@ export function AppSidebar() {
         {isAdmin && (
            <NavSection title="Income Products" icon={DollarSign} defaultOpen={["/admin/website-audit", "/audit", "/admin/research-report", "/admin/digital-products", "/admin/payment-links", "/admin/archive-rescue", "/admin/wedges", "/admin/revenue-missions", "/admin/service-orders", "/admin/executive-report", "/admin/smart-leads", "/admin/cmmc", "/admin/missed-call-recovery", "/admin/pilot-tools", "/admin/finished-not-billed"].includes(location)} accent badge="$$">
             <NavLink path="/admin/payment-links" icon={DollarSign} label="Get Paid" badge="NEW" />
-            <NavLink path="/admin/website-audit" icon={Gauge} label="AI Readiness Reports" badge="MANUAL" />
+            <NavLink path="/admin/website-audit" icon={Gauge} label="Website Audit" badge="MANUAL" />
             {isPlatformAdmin && <NavLink path="/admin/pilot-tools" icon={Gauge} label="Business Pilot Tools" badge="NEW · MANUAL" />}
             {isPlatformAdmin && config.finishedNotBilledEnabled && <NavLink path="/admin/finished-not-billed" icon={FileCheck} label="Finished but Not Billed" badge="$175 PILOT" touchFriendly />}
             <NavLink path="/admin/executive-report" icon={Gauge} label="Company Reports" badge="NEW" />

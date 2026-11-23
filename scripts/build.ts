@@ -29,6 +29,9 @@ const allowlist = [
   "passport",
   "passport-local",
   "pg",
+  // Layout intake parses small CSS excerpts on the server. Bundle the build
+  // dependency so the published VM does not need development node_modules.
+  "postcss",
   "uuid",
   "ws",
   "zod",

@@ -5,6 +5,26 @@ import releaseFacts from "../../../docs/release-facts.json";
 
 const updates = [
   {
+    title: "Delivered apps open separately from your workspace",
+    business: "Self-contained HTML apps can still open from a Play link. The preview no longer shares your signed-in workspace's browser storage or can make background requests to the workspace. Download remains available.",
+    technical: "The HTML Play response now uses an opaque-origin browser sandbox. Inline JavaScript and CSS and browser downloads remain supported; the preview cannot make background requests or load remote resources. Signed-link and file-ownership checks are unchanged.",
+  },
+  {
+    title: "Website Audit: layout second opinion",
+    business: "The owner can request an optional GLM 5.4 second opinion on a public or synthetic screenshot and related CSS. It suggests what to check, without editing or publishing the website.",
+    technical: "The opt-in Website Audit panel sends only the public or synthetic screenshot and CSS the owner explicitly submits. It uses a capped GLM 5.4 advisory request, returns verification steps, and does not run proposed code.",
+  },
+  {
+    title: "Lower-cost option for routine owner work",
+    business: "Included model routes still go first. For routine owner work that needs the paid fallback, GPT-6 Luna can be preferred when it meets the existing pricing rules. This is not a new charge or default for customers.",
+    technical: "Optional CheaperInference GPT-6 Luna selection is limited to owner fast/balanced paid fallback after included lanes. Live-catalog discount, list and reserve-rate comparison, authorization and budget checks still apply; pins and advanced tiers are unchanged.",
+  },
+  {
+    title: "Web research and private slide delivery",
+    business: "Existing web research tools can collect more pages from supported public sites. Slides created with a customer's Google connection stay under that account's sharing settings rather than being made public by default.",
+    technical: "Existing Firecrawl tools now use v2 with bounded pagination and cancellation. Crawl depth counts URL path segments, not link hops. Tenant-created Slides require Google account access, and memory edits cannot change record ownership.",
+  },
+  {
     title: "Finished but Not Billed: HVAC billing review",
     business: "The proposed $175 manual pilot helps an HVAC office find completed jobs that may need a billing check. The owner workbench accepts up to 30 coded jobs, flags holds and conflicting records, and exports a handoff for office review. No checkout or invoices are sent.",
     technical: "The owner-only Business Pilot Tools workbench validates bounded CSV inputs locally and exports review status without storing or uploading batch records. A missing match is not billing authorization; no payment or accounting integrations were added.",

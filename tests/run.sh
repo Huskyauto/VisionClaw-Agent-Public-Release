@@ -145,6 +145,7 @@ FILES=(
   "tests/security/agentid-auth.test.ts"
   "tests/security/admin-pin-lockout-regression.test.ts"
   "tests/unit/tool-rate-limit-pacing.test.ts"
+  "tests/unit/firecrawl-v2.test.ts"
   "tests/security/npm-audit-deferrals.test.ts"
   "tests/security/features-doc-content-verification.test.ts"
   "tests/security/features-doc-delivery-project-guard.test.ts"

@@ -29,3 +29,24 @@ test("Release surfaces preserve evidence boundaries without hardcoded publicatio
   assert.match(sidebar, /\{CURRENT_SOURCE_RELEASE\}/, "Sidebar must render the shared current source revision");
   assert.doesNotMatch(sidebar, /R\d+(?:\.\d+)*\s*·\s*pending/i);
 });
+
+test("owner layout review, metered fallback and release-only findings agree across surfaces", () => {
+  const read = (path: string) => readFileSync(path, "utf8");
+  for (const path of [
+    "README.md",
+    "README.md",
+    "client/src/components/prepublication-notice.tsx",
+    "client/src/components/recent-platform-updates.tsx",
+    "client/index.html",
+  ]) {
+    const copy = read(path);
+    assert.match(copy, /GLM 5\.4/, path);
+    assert.match(copy, /GPT-6 Luna/, path);
+    assert.match(copy, /public or synthetic/i, path);
+    assert.match(copy, /paid\s+fallback/i, path);
+  }
+  const latest = JSON.parse(read("client/src/data/updates.json"))[0];
+  assert.match(JSON.stringify(latest), /GLM 5\.4.*GPT-6 Luna/);
+  assert.doesNotMatch(read("client/index.html"), /Free trial with 5 conversations/);
+  assert.match(read("client/src/components/app-sidebar.tsx"), /path="\/admin\/website-audit"[^>]+label="Website Audit"/);
+});

@@ -22,10 +22,10 @@ import { hasIncomeOpenaiApiGrant } from "./lib/income-openai-route";
 import { hasOwnerJuryApiGrant } from "./lib/owner-jury-api-route";
 import { assertStandardComputeAccess, standardComputeModelId, standardComputeReady, validateStandardComputeCompletion } from "./lib/standard-compute";
 import { assertCheaperInferenceAccess, cheaperInferenceReady, cheaperInferenceCostFields,
-  guardCheaperInferenceRequest, CHEAPER_INFERENCE_MODEL_ID, CHEAPER_INFERENCE_UPSTREAM_MODEL,
-  CHEAPER_INFERENCE_BASE_URL } from "./lib/cheaper-inference";
+  guardCheaperInferenceRequest, CHEAPER_INFERENCE_BASE_URL } from "./lib/cheaper-inference";
 import { cheaperAutomaticAllowed, getCheaperCatalog, catalogUsageCost,
-  cheaperRequestMaximum, runCheaperBudgeted, cheaperMinimumDiscount } from "./lib/cheaper-inference-automatic";
+  cheaperRequestMaximum, runCheaperBudgeted, cheaperMinimumDiscount, chooseCheaperAutomaticLuna,
+  CHEAPER_LUNA_6_UPSTREAM } from "./lib/cheaper-inference-automatic";
 
 export const COST_LEDGER_RECORDED = Symbol.for("visionclaw.cost-ledger-recorded");
 import { normalizeRetiredModelId, wrapClientWithParamAdaptation } from "./lib/param-adaptation";
@@ -1890,13 +1890,22 @@ export async function getClientForModel(
       assertCheaperInferenceAccess(tenantId, options ?? {});
       if (currentTenantId() !== null && currentTenantId() !== tenantId) throw new Error("CheaperInference tenant scope mismatch");
       if (!isProviderHealthy("cheaperinference")) throw new Error("CheaperInference is temporarily unavailable");
-      const snapshot = (await getCheaperCatalog()).find(m => m.id === upstream &&
+      const catalog = await getCheaperCatalog();
+      const snapshot = catalog.find(m => m.id === upstream &&
         m.endpoint === "/v1/chat/completions");
       if (!snapshot) throw new Error("CheaperInference catalog no longer authorizes this chat model");
       const automatic = cheaperAutomaticAllowed(tenantId) &&
         !(options?.explicitOwnerSelection === true && options?.platformAdminVerified === true);
-      if (automatic && snapshot.discount < cheaperMinimumDiscount())
-        throw new Error("CheaperInference automatic model does not meet the operator catalog discount floor");
+      const checkAutomaticPolicy = () => {
+        if (!automatic) return;
+        const floor = cheaperMinimumDiscount();
+        if (snapshot.discount < floor)
+          throw new Error("CheaperInference automatic model does not meet the operator catalog discount floor");
+        if (upstream === CHEAPER_LUNA_6_UPSTREAM &&
+            chooseCheaperAutomaticLuna(catalog, "balanced", floor)?.id !== upstream)
+          throw new Error("CheaperInference GPT-6 Luna is not eligible for automatic use at current settings and prices");
+      };
+      checkAutomaticPolicy();
       const payload = guardCheaperInferenceRequest({
         ...params, ...(automatic ? { min_discount_percent: cheaperMinimumDiscount() } : {}),
       }, upstream);
@@ -1915,9 +1924,10 @@ export async function getClientForModel(
             assertCheaperInferenceAccess(tenantId, options ?? {});
             if (!isProviderHealthy("cheaperinference") ||
                 (currentTenantId() !== null && currentTenantId() !== tenantId) ||
-                (automatic && (!cheaperAutomaticAllowed(tenantId) || snapshot.discount < cheaperMinimumDiscount())) ||
+                (automatic && !cheaperAutomaticAllowed(tenantId)) ||
                 requestOptions?.signal?.aborted)
               throw new Error("CheaperInference operator, scope or deadline stopped dispatch after reservation");
+            checkAutomaticPolicy();
           });
       } catch (error: any) {
         if ([401, 403, 429].includes(error?.status) || error?.status >= 500) {
@@ -2613,11 +2623,11 @@ export async function getModelForTierAsync(
   if (options?.allowMeteredFallback !== false && cheaperAutomaticAllowed(tenantId) &&
       isProviderHealthy("cheaperinference")) {
     try {
-      const candidate = (await getCheaperCatalog()).find(m =>
-        m.id === CHEAPER_INFERENCE_UPSTREAM_MODEL && m.endpoint === "/v1/chat/completions");
-      if (candidate && candidate.discount >= cheaperMinimumDiscount()) {
-        logAutoRoute(tier, CHEAPER_INFERENCE_MODEL_ID, "CheaperInference owner wallet ($20 shared UTC-day cap)");
-        return CHEAPER_INFERENCE_MODEL_ID;
+      const candidate = chooseCheaperAutomaticLuna(await getCheaperCatalog(), tier, cheaperMinimumDiscount());
+      if (candidate) {
+        const selected = `cheaperinference/${candidate.id}`;
+        logAutoRoute(tier, selected, "CheaperInference owner wallet (shared UTC-day cap)");
+        return selected;
       }
     } catch (error) {
       console.warn("[auto-route] CheaperInference paid fallback not admitted: catalog unavailable", error);

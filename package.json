@@ -1,6 +1,6 @@
 {
   "name": "visionclaw-agent",
-  "version": "137.4.0-sec",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "engines": {

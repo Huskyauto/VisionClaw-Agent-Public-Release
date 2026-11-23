@@ -402,7 +402,10 @@ async function proactiveRefresh() {
   }
 }
 
-export async function driveRequest(endpoint: string, options?: { method?: string; headers?: Record<string, string>; body?: string | Buffer }, _retryCount = 0): Promise<Response> {
+export async function driveRequest(endpoint: string, options?: {
+  method?: string; headers?: Record<string, string>; body?: string | Buffer;
+  redirect?: RequestRedirect; timeoutMs?: number;
+}, _retryCount = 0): Promise<Response> {
   const token = await getAccessToken();
   const url = endpoint.startsWith("http") ? endpoint : `${DRIVE_API}${endpoint}`;
 
@@ -413,7 +416,8 @@ export async function driveRequest(endpoint: string, options?: { method?: string
       ...options?.headers,
     },
     body: options?.body,
-    timeoutMs: 60_000,
+    redirect: options?.redirect,
+    timeoutMs: options?.timeoutMs ?? 60_000,
   });
 
   if (resp.status === 401 && _retryCount < 2) {

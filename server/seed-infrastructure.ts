@@ -36,8 +36,8 @@ export async function seedNightlyAutoresearch() {
     {
       name: "Nightly AI Model & Provider Intelligence",
       personaId: 9,
-      objective: "Scan for newly released or updated AI models, providers, and API changes. Check OpenAI, Anthropic, Google, xAI, Meta, Mistral, DeepSeek, Cohere, and open-source model hubs (HuggingFace trending, Ollama library). For each experiment: identify one new model or significant update, assess its capabilities (context window, pricing, speed, specialties), and recommend whether VisionClaw should add it to the model registry. Include the model ID format, provider endpoint, and estimated cost per 1M tokens.",
-      constraints: "Only recommend models with public API access or open weights. Skip models in private beta unless waitlist is open. Verify pricing from official sources. Do not recommend models that duplicate existing capabilities without clear improvement.",
+      objective: "Evaluate recent provider-verified model releases not already in VisionClaw's registry. Current sources: Anthropic's official Models API and model status table.",
+      constraints: "Use only the exact model and release evidence supplied by the runner. Missing data stays unverified. Registry additions remain pending for human review; do not propose code or routing changes.",
       metrics: "Discovery novelty (is this actually new?), Practical value for VisionClaw agents, Cost-effectiveness vs current models, Integration feasibility",
       strategy: "balanced",
       maxExperiments: 12,

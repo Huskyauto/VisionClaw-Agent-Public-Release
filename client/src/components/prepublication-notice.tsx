@@ -1,7 +1,7 @@
 import facts from "../../../docs/release-facts.json";
 
-export const CURRENT_SOURCE_RELEASE = "R137.4+sec";
-export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 19, 2026 source update: HVAC billing review, source-backed working context, owner model options and operational reliability.`;
+export const CURRENT_SOURCE_RELEASE = "R137.4+sec2";
+export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 23, 2026 source update: safer delivered-app previews, owner Website Audit layout reviews and routine model routing.`;
 export const DEVELOPMENT_PLATFORM_SUMMARY =
   `${facts.metrics.registeredTools} total registered tools; ` +
   `${facts.metrics.declaredTables} declared / ${facts.metrics.liveTables} live development tables; ` +
@@ -12,6 +12,9 @@ export const DEVELOPMENT_PLATFORM_SUMMARY =
 export const CURRENT_PLATFORM_DESCRIPTION =
   `${SOURCE_UPDATE_SUMMARY} ${DEVELOPMENT_PLATFORM_SUMMARY} ` +
   "Scoped evidence is not whole-platform certification. " +
+  "Delivered HTML previews run separately from the signed-in workspace. " +
+  "When enabled, owner-only Website Audit can send a public or synthetic screenshot and CSS to GLM 5.4 for a layout second opinion, not an automatic fix. " +
+  "GPT-6 Luna is an optional owner fast/balanced paid fallback when catalog prices qualify; included routes take priority. " +
   "Modern MCP key authentication also requires the owning account to remain active. " +
   "The Finished but Not Billed workbench compares coded HVAC records in the browser for office review; it does not issue invoices or collect payment. " +
   "Working context recalls exact, authorized excerpts from saved conversations, not new instructions or approvals. " +

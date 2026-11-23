@@ -1042,11 +1042,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const wantsPlay = req.query.play === "1";
     if (isDeliveryHtml && wantsPlay) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      // Lock down the page: no remote scripts, no framing of arbitrary origins,
-      // no plugins. Allows inline JS/CSS so single-file apps still work.
+      // Frame denial alone does not isolate a top-level page. The sandbox
+      // gives delivered scripts an opaque origin; inline single-file apps still
+      // run, but don't inherit the signed-in app's storage or network access.
       res.setHeader(
         "Content-Security-Policy",
-        "default-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';",
+        "sandbox allow-scripts allow-downloads; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none';",
       );
       res.setHeader("X-Frame-Options", "DENY");
       res.setHeader("Referrer-Policy", "no-referrer");

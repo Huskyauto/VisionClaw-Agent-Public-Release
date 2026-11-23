@@ -124,7 +124,7 @@ function TypewriterHero() {
 }
 
 const CURRENT_TRUST_SUBTITLE: Record<string, string> = {
-  subtitle: `${SOURCE_UPDATE_SUMMARY} Modern MCP keys now require a currently active owning account. The wider tenant audit remains incomplete; this is not whole-app security certification.`,
+  subtitle: `${SOURCE_UPDATE_SUMMARY} Delivered HTML previews are isolated from workspace storage, and modern MCP keys require an active account. The wider tenant audit remains incomplete; this is not whole-app security certification.`,
 };
 
 function CurrentReleaseEvidence() {
@@ -159,6 +159,9 @@ function CurrentReleaseEvidence() {
                 <strong className="text-foreground">Finished but Not Billed:</strong> a proposed $175 manual pilot for HVAC offices. Compare up to 30 coded completed jobs with invoice records and export a list for office review. The workbench does not receive payment, send invoices or store the batch on the server.
               </p>
               <p>
+                <strong className="text-foreground">Website Audit:</strong> when enabled, the owner can ask GLM 5.4 for a layout second opinion using a public or synthetic screenshot and its CSS. The feature suggests edits; it does not apply them or publish the site.
+              </p>
+              <p>
                 <strong className="text-foreground">Company reports:</strong> full-package continuation and review remain in development. The latest recorded run is blocked; final approved reports, narrated audio and verified delivery are still acceptance requirements, not completed customer outcomes.
               </p>
               <p>
@@ -178,7 +181,10 @@ function CurrentReleaseEvidence() {
                 <strong className="text-foreground">Working context:</strong> later turns can recall exact source excerpts for goals, decisions and corrections within the same authorized workspace scope. Recalled text is not instruction or approval, and assistant reports are not execution evidence.
               </p>
               <p>
-                <strong className="text-foreground">Owner models:</strong> GPT-6.2 Sol and Astra are explicit choices. The optional direct-owner jury update does not change standard defaults or grant new authority. Model access and metered calls retain their existing gates.
+                <strong className="text-foreground">Owner models:</strong> GPT-6.2 Sol and Astra are explicit choices. GPT-6 Luna is an opt-in paid fallback for routine work when included routes are unavailable and rates qualify. Existing budget, jury and access controls are unchanged.
+              </p>
+              <p>
+                <strong className="text-foreground">Safer Play links:</strong> delivered HTML apps can run locally in the browser without access to the signed-in workspace's storage. The preview blocks background network requests and still allows downloading.
               </p>
               <p>
                 <strong className="text-foreground">Verification limits:</strong> the wider tenant audit remains incomplete. Backup access checks, release packaging and isolated Railway staging evidence do not establish production parity or whole-app security certification.

@@ -15,6 +15,21 @@ import { join } from "node:path";
 import { classifyReleaseScope, digestReleaseInputs, releaseInputPaths, sameReleaseMembership, runBoundedReleaseCommand } from "../../scripts/lib/targeted-release-check";
 import { buildDataPolicy } from "../../scripts/lib/build-data-policy";
 
+test("benchmark and scheduled replay changes select their own regressions without relaxing unknown paths", () => {
+  const scope = classifyReleaseScope([
+    "scripts/harness-bench-report.ts", "server/lib/harness-bench-core.ts",
+    "tests/lib/harness-bench-core.test.ts", "tests/unit/felix-outcome-loop-integration.test.ts",
+    "scripts/golden-path-replay.ts", "scripts/lib/golden-path-replay-runtime.ts",
+    "server/heartbeat.ts", "server/heartbeat-seed.ts", "scripts/unreviewed-replay.ts",
+  ]);
+  assert.deepEqual(scope.unknown, ["scripts/unreviewed-replay.ts"]);
+  for (const path of [
+    "tests/lib/harness-bench-core.test.ts", "tests/unit/felix-outcome-loop-integration.test.ts",
+    "tests/unit/golden-path-replay-authority.test.ts", "tests/unit/golden-path-replay-evidence.test.ts",
+    "tests/security/tool-authority-boundary.test.ts",
+  ]) assert.ok(scope.tests.includes(path), path);
+});
+
 test("current sensitive changes select explicit boundaries and regressions", () => {
   const scope = classifyReleaseScope(["server/auth.ts", "server/tools/lib/safe-fetch.ts", "server/job-worker.ts"]);
   assert.deepEqual(scope.unknown, []);
@@ -30,6 +45,14 @@ test("PDF ownership changes select document boundary regressions", () => {
   assert.deepEqual(scope.unknown, []);
   assert.ok(scope.areas.includes("documents"));
   assert.ok(scope.tests.includes("tests/security/pdf-input-ownership.test.ts"));
+});
+
+test("memory ownership changes select the storage boundary regressions", () => {
+  for (const file of ["server/routes/memory.ts", "server/storage.ts"]) {
+    const scope = classifyReleaseScope([file]);
+    assert.deepEqual(scope.unknown, []);
+    assert.ok(scope.tests.includes("tests/security/storage-required-tenant-boundaries.test.ts"));
+  }
 });
 
 test("payment and plan ownership changes select their actual boundary regressions", () => {

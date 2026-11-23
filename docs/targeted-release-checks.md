@@ -83,6 +83,13 @@ The older `scripts/verify-republish-readiness.ts` remains the strict
 **full-audit** validator. It will still reject an incomplete or stale full audit.
 The new command does not override it or manufacture a full-audit receipt.
 
+The full TypeScript check runs in workspace release verification and GitHub CI,
+not on the production web server. The production scheduler retires the legacy
+compiler row without removing its history. Scheduled replay changes select the
+fixture, tool-authority, and owner-alert regressions; offline benchmark changes
+select the benchmark and Felix outcome regressions. Neither mapping admits
+unrecognized code paths.
+
 ## Known-finding review during this implementation
 
 The 26 retained severe allegations in the historical October 19 audit were

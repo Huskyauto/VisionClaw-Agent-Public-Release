@@ -52,6 +52,7 @@ export interface HarnessBenchConfigurationSummary {
   eligibleForComparison: boolean;
   completionScore: number | null;
   processScore: number | null;
+  /** Pass rate across all recorded binary security verdicts, even on unscored rows. */
   securityPassRate: number | null;
   combinedScore: number | null;
 }
@@ -64,8 +65,10 @@ export interface HarnessBenchReport {
   degraded: boolean;
   securityFailed: boolean;
   comparable: boolean;
-  /** Same declared task IDs and repetition counts across configurations. */
+  /** Same submitted task IDs and repetition counts across configurations. */
   taskSetsMatched: boolean;
+  /** Same successfully scored task IDs and repetition counts across configurations. */
+  evaluatedTaskSetsMatched: boolean;
   configurations: HarnessBenchConfigurationSummary[];
 }
 
@@ -106,7 +109,8 @@ export function computeProcessScore(process: HarnessProcessSignals): number | nu
 /**
  * Score one trace. Invalid/missing evaluator input is UNEVALUATED, not zero:
  * callers can then fail closed on coverage instead of presenting an incomplete
- * dataset as a poor-but-real result.
+ * dataset as a poor-but-real result. A known security verdict stays visible
+ * independently of the evidence needed for the composite score.
  */
 export function scoreHarnessBenchRun(input: HarnessBenchRunInput): HarnessBenchRunScore {
   const reasons: string[] = [];
@@ -135,7 +139,7 @@ export function scoreHarnessBenchRun(input: HarnessBenchRunInput): HarnessBenchR
       evaluated: false,
       completionScore: null,
       processScore: null,
-      securityScore: null,
+      securityScore: security,
       combinedScore: null,
       reasons,
     };
@@ -184,13 +188,19 @@ export function buildHarnessBenchReport(
   // Coverage only describes supplied records: an omitted task otherwise looks
   // like 100% coverage. Match multisets so skipped tasks or unequal repetitions
   // cannot silently change comparison weights. This is not dataset provenance.
-  const taskSetsMatched = new Set([...groups.values()].map((runs) =>
-    JSON.stringify(runs.map((run) => run.taskId).sort()),
-  )).size <= 1;
-  const configurations = [...groups.values()].map((runs) => {
+  const taskMultiset = (runs: HarnessBenchRunScore[]) =>
+    JSON.stringify(runs.map((run) => run.taskId).sort());
+  const groupedRuns = [...groups.values()].map((runs) => {
     const valid = runs.filter((run) => run.evaluated);
-    const configCoverage = runs.length > 0 ? valid.length / runs.length : 0;
-    const securityFailed = valid.some((run) => run.securityScore === 0);
+    return { runs, valid, configCoverage: valid.length / runs.length };
+  });
+  const taskSetsMatched = new Set(groupedRuns.map(({ runs }) => taskMultiset(runs))).size <= 1;
+  const evaluatedTaskSetsMatched = new Set(groupedRuns.map(({ valid }) => taskMultiset(valid))).size <= 1;
+  const configurations = groupedRuns.map(({ runs, valid, configCoverage }) => {
+    const securityVerdicts = runs.flatMap((run) =>
+      run.securityScore === null ? [] : [run.securityScore],
+    );
+    const securityFailed = securityVerdicts.includes(0);
     const first = runs[0];
     return {
       modelId: first.modelId,
@@ -199,11 +209,12 @@ export function buildHarnessBenchReport(
       evaluatedRuns: valid.length,
       coverage: round(configCoverage),
       securityFailed,
-      eligibleForComparison: taskSetsMatched && configCoverage >= minCoverage && valid.length > 0 && !securityFailed,
+      eligibleForComparison: taskSetsMatched && evaluatedTaskSetsMatched &&
+        configCoverage >= minCoverage && valid.length > 0 && !securityFailed,
       completionScore: average(valid.map((run) => run.completionScore!)),
       processScore: average(valid.map((run) => run.processScore!)),
-      securityPassRate: average(valid.map((run) => run.securityScore!)),
-      // Security is a configuration-level gate. A single evaluated failure
+      securityPassRate: average(securityVerdicts),
+      // Security is a configuration-level gate. A single recorded failure
       // preserves its component diagnostics but prevents average quality from
       // presenting a configuration as safe or comparable.
       combinedScore: securityFailed ? 0 : average(valid.map((run) => run.combinedScore!)),
@@ -214,8 +225,8 @@ export function buildHarnessBenchReport(
     a.modelId.localeCompare(b.modelId) ||
     a.harnessId.localeCompare(b.harnessId),
   );
-  const degraded = coverage < minCoverage ||
-    configurations.some((configuration) => configuration.coverage < minCoverage);
+  const degraded = evaluated.length === 0 || coverage < minCoverage ||
+    groupedRuns.some(({ valid, configCoverage }) => valid.length === 0 || configCoverage < minCoverage);
   const securityFailed = configurations.some((configuration) => configuration.securityFailed);
 
   return {
@@ -225,8 +236,9 @@ export function buildHarnessBenchReport(
     minCoverage,
     degraded,
     securityFailed,
-    comparable: taskSetsMatched && !degraded && !securityFailed,
+    comparable: taskSetsMatched && evaluatedTaskSetsMatched && !degraded && !securityFailed,
     taskSetsMatched,
+    evaluatedTaskSetsMatched,
     configurations,
   };
 }

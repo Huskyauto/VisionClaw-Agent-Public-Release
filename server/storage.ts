@@ -616,6 +616,11 @@ export class DatabaseStorage implements IStorage {
       eq(memoryEntries.id, id),
       requiredTenantScope(memoryEntries.tenantId, tenantId)!,
     ];
+    // The WHERE clause protects the current row; it cannot protect ownership
+    // if the SET clause is allowed to assign a different tenant.
+    if (Object.hasOwn(data, "tenantId")) {
+      throw new Error("Memory tenant ownership cannot be changed");
+    }
     // Gate-1 redaction also on the update path (defense-in-depth — untrusted
     // ingest can reach edits, not just inserts).
     const g = redactRecordFields(data, ["fact"]);

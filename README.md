@@ -1,6 +1,28 @@
 # VisionClaw Agent
 
-## Latest source update — R137.4+sec (November 19, 2026)
+## Latest source update — R137.4+sec2 (November 23, 2026)
+
+- **Safer delivered apps:** self-contained HTML previews run in a browser
+  sandbox separate from signed-in workspace storage. Downloads remain
+  available, and preview scripts cannot make background network requests.
+- **Website Audit:** when enabled, the owner can request a GLM 5.4 layout
+  second opinion on a public or synthetic screenshot and related CSS. The
+  advisory result does not modify source files, run tools or publish a website.
+- **Routine owner routing:** GPT-6 Luna is an optional fast/balanced paid
+  fallback through CheaperInference after included routes, subject to catalog
+  price checks and existing budgets. No new customer default, advanced tier,
+  automatic jury member or grant of tool authority.
+- **Existing tools and workflows:** Firecrawl uses v2 with bounded pagination
+  and cancellation; crawl depth means URL path segments. Tenant-created
+  Google Slides stay under Google account sharing controls. Memory edits
+  cannot change ownership, and scheduled fixture replay uses guarded tools.
+- **Model intelligence:** verified first-party release and lifecycle evidence
+  can queue a pending registry review, not automatic activation.
+- **Source boundaries:** development evidence is not production certification.
+  The sanitized snapshot exports eligible source, not customer files, private
+  audit records, runtime state or credentials. It does not publish the app.
+
+## Previous source update — R137.4+sec (November 19, 2026)
 
 - **Finished but Not Billed:** a manual HVAC billing-review workbench compares
   coded jobs and invoices in the browser. Findings go to the office; the

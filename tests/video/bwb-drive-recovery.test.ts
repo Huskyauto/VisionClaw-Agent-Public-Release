@@ -9,6 +9,67 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import vm from "node:vm";
+import { createRequire } from "node:module";
+import { transformSync } from "esbuild";
+import { currentTenantId, withTenantContext } from "../../server/lib/tenant-context";
+
+test("a Drive 401 refreshes only the recovery read, preserving its destination and privacy check", async () => {
+  const transportSource = fs.readFileSync("scripts/lib/bwb-drive-recovery-transport.ts", "utf8")
+    .replace('await import("../../server/google-drive")', "__drive")
+    .replace('await import("../../server/lib/tenant-context")', "__tenant");
+  const driveSource = fs.readFileSync("server/google-drive.ts", "utf8");
+  const request = driveSource.slice(driveSource.indexOf("export async function driveRequest("),
+    driveSource.indexOf("export async function driveJson("));
+  const code = (source: string) => transformSync(source, { loader: "ts", format: "cjs" }).code;
+  const fileId = "fixture_file_1234";
+  const folderId = "fixture_folder";
+  const bytes = Buffer.from("exact bytes");
+  const reads: { url: string; redirect?: string; token: string }[] = [];
+  let refreshes = 0;
+  let mediaReads = 0;
+  let privateFile = true;
+  const fetchFixture = async (url: string, options: { headers: Record<string, string>; redirect?: string }) => {
+    assert.equal(currentTenantId(), 1);
+    reads.push({ url, redirect: options.redirect, token: options.headers.Authorization });
+    if (reads.length === 1) return new Response(null, { status: 401 });
+    return Response.json({
+      size: String(bytes.length), ownedByMe: true, trashed: false, parents: [folderId],
+      permissions: [privateFile ? { type: "user", role: "owner" } : { type: "anyone", role: "reader" }],
+    });
+  };
+  const context = {
+    module: { exports: {} as { driveRequest?: unknown; createOwnerRecoveryTransport?: typeof import("../../scripts/lib/bwb-drive-recovery-transport").createOwnerRecoveryTransport } },
+    require: createRequire(new URL("../../scripts/lib/bwb-drive-recovery-transport.ts", import.meta.url)),
+    AbortSignal, fetch: fetchFixture, fetchWithTimeout: fetchFixture,
+    DRIVE_API: "https://www.googleapis.com",
+    _cachedToken: "", _tokenExpiry: 0, log() {},
+    getAccessToken: async () => refreshes ? "renewed-fixture" : "expired-fixture",
+    fullRefreshCascade: async () => { refreshes++; return "renewed-fixture"; },
+    __drive: {} as Record<string, unknown>,
+    __tenant: { withTenantContext },
+  };
+  vm.createContext(context);
+  vm.runInContext(code(request), context);
+  context.__drive = {
+    driveRequest: context.module.exports.driveRequest, getAccessToken: context.getAccessToken,
+    readDriveFileBytes: async (id: string) => { assert.equal(id, fileId); mediaReads++; return bytes; },
+    uploadToDrive: () => assert.fail("Recovery verification must not reupload"),
+  };
+  context.module.exports = {};
+  vm.runInContext(code(transportSource), context);
+  const transport = await context.module.exports.createOwnerRecoveryTransport!("fixture");
+  await transport.verify({ fileId, folderId }, bytes);
+  assert.equal(refreshes, 1);
+  assert.equal(mediaReads, 1);
+  assert.deepEqual(reads.map(r => [new URL(r.url).origin, new URL(r.url).pathname, r.redirect, r.token]), [
+    ["https://www.googleapis.com", `/drive/v3/files/${fileId}`, "error", "Bearer expired-fixture"],
+    ["https://www.googleapis.com", `/drive/v3/files/${fileId}`, "error", "Bearer renewed-fixture"],
+  ]);
+  privateFile = false;
+  await assert.rejects(transport.verify({ fileId, folderId }, bytes), /owner-private/);
+  assert.equal(mediaReads, 1);
+});
 
 test("a failed Drive backup stops progression and a retry preserves exact bytes", async () => {
   const remote = new Map<string, Buffer>();

@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import type { RecoveryTransport } from "./bwb-drive-recovery";
+import type { TenantContext } from "../../server/lib/tenant-context";
+import { ADMIN_TENANT_ID } from "../../server/tenant-constants";
+
+const ownerRecoveryContext: TenantContext = { tenantId: ADMIN_TENANT_ID, source: "explicit" };
 
 export function recoveryArtifactKey(identity: string): string {
   return `artifact:${createHash("sha256").update(identity).digest("hex")}`;
@@ -8,15 +12,14 @@ export function recoveryArtifactKey(identity: string): string {
 
 /** Internal BWB owner service only. Never use platform Drive for customer tenants. */
 export async function createOwnerRecoveryTransport(videoId: string): Promise<RecoveryTransport> {
-  const { uploadToDrive, getAccessToken, readDriveFileBytes } = await import("../../server/google-drive");
+  const { uploadToDrive, driveRequest, readDriveFileBytes } = await import("../../server/google-drive");
   const { withTenantContext } = await import("../../server/lib/tenant-context");
   const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
   async function verify(remote: { fileId: string; folderId: string }, bytes: Buffer) {
     if (!/^[a-zA-Z0-9_-]{10,}$/.test(remote.fileId)) throw new Error("Invalid recovery Drive identity");
-    const token = await getAccessToken();
-    const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(remote.fileId)}?fields=id,size,trashed,ownedByMe,parents,permissions(type,role,deleted)`,
-      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30_000), redirect: "error" },
+    const response = await driveRequest(
+      `/drive/v3/files/${encodeURIComponent(remote.fileId)}?fields=id,size,trashed,ownedByMe,parents,permissions(type,role,deleted)`,
+      { timeoutMs: 30_000, redirect: "error" },
     );
     if (!response.ok) throw new Error(`Recovery metadata verification failed: HTTP ${response.status}`);
     const metadata = await response.json();
@@ -29,7 +32,7 @@ export async function createOwnerRecoveryTransport(videoId: string): Promise<Rec
   let folder: Promise<string> | undefined;
   async function getFolder() {
     if (!folder) {
-      folder = withTenantContext(1, async () => {
+      folder = withTenantContext(ownerRecoveryContext, async () => {
         const bytes = Buffer.from(JSON.stringify({ version: 1, videoId, purpose: "Private BWB recovery" }));
         const seed = await uploadToDrive({
           fileData: bytes, fileName: "RECOVERY-START.json", mimeType: "application/json",
@@ -47,7 +50,7 @@ export async function createOwnerRecoveryTransport(videoId: string): Promise<Rec
   }
   return {
     async put(name, bytes, key) {
-      return withTenantContext(1, async () => {
+      return withTenantContext(ownerRecoveryContext, async () => {
         const folderId = await getFolder();
         const result = await uploadToDrive({
           fileData: bytes,
@@ -62,7 +65,7 @@ export async function createOwnerRecoveryTransport(videoId: string): Promise<Rec
         return { fileId: result.fileId, folderId };
       });
     },
-    verify: (receipt, bytes) => withTenantContext(1, () => verify(receipt, bytes)),
+    verify: (receipt, bytes) => withTenantContext(ownerRecoveryContext, () => verify(receipt, bytes)),
   };
 }
 

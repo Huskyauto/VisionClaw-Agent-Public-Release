@@ -44,6 +44,11 @@ The companion watcher backfills an already-running old process. It cannot
 retroactively enforce awaited checkpoints inside that process. It exits when the
 result sidecar is backed up, on an upload failure, or after one hour.
 
+Recovery metadata checks and inventory listing use the existing bounded Drive
+authentication refresh. A Google HTTP 401 retries the read after refreshing
+credentials. It does not repeat an upload or render, follow a metadata redirect,
+or bypass the owner-only permission and byte checks.
+
 ## Owner recovery commands
 
 Find the named **BWB Recovery VIDEO_ID** folder in the owner's Drive or the
