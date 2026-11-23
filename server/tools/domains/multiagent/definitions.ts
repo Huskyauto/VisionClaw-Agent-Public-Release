@@ -31,7 +31,7 @@ export const ensembleQueryDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "ensemble_query",
-    description: "Use the default frontier jury: owner requests are Profundo-first when enabled, with automatic free/subscription backups (including enabled Standard Compute pinned Gemini) then scoped budget-capped native APIs on faults. Standard Compute has a finite prepaid allowance. Distinct Profundo models share ONE provider; never claim provider independence. Other pools are explicit alternatives, not automatic upgrades. Compare reasoning perspectives for hard tasks; supply evidence_sources for source-bound observation, NOT truth certification. restate_gate detects ambiguity; dissent_quota may add steelmen. Other tenants retain their routing policy. Agreement is not factual proof. evidenceObservation covers only this exact answer; missing sources remain unresolved. Fetch primary sources with approved research tools first; this tool does not authenticate supplied URLs.",
+    description: "Run the default frontier jury for hard decisions. An explicit authenticated owner request prefers DeepSeek V4 Pro, GPT-6.2 Sol and Fable 5.2 when Profundo is off and the scoped budget allows. The server selects and reports actual routes. When enabled, Profundo stays subscription-first; its models share one provider. Existing bounded recovery retains completed votes. Alternative pools and other tenants are unchanged. Agreement is not factual proof. Fetch primary sources first; evidence_sources supplies source snapshots, not URL authentication. restate_gate checks ambiguity; dissent_quota may add steelmen.",
     parameters: {
       type: "object",
       properties: {

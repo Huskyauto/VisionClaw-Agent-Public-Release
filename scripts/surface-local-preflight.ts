@@ -29,8 +29,7 @@ async function main() {
     console.log(JSON.stringify({ step: "production-shape-generation", status: "starting" }));
     const response = await surfaceRequest(legionProxyPort(), "/v1/chat/completions", {
       model: SURFACE_MODEL, stream: true, temperature: 0,
-      messages: [{ role: "system", content: "Return only the exact JSON requested. No explanations or tools." },
-        { role: "user", content: 'Fictional test, no real records: return exactly {"concepts":[]}.' }],
+      messages: [{ role: "user", content: "What is 17 + 25? Reply with only the number." }],
     }, 90_000, abort.signal);
     // Record even a semantically rejected returned completion, never its content.
     const usage = response.usage;
@@ -50,13 +49,13 @@ async function main() {
     } catch { console.warn("[surface-preflight] usage persistence uncertain; do not repeat inference for accounting"); }
     finally { if (accountingTimer) clearTimeout(accountingTimer); }
     const content = response.choices?.[0]?.message?.content;
-    if (typeof content !== "string" || JSON.stringify(JSON.parse(content)) !== '{"concepts":[]}') {
-      throw Error("Surface synthetic JSON contract failed; no automatic retry");
+    if (typeof content !== "string" || content !== "42") {
+      throw Error("Surface known-answer correctness check failed; no automatic retry");
     }
     console.log(JSON.stringify({ step: "production-shape-generation", provider: "surface-local",
       model: SURFACE_MODEL, latencyMs: Date.now() - start, stream: true, maxTokensOmitted: true,
       contentSha256: createHash("sha256").update(content).digest("hex"),
-      usageReported: reported, inferenceCostUsd: 0, hostedFallback: false }));
+      knownAnswerPassed: true, usageReported: reported, inferenceCostUsd: 0, hostedFallback: false }));
     // Fixed negative destinations only. Failed dials are observations, not proof
     // of a deny rule; an unavailable listener can also fail.
     for (const destination of ["100.94.89.78:22", "100.94.89.78:443",

@@ -1,16 +1,16 @@
 # Tenant-Isolation Audit Report
 
-_Generated 2026-11-17T22:47:41.664Z by `scripts/tenant-isolation-audit.ts` using `claude-sonnet-5` pinned to `profundo`._
+_Generated 2026-11-19T14:08:27.726Z by `scripts/tenant-isolation-audit.ts` using `claude-sonnet-5` pinned to `profundo`._
 
 **READ-ONLY audit** — findings below are surfaced for human review. No code was changed.
 
-> ⚠️ **DEGRADED RUN — INCOMPLETE COVERAGE.** 370 file(s) were NOT audited this run (chunk cap in effect). Findings below are PARTIAL — do not read "few findings" as "all clear."
+> ⚠️ **DEGRADED RUN — INCOMPLETE COVERAGE.** 395 file(s) were NOT audited this run (chunk cap in effect). Findings below are PARTIAL — do not read "few findings" as "all clear."
 
-- Coverage: **512/882** file(s) audited · chunks 191/358 OK (0 failed, 167 pending)
-- Findings: **103** (CRITICAL 0 · HIGH 45 · MEDIUM 54 · LOW 4)
-- Severe dispositions: **45 kept** · 0 precision false-positive · 0 allowlist false-positive · 0 deferred real risk
+- Coverage: **498/893** file(s) audited · chunks 174/360 OK (0 failed, 186 pending)
+- Findings: **93** (CRITICAL 0 · HIGH 38 · MEDIUM 51 · LOW 4)
+- Severe dispositions: **38 kept** · 0 precision false-positive · 0 allowlist false-positive · 0 deferred real risk
 
-### HIGH (45)
+### HIGH (38)
 
 - **server/agent-activity.ts:60** — SELECT against the potentially tenant-scoped `personas` table filters only by `personaId` without verifying the `tenantId`. If a user provides a foreign `personaId`, this can leak the persona's emoji and catchphrase across tenants via the live agent status cache.
   - _Fix:_ Update `getPersonality` to accept `tenantId` and include `eq(personas.tenantId, tenantId)` in the WHERE clause.
@@ -32,8 +32,6 @@ _Generated 2026-11-17T22:47:41.664Z by `scripts/tenant-isolation-audit.ts` using
   - _Fix:_ Derive the Drive folder from the authenticated tenant or verify `_projectDriveFolderId` against a tenant-owned, server-side mapping before uploading; reject any folder that is not owned by the current tenant.
 - **server/channels/kernel.ts:177** — The kernel accepts a conversationId from the adapter-supplied resolveConversation callback and passes it to processMessage with turn.tenantId, but performs no ownership check tying that conversation to the tenant. If any adapter derives the conversation from caller-controlled identifiers without validating ownership, this central dispatch path can process another tenant's conversation.
   - _Fix:_ Before calling processMessage, verify that the resolved conversation belongs to turn.tenantId using a tenant-constrained lookup, or require resolveConversation to return only an ownership-verified record and enforce that contract in each adapter.
-- **server/chat-engine/project-context.ts:23** — The fallback project lookup verifies that the linked project belongs to tenantId but does not verify that conversationId belongs to tenantId. If a caller supplies a conversation ID from another tenant that is linked to a project in this tenant (or if cross-tenant links exist), the function can derive and return that project's context. The tenantId is taken from the supplied conv object rather than establishing ownership of conversationId in this query path.
-  - _Fix:_ Require the conversation itself to belong to tenantId before any project lookup, and include a tenant predicate or tenant-checked join for conversations in the project_conversations fallback query. Treat a missing tenant-matching conversation row as unauthorized and return null.
 - **server/cmmc-assessments.ts:76** — createCmmcAssessment accepts customerId as an input and stores it on the tenant-scoped assessment without verifying that the referenced customer belongs to params.tenantId. A caller able to invoke this function could associate another tenant's customer record with the new assessment.
   - _Fix:_ Before inserting, query the customer by customerId constrained by tenantId and reject the request unless the row exists in the authenticated tenant; alternatively derive customerId from a tenant-scoped lookup rather than trusting the caller-provided foreign key.
 - **server/crews-engine.ts:402** — addCrewTask accepts caller-controlled agentId and stores it in a tenant-scoped crew_tasks row without verifying that the referenced crew_agents row belongs to the same tenant and crew. A cross-tenant or cross-crew agent reference can therefore be persisted and later used during execution.
@@ -60,8 +58,12 @@ _Generated 2026-11-17T22:47:41.664Z by `scripts/tenant-isolation-audit.ts` using
   - _Fix:_ Do not grant public or published-to-web permissions for tenant artifacts. Serve presentations through an authenticated, tenant-checked proxy or grant access only to authorized tenant principals, and verify the requesting user's tenant before returning any artifact URL.
 - **server/heartbeat.ts:879** — The heartbeat dispatcher loads a persona using only task.personaId, without passing or validating the task tenant. If personas are tenant-scoped, this permits a task referencing another tenant's persona to read that row and use its identity/context.
   - _Fix:_ Change getPersona to require tenantId and enforce persona.tenant_id = task.tenantId in the query, or perform an explicit ownership check before loading and using the persona.
-- **server/lib/agent-trace.ts:130** — UPDATE against tenant-scoped table agent_trace_spans filters only by span_id and omits tenant_id. If span_id is ever guessed, reused, or sourced across tenant contexts, this write can modify another tenant's row.
-  - _Fix:_ Include tenant_id in the UPDATE predicate, e.g. carry the opening tenantId into persistSpanClose and use WHERE tenant_id = ${tenantId} AND span_id = ${spanId}.
+- **server/lib/action-ledger.ts:268** — SELECT against tenant-scoped table `action_attempts` lacks a `tenant_id` constraint. Comments claim this is a cross-tenant platform loop, but the caller is not in this batch to verify system-level authorization.
+  - _Fix:_ Verify the caller is strictly gated to a global admin/system context, or inject the tenant_id if this is exposed to ordinary customers.
+- **server/lib/action-ledger.ts:304** — UPDATE against tenant-scoped table `action_attempts` lacks a `tenant_id` constraint. Comments claim this is a cross-tenant platform loop, but the caller is not in this batch to verify system-level authorization.
+  - _Fix:_ Verify the caller is strictly gated to a global admin/system context, or inject the tenant_id if this is exposed to ordinary customers.
+- **server/lib/agent-trace.ts:126** — UPDATE against tenant-scoped table agent_trace_spans lacks a tenant_id constraint in the WHERE clause.
+  - _Fix:_ Pass tenantId to persistSpanClose and add AND tenant_id = ${tenantId} to the WHERE clause.
 - **server/lib/commerce-catalog.ts:137** — registerProduct inserts commerce_products.tenant_id directly from input.tenantId, but this library does not bind that value to an authenticated tenant or otherwise validate that the caller is authorized to act for it. If tenantId is request-derived at any caller, this permits cross-tenant product creation and can also make the mission/sequence ownership checks operate against an attacker-selected tenant.
   - _Fix:_ Accept an authenticated tenant context rather than a caller-controlled tenantId, derive the tenant ID from that context, and use it consistently for the INSERT and foreign-record ownership checks. Verify all callers enforce the required owner/admin gate before invoking this function.
 - **server/lib/sandbox/replay.ts:125** — Both replay entry points accept tenantId as a caller-supplied numeric option and only validate that it is positive; this unit does not bind it to an authenticated principal or verify that the caller may access that tenant. The tenant ID is then used for corpus reads and tenant-scoped sandbox inserts, so relying on an unshown caller check could permit cross-tenant replay data access or writes. Customer reachability cannot be confirmed without the callers and authentication middleware.
@@ -86,24 +88,8 @@ _Generated 2026-11-17T22:47:41.664Z by `scripts/tenant-isolation-audit.ts` using
   - _Fix:_ Restrict this function to an authenticated global worker/control-plane principal and audit its callers; otherwise constrain selection by the caller's tenant_id and avoid returning cross-tenant payloads.
 - **server/martech-bundle.ts:325** — The UPDATE targets the tenant-scoped tenantVoiceProfiles table using only the profile id, without a tenant_id predicate. Although the row was previously selected with tenant filtering, the mutation itself lacks an ownership constraint and should not rely on the earlier lookup for isolation.
   - _Fix:_ Add the tenant constraint to the UPDATE condition, for example: where(and(eq(tenantVoiceProfiles.id, existing.id), eq(tenantVoiceProfiles.tenantId, opts.tenantId))). Verify that exactly one row was updated.
-- **server/memory-graph.ts:130** — The UPDATE of tenant-scoped memory_categories is constrained only by category id and does not include tenant_id. A category id from another tenant could therefore have its memory_count modified if this function is called with an unowned id.
-  - _Fix:_ Add AND tenant_id = ${tenantId} to the UPDATE predicate, and treat the affected-row count as an ownership check.
-- **server/memory-graph.ts:261** — linkRelatedMemories checks memory_links by caller-supplied memory IDs without validating that newMemoryId belongs to tenantId. Although target memories are selected for the tenant, an unowned source ID can be used to inspect existing links and proceed with a cross-tenant relationship.
-  - _Fix:_ First verify newMemoryId is an active, non-deleted memory owned by tenantId, and constrain the link-existence query through tenant-owned source and target memory_entries.
-- **server/memory-graph.ts:275** — The memory_links INSERT uses caller-supplied newMemoryId and a selected target id without proving both memory_entries belong to tenantId. Because memory_links is scoped through its endpoint memories, this can create cross-tenant links and contaminate relationship reads.
-  - _Fix:_ Perform an ownership check for both endpoint IDs in the same transaction, or insert only after joining both memory_entries with tenant_id = ${tenantId}; reject any endpoint not owned by the tenant.
-- **server/memory-graph.ts:295** — getLinkedMemories allows tenantId === null to replace tenant filtering with TRUE, but this function contains no authorization gate proving the caller is a global administrator or trusted system path. It also validates the tenant only for the linked endpoint, not for the caller-supplied memoryId.
-  - _Fix:_ Do not expose an unauthenticated null bypass; require an explicit trusted-admin authorization context and otherwise require tenantId. Also verify memoryId belongs to tenantId before returning links.
-- **server/memory-graph.ts:710** — UPDATE against tenant-scoped memory_entries is filtered only by id and omits the tenant_id ownership constraint. Although the id was previously selected with a tenant filter, the mutation itself lacks a mutation-time tenant check.
-  - _Fix:_ Add `AND tenant_id = ${tenantId}` to the UPDATE predicate and verify that the affected-row count is exactly as expected before counting the memory as categorized.
-- **server/memory-intelligence.ts:39** — findSimilarMemories accepts an optional tenantId and passes it directly to storage.getMemoryEntries. If the storage method omits tenant filtering when tenantId is undefined, this utility can read memories across tenants; the actual storage query and all callers were not provided to establish enforcement.
-  - _Fix:_ Make tenantId mandatory, reject missing or invalid values before querying, and ensure getMemoryEntries always applies an explicit tenant_id predicate.
-- **server/memory-intelligence.ts:448** — getMemoryHealth exposes tenant-scoped memory statistics with an optional tenantId and passes undefined through to getMemoryEntries. Without a guaranteed tenant predicate in the storage implementation, this can aggregate data across tenants; caller authorization and the underlying query are not shown.
-  - _Fix:_ Require and validate tenantId, enforce tenant_id filtering in getMemoryEntries, and verify every caller derives the tenant from authenticated context rather than request input.
-- **server/memory-intelligence.ts:497** — findAndResolveContradictions accepts an optional tenantId and uses it for memory lookup through findSimilarMemories. A missing tenant can therefore result in an unscoped read and return another tenant's memory ID/fact, depending on the unseen storage behavior.
-  - _Fix:_ Require a validated tenantId for this operation and enforce tenant_id in the underlying SELECT; add tests proving missing or mismatched tenant context cannot return another tenant's memory.
 
-### MEDIUM (54)
+### MEDIUM (51)
 
 - **server/agent-channels.ts:101** — The `fromPersonaId` foreign key is written to `channel_messages` without first verifying that the referenced persona belongs to the caller's tenant, unlike `threadId` and `eventRef` which are properly checked.
   - _Fix:_ Add an ownership check for `params.fromPersonaId` against the `personas` table using `params.tenantId` before inserting the message.
@@ -207,20 +193,14 @@ _Generated 2026-11-17T22:47:41.664Z by `scripts/tenant-isolation-audit.ts` using
   - _Fix:_ Include AND tenant_id = ${selected.tenant_id} in the WHERE clause and verify the affected-row count, preserving the tenant binding through this mutation.
 - **server/lobster.ts:498** — The resume path authorizes access solely by possession of the resume token: runLobster passes only token/approval to resumeWorkflow, and resumeWorkflow loads persisted state without checking the authenticated caller's tenant or persona. A caller who obtains another tenant's token could continue that workflow, including subsequent tenant-scoped tool operations. This source does not show the route/caller gate, so customer reachability and token exposure must be verified.
   - _Fix:_ Pass the authenticated tenant/persona context into resumeWorkflow, persist the launching tenant and required actor identity with the state, and reject resumes when they do not match. Also enforce one-time expiry and ensure the route does not allow unauthenticated or cross-tenant token use.
-- **server/memory-graph.ts:106** — ensureCategory inserts a caller-supplied parent_id without verifying that the referenced parent category belongs to tenantId. This can create cross-tenant category relationships when parentId is externally derived or supplied.
-  - _Fix:_ Before inserting, verify parent_id with SELECT id FROM memory_categories WHERE id = ${parentId} AND tenant_id = ${tenantId}; reject or null out the parent when ownership is not established.
-- **server/memory-intelligence.ts:386** — The caller-supplied sourceMessageId is passed into persistTemporalTriple and subsequently recordMemoryDerivation without an ownership check in this unit. If those helpers do not verify that the message belongs to tenantId, a foreign message ID could create a cross-tenant derivation edge.
-  - _Fix:_ Before recording the derivation, load the message with an explicit tenant_id = tenantId predicate (or make recordMemoryDerivation perform that check transactionally), and reject missing, nonexistent, or cross-tenant sourceMessageId values.
-- **server/memory/forgetting-store.ts:1103** — SELECT on tenant-scoped table `memory_erasure_requests` lacks a tenant_id constraint. The caller is not visible in this batch to verify if this is a safely gated global/admin control-plane operation.
-  - _Fix:_ Verify the caller of `listStaleErasureRequests` is strictly an internal background worker or admin gate. If exposed to tenant users, add a tenant_id constraint.
 
 ### LOW (4)
 
 - **server/heartbeat-startup.ts:81** — The startup normalization UPDATE targets the tenant-scoped heartbeat_tasks table with only WHERE id = ..., without constraining tenant_id. The same issue occurs in the reflection-model UPDATE at line 85. This is an internal all-tenant control-plane path rather than a demonstrated customer-reachable disclosure, but an incorrect or reused task ID could cause cross-tenant mutation.
   - _Fix:_ Use a tenant-aware update with WHERE id = ${t.id} AND tenant_id = ${Number(t.tenantId)}, or route both changes through updateHeartbeatTask with the task's tenant ID and retain an explicit privileged all-tenant control-plane boundary.
-- **server/job-queue.ts:442** — failJob performs a SELECT against tenant-scoped table agent_jobs using only id and tenant_id, without also verifying the caller still owns the live attempt/status/lease for that job. A caller holding a foreign or stale job id within the same tenant could read max_attempts before the fenced UPDATE no-ops.
-  - _Fix:_ Fold max_attempts retrieval into a single fenced UPDATE/CTE that also checks attempts, status='running', and unexpired lease, or first SELECT ... FOR UPDATE with the same tenant/attempt/lease predicates used by the subsequent UPDATEs.
-- **server/job-queue.ts:550** — getJobTenantForAdmin reads from tenant-scoped table agent_jobs by id with no tenant predicate. The comment says this is admin-only, but this file alone does not provide evidence of the actual admin gate at callers, so this is a candidate cross-tenant lookup surface if exposed outside verified admin routes.
-  - _Fix:_ Ensure all callers are protected by a verified platform-admin authorization gate, or require an explicit admin-scoped parameter/type that cannot be used by tenant-facing code. If feasible, colocate or enforce the admin authorization before this lookup.
-- **server/job-queue.ts:550** — getJobTenantForAdmin performs a SELECT on tenant-scoped table agent_jobs by id without a tenant_id predicate. Although the comment says it is for platform-admin use, this helper itself does not enforce any admin gate, so misuse by non-admin callers could disclose another tenant's job ownership metadata.
-  - _Fix:_ Enforce the platform-admin authorization at the caller boundary and preferably make this helper accept an explicit verified admin/operator context, or restrict its export/visibility so tenant-facing code cannot call it. If feasible, provide separate tenant-scoped lookup helpers for non-admin use.
+- **server/job-queue.ts:553** — SELECT against tenant-scoped table `agent_jobs` lacks a `tenant_id` constraint. Although commented as an admin function, the batch lacks caller context to verify it is protected by a global admin authorization gate.
+  - _Fix:_ Verify the caller enforces strict global admin authorization, or require a tenant_id if used in tenant-facing routes.
+- **server/job-queue.ts:593** — SELECT against tenant-scoped table `agent_jobs` omits the `tenant_id` constraint when `scope === ALL_TENANTS`. The batch lacks caller context to verify that `ALL_TENANTS` is only passed by authenticated global admins.
+  - _Fix:_ Verify that the route handler calling this function with `ALL_TENANTS` enforces global admin privileges.
+- **server/job-queue.ts:664** — SELECT against tenant-scoped table `agent_jobs` omits the `tenant_id` constraint when `scope === ALL_TENANTS`. The batch lacks caller context to verify that `ALL_TENANTS` is only passed by authenticated global admins.
+  - _Fix:_ Verify that the route handler calling this function with `ALL_TENANTS` enforces global admin privileges.

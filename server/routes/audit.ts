@@ -18,6 +18,7 @@ import { agentJourneySchema, auditChecksForStorage } from "../lib/agent-journey-
 import { registerReportRecoveryRoute } from "./report-recovery";
 import { registerCompanyReportPackages } from "./company-report-packages";
 import { registerAgentReadyRoutes } from "./agent-ready-package";
+import { registerGlm54LayoutRoutes } from "./glm54-layout-review";
 
 const AUDIT_TENANT_ID = 1; // platform-owner storefront
 
@@ -546,6 +547,7 @@ export function registerAuditAdminRoutes(app: Express, helpers: {
   });
   registerCompanyReportPackages(app, { authMiddleware, requireAdmin });
   registerAgentReadyRoutes(app, { authMiddleware, requireAdmin });
+  registerGlm54LayoutRoutes(app, { authMiddleware, requireAdmin });
 
   // Instant audit (same engine as the public /audit page, no Turnstile /
   // public rate limits — operator is authenticated).

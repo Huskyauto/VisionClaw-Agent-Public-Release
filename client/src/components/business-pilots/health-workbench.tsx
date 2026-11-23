@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { authFetch } from "@/lib/queryClient";
+import { Link } from "wouter";
+import { useSiteConfig } from "@/hooks/use-site-config";
 import { healthSchema, type HealthInput } from "../../../../shared/business-pilots/health";
 import type { PilotResult } from "../../../../shared/business-pilots/common";
 import ReleaseWorkbench from "@/components/business-pilots/release-workbench";
@@ -169,6 +171,7 @@ function HealthResult({ result }: { result: PilotResult }) {
 }
 
 export default function BusinessHealthWorkbench() {
+  const { config } = useSiteConfig();
   const [activeKind, setActiveKind] = useState<PilotKind>("health");
   const [draft, setDraft] = useState<HealthDraft>(initialDraft);
   const [runs, setRuns] = useState<SavedRun[]>([]);
@@ -395,6 +398,11 @@ export default function BusinessHealthWorkbench() {
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8b6b4e]">Input boundary</p>
               <p className="mt-2 text-xs leading-5 text-[#68756d]">Enter aggregates only. Do not include credentials, customer names, or personal data.</p>
             </div>
+            {config.finishedNotBilledEnabled && (
+              <Link href="/admin/finished-not-billed" className="flex min-w-[180px] items-center gap-2 rounded-xl border border-[#cbd9ce] bg-[#f9f8f2] px-3 py-3 text-sm font-medium text-[#245e57] hover:underline">
+                <FileText className="size-4 shrink-0" /> Finished but Not Billed
+              </Link>
+            )}
           </nav>
 
           <div className="min-w-0 space-y-6">

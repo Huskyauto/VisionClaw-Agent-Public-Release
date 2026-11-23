@@ -29,7 +29,7 @@ test("a rejected Lenovo answer automatically tries Surface once through the same
 const source = { text: "Inspect the real caller before changing code.", sha256: "a".repeat(64) };
 const validContent = '{"concepts":[{"key":"caller-check","title":"Check caller","lineStarts":[1]}]}';
 const completion = (content: string, surface = false) => ({
-  model: surface ? "qwen2.5-7b-instruct-qnn-npu:3" : "qwen3:8b",
+  model: surface ? "qwen2.5-7b-instruct-generic-gpu:4" : "qwen3:8b",
   system_fingerprint: "fp_ollama", usage: { prompt_tokens: 20, completion_tokens: 20 },
   choices: [{ finish_reason: "stop", message: { content } }],
 });
@@ -64,7 +64,7 @@ test("every rejected Lenovo response type reaches Surface, while a valid primary
       hosted: async () => { calls.push("hosted"); throw Error("Hosted must not run"); },
     });
     const result = await compile(".agents/skills/zoom-out/SKILL.md");
-    assert.equal(result.model, kind === "valid" ? "legion-local:qwen3:8b" : "surface-local:qwen2.5-7b-instruct-qnn-npu:3", kind);
+    assert.equal(result.model, kind === "valid" ? "legion-local:qwen3:8b" : "surface-local:qwen2.5-7b-instruct-generic-gpu:4", kind);
     assert.deepEqual(calls, kind === "valid" ? ["lenovo"] : ["lenovo", "surface"], kind);
   }
 });
@@ -269,7 +269,7 @@ test("task validation happens inside failover; both returned completions are acc
     legionGenerate: async () => reply("qwen3:8b", "not JSON"),
     surfaceGenerate: async () => {
       assert.equal(releases, 0);
-      return reply("qwen2.5-7b-instruct-qnn-npu:3", '{"concepts":[]}');
+      return reply("qwen2.5-7b-instruct-generic-gpu:4", '{"concepts":[]}');
     },
   });
   const worker = createLegionWorker({
@@ -282,7 +282,7 @@ test("task validation happens inside failover; both returned completions are acc
     messages: [{ role: "user", content: "Synthetic engineering source" }],
     validateContent: content => { JSON.parse(content); },
   });
-  assert.equal(result.model, "surface-local:qwen2.5-7b-instruct-qnn-npu:3");
+  assert.equal(result.model, "surface-local:qwen2.5-7b-instruct-generic-gpu:4");
   assert.deepEqual(receipts.map(r => r.toolName), ["llm.legion-local", "llm.surface-local"]);
   assert.equal(releases, 1);
 });

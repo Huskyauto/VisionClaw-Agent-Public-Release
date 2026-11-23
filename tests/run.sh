@@ -31,6 +31,7 @@ if ! timeout 60 npx tsx scripts/preflight-domain-boundaries.ts; then
 fi
 
 FILES=(
+  "tests/deployment/railway-staging-startup-repair.test.cjs"
   "tests/security/backup-confidentiality.test.ts"
   "tests/security/crew-route-authority.test.ts"
   "tests/unit/memory-backup-bundle.test.ts"
@@ -40,6 +41,7 @@ FILES=(
   "tests/security/owner-only-identity.test.ts"
   "tests/security/app-review-integrity.test.ts"
   "tests/security/app-review-followthrough.test.ts"
+  "tests/docker-release-facts-context.test.ts"
   "tests/lib/demo-studio.test.ts"
   "tests/lib/harness-ab-sample.test.ts"
   "tests/lib/structured-prompt-profile.test.ts"
@@ -143,6 +145,7 @@ FILES=(
   "tests/security/agentid-auth.test.ts"
   "tests/security/admin-pin-lockout-regression.test.ts"
   "tests/unit/tool-rate-limit-pacing.test.ts"
+  "tests/unit/firecrawl-v2.test.ts"
   "tests/security/npm-audit-deferrals.test.ts"
   "tests/security/features-doc-content-verification.test.ts"
   "tests/security/features-doc-delivery-project-guard.test.ts"

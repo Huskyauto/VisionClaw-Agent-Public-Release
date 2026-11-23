@@ -119,7 +119,7 @@ test("Surface dispatch keeps owner gating, actual provider accounting and strict
         calls++;
         if (scenario === "revoked") enabled = false;
         return { provider: "surface-local", localFallback: false, response: {
-          model: scenario === "wrong-model" ? "phi-3.5-mini" : "qwen2.5-7b-instruct-qnn-npu:3",
+          model: scenario === "wrong-model" ? "phi-3.5-mini" : "qwen2.5-7b-instruct-generic-gpu:4",
           ...(scenario === "unknown-usage" ? {} : { usage: { prompt_tokens: 10, completion_tokens: 10 } }),
           choices: [{ finish_reason: "stop", message: { content: '{"concepts":[]}',
             ...(scenario === "tools" ? { tool_calls: [{ id: "forbidden" }] } : {}) } }],
@@ -131,7 +131,7 @@ test("Surface dispatch keeps owner gating, actual provider accounting and strict
       messages: [{ role: "user", content: "Synthetic public engineering text" }] });
     if (scenario === "valid" || scenario === "unknown-usage") {
       const result = await run();
-      assert.equal(result.model, "surface-local:qwen2.5-7b-instruct-qnn-npu:3");
+      assert.equal(result.model, "surface-local:qwen2.5-7b-instruct-generic-gpu:4");
       assert.equal(receipts[0].toolName, "llm.surface-local");
       assert.equal(receipts[0].costUsd, 0);
       assert.equal(receipts[0].operation, scenario === "unknown-usage" ? "compile-runbook:usage-unreported" : "compile-runbook");

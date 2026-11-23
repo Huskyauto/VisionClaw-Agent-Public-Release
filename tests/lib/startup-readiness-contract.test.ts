@@ -3,6 +3,78 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import test from "node:test";
+import { Client } from "pg";
+import { runStripeMigrationsWithRetry } from "../../server/lib/stripe-migration-retry";
+
+test("Stripe startup retries once after the real pg connection deadline fires", async () => {
+  // Accept TCP without sending a PostgreSQL startup response. No real DB
+  // credentials, SQL statements, or Stripe requests are used by this test.
+  const listener = createServer((socket) => socket.resume());
+  await new Promise<void>((resolve, reject) => {
+    listener.once("error", reject);
+    listener.listen(0, "127.0.0.1", resolve);
+  });
+  const address = listener.address();
+  assert(address && typeof address === "object");
+  const client = new Client({
+    host: "127.0.0.1", port: address.port, user: "fixture", database: "fixture",
+    password: "fixture", ssl: false, connectionTimeoutMillis: 75,
+  });
+  const trail: string[] = [];
+  try {
+    let attempts = 0;
+    let timeout: unknown;
+    await runStripeMigrationsWithRetry(async () => {
+      trail.push("connect");
+      if (++attempts === 1) {
+        try {
+          await client.connect();
+        } catch (error) {
+          timeout = error;
+          throw error;
+        }
+      }
+    }, {
+      onRetry: () => { trail.push("retry announced"); },
+      wait: async () => { trail.push("waited"); },
+    });
+    assert.deepEqual(trail, ["connect", "retry announced", "waited", "connect"]);
+
+    assert(timeout instanceof Error);
+    attempts = 0;
+    await assert.rejects(runStripeMigrationsWithRetry(async () => {
+      attempts++;
+      throw timeout;
+    }, { onRetry: () => {}, wait: async () => {} }), (error) => error === timeout);
+    assert.equal(attempts, 2, "a second real connection timeout must not start another attempt");
+  } finally {
+    await client.end();
+    await new Promise<void>((resolve) => listener.close(() => resolve()));
+  }
+});
+
+test("Stripe startup does not retry an SQL error or an unrelated timeout with the same message", async () => {
+  for (const failure of [new Error("canceling statement due to lock timeout"), new Error("timeout expired")]) {
+    let attempts = 0;
+    await assert.rejects(runStripeMigrationsWithRetry(async () => {
+      attempts++;
+      throw failure;
+    }, {
+      onRetry: () => assert.fail("unrelated failure attempted a retry"),
+      wait: async () => assert.fail("unrelated failure attempted a wait"),
+    }), (error) => error === failure);
+    assert.equal(attempts, 1);
+  }
+});
+
+test("Stripe bootstrap starts in the background only after the main listener and staging guard", async () => {
+  const source = await readFile("server/index.ts", "utf8");
+  const listen = source.indexOf("await listenWithRetry(5)");
+  const startup = source.indexOf("void initializeStripeAtStartup()");
+  assert(listen >= 0 && startup > listen);
+  assert.match(source.slice(listen, startup), /if \(isolatedStaging\) \{[\s\S]*Stripe\/payment startup disabled[\s\S]*\}\s*else\s*\{(?:\s*\/\/[^\n]*\n)*\s*$/);
+  assert.doesNotMatch(source, /await initializeStripeAtStartup\(/);
+});
 
 async function unusedPort(): Promise<number> {
   const server = createServer();
@@ -46,7 +118,7 @@ test("production binds the warm-up page before awaiting network-dependent auth d
   );
 });
 
-test("the production warm-up page keeps the VM root readiness probe healthy", { timeout: 30_000 }, async () => {
+test("the production warm-up page keeps the VM root readiness probe healthy", { timeout: 40_000 }, async () => {
   const port = await unusedPort();
   let output = "";
   const child = spawn(process.execPath, ["dist/index.cjs"], {
@@ -82,7 +154,10 @@ test("the production warm-up page keeps the VM root readiness probe healthy", { 
 
   try {
     let response: Response | undefined;
-    const deadline = Date.now() + 15_000;
+    // Use the existing 30-second Docker liveness budget rather than a
+    // shorter test-only cutoff. Cold public bundles can need longer to
+    // load modules on a shared worker before the early bind executes.
+    const deadline = Date.now() + 29_000;
     while (Date.now() < deadline) {
       if (child.exitCode !== null) {
         assert.fail(`production server exited before readiness probe: ${output}`);

@@ -49,7 +49,8 @@ The report keeps the three important dimensions separate:
 - **Process** — an equal-weight average of trace-backed `toolUse`,
   `stateConsistency`, and `robustness`.
 - **Security** — a binary structural verdict, never an LLM’s impression of
-  safety.
+  safety. A recorded verdict still counts even when another score on that
+  row is missing; an unknown verdict is not counted as a pass or failure.
 
 The displayed combined score is:
 
@@ -65,13 +66,20 @@ look excellent. The separate component scores remain visible for diagnosis.
 
 - Missing or malformed values make a run **unevaluated**; they are never
   silently discarded.
-- Coverage is checked globally and per configuration. A configuration needs at
-  least the requested coverage floor (default `80%`) before it is eligible for
-  comparison. Any under-covered configuration makes the entire comparison
-  non-comparable, even if the global average coverage looks sufficient.
-- The command exits `3` when coverage is incomplete **or** when any evaluated
-  configuration fails a structural security check. That is an honest
-  non-comparable result, not a favorable low score.
+- Every configuration needs at least one fully scored run and must meet the
+  coverage floor (default `80%`). Coverage is checked globally and per
+  configuration.
+- The submitted **and** the successfully scored task IDs and repetition counts
+  must match across configurations. Two arms at 80% cannot be compared if each
+  dropped a different task. JSON reports distinguish `taskSetsMatched` from
+  `evaluatedTaskSetsMatched`.
+- The command exits `3` for insufficient evidence, mismatched tasks, or any
+  recorded structural security failure, even if completion or process evidence
+  on the same row is missing. The coverage setting cannot waive such a failure.
+- The report only checks supplied records, not the experiment design. Freeze
+  the task set independently and give materially different scenarios or trials
+  distinct task IDs. Partial coverage supports conclusions about the common
+  scored subset only. Use a floor of `1` when every task must be evaluated.
 - Use an independent oracle/judge for completion. The candidate model must not
   grade itself.
 - Derive process and security signals from traces and policy validators where

@@ -24,7 +24,7 @@ async function overviewHandler(params: Record<string, any>, ctx: ToolContext): P
       { countStoredIncomeOpportunities, readStoredIncomeOpportunityPage, INCOME_OPPORTUNITIES },
       { countProductsForOverview, readProductsPageForOverview },
       { getPublicCatalog },
-      { OWNER_SERVICE_OFFERINGS },
+      { getOwnerServiceOfferings },
     ] = await Promise.all([
       import("../../../lib/income-opportunities"),
       import("../../../lib/commerce-catalog"),
@@ -43,7 +43,7 @@ async function overviewHandler(params: Record<string, any>, ctx: ToolContext): P
         page: (offset, limit) => readProductsPageForOverview(tenantId, offset, limit),
       },
       builtinProducts: createArrayOverviewSource(getPublicCatalog()),
-      serviceOfferings: createArrayOverviewSource(OWNER_SERVICE_OFFERINGS),
+      serviceOfferings: createArrayOverviewSource(getOwnerServiceOfferings()),
     };
     return await readOwnerBusinessOverview(params, sources);
   } catch (err) {

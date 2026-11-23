@@ -8,6 +8,7 @@ import { requestWithModelToolRoster } from "../../server/lib/model-tool-authoriz
 import { trustedExecFlags } from "../../server/safety/trusted-exec-stamp";
 import { parseToolCallsFromContent } from "../../server/tool-call-fallback-parser";
 import { resolveToolPersonaId } from "../../server/tools/invocation-authority";
+import { tenantAccessAllowed } from "../../server/lib/owner-only-access";
 
 function loadGuardedExecutor(dispatches: Array<{ toolName: string; args: Record<string, unknown> }>) {
   const source = fs.readFileSync("server/guarded-tool-executor.ts", "utf8");
@@ -17,6 +18,9 @@ function loadGuardedExecutor(dispatches: Array<{ toolName: string; args: Record<
   const module = { exports: {} as Record<string, any> };
 
   const loadModule = (specifier: string): any => {
+    if (specifier === "./lib/owner-only-access") {
+      return { tenantAccessAllowed: (id: unknown) => tenantAccessAllowed(id, false) };
+    }
     if (specifier === "./tools/invocation-authority") return { resolveToolPersonaId };
     if (specifier === "./tools") {
       return {

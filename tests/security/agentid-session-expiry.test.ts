@@ -8,6 +8,7 @@ import session from "express-session";
 import passport from "passport";
 import ts from "typescript";
 import { transformSync } from "esbuild";
+import { ownerOnlyAccess, tenantAccessAllowed } from "../../server/lib/owner-only-access";
 
 // Execute production guards without application startup, credentials, provider
 // calls or real customer data. Time is injected only into the fixture VM.
@@ -142,6 +143,8 @@ for (const [kind, tenantId, isAdmin] of [
       { module, exports: module.exports,
         Date: { now: () => now }, sessionCache: cache,
         agentIdEnabled: () => false,
+        ownerOnlyAccess: () => ownerOnlyAccess({ APP_ACCESS_MODE: "multi-tenant" }),
+        tenantAccessAllowed: (id: unknown) => tenantAccessAllowed(id, false),
         hashSessionToken: () => "fixture-hash",
         isTenantSessionActive: async (id: number) => id === tenantId,
         deleteSession: async () => { throw new Error("Active human session must not be deleted"); },

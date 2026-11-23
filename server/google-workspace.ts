@@ -598,6 +598,8 @@ export async function docsCreate(tenantId: number, title: string, content?: stri
 }
 
 export async function slidesCreate(tenantId: number, options: SlidesCreateOptions): Promise<any> {
+  // A connector routing override cannot promote a tenant to public publishing.
+  const platformDelivery = tenantId === ADMIN_TENANT_ID && isPlatformGoogleConnectorTenant(tenantId);
   const token = await getGoogleToken(tenantId, "slides");
   const SLIDES_API = "https://slides.googleapis.com/v1/presentations";
   const theme = resolveTheme(options.theme);
@@ -622,16 +624,20 @@ export async function slidesCreate(tenantId: number, options: SlidesCreateOption
       }
       const driveFile = await driveResp.json();
       const presentationId = driveFile.id;
-      await fetch(`https://www.googleapis.com/drive/v3/files/${presentationId}/permissions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "reader", type: "anyone" }),
-      }).catch(() => {});
+      if (platformDelivery) {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${presentationId}/permissions`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "reader", type: "anyone" }),
+        }).catch(() => {});
+      }
       const slidesUrl = `https://docs.google.com/presentation/d/${presentationId}/edit`;
       try {
         presentation = await gFetch(token, `${SLIDES_API}/${presentationId}`);
       } catch {
-        return { presentationId, url: slidesUrl, title: options.title, slideCount: 0, warning: "Slides API scope not available - presentation created as empty shell via Drive API" };
+        return { presentationId, url: slidesUrl, title: options.title, slideCount: 0,
+          ...(!platformDelivery && { access: "google-account-required" }),
+          warning: "Slides API scope not available - presentation created as empty shell via Drive API" };
       }
     } else {
       throw createErr;
@@ -1975,6 +1981,25 @@ export async function slidesCreate(tenantId: number, options: SlidesCreateOption
     console.warn(`[slides] Post-build verification failed (non-critical): ${verifyErr.message?.slice(0, 100)}`);
   }
 
+  const slidesUrl = `https://docs.google.com/presentation/d/${presentationId}/edit`;
+  const presentUrl = `https://docs.google.com/presentation/d/${presentationId}/present`;
+  if (!platformDelivery) {
+    // The tenant's Google account owns the new deck. Do not grant permissions,
+    // publish copies, or save tenant thumbnails/notes in platform directories.
+    return {
+      title: options.title,
+      presentationId,
+      slideCount: options.slides.length,
+      editUrl: slidesUrl,
+      presentFullscreenUrl: presentUrl,
+      pdfDownloadUrl: `https://docs.google.com/presentation/d/${presentationId}/export/pdf`,
+      pptxDownloadUrl: `https://docs.google.com/presentation/d/${presentationId}/export/pptx`,
+      access: "google-account-required",
+      ...(imagesFailed > 0 && { imageWarning: `${imagesFailed} image(s) failed to insert.` }),
+      ...(chunkFailures.length > 0 && { partialSuccess: true, chunkWarning: "Some slides may have missing elements." }),
+    };
+  }
+
   try {
     const shareResp = await fetch(`https://www.googleapis.com/drive/v3/files/${presentationId}/permissions`, {
       method: "POST",
@@ -2052,9 +2077,6 @@ export async function slidesCreate(tenantId: number, options: SlidesCreateOption
       await makeFileShareable(presentationId);
     } catch (_silentErr) { logSilentCatch("server/google-workspace.ts", _silentErr); }
   }
-
-  const slidesUrl = `https://docs.google.com/presentation/d/${presentationId}/edit`;
-  const presentUrl = `https://docs.google.com/presentation/d/${presentationId}/present`;
 
   try {
     const accessCheck = await fetch(slidesUrl, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(10000) });

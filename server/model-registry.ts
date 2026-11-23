@@ -12,6 +12,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { MAMMOUTH_MODELS } from "./lib/mammouth-catalog";
 import { META_MODELS, META_MAX_OUTPUT, metaModel } from "./lib/meta";
+import { isGpt62Model } from "./lib/gpt-6-2";
 
 export interface ModelInfo {
   id: string;
@@ -102,6 +103,8 @@ export const MODEL_REGISTRY: ModelInfo[] = [
   { id: "gpt-6-luna", label: "GPT-6 Luna", provider: "openai", tier: "balanced", description: "OpenAI GPT-6 low-cost workhorse — first metered fallback only after healthy zero-marginal lanes are unavailable; requires the existing metered-spend authorization", capabilities: ["vision", "code", "tools"], costClass: "cheap", trainingRegime: "unknown" },
   { id: "gpt-6-sol", label: "GPT-6 Sol", provider: "openai", tier: "powerful", description: "OpenAI GPT-6 premium reasoning model — deliberate high-risk or failed-verification escalation only; never the routine automatic workhorse", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "unknown" },
   { id: "gpt-6-astra", label: "GPT-6 Astra", provider: "openai", tier: "powerful", description: "OpenAI GPT-6 Astra — best-reasoning owner-only finishing lane; Flex by default at official Batch rates, never automatic customer routing", capabilities: ["code", "tools"], costClass: "paid", trainingRegime: "unknown" },
+  { id: "gpt-6.2-sol", label: "GPT-6.2 Sol", provider: "openai", tier: "powerful", description: "Explicit owner selection for coding and professional work. Direct OpenAI Standard: $2/M input, $10/M output; long-context rates and shared paid-AI cap apply.", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "unknown" },
+  { id: "gpt-6.2-astra", label: "GPT-6.2 Astra", provider: "openai", tier: "powerful", description: "Explicit owner selection for difficult reasoning and final review. Direct OpenAI Standard: $8/M input, $40/M output; long-context rates and shared paid-AI cap apply.", capabilities: ["vision", "code", "tools"], costClass: "paid", trainingRegime: "unknown" },
 
   { id: "claude-sonnet-4-5", label: "Claude Sonnet 4 (Latest)", provider: "anthropic", tier: "powerful", description: "Latest Sonnet - best balanced model", capabilities: ["vision", "code", "tools"], costClass: "free", trainingRegime: "rlvr" },
   { id: "claude-opus-4-5", label: "Claude Opus 4 (Latest)", provider: "anthropic", tier: "powerful", description: "Latest Opus - most capable reasoning and coding", capabilities: ["vision", "code", "tools"], costClass: "free", trainingRegime: "rlvr" },
@@ -367,6 +370,8 @@ export const MODEL_MAX_OUTPUT: Record<string, number> = {
   "gpt-6-luna": 128000,
   "gpt-6-sol": 128000,
   "gpt-6-astra": 128000,
+  "gpt-6.2-sol": 128000,
+  "gpt-6.2-astra": 128000,
   "sonar": 16384,
   "sonar-pro": 16384,
   "sonar-reasoning-pro": 16384,
@@ -379,6 +384,7 @@ export function isOwnerOnlyFinalDecisionModel(modelId: string): boolean {
     modelId.startsWith("mammouth/") ||
     modelId.startsWith("cheaperinference/") ||
     modelId === "gpt-6-astra" ||
+    isGpt62Model(modelId) ||
     modelId === "claude-fable-5-1" ||
     modelId === "claude-fable-5-2" ||
     modelId === "gemini-4-carbon" ||

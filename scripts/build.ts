@@ -4,7 +4,7 @@ import { rm, readFile, mkdir, copyFile, writeFile } from "fs/promises";
 import { execSync } from "child_process";
 import { stageTypeScriptStandardLibraries } from "./package-typescript-libs";
 import { stageLegionBinaries, stageLegionRunbooks } from "./stage-legion-binaries";
-import { buildDataPolicy } from "./lib/build-data-policy";
+import { buildDataPolicy, isPublicMirror } from "./lib/build-data-policy";
 import { buildGraph } from "./build-codebase-graph";
 import { captureVerifierSource } from "../server/lib/workspace-verifier-source";
 import { encodeVerifierSourceArtifact, VERIFIER_SOURCE_ARTIFACT } from "../server/lib/workspace-verifier-source-artifact";
@@ -29,6 +29,9 @@ const allowlist = [
   "passport",
   "passport-local",
   "pg",
+  // Layout intake parses small CSS excerpts on the server. Bundle the build
+  // dependency so the published VM does not need development node_modules.
+  "postcss",
   "uuid",
   "ws",
   "zod",
@@ -39,16 +42,18 @@ async function buildAll() {
   // Ship a current, disposable source index. Never build it on a chat/request
   // path or silently publish an old graph when source indexing fails.
   await buildGraph();
+  const publicMirror = isPublicMirror();
   const dataPolicy = buildDataPolicy(
     process.argv.includes("--release-check"),
     process.env.REPLIT_DEPLOYMENT === "1" || process.env.SKIP_DEV_DATA_SYNC === "1",
+    publicMirror,
   );
   // Skip dev-data sync during deployment builds — it reads from a DB that may
   // be slow/unreachable from the build runner and isn't needed when shipping
   // the production bundle. Only run during local builds where DATABASE_URL
   // points at the dev DB.
   if (!dataPolicy.syncDevData) {
-    console.log("[build] skipping dev-data sync (deployment or release check)");
+    console.log("[build] skipping dev-data sync (deployment, release check or public mirror)");
   } else {
     console.log("syncing dev data for production...");
     try {
@@ -109,7 +114,8 @@ async function buildAll() {
     logLevel: "info",
   });
   await stageLegionBinaries();
-  await stageLegionRunbooks();
+  if (publicMirror) console.log("[build] private Legion runbooks are not part of the public mirror");
+  else await stageLegionRunbooks();
 
   // Proposal verification runs in a memory-capped child process in production.
   // Ship a plain Node bundle; the production caller intentionally fails closed

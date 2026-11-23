@@ -25,6 +25,7 @@ export async function getConversationProjectContext(conversationId: number, conv
       FROM project_conversations pc
       JOIN projects p ON p.id = pc.project_id
       WHERE pc.conversation_id = ${conversationId} AND p.tenant_id = ${tenantId}
+      ORDER BY pc.project_id
       LIMIT 1
     `);
     const linkRows = (linkRes as any).rows || linkRes;

@@ -11,7 +11,8 @@ import {
   guardCheaperInferenceRequest,
   cheaperInferenceCostFields,
 } from "../../server/lib/cheaper-inference";
-import { cheaperRequestMaximum, catalogUsageCost } from "../../server/lib/cheaper-inference-automatic";
+import { cheaperRequestMaximum, catalogUsageCost, chooseCheaperAutomaticLuna,
+  CHEAPER_LUNA_6_UPSTREAM } from "../../server/lib/cheaper-inference-automatic";
 
 test("CheaperInference requires explicit verified owner selection and an enabled secret", () => {
   const env = { CHEAPER_INFERENCE_API_KEY: "fixture-not-a-real-key" };
@@ -58,7 +59,14 @@ function providerFunction(name: string, globals: Record<string, unknown>) {
   const module = { exports: {} as any };
   vm.runInNewContext(transformSync(`${node.getText(ast).replace(/^export\s+/, "")}\nexport { ${name} };`, {
     loader: "ts", format: "cjs", target: "node22",
-  }).code, { module, exports: module.exports, console, ...globals });
+  }).code, {
+    module, exports: module.exports, console,
+    process: { env: {} }, CHEAPER_LUNA_6_UPSTREAM,
+    FABLE_52_MODEL: "claude-fable-5-2", CARBON_MODEL: "gemini-4-carbon",
+    isGpt62Model: () => false, carbonReady: () => false, metaReady: () => false,
+    mammouthReady: () => false, metaPrimaryAllowed: () => false,
+    ...globals,
+  });
   return module.exports[name];
 }
 
@@ -95,19 +103,22 @@ test("real accounting wrapper records CheaperInference receipts for buffered and
 
 test("CheaperInference catalog is owner-only and excluded from unscoped automatic catalogs", async () => {
   const globals = {
-    storage: { getProviderKeys: async () => [{ provider: "cheaperinference", enabled: true }] },
+    storage: { getProviderKeys: async () => [{ provider: "cheaperinference", enabled: true }],
+      getTenantProviderKey: async () => undefined },
     hasOpenferenceKey: () => false, cheaperInferenceReady: () => true,
     mammouthReady: () => false,
     INTEGRATION_ENV: {}, SUBSCRIPTION_BASE_URLS: {}, MODEL_REGISTRY,
     RETIRED_MODEL_IDS: new Set(), isSyntheticEvaluationModel: () => false,
     isOwnerOnlyFinalDecisionModel,
-    getCheaperCatalog: async () => [],
+    getCheaperCatalog: async () => [{ id: CHEAPER_LUNA_6_UPSTREAM, endpoint: "/v1/chat/completions", discount: 35 }],
   };
   const catalog = providerFunction("getAvailableModelsForTenant", globals);
   const automatic = providerFunction("getAvailableModels", globals);
   assert.ok((await catalog(1, true)).some((m: any) => m.id === CHEAPER_INFERENCE_MODEL_ID));
+  assert.ok((await catalog(1, true)).some((m: any) => m.id === "cheaperinference/gpt-6-luna"));
   for (const [tenant, admin] of [[1, false], [2, false], [2, true]]) {
     assert.equal((await catalog(tenant, admin)).some((m: any) => m.id === CHEAPER_INFERENCE_MODEL_ID), false);
+    assert.equal((await catalog(tenant, admin)).some((m: any) => m.id === "cheaperinference/gpt-6-luna"), false);
   }
   assert.equal((await automatic()).some((m: any) => m.id === CHEAPER_INFERENCE_MODEL_ID), false);
   const tiers = readFileSync("data/model-tiers.json", "utf8");
@@ -121,8 +132,14 @@ test("tier routing keeps free first, then owner CheaperInference; free-only and 
   let minimumDiscount = 40;
   let openferenceAvailable = false;
   let healthyOpenferenceModel = "";
+  const env: Record<string, string> = {
+    AI_INTEGRATIONS_OPENAI_API_KEY: "fixture", AI_INTEGRATIONS_OPENAI_BASE_URL: "fixture",
+  };
+  let candidate = { id: "gpt-6-luna", type: "text", endpoint: "/v1/chat/completions", discount: 34.5,
+    input: 0.0655, output: 0.3275, maximumInput: 0.40, maximumOutput: 1.50 };
   const tier = providerFunction("getModelForTierAsync", {
-    process: { env: { AI_INTEGRATIONS_OPENAI_API_KEY: "fixture", AI_INTEGRATIONS_OPENAI_BASE_URL: "fixture" } },
+    process: { env },
+    currentTenantId: () => null,
     getProfundoKey: () => null, providerLaneCanServeModel: () => false,
     storage: { getProviderKeys: async () => [] }, hasOpenferenceKey: () => openferenceAvailable,
     OPENFERENCE_MODEL_MAP: {
@@ -137,8 +154,12 @@ test("tier routing keeps free first, then owner CheaperInference; free-only and 
     cheaperAutomaticAllowed: (tenant: number) => tenant === 1,
     replitCooldownActive: async () => cooldown,
     cheaperMinimumDiscount: () => minimumDiscount,
-    CHEAPER_INFERENCE_MODEL_ID, CHEAPER_INFERENCE_UPSTREAM_MODEL: "gpt-5.6-luna",
-    getCheaperCatalog: async () => [{ id: "gpt-5.6-luna", endpoint: "/v1/chat/completions", discount }],
+    chooseCheaperAutomaticLuna: (
+      entries: Parameters<typeof chooseCheaperAutomaticLuna>[0],
+      routeTier: Parameters<typeof chooseCheaperAutomaticLuna>[1], floor: number,
+    ) => chooseCheaperAutomaticLuna(entries, routeTier, floor, env),
+    getCheaperCatalog: async () => [{ id: "gpt-5.6-luna", type: "text", endpoint: "/v1/chat/completions",
+      discount, input: 0.08, output: 0.48, maximumInput: 0.8, maximumOutput: 3.6 }, candidate],
     meteredLlmEnabled: () => false,
   });
   assert.equal(await tier("balanced", 1), "gpt-5.4");
@@ -158,6 +179,26 @@ test("tier routing keeps free first, then owner CheaperInference; free-only and 
   minimumDiscount = 15;
   discount = 15;
   assert.equal(await tier("balanced", 1), CHEAPER_INFERENCE_MODEL_ID);
+  env.CHEAPER_INFERENCE_PREFER_GPT6_LUNA = "true";
+  assert.equal(await tier("balanced", 1), CHEAPER_INFERENCE_MODEL_ID);
+  env.CHEAPER_INFERENCE_PREFER_GPT6_LUNA = "1";
+  assert.equal(await tier("fast", 1), "cheaperinference/gpt-6-luna");
+  assert.equal(await tier("balanced", 1), "cheaperinference/gpt-6-luna");
+  assert.equal(await tier("powerful", 1), CHEAPER_INFERENCE_MODEL_ID);
+  assert.equal(await tier("reasoning", 1), CHEAPER_INFERENCE_MODEL_ID);
+  await assert.rejects(tier("fast", 2));
+  await assert.rejects(tier("fast", 1, { freeTierOnly: true }));
+  await assert.rejects(tier("fast", 1, { allowMeteredFallback: false }));
+  freeHealthy = true;
+  assert.equal(await tier("fast", 1), "gpt-5.4");
+  freeHealthy = false;
+  candidate = { ...candidate, discount: 14.9 };
+  assert.equal(await tier("balanced", 1), CHEAPER_INFERENCE_MODEL_ID);
+  candidate = { ...candidate, discount: 34.5, output: 0.481 };
+  assert.equal(await tier("balanced", 1), CHEAPER_INFERENCE_MODEL_ID);
+  candidate = { ...candidate, output: 0.3275, maximumOutput: 3.601 };
+  assert.equal(await tier("balanced", 1), CHEAPER_INFERENCE_MODEL_ID);
+  delete env.CHEAPER_INFERENCE_PREFER_GPT6_LUNA;
   discount = 14;
   await assert.rejects(tier("balanced", 1));
   discount = 15;
@@ -218,6 +259,58 @@ test("actual closed create enforces the configured floor before reserving and di
   events.length = 0; discount = 14;
   await assert.rejects(client.chat.completions.create(payload), /discount floor/);
   assert.deepEqual(events, []);
+});
+
+test("automatic GPT-6 Luna rechecks price and opt-in before spending; explicit owner selection is unchanged", async () => {
+  const env = { CHEAPER_INFERENCE_API_KEY: "fixture", CHEAPER_INFERENCE_PREFER_GPT6_LUNA: "1" };
+  const events: string[] = [];
+  let candidateOutput = 0.33;
+  let stopAfterReserve = false;
+  const common = { type: "text", endpoint: "/v1/chat/completions", context: 8192, vision: false,
+    input: 0.07, maximumInput: 0.4, maximumOutput: 1.5, discount: 35 };
+  const resolve = providerFunction("getClientForModel", {
+    process: { env }, MODEL_REGISTRY: [], normalizeModelId: (id: string) => id,
+    isSyntheticEvaluationModel: () => false, isOwnerOnlyFinalDecisionModel: () => false,
+    currentTenantId: () => 1, assertCheaperInferenceAccess() {}, isProviderHealthy: () => true,
+    cheaperAutomaticAllowed: () => true, cheaperMinimumDiscount: () => 15,
+    getCheaperCatalog: async () => [
+      { ...common, id: "gpt-5.6-luna", input: 0.08, output: 0.48 },
+      { ...common, id: "gpt-6-luna", output: candidateOutput },
+    ],
+    chooseCheaperAutomaticLuna: (
+      entries: Parameters<typeof chooseCheaperAutomaticLuna>[0],
+      tier: Parameters<typeof chooseCheaperAutomaticLuna>[1], floor: number,
+    ) => chooseCheaperAutomaticLuna(entries, tier, floor, env),
+    CHEAPER_INFERENCE_BASE_URL: "https://fixture.invalid/v1",
+    OpenAI: class {
+      chat = { completions: { create: async () => { events.push("dispatch"); return {}; } } };
+    },
+    guardCheaperInferenceRequest, cheaperRequestMaximum, catalogUsageCost,
+    buildPatchedCreate: (create: any) => create,
+    runCheaperBudgeted: async (_tenant: number, _max: number, call: () => Promise<unknown>,
+      _cost: unknown, _deps: unknown, beforeDispatch: () => void) => {
+      events.push("reserve");
+      if (stopAfterReserve) env.CHEAPER_INFERENCE_PREFER_GPT6_LUNA = "0";
+      beforeDispatch();
+      return call();
+    },
+  });
+  const { client } = await resolve("cheaperinference/gpt-6-luna", 1);
+  const payload = { model: "gpt-6-luna", messages: [{ role: "user", content: "fixture" }], max_completion_tokens: 128 };
+  candidateOutput = 0.50;
+  await assert.rejects(client.chat.completions.create(payload), /not eligible/);
+  assert.deepEqual(events, []);
+  candidateOutput = 0.33;
+  await client.chat.completions.create(payload);
+  assert.deepEqual(events.splice(0), ["reserve", "dispatch"]);
+  stopAfterReserve = true;
+  await assert.rejects(client.chat.completions.create(payload), /not eligible/);
+  assert.deepEqual(events.splice(0), ["reserve"]);
+  const manual = await resolve("cheaperinference/gpt-6-luna", 1, {
+    explicitOwnerSelection: true, platformAdminVerified: true,
+  });
+  await manual.client.chat.completions.create(payload);
+  assert.deepEqual(events, ["reserve", "dispatch"]);
 });
 
 test("requests pin the upstream model and reject malformed or excessive output budgets", () => {

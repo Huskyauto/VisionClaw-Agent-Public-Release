@@ -11,7 +11,13 @@ dist
 .replit
 replit.nix
 attached_assets
-.agents
+# Build-time inputs for stageLegionRunbooks only. Descendant exclusions (rather
+# than a bare parent exclusion) let Docker traverse for these exact exceptions.
+# Memory, user profiles, other skills and sibling runbook files stay excluded.
+.agents/**
+!.agents/skills/tdd/SKILL.md
+!.agents/skills/zoom-out/SKILL.md
+!.agents/skills/module-girth-guard/SKILL.md
 .config
 .upm
 uploads/*
@@ -22,10 +28,11 @@ tmp
 .env
 .env.*
 project-assets
-# Frontend build-time dependency: admit only the public release-facts snapshot.
+# Admit only the two documentation files imported by the frontend build.
 # Keep all other documentation, schema snapshots and reports out of the context.
 docs/*
 !docs/release-facts.json
+!docs/finished-but-not-billed.md
 # data/ is selectively allowlist-COPY'd in Dockerfile (specific files only, not the tree).
 # Listing the heavy/sensitive subdirs here keeps the build CONTEXT lean
 # (cuts ~17MB from `docker build` upload) but the COPY allowlist is the real safety boundary.

@@ -1,10 +1,19 @@
 # Parallel laptop maintenance
 
+**Private-app memory extension:** the separate exact `LOCAL_MEMORY_ENABLED=1`
+opt-in reuses these device slots for category/source selection and Lenovo dream
+digests/advisory consolidation proposals. Bob approved his own memory data on
+his laptops. It does not broaden the runbook source allowlist or give laptops
+write/approval authority. Current Surface GPU cutover, task acceptance/recovery
+and the pending node-side startup-script alignment:
+`docs/laptop-memory-work.md`.
+
 ## Scope and controls
 
 Bob approved both laptops working on different read-only internal maintenance
-tasks, overnight and on demand. Surface retains its current 7B Foundry model;
-Lenovo retains Qwen3 8b. No models were installed or resized.
+tasks, overnight and on demand. Surface now uses the owner-selected 7B Foundry
+GPU variant, `qwen2.5-7b-instruct-generic-gpu:4`, rather than the broken NPU build;
+Lenovo retains Qwen3 8b. VisionClaw did not install, load or resize either model.
 
 This first expansion uses only the same three screened engineering runbooks:
 test-first development, caller inspection and oversized-module maintenance.

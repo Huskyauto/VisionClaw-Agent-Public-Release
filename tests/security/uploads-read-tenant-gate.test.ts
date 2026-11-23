@@ -26,6 +26,18 @@ const __dirname = path.dirname(__filename);
 const HANDLERS = path.resolve(__dirname, "../../server/tools/domains/files/handlers.ts");
 const ROUTES = path.resolve(__dirname, "../../server/routes.ts");
 
+test("interactive delivery HTML runs with an opaque origin and no application fetch access", () => {
+  const source = fs.readFileSync(ROUTES, "utf-8");
+  const play = source.split("if (isDeliveryHtml && wantsPlay) {")[1]?.split("} else if")[0];
+  assert.ok(play, "missing HTML Play response branch");
+  assert.match(play, /"Content-Security-Policy",\s*"sandbox allow-scripts allow-downloads;/);
+  assert.match(play, /default-src 'none';/);
+  assert.match(play, /connect-src 'none';/);
+  assert.match(play, /form-action 'none';/);
+  assert.match(play, /script-src 'unsafe-inline';/);
+  assert.doesNotMatch(play, /allow-same-origin|unsafe-eval/);
+});
+
 test("configured upload root rejects traversal and sibling-prefix paths", () => {
   assert.equal(isPathWithin(UPLOADS_DIR, resolveUploadsChild("safe-file.pdf")), true);
   assert.throws(() => resolveUploadsChild("../outside.pdf"), /escapes/);

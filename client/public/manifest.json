@@ -1,7 +1,7 @@
 {
   "name": "VisionClaw Agent — Autonomous AI Corporation",
   "short_name": "VisionClaw Agent",
-  "description": "VisionClaw Agent R137.3+sec2 (November 17, 2026): development evidence lists 428 registered tools, 386 publicly documented tools, 148 capabilities, 18 personas, 202 declared / 283 live development tables, 905 platform indexes and 100 curated models. Credential, logout, navigation and private-mode website repairs. Not production telemetry or whole-platform certification; company-package completion remains unverified.",
+  "description": "VisionClaw Agent R137.4+sec2. Development inventory: 428 registered tools, 386 publicly documented tools, 202 declared / 283 live development tables, 905 platform indexes and 102 curated models. Not production telemetry.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0b",

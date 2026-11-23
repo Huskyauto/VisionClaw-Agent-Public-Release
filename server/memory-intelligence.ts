@@ -12,6 +12,7 @@ import { statedToWeight } from "./lib/deterministic-picker";
 import {
   createMemoryRelationshipClassifier, MEMORY_RELATION_MODEL, MEMORY_RELATION_PROMPT,
 } from "./lib/memory-relationship-classifier";
+import type { WorkingContextCapture, WorkingContextService } from "./working-context";
 
 const SIMILARITY_THRESHOLD = 0.82;
 const CONTRADICTION_THRESHOLD = 0.55;
@@ -163,6 +164,7 @@ export async function intelligentExtractMemory(
   personaId?: number | null,
   tenantId?: number,
   sourceMessageId?: number | null,
+  workingTurn?: { conversationId: number; assistantMessageId: number },
 ): Promise<{ created: number; updated: number; skipped: number; actions: MemoryAction[] }> {
   // Fail CLOSED on a missing tenant rather than silently defaulting to tenant 1
   // (the old `= 1` default let a caller omission bleed memory into the admin
@@ -171,8 +173,43 @@ export async function intelligentExtractMemory(
     throw new Error(`intelligentExtractMemory: tenantId is required (got ${tenantId})`);
   }
   const stats = { created: 0, updated: 0, skipped: 0, actions: [] as MemoryAction[] };
+  let workingCapture: WorkingContextCapture | null = null;
+  let workingService: WorkingContextService | undefined;
+  let localWorkingFallback: { candidate: unknown } | undefined;
 
   try {
+    let workingInstructions = "";
+    let workingInput = "";
+    if (workingTurn && sourceMessageId) {
+      try {
+        const working = await import("./working-context");
+        if (working.workingContextEnabled()) {
+          workingService = await working.getWorkingContextService();
+          workingCapture = await workingService.prepareCapture({
+            tenantId, personaId: personaId ?? null, conversationId: workingTurn.conversationId,
+            userMessageId: sourceMessageId, assistantMessageId: workingTurn.assistantMessageId,
+          });
+          if (workingCapture) {
+            workingInstructions = working.WORKING_CONTEXT_EXTRACTION_INSTRUCTIONS;
+            workingInput = "\n\n" + working.workingContextExtractionInput(workingCapture);
+          }
+        }
+      } catch { console.warn("[working-context] capture-unavailable"); }
+    }
+    if (workingCapture) {
+      try {
+        const { localMemoryTasks } = await import("./legion/memory-runtime");
+        const result = await localMemoryTasks.workingContext(workingCapture);
+        if (result.status === "accepted" && workingService) {
+          // Live artifacts are immutable per turn: hold this candidate until
+          // richer hosted extraction has had the first chance to save.
+          localWorkingFallback = { candidate: result.value };
+        }
+      } catch {
+        // Optional local infrastructure must not break legacy fact extraction.
+        console.warn("[working-context] local-selection-unavailable");
+      }
+    }
     const resp = await replitOpenai.chat.completions.create({
       model: "gpt-5.4",
       messages: [
@@ -202,14 +239,14 @@ Rules:
 - Keep facts concise, specific, and third-person ("User lives in Texas" not "I live in Texas")
 - Do NOT emit a confidence number. Set "stated" to a category: "explicit" = the user clearly said it, "implied" = reasonably inferable from context, "speculative" = a guess (these are dropped)
 - If nothing worth remembering, return {"facts": []}
-- Max ${MAX_FACTS_PER_TURN} facts per extraction`,
+- Max ${MAX_FACTS_PER_TURN} facts per extraction` + workingInstructions,
         },
         {
           role: "user",
-          content: `User said: "${userMessage.slice(0, 500)}"\nAssistant responded: "${assistantResponse.slice(0, 500)}"\n\nExtract durable facts:`,
+          content: `User said: "${userMessage.slice(0, 500)}"\nAssistant responded: "${assistantResponse.slice(0, 500)}"\n\nExtract durable facts:` + workingInput,
         },
       ],
-      max_completion_tokens: 300,
+      max_completion_tokens: workingInstructions ? 900 : 300,
       response_format: { type: "json_object" },
     });
 
@@ -217,6 +254,14 @@ Rules:
     if (!content) return stats;
 
     const parsed = JSON.parse(content);
+    // Do this before the legacy no-facts return: a useful blocker/next step
+    // need not be a durable personal fact.
+    try {
+      if (workingCapture && workingService) {
+        const accepted = await workingService.commitCapture(workingCapture, parsed.working_context);
+        if (accepted > 0) localWorkingFallback = undefined;
+      }
+    } catch { console.warn("[working-context] commit-unavailable"); }
     const facts: ExtractedFact[] = (parsed.facts || [])
       .map((f: any) => ({ ...f, confidence: statedToWeight(f.stated) }))
       .filter((f: any) => f.fact && f.fact.length > 5 && f.confidence >= 0.5)
@@ -318,6 +363,14 @@ Rules:
   } catch (err: any) {
     console.error(`[memory-intel] Extraction failed:`, err.message);
     return stats;
+  } finally {
+    if (workingCapture && workingService && localWorkingFallback) {
+      try {
+        await workingService.commitCapture(workingCapture, localWorkingFallback.candidate);
+      } catch {
+        console.warn("[working-context] local-fallback-commit-unavailable");
+      }
+    }
   }
 }
 

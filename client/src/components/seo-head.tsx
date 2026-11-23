@@ -78,7 +78,7 @@ export function SeoHead({
       // Any release-specific R-tag in here drifts within hours of every round
       // and rewrites itself on every SPA unmount. Live counts + release notes
       // are surfaced through /trust and /api/public/trust.
-      const fallback = "Deploy an 18-agent AI team with strict tenant isolation and bounded attached-file review recovery that prevents promise-only responses from ending the turn. Live platform stats and current release notes are at /trust.";
+      const fallback = "VisionClaw brings specialist AI agents, shared business tools and scoped access controls into one workspace. See /trust for platform metrics and /updates for current source changes.";
       setMeta("name", "description", fallback);
       setMeta("property", "og:title", `${pName} — Your Autonomous AI Corporation`);
       setMeta("property", "og:description", fallback);
@@ -86,7 +86,7 @@ export function SeoHead({
       setMeta("property", "og:url", window.location.origin);
       setMeta("name", "twitter:card", "summary_large_image");
       setMeta("name", "twitter:title", `${pName} — Your Autonomous AI Corporation`);
-      setMeta("name", "twitter:description", "18 specialist AI agents running autonomous corporate operations. Run a live Instant AI Readiness Audit at /audit.");
+      setMeta("name", "twitter:description", fallback);
       // R125+13.7 (architect LOW closed): remove the canonical link on unmount.
       // Without this, a page that set <link rel="canonical" href="/audit"> would
       // leave it on the document during SPA navigation to a page that does NOT

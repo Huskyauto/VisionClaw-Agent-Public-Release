@@ -6,8 +6,9 @@
 import { createHash } from "node:crypto";
 import { restoreBwbRecovery, mergeRecoveryInventories } from "./lib/bwb-drive-recovery";
 import { assertPrivateRecoveryMetadata } from "./lib/bwb-drive-recovery-transport";
-import { getAccessToken, readDriveFileBytes } from "../server/google-drive";
+import { driveRequest, readDriveFileBytes } from "../server/google-drive";
 import { withTenantContext } from "../server/lib/tenant-context";
+import { ADMIN_TENANT_ID } from "../server/tenant-constants";
 
 async function main() {
   const [folderId, inventoryId] = process.argv.slice(2);
@@ -16,10 +17,9 @@ async function main() {
   }
   async function download(fileId: string) {
     if (!/^[A-Za-z0-9_-]{10,}$/.test(fileId)) throw new Error("Invalid recovery file identity");
-    const token = await getAccessToken();
-    const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,size,trashed,ownedByMe,parents,permissions(type,role,deleted)`,
-      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30_000), redirect: "error" },
+    const response = await driveRequest(
+      `/drive/v3/files/${fileId}?fields=id,size,trashed,ownedByMe,parents,permissions(type,role,deleted)`,
+      { timeoutMs: 30_000, redirect: "error" },
     );
     if (!response.ok) throw new Error(`Recovery metadata read failed: HTTP ${response.status}`);
     const metadata = await response.json();
@@ -34,14 +34,13 @@ async function main() {
   if (inventoryId) {
     inventory = JSON.parse((await download(inventoryId)).toString("utf8"));
   } else {
-    const token = await getAccessToken();
     const name = `${createHash("sha256").update("RECOVERY-INVENTORY.json").digest("hex").slice(0, 12)}-RECOVERY-INVENTORY.json`;
     const query = new URLSearchParams({
       q: `'${folderId}' in parents and trashed=false and name='${name}'`,
       pageSize: "1000", orderBy: "createdTime", fields: "nextPageToken,files(id)",
     });
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files?${query}`, {
-      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30_000), redirect: "error",
+    const response = await driveRequest(`/drive/v3/files?${query}`, {
+      timeoutMs: 30_000, redirect: "error",
     });
     if (!response.ok) throw new Error(`Recovery inventory listing failed: HTTP ${response.status}`);
     const listed = await response.json();
@@ -59,7 +58,7 @@ async function main() {
   console.log(JSON.stringify({ ...restored, inventoryId,
     inventorySha256: createHash("sha256").update(JSON.stringify(inventory)).digest("hex") }));
 }
-withTenantContext(1, main).then(() => process.exit(0)).catch(error => {
+withTenantContext({ tenantId: ADMIN_TENANT_ID, source: "explicit" }, main).then(() => process.exit(0)).catch(error => {
   console.error(`[bwb-recovery-restore] ${error.message}`);
   process.exit(1);
 });

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
-import { cheaperInferenceReady, CHEAPER_INFERENCE_BASE_URL } from "./cheaper-inference";
+import { cheaperInferenceReady, CHEAPER_INFERENCE_BASE_URL, CHEAPER_INFERENCE_UPSTREAM_MODEL } from "./cheaper-inference";
 import { currentTenantId } from "./tenant-context";
 
 export function cheaperMinimumDiscount(env: Record<string, string | undefined> = process.env): number {
@@ -28,6 +28,31 @@ export interface CheaperCatalogEntry {
   maximumOutput: number;
   imagePrice?: number;
   discount: number;
+}
+
+export const CHEAPER_LUNA_6_UPSTREAM = "gpt-6-luna";
+
+/** Prefer a proven routine model only while today's catalog supports the tradeoff. */
+export function chooseCheaperAutomaticLuna(
+  entries: readonly CheaperCatalogEntry[],
+  tier: "fast" | "balanced" | "powerful" | "reasoning",
+  minimumDiscount: number,
+  env: NodeJS.ProcessEnv = process.env,
+): CheaperCatalogEntry | undefined {
+  const chat = (id: string) => entries.find(m =>
+    m.id === id && m.type === "text" && m.endpoint === "/v1/chat/completions");
+  const baseline = chat(CHEAPER_INFERENCE_UPSTREAM_MODEL);
+  if (baseline && env.CHEAPER_INFERENCE_PREFER_GPT6_LUNA === "1" &&
+      (tier === "fast" || tier === "balanced")) {
+    const candidate = chat(CHEAPER_LUNA_6_UPSTREAM);
+    if (candidate && candidate.discount >= minimumDiscount &&
+        candidate.input <= baseline.input && candidate.output <= baseline.output &&
+        (candidate.input < baseline.input || candidate.output < baseline.output) &&
+        candidate.maximumInput <= baseline.maximumInput && candidate.maximumOutput <= baseline.maximumOutput) {
+      return candidate;
+    }
+  }
+  return baseline && baseline.discount >= minimumDiscount ? baseline : undefined;
 }
 
 function rate(value: unknown, optional = false): number {

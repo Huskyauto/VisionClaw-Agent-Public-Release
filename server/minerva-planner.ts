@@ -919,6 +919,9 @@ export async function listPlans(args: { tenantId: number; status?: string; activ
         FROM plans
         WHERE tenant_id = ${tenantId}
            AND status IN ('approved', 'executing', 'completed', 'failed', 'handoff_pending', 'publish_required')
+           -- Dashboard recency only: retain failed rows unchanged in full history.
+           -- Apply before LIMIT so old failures cannot crowd out newer results.
+           AND (status <> 'failed' OR updated_at >= NOW() - INTERVAL '30 days')
          ORDER BY
              CASE
                WHEN status IN ('publish_required', 'handoff_pending', 'executing', 'approved') THEN 0

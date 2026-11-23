@@ -49,7 +49,7 @@ const DRAIN_INTERVAL_MS = 5 * 60 * 1000;
 let drainTimer: NodeJS.Timeout | null = null;
 let draining = false;
 
-// Serialize spoolJob calls so countSpoolFiles()→write is atomic per process.
+// Serialize spoolJob calls so inventory→write is atomic per process.
 // Node is single-threaded but awaits yield — without this, two in-flight
 // spool calls can both observe count=999 and both write, overshooting the cap.
 let spoolLock: Promise<void> = Promise.resolve();
@@ -73,14 +73,18 @@ async function ensureQuarantineDir(): Promise<void> {
   } catch (_silentErr) { logSilentCatch("server/job-spool.ts", _silentErr); }
 }
 
-/** Count current spool files (bounded enumeration for the MAX_SPOOL_FILES check). */
-async function countSpoolFiles(): Promise<number> {
-  try {
-    const entries = await fs.readdir(SPOOL_DIR);
-    return entries.filter((e) => e.endsWith(".json")).length;
-  } catch {
-    return 0;
+/** Reuse the capacity listing to order new entries after pending ones, including after restart. */
+async function spoolInventory(): Promise<{ count: number; latest: number }> {
+  const entries = await fs.readdir(SPOOL_DIR);
+  let count = 0;
+  let latest = 0;
+  for (const name of entries) {
+    if (!name.endsWith(".json")) continue;
+    count++;
+    const sequence = /^(\d{13})-[a-f0-9]{12}\.json$/.exec(name);
+    if (sequence) latest = Math.max(latest, Number(sequence[1]));
   }
+  return { count, latest };
 }
 
 /**
@@ -126,7 +130,7 @@ export async function spoolJob(
   await prev;
   try {
     await ensureSpoolDir();
-    const count = await countSpoolFiles();
+    const { count, latest } = await spoolInventory();
     if (count >= MAX_SPOOL_FILES) {
       throw new Error(
         `[job-spool] Spool full (${count}/${MAX_SPOOL_FILES}) — DB appears down for an extended period; refusing to spool new job kind=${kind}`,
@@ -138,7 +142,7 @@ export async function spoolJob(
       opts,
       spooledAt: new Date().toISOString(),
     };
-    const filename = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.json`;
+    const filename = `${Math.max(Date.now(), latest + 1)}-${crypto.randomBytes(6).toString("hex")}.json`;
     const full = path.join(SPOOL_DIR, filename);
     // Atomic write: write to .tmp, fsync, then rename, so a crash mid-write
     // never leaves a half-written JSON file for the drainer to choke on.
@@ -212,7 +216,10 @@ export async function drainSpool(
       // Phase 2: enqueue. Failure here is TRANSIENT (DB down): stop the
       // whole drain and retry next pass, to avoid hammering an outage.
       try {
-        await realEnqueue(rec.kind, rec.payload, rec.opts);
+        const jobId = await realEnqueue(rec.kind, rec.payload, rec.opts);
+        if (!Number.isSafeInteger(jobId) || jobId <= 0) {
+          throw new Error("Queue did not acknowledge a persisted job ID");
+        }
         await fs.unlink(full);
         drained++;
       } catch (err) {
