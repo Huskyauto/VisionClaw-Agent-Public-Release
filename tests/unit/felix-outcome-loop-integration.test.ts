@@ -61,7 +61,13 @@ test("synthesis-only recovery is monotonic and cannot extend the tool-bearing ro
 test("slow-tool SSE recovery returns through the semantic checkpoint", () => {
   assert.match(routesSource, /Recovery succeeded[\s\S]{0,220}break escalation_retry/);
   assert.doesNotMatch(routesSource, /Recovery succeeded[\s\S]{0,220}break round_loop/);
-  assert.match(routesSource, /for await \(const rChunk of recoveryStream\) \{\s*if \(\(rChunk as any\)\?\.model\) workerModels\.add/);
+  const recoveryLoop = routesSource.match(
+    /for await \(const rChunk of streamWithProgressDeadline<any>\(recoveryStream, \{([^}]+)\}\)\) \{\s*if \(\(rChunk as any\)\?\.model\) workerModels\.add/,
+  );
+  assert.ok(recoveryLoop, "recovery must consume the bounded stream and record the served model");
+  assert.match(recoveryLoop[1], /timeoutMs: STREAM_FIRST_CHUNK_TIMEOUT/);
+  assert.match(recoveryLoop[1], /signal: streamAbortController\.signal/);
+  assert.match(recoveryLoop[1], /onTimeout: \(\) => recoveryStream\?\.controller\?\.abort\(\)/);
   assert.match(routesSource, /const recoveryMarkupFilter = createToolMarkupStreamFilter\(\)/);
   assert.match(routesSource, /recoveryMarkupFilter\.push\(rDelta\)/);
   assert.match(routesSource, /recoveryMarkupFilter\.flush\(\)/);

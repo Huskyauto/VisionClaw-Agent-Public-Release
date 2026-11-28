@@ -99,6 +99,9 @@ export function registerMemoryRoutes(app: Express, helpers: MemoryHelpers) {
   app.patch("/api/memory/:id", async (req, res) => {
     const tenantId = getTenantFromRequest(req);
     if (!tenantId) return res.status(401).json({ error: "Authentication required" });
+    if (req.body != null && Object.hasOwn(req.body, "tenantId")) {
+      return res.status(400).json({ error: "Memory tenant ownership cannot be changed" });
+    }
     const memId = parseInt(req.params.id as string);
     const existing = await storage.getMemoryEntry(memId, tenantId);
     if (!existing) return res.status(404).json({ error: "Not found" });

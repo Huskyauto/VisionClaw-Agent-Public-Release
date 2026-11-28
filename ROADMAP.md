@@ -12,6 +12,24 @@ where we're going (so you can decide whether to fork, contribute, or wait).
 
 ---
 
+## R138+sec — November 27, 2026 cross-app review and background work
+
+Owner-approved Mellum processing handles screened background runbooks, not
+interactive answers. The overnight workload is enabled; direct Lenovo remains
+primary and the installed Spark backup completed a real production arithmetic
+probe with accounting confirmed. Outage-triggered switching is not yet proven.
+Daily AI Insights supports shared research and separate reviews, not automatic
+adoption. Exact-source GitHub verification and two focused safety corrections
+are documented in [the review](docs/app-review-2026-11-27.md).
+Known residual findings remain explicit; source synchronization does not
+publish Replit production.
+
+## R137.4+sec2 — November 23, 2026 cross-app review
+
+Delivered HTML previews now use an isolated browser sandbox. Optional
+owner Website Audit layout advice and conditional routine Luna routing are
+documented separately from public access and production availability.
+
 ## R137.3+sec2 — November 17, 2026 cross-app source review
 
 Current source rechecks legacy MCP account activity, clears local identity after
@@ -119,7 +137,7 @@ evidence required before deferred ideas become active work.
 
 ## Current platform totals
 
-**428 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 148 active capabilities · 202 declared / 283 live development tables · 905 platform indexes · 41 governance rules · 100 curated AI models in the core registry plus daily OpenRouter catalog discovery.** ([authoritative release facts](docs/release-facts.json), November 17 development snapshot). R137.3+sec2 includes the reviewed credential, navigation and private-mode website repairs, owner-only access preparation, bounded parallel local maintenance and the agent-ready website package. Demo Studio is documented in [its contract](docs/demo-studio.md); app publication and production readiness remain separate. The [prior review](docs/app-review-2026-11-14.md) retains its original evidence and limits.
+**428 total registered tools · 386 public documented tools · 68 total skills · 18 personas · 150 active capabilities · 202 declared / 283 live development tables · 905 platform indexes · 41 governance rules · 102 curated AI models in the core registry plus daily OpenRouter catalog discovery.** ([authoritative release facts](docs/release-facts.json), November 27 development snapshot). R138+sec adds screened background work, a verified Spark transport, shared daily research, source-bound checks and source-fetch/undo-policy corrections. App publication and production readiness remain separate.
 
 Machine-readable source: [docs/release-facts.json](docs/release-facts.json).
 

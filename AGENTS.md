@@ -47,7 +47,22 @@ If the answer is not in those indexes, *then* fall back to ripgrep, *then* fall 
 3. **Never log or print secrets.** Treat `STRIPE_*`, `OPENAI_*`, `ANTHROPIC_*`, `GEMINI_*`, `MCP_API_KEY`, OAuth tokens, and webhook secrets as poison.
 4. **Owner privacy:** "Bob Washburn" privately, "Robert Washburn" publicly (i.e. anything that touches the public mirror).
 5. **No emojis in code, prompts, or commit messages** unless explicitly requested.
-6. **Automatic private GitHub backups are owner-authorized.** Keep `Auto Git Push` running with `bash scripts/git-auto-push.sh` so source updates reach `Huskyauto/VisionClaw-Agent`. The owner requested this to avoid losing app work and updates. Do not force-push. Public-mirror refreshes and application publication still require separate explicit owner approval. Existing Railway automation can react to private pushes; do not change its deployment settings without approval.
+6. **Normal private GitHub pushes are currently held.** Keep `Auto Git Push` inert pending owner approval of the Railway build fix. The owner separately approved private `release-checks/<source-digest>` uploads for GitHub-hosted release checks; that exception never authorizes main updates, PRs, force-pushes, public-mirror refreshes, deployment-setting changes or publication. See `docs/github-release-checks.md`. Earlier automatic-backup authorization does not override this hold.
+
+### Permanent pre-publishing offload
+
+The owner requires GitHub as the default for heavy portable release verification.
+Run `npm run release:check` to submit the exact reviewed candidate once, then
+`npm run publish:preflight` after GitHub finishes. The latter authenticates
+current-source remote evidence and runs only the bounded local DB catalog check;
+do not repeat full TypeScript, regression suites, portability checks or production
+verification builds on the 4 GB VM after those GitHub checks pass.
+Use `release:check:local-fallback` and `publish:preflight:local-fallback` only as
+deliberate exceptions, never an automatic retry path. Keep startup/environment
+checks, schema review, independent acceptance and final Publish approval.
+Setup-only runs, older GitHub copies and stale receipts cannot clear the current
+application. An unclassified baseline delta blocks before upload; do not lift
+the main push/deployment hold to work around it.
 
 ## Architecture Map (entrypoints)
 
@@ -69,7 +84,7 @@ If the answer is not in those indexes, *then* fall back to ripgrep, *then* fall 
 4. **Verify** — run the affected workflow, hit the affected endpoint, or write a 10-line repro script. Do not declare "done" without proof.
    Distinguish implemented, locally verified, published and production-verified states. A recorded check applies only to its checked source, scope and environment; report unknown outcomes explicitly.
 5. **Document** — update `replit.md` and (if architectural) this file.
-6. **Repository propagation** — keep the owner-authorized private backup workflow running. Normal private source commits/pushes do not need a new approval each time; public-mirror refreshes, force-pushes and application publication are not authorized by that backup permission.
+6. **Repository propagation** — obey the current normal-push hold in rule 6 above; do not restart Auto Git Push. The permanent GitHub verification exception covers isolated `release-checks/<digest>` uploads only, not main updates, PRs, public-mirror refreshes, force-pushes or application publication.
 
 ## When to Defer to Felix
 

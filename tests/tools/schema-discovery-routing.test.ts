@@ -60,3 +60,20 @@ test("filtered chat menus keep schema inspection before the normal blocked-tool 
   const names = vm.runInNewContext(array[1]) as string[];
   assert.ok(names.includes("introspect_tools"));
 });
+
+test("owner Felix's actual capped API roster retains the Legion diagnostic without dropping handoff slots", async () => {
+  const routeTools = loadRouter(false);
+  const tools = ["test_api_keys", "cash_flow_summary", "spark_send_message",
+    "grok_send_message", "instinct_send_message", "a", "b", "c", "d", "e"].map(name => ({
+    type: "function", function: { name, description: name, parameters: { type: "object", properties: {} } },
+  }));
+  const result = await routeTools(tools, [{ role: "user", content:
+    "Check legion-local / Mellum 2.1 using the fixed 17 + 25 acceptance test." }], {
+    tenantId: 1, personaId: 2, maxTools: 1, forceCategories: ["business"],
+  });
+  let roster: string[] = [];
+  requestWithModelToolRoster({ tools: result.tools }, names => { roster = names; }, () => undefined);
+  for (const name of ["test_api_keys", "spark_send_message", "grok_send_message", "instinct_send_message"])
+    assert.equal(isToolAllowedInModelRound(name, roster), true, name);
+  assert.match(result.contrastiveNote ?? "", /local_check/);
+});

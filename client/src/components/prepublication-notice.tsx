@@ -1,7 +1,7 @@
 import facts from "../../../docs/release-facts.json";
 
-export const CURRENT_SOURCE_RELEASE = "R137.3+sec2";
-export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 17, 2026 legacy credential revocation checks, offline logout cleanup, Skills navigation, private-mode website guidance and current repository documentation.`;
+export const CURRENT_SOURCE_RELEASE = "R138+sec";
+export const SOURCE_UPDATE_SUMMARY = `${CURRENT_SOURCE_RELEASE} — November 27, 2026 source update: Mellum background work, verified Spark relay, shared daily AI insights, source-bound release checks and safer source fetching.`;
 export const DEVELOPMENT_PLATFORM_SUMMARY =
   `${facts.metrics.registeredTools} total registered tools; ` +
   `${facts.metrics.declaredTables} declared / ${facts.metrics.liveTables} live development tables; ` +
@@ -12,6 +12,19 @@ export const DEVELOPMENT_PLATFORM_SUMMARY =
 export const CURRENT_PLATFORM_DESCRIPTION =
   `${SOURCE_UPDATE_SUMMARY} ${DEVELOPMENT_PLATFORM_SUMMARY} ` +
   "Scoped evidence is not whole-platform certification. " +
+  "Structured source extraction now uses the shared DNS-pinned HTTPS fetch boundary and refuses redirects before they can reach a private destination. Snapshot-policy failure refuses dispatch instead of bypassing undo requirements. " +
+  "Owner-approved Lenovo background processing handles screened runbook work, not conversational answers or interactive troubleshooting. " +
+  "Direct Lenovo remains primary; the production Spark relay completed a fixed arithmetic check with the approved Mellum model, measured tokens and confirmed accounting. " +
+  "The overnight runbook schedule is enabled; broad routine compaction and optional connection-alert emails have separate opt-ins. " +
+  "Daily AI Insights provides a shared research exchange; submissions and reviewer feedback do not authorize automatic adoption. " +
+  "Portable release checks run against exact source candidates on GitHub; source publication is separate from application deployment. " +
+  "Delivered HTML previews run separately from the signed-in workspace. " +
+  "When enabled, owner-only Website Audit can send a public or synthetic screenshot and CSS to GLM 5.4 for a layout second opinion, not an automatic fix. " +
+  "GPT-6 Luna is an optional owner fast/balanced paid fallback when catalog prices qualify; included routes take priority. " +
+  "Modern MCP key authentication also requires the owning account to remain active. " +
+  "The Finished but Not Billed workbench compares coded HVAC records in the browser for office review; it does not issue invoices or collect payment. " +
+  "Working context recalls exact, authorized excerpts from saved conversations, not new instructions or approvals. " +
+  "Explicit owner model options and separate, opt-in jury routing retain the existing budget and authorization rules. " +
   "The optional legacy MCP path now checks current account activity for cached and global owner keys and refuses authorization-store failures. " +
   "Failed remote logout no longer retains local identity or private query data; remote session revocation still requires server confirmation. " +
   "Authenticated Skills navigation reaches the workspace; private-mode public pages do not offer inaccessible contact or purchase forms. " +

@@ -10,10 +10,12 @@ public-mirror/
 .local/testing-agent/
 .local/offline-verification/
 .local/release-checks/
+.local/republication-triage/
 
 # Regenerable package download caches; installed tools/dependencies stay intact.
 .cache/uv/
 .cache/pip/
+.cache/nix/
 
 # User-provided source material belongs in the development workspace, not the
 # production image. Preserve every asset referenced directly by production
@@ -27,3 +29,4 @@ attached_assets/*
 data/private-alert-logs/
 /generated-artifacts/
 /project-assets/bwb-retrospective-delivery/
+.local/company-deliverables/

@@ -78,6 +78,7 @@ async function main() {
   };
   const requiredChecks = ["regressions", "typecheck", "surface-preflight", "domain-preflight", "build"];
   if (scope.areas.includes("payments")) requiredChecks.push("mission-lifecycle");
+  if (scope.areas.includes("muse-s2-integration")) requiredChecks.push("muse-s2-integration");
   const requirements = requiredChecks.map(id => ({ id, label: `${id}: bounded command exits successfully` }));
   const confirmationSource = confirmationDigest({ base, source, changed, scope, requirements });
   mkdirSync(output, { recursive: true, mode: 0o700 });
@@ -121,6 +122,11 @@ async function main() {
   if (scope.areas.includes("payments")) {
     steps.splice(1, 0, ["mission-lifecycle", process.execPath, [
       "--import", "tsx", "--test", "--test-force-exit", "tests/integration/mission-golden-path.test.ts",
+    ], 120_000]);
+  }
+  if (scope.areas.includes("muse-s2-integration")) {
+    steps.splice(1, 0, ["muse-s2-integration", process.execPath, [
+      "--import", "tsx", "--test", "--test-force-exit", "tests/integration/muse-s2-adapter.test.ts",
     ], 120_000]);
   }
   save();

@@ -9,9 +9,21 @@ import { claimNodeIdentity } from "./node-store";
 import { startTailnetNode } from "./local-api";
 import { LEGION_TAG } from "./proxy-client";
 
+export function legionBackgroundConfiguration(env: NodeJS.ProcessEnv = process.env) {
+  if (env.LEGION_BACKGROUND_ENABLED !== "1")
+    return { enabled: false, reason: "background_flag_disabled" } as const;
+  // Published runtimes need not carry the editor's workspace ID. Replit owns
+  // this domain list; the generated hostname belongs only to the original
+  // deployment. Never trust request Host, a copied custom domain, or a flag alone.
+  const primary = env.REPLIT_DEPLOYMENT === "1"
+    ? env.REPLIT_DOMAINS?.split(",").some(domain => domain.trim() === "vison-claw-agent.replit.app") === true
+    : env.REPL_ID === "45b6d1c0-f690-443b-a4f3-d57f5cba126d";
+  if (!primary)
+    return { enabled: false, reason: "not_primary_project" } as const;
+  return { enabled: true, reason: "enabled" } as const;
+}
 export function legionBackgroundEnabled() {
-  return process.env.LEGION_BACKGROUND_ENABLED === "1" &&
-    process.env.REPL_ID === "45b6d1c0-f690-443b-a4f3-d57f5cba126d";
+  return legionBackgroundConfiguration().enabled;
 }
 export const legionProduction = () => process.env.REPLIT_DEPLOYMENT === "1" || process.env.NODE_ENV === "production";
 export const legionProxyPort = () => legionProduction() ? 10552 : 10551;
@@ -115,9 +127,17 @@ async function cycle() {
     await checkpoint(); // Never serve inference before identity is durable.
     ready = true;
     console.log(`[legion] supervised ${environment} node ready; fixed Ollama route only`);
+    void import("./warmup").then(module => module.warmLegionModel())
+      .catch(() => console.warn("[legion] optional model warmup unavailable"));
+    let lastWarmup = Date.now();
     let lastCheckpoint = Date.now();
     while (!stopping && !observedStop && legionBackgroundEnabled()) {
       await delay(1000);
+      if (Date.now() - lastWarmup >= 240_000) {
+        lastWarmup = Date.now();
+        void import("./warmup").then(module => module.warmLegionModel())
+          .catch(() => console.warn("[legion] optional model warmup unavailable"));
+      }
       if (Date.now() - lastCheckpoint >= 30_000) {
         verify(await status(socket));
         await checkpoint();
@@ -146,7 +166,12 @@ async function cycle() {
 }
 
 export function startLegionSupervisor() {
-  if (supervising || !legionBackgroundEnabled()) return;
+  if (supervising) return;
+  const configuration = legionBackgroundConfiguration();
+  if (!configuration.enabled) {
+    console.info(`[legion] supervisor disabled: ${configuration.reason}`);
+    return;
+  }
   stopping = false;
   if (shutdown.signal.aborted) shutdown = new AbortController();
   supervising = (async () => {
@@ -156,7 +181,7 @@ export function startLegionSupervisor() {
       for (let elapsed = 0; elapsed < backoff && !stopping; elapsed += 250) await delay(250);
       if (stopping) return;
       try { await cycle(); }
-      catch { console.warn("[legion] supervised node unavailable; optional local work will skip, no paid fallback"); }
+      catch { console.warn("[legion] supervised node unavailable; callers retain their approved backup routing"); }
     }
     console.warn("[legion] restart limit reached; operator inspection required");
   })().finally(() => { supervising = undefined; });

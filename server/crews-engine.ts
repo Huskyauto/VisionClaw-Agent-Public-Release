@@ -389,6 +389,20 @@ export async function addCrewTask(params: {
   if (!params.expectedOutput?.trim()) return { success: false, error: "expectedOutput required" };
 
   try {
+    if (params.agentId != null) {
+      const agentResult = await db.execute(sql`
+        SELECT id FROM crew_agents
+        WHERE id = ${params.agentId}
+          AND crew_id = ${params.crewId}
+          AND tenant_id = ${params.tenantId}
+        LIMIT 1
+      `);
+      const agentRows = (agentResult as any).rows || agentResult;
+      if (!agentRows[0]) {
+        return { success: false, error: "Agent not found in this crew and tenant" };
+      }
+    }
+
     const toolsArr = boundPostgresArray(params.tools, "text");
     const ctxArr = boundPostgresArray(params.contextTaskIds, "integer");
     const res = await db.execute(sql`

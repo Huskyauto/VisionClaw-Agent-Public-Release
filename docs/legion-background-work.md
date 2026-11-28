@@ -1,5 +1,12 @@
 # Lenovo background worker — current scope
 
+**November 26 Mellum update:** Lenovo is primary under the existing admission
+and source contracts. It now uses the fixed Mellum model and verbatim Spark
+guardrail, with one bounded validation retry; selected reasoning proposals use
+Qwen3 8B for that retry. See `docs/legion-mellum-offload.md` for scope and actual
+development evidence. Older allocation/activation descriptions below are
+historical; production acceptance is not established by this update.
+
 **Current owner-approved parallel allocation:** see
 `docs/parallel-local-maintenance.md`. With the parallel flag, Lenovo and Surface
 have independent inference slots and different task classes. The serial

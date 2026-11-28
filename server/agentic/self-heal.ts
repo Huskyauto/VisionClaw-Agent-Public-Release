@@ -2,7 +2,7 @@ import { db } from "../db";
 import { selfHealAttempts } from "@shared/schema";
 import { eq, and, desc, gte, sql } from "drizzle-orm";
 import { runLlmTask } from "../llm-task";
-import { appendStep } from "./runs";
+import { appendStep, getRun } from "./runs";
 import { createApproval } from "./approvals";
 import { awaitApprovalDecision } from "./resume-worker";
 
@@ -271,6 +271,20 @@ export async function attemptSelfHeal(params: {
   availableTools?: string[];
 }): Promise<SelfHealResult> {
   const { tenantId, runId = null, triggerSource, originalGoal, failure } = params;
+
+  if (runId !== null) {
+    if (!Number.isSafeInteger(runId) || runId <= 0) {
+      return { attemptId: -1, healed: false, error: "Invalid runId for self-heal", shouldRetry: false };
+    }
+    if (!await getRun(runId, tenantId)) {
+      return {
+        attemptId: -1,
+        healed: false,
+        error: `Run ${runId} not found for tenant ${tenantId}`,
+        shouldRetry: false,
+      };
+    }
+  }
 
   const rateLimit = await checkRateLimit(tenantId);
   if (!rateLimit.allowed) {

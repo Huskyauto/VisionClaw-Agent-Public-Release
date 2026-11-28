@@ -10,16 +10,18 @@ const landing = read("client/src/pages/landing.tsx");
 const sidebar = read("client/src/components/app-sidebar.tsx");
 const updates = JSON.parse(read("client/src/data/updates.json"));
 const release = /CURRENT_SOURCE_RELEASE = "([^"]+)"/.exec(notice)?.[1];
+const currentDate = /— ([A-Za-z]+ \d{1,2}, \d{4}) source update:/.exec(notice)?.[1];
 
 test("current release agrees across shared summary, dashboard data and both READMEs", () => {
-  assert.equal(release, "R137.3+sec2");
+  assert.match(release ?? "", /^R\d/);
+  assert.ok(currentDate);
   if (isPrivateSource) {
     const published = readCurrentRelease("replit.md");
     assert.equal(published.round, release);
-    assert.equal(published.date, "November 17, 2026");
+    assert.equal(published.date, currentDate);
   }
   assert.equal(updates[0].version, release);
-  assert.equal(updates[0].date, "November 17, 2026");
+  assert.equal(updates[0].date, currentDate);
   const readmes = isPrivateSource ? ["README.md", "README.md"] : ["README.md"];
   for (const file of [...readmes, "ROADMAP.md"]) {
     assert.ok(read(file).slice(0, 18000).includes(release!));
@@ -47,10 +49,10 @@ test("last-72-hour features reach both landing views and the shared dashboard re
     "Website readiness", "Company report", "Alert logs", "Outcome-first", "Video packaging"]) {
     assert.ok(current.includes(term), `missing current feature: ${term}`);
   }
-  assert.match(current, /Source updates through \{releaseFacts\.releaseDate\}/);
+  assert.match(current, /\{releaseFacts\.releaseDate\} development inventory/);
   assert.match(current, /owner-only/i);
-  assert.match(JSON.stringify(updates[0]), /production/i);
-  assert.match(JSON.stringify(updates[0]), /not whole-platform certification/i);
+  assert.match(JSON.stringify(updates[0]), /production|deployment/i);
+  assert.match(JSON.stringify(updates[0]), /not (?:presented as |whole-platform )?certification/i);
   assert.match(read("client/src/pages/home.tsx"), /HOME_RELEASES\.slice/);
 });
 
@@ -61,7 +63,7 @@ test("retained November changes stay documented while current summaries use the 
     assert.ok(current.toLowerCase().includes(term.toLowerCase()), `landing missing ${term}`);
     assert.ok(latest.toLowerCase().includes(term.toLowerCase()), `release feed missing ${term}`);
   }
-  assert.match(notice, /November 17, 2026/);
+  assert.equal(updates[0].date, currentDate);
   assert.match(notice, /audit remains degraded and incomplete/);
   assert.match(latest, /not certification/i);
   assert.match(latest, /does not replay/i);
@@ -126,11 +128,16 @@ test("public current-count table and architecture diagram agree with dated relea
   assert.ok(diagram?.includes(`${facts.coreRegistryModels} curated`));
 });
 
-test("private backup wording distinguishes standing authority from a temporary review hold", () => {
+test("the current repository hold overrides standing private-backup authority", () => {
   if (!isPrivateSource) return; // Private backup instructions are not exported.
   assert.match(read("README.md"), /Private source backup:[\s\S]{0,100}owner-authorized/);
   assert.match(read("README.md"), /temporarily paused during review/);
-  assert.match(read("replit.md"), /Normal private GitHub backups through Auto Git Push are owner-authorized/);
+  const authority = read("replit.md").split("**Current repository/publication authority:**")[1]?.split("\n\n")[0];
+  assert.ok(authority, "current repository authority must be explicit");
+  assert.match(authority, /Normal private pushes and\s+`Auto Git Push` remain on hold/);
+  assert.match(authority, /release-checks\/<digest>/);
+  assert.match(authority, /does not\s+authorize main updates/);
+  assert.doesNotMatch(authority, /normal private source[\s\S]*do not need repeated approval/);
 });
 
 test("private README current tables and every literal sidebar path remain aligned", () => {

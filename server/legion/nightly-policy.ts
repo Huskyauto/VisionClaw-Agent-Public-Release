@@ -1,6 +1,8 @@
 import { LEGION_RUNBOOKS, LegionSourceChanged } from "./runbook-source";
 import { LegionAdmissionDeferred } from "./background";
 import { SURFACE_MODEL } from "./local-router";
+import { LEGION_MODEL, LEGION_REASONING_MODEL } from "./model-policy";
+import { HostedRunbookWaiting } from "./runbook-hosted";
 
 export const LEGION_RUNBOOK_JOB = "legion_runbook_compile";
 export const SURFACE_RULE_JOB = "surface_runbook_rule";
@@ -71,6 +73,9 @@ export async function runLocalRunbookJob(job: ClaimedJob, deps: NightlyDependenc
   try { result = await deps.compile(p.sourcePath, p.sourceSha256); }
   catch (error) {
     if (error instanceof LegionSourceChanged) return { status: "superseded", reason: "source_changed", sourceSha256: p.sourceSha256 };
+    if (error instanceof HostedRunbookWaiting && !error.generationStarted) {
+      throw new LegionJobWaiting(error.message);
+    }
     if (error instanceof LegionAdmissionDeferred) {
       if (!error.generationStarted) throw new LegionJobWaiting(error.message);
       throw Error("Local backup busy after a real attempt; retry remains charged to attempt limit");
@@ -83,7 +88,7 @@ export async function runLocalRunbookJob(job: ClaimedJob, deps: NightlyDependenc
   const hosted = result.hostedFallback === true;
   const validModel = hosted
     ? deps.hostedEnabled?.() === true && /^hosted:[^\r\n]{1,200}$/.test(result.model)
-    : ["legion-local:qwen3:8b", `surface-local:${SURFACE_MODEL}`].includes(result.model);
+    : [`legion-local:${LEGION_MODEL}`, `legion-local:${LEGION_REASONING_MODEL}`, `surface-local:${SURFACE_MODEL}`].includes(result.model);
   if (!validModel ||
       !Array.isArray(result.concepts) ||
       result.concepts.length < 1 || result.concepts.length > (kind === SURFACE_RULE_JOB ? 1 : 4) ||

@@ -1,8 +1,9 @@
+import { sparkRelayEnabled } from "./spark-relay-runtime";
 import { z } from "zod";
 import { readLegionRunbook, LegionSourceChanged } from "./runbook-source";
 import { runLegionBackground } from "./background-runtime";
 import { LegionAdmissionDeferred } from "./background";
-import { assertRunbookActive, generateHostedRunbook, localHostedFallbackEnabled } from "./runbook-hosted";
+import { assertRunbookActive, generateHostedRunbook, localHostedFallbackEnabled, HostedRunbookWaiting } from "./runbook-hosted";
 import { legionShutdownSignal } from "./runtime";
 import { localParallelEnabled } from "./local-slots";
 import { surfaceLocalEnabled } from "./local-provider-runtime";
@@ -33,7 +34,7 @@ export function createSimpleRuleCompiler(deps: Dependencies) {
     if (expectedSha256 !== undefined && source.sha256 !== expectedSha256) {
       throw new LegionSourceChanged("Simple runbook changed before dispatch");
     }
-    const signal = AbortSignal.any([legionShutdownSignal(), AbortSignal.timeout(240_000)]);
+    const signal = AbortSignal.any([legionShutdownSignal(), AbortSignal.timeout(sparkRelayEnabled() ? 270_000 : 240_000)]);
     const lines = source.text.split("\n");
     // Surface should not read a long runbook just to choose one instruction.
     // Retain original source numbers and exact bytes; never trim a bad answer.
@@ -69,9 +70,17 @@ export function createSimpleRuleCompiler(deps: Dependencies) {
     } catch (error) {
       signal.throwIfAborted();
       deps.assertActive();
-      if (error instanceof LegionAdmissionDeferred || (error instanceof Error && error.name === "AbortError") ||
+      if ((error instanceof LegionAdmissionDeferred && error.generationStarted) ||
+          (error instanceof Error && error.name === "AbortError") ||
           !deps.hostedEnabled()) throw error;
-      reply = await deps.hosted(messages, signal);
+      try { reply = await deps.hosted(messages, signal); }
+      catch (hostedError) {
+        if (hostedError instanceof HostedRunbookWaiting &&
+            !(error instanceof LegionAdmissionDeferred && !error.generationStarted)) {
+          throw new HostedRunbookWaiting(hostedError.message, true);
+        }
+        throw hostedError;
+      }
       hostedFallback = true;
     }
     signal.throwIfAborted();

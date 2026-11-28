@@ -1,6 +1,6 @@
 {
   "name": "visionclaw-agent",
-  "version": "137.3.0-sec.2",
+  "version": "138.0.0-sec",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -9,12 +9,17 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "npm run check:portable-install && tsx scripts/build.ts",
+    "build:publish": "node scripts/prepare-publish-snapshot.cjs --check && npm run build -- --release-check && node scripts/prepare-publish-snapshot.cjs --apply",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "NODE_OPTIONS=--max-old-space-size=4096 tsc",
     "db:push": "drizzle-kit push",
     "check:portable-install": "node --test --test-name-pattern=\"^every locked tarball\" tests/deployment/portable-install.test.cjs",
-    "publish:preflight": "npm run check:portable-install && npm run check && npx tsc -p tsconfig.publish-preflight.json && npx tsx scripts/publish-preflight.ts",
-    "release:check": "tsx scripts/targeted-release-check.ts",
+    "check:reports": "node --import tsx --test tests/unit/report-regression-guard.test.ts",
+    "publish:preflight": "tsx scripts/prepublish.ts",
+    "publish:preflight:local-fallback": "npm run check:portable-install && npm run check && npx tsc -p tsconfig.publish-preflight.json && npx tsx scripts/publish-preflight.ts",
+    "release:check": "tsx scripts/remote-release.ts submit",
+    "release:check:local-fallback": "tsx scripts/targeted-release-check.ts",
+    "release:remote": "tsx scripts/remote-release.ts",
     "verify:bwb": "tsx scripts/project-confirmation.ts --profile bwb",
     "bwb:oversight-report": "npx tsx scripts/bwb-oversight-shadow-report.ts",
     "capability:evidence-report": "npx tsx scripts/capability-evidence-shadow-report.ts",

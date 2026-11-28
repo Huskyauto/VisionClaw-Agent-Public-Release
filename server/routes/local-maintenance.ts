@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { db } from "../db";
-import { legionBackgroundEnabled } from "../legion/runtime";
+import { legionBackgroundEnabled, legionBackgroundConfiguration, legionRuntimeReady } from "../legion/runtime";
 import { localParallelEnabled } from "../legion/local-slots";
 import { surfaceLocalEnabled } from "../legion/local-provider-runtime";
 import { localHostedFallbackEnabled } from "../legion/runbook-hosted";
@@ -10,7 +10,10 @@ import { legionNightlyEnabled } from "../legion/nightly";
 import { LOCAL_MAINTENANCE_SOURCES } from "../legion/simple-runbook-rule";
 import { LEGION_RUNBOOK_JOB, SURFACE_RULE_JOB } from "../legion/nightly-policy";
 import { SURFACE_MODEL } from "../legion/local-router";
+import { LEGION_MODEL } from "../legion/model-policy";
 import { localMaintenanceEnvironment, queueLocalMaintenance, resultRows } from "../legion/maintenance";
+import { sparkRelayStore } from "../legion/spark-relay-runtime";
+import { registerSparkRelayOwner } from "./spark-legion-relay";
 
 type Dependencies = {
   authMiddleware: any;
@@ -24,6 +27,7 @@ const selection = z.object({
 /** Owner only; installed after the application's authentication/CSRF middleware.
  * No source paths, free-form prompts, tenant ids or model ids accepted. */
 export function registerLocalMaintenanceRoutes(app: Express, deps: Dependencies) {
+  registerSparkRelayOwner(app, deps.authMiddleware, deps.requirePlatformAdmin);
   let windowStart = 0;
   let requests = 0;
   app.get("/api/admin/local-maintenance", deps.authMiddleware, async (req, res) => {
@@ -42,10 +46,12 @@ export function registerLocalMaintenanceRoutes(app: Express, deps: Dependencies)
       const busy = (id: number) => slots.some(s => Number(s.objid) === id);
       res.json({
         enabled: localParallelEnabled(), nightlyEnabled: legionNightlyEnabled(),
+        legionConfiguration: legionBackgroundConfiguration(), legionTransportReady: legionRuntimeReady(),
         surfaceEnabled: surfaceLocalEnabled(), hostedFallbackEnabled: localHostedFallbackEnabled(), environment,
+        sparkRelay: await sparkRelayStore.status(1),
         sources: LOCAL_MAINTENANCE_SOURCES.map(({ id, title }) => ({ id, title })),
         nodes: [
-          { id: "legion-local", label: "Lenovo", model: "qwen3:8b",
+          { id: "legion-local", label: "Lenovo", model: LEGION_MODEL,
             assignment: "Multi-concept, source-backed runbook analysis", configured: legionBackgroundEnabled(), busy: busy(1) },
           { id: "surface-local", label: "Surface", model: SURFACE_MODEL,
             assignment: "One direct question and one exact source reference", configured: surfaceLocalEnabled(), busy: busy(2) },

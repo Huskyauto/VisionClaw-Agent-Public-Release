@@ -148,9 +148,11 @@ test("auto-project messages and research program joins have direct tenant bounda
   const project = declaration("server/auto-project.ts", "checkAndAutoCreateProject");
   assert.match(project, /WHERE conversation_id = \$\{conversationId\}\s+AND tenant_id = \$\{tenantId\}/);
   const research = readFileSync("server/research-proposals.ts", "utf8");
-  const joins = [...research.matchAll(/JOIN research_programs rp ON ([^\n]+)/g)].map(m => m[1]);
-  assert.equal(joins.length, 3);
-  for (const join of joins) assert.match(join, /rp\.tenant_id = (re|rs)\.tenant_id/);
+  const joins = [...research.matchAll(/\bJOIN\s+research_programs\s+(?:AS\s+)?(\w+)\s+ON\s+([^\n]+)/gi)];
+  assert.ok(joins.length >= 4, "Expected all four known research-program join sites to be covered");
+  for (const [, alias, condition] of joins) {
+    assert.match(condition, new RegExp(`\\bAND\\s+${alias}\\.tenant_id\\s*=\\s*(?:re|rs)\\.tenant_id\\b`, "i"));
+  }
 });
 
 test("worker failures, embeddings, seed links and phone pairings have direct scope guards", () => {

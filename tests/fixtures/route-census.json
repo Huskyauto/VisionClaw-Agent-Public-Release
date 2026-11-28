@@ -1,7 +1,9 @@
 {
   "_comment": "Route census \u2014 fail-closed conservation gate for the routes.ts decomposition. Update this file IN THE SAME PR/change as any route move so the diff itself proves conservation: a pure move shows `total` UNCHANGED and `routesTsInline` DECREASED. `inlineCeiling` may only ever ratchet DOWN. Counts BOTH `app.METHOD(` and `<name>Router.METHOD(` registration styles across server/routes.ts + server/routes/**; the shared draft (app.-only, mirror baseline 659) undercounted router-style modules \u2014 corrected here against the real main tree. Baseline is the test's own regex computation (authoritative gate), not an external grep.",
   "_reconciliation": "October 19: 803 -> 813, with the inline ceiling reduced to 170. November 8 follow-through: the same lexical counter finds 819. The six additions since that fixture are four company-package continuation/review/recovery registrations and two owner Engineering Reference registrations. Moving the auth-health registration is -1/+1, net zero. Inline ceiling remains 170; no conservation or safety guard was removed. Variable-path/loop-expanded handlers are not a runtime route inventory.",
-  "total": 819,
+  "_november17_reconciliation": "819 -> 823 verified against the last census commit: server/routes/agent-ready-package.ts +1 lexical loop registration; server/routes/auth-extra.ts +1 authenticated logout; server/routes/local-maintenance.ts +2 registrations. These are actual additions, not route moves. Inline count and its ceiling remain 170.",
+  "_november26_reconciliation": "823 -> 827: four owner-only Daily AI Insights status, pause, smoke and promote registrations in server/routes/daily-ai-insights.ts. No pure move or inline growth; inline ceiling remains 170.",
+  "total": 835,
   "routesTsInline": 170,
   "inlineCeiling": 170
 }

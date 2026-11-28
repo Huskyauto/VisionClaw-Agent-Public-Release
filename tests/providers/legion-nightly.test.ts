@@ -4,6 +4,22 @@ import { LocalAdmissionDeferred } from "../../server/legion/local-slots";
 import { legionNightWindow, runLocalRunbookJob, LegionJobWaiting, LegionJobRejected } from "../../server/legion/nightly-policy";
 import { compileLegionRunbook } from "../../server/legion/runbook";
 import { LegionSourceChanged } from "../../server/legion/runbook-source";
+import { HostedRunbookWaiting } from "../../server/legion/runbook-hosted";
+
+test("pre-dispatch cloud admission failure retains the job without forgiving real generation", async () => {
+  const queued = { id: 97, kind: "legion_runbook_compile", tenantId: 1, attempts: 1,
+    payload: { tenantId: 1, environment: "development", sourcePath: ".agents/skills/zoom-out/SKILL.md",
+      sourceSha256: "a".repeat(64), window: "2026-11-26" } };
+  let generationStarted = false;
+  const deps = { enabled: () => true, ready: () => false, hostedEnabled: () => true,
+    environment: () => "development", read: async () => ({ sha256: "a".repeat(64), text: "Source-backed instruction." }),
+    health: async () => { throw Error("Laptops offline"); },
+    compile: async () => { throw new HostedRunbookWaiting("Cloud admission unavailable", generationStarted); } };
+  await assert.rejects(runLocalRunbookJob(queued, deps), LegionJobWaiting);
+  generationStarted = true;
+  await assert.rejects(runLocalRunbookJob(queued, deps), error =>
+    error instanceof Error && !(error instanceof LegionJobWaiting));
+});
 
 test("queue capacity deferral never refunds a generation that already happened", async () => {
   const fixture = { id: 99, kind: "legion_runbook_compile", tenantId: 1, attempts: 1,
@@ -94,13 +110,13 @@ test("Surface results use the same queued source-grounding gate, not a weaker ac
     read: async () => ({ sha256: "a".repeat(64), text: quote }),
     health: async () => ({}),
     compile: async () => ({ sourceSha256: "a".repeat(64),
-      model: "surface-local:qwen2.5-7b-instruct-qnn-npu:3",
+      model: "surface-local:qwen2.5-7b-instruct-generic-gpu:4",
       concepts: [{ key: "caller-check", title: "Caller check", quotes: [quote] }] }) };
   const result = await runLocalRunbookJob(job, deps);
   assert.equal(result.status, "compiled");
   assert.equal(result.advisoryOnly, true);
   deps.compile = async () => ({ sourceSha256: "a".repeat(64),
-    model: "surface-local:qwen2.5-7b-instruct-qnn-npu:3",
+    model: "surface-local:qwen2.5-7b-instruct-generic-gpu:4",
     concepts: [{ key: "caller-check", title: "Caller check", quotes: ["Invented ungrounded source excerpt"] }] });
   await assert.rejects(runLocalRunbookJob(job, deps));
 });

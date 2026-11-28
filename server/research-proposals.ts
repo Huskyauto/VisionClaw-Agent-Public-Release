@@ -19,9 +19,10 @@ import { parseProposalDiff, findExactMatch } from "./lib/proposal-diff";
 import { redactPiiForStorage } from "./storage-helpers/pii-redaction-guard";
 import { assertMemoryValueNotTombstoned } from "./memory/tombstones";
 import { PROGRAM_PERSONA_MAP, resolvePersonaId, type ActiveSession } from "./research-engine";
+import { MODEL_INTELLIGENCE_PROGRAM, admitsResearchCodeProposal, researchModelDigestEvidence } from "./lib/research-model-intelligence";
 
 export const CODE_PROPOSAL_TARGETS: Record<string, string[]> = {
-  "Nightly AI Model & Provider Intelligence": ["server/providers.ts", "server/model-failover.ts", "server/auto-router.ts"],
+  [MODEL_INTELLIGENCE_PROGRAM]: ["server/providers.ts", "server/model-failover.ts", "server/auto-router.ts"],
   "Nightly AI Tools & Techniques Scanner": ["server/tools.ts", "server/chat-engine.ts", "server/agentic-engines.ts"],
   "Nightly Competitive Platform Analysis": ["server/tools.ts", "server/chat-engine.ts", "server/agentic-engines.ts"],
   "Nightly Agent Architecture Research": ["server/chat-engine.ts", "server/trust-engine.ts", "server/research-engine.ts", "server/heartbeat.ts"],
@@ -337,6 +338,8 @@ Produce a concrete code proposal to implement this finding in VisionClaw.`,
 export async function generateCodeProposal(
   ...args: Parameters<typeof generateCodeProposalUncoordinated>
 ): ReturnType<typeof generateCodeProposalUncoordinated> {
+  // Older durable jobs must not bypass the new source/registry boundary.
+  if (!admitsResearchCodeProposal(args[1])) return null;
   // Source-repair handoffs are recovery work, not optional research; their
   // own durable claim/verification path must not be blocked by maintenance.
   if (args[8] === "production-repair-handoff") return generateCodeProposalUncoordinated(...args);
@@ -375,6 +378,7 @@ export async function replayHighValueFindings(opts: {
     FROM research_experiments re
     JOIN research_programs rp ON rp.id = re.program_id AND rp.tenant_id = re.tenant_id
     WHERE re.status = 'keep'
+      AND rp.name <> ${MODEL_INTELLIGENCE_PROGRAM}
       AND re.replayed_at IS NULL
       AND re.metric_value ~ '^[0-9]+$'
       AND re.metric_value::int >= ${minScore}
@@ -775,7 +779,7 @@ async function generateResearchDigestUncoordinated(tenantId: number = 1): Promis
 
     const sessionsResult = await db.execute(sql`
       SELECT rs.id, rs.program_id, rs.total_experiments, rs.experiments_kept, rs.experiments_discarded,
-        rs.experiments_crashed, rs.summary, rs.model, rs.started_at, rs.ended_at,
+        rs.experiments_crashed, rs.summary, rs.model, rs.status, rs.started_at, rs.ended_at,
         rp.name as program_name
       FROM research_sessions rs
       JOIN research_programs rp ON rs.program_id = rp.id AND rp.tenant_id = rs.tenant_id
@@ -786,20 +790,28 @@ async function generateResearchDigestUncoordinated(tenantId: number = 1): Promis
 
     const findingsResult = await db.execute(sql`
       SELECT re.id, re.session_id, re.hypothesis, re.approach, re.result, re.metric_value, re.status, re.model,
-        rp.name as program_name
+        rp.name as program_name, re.verification_details
       FROM research_experiments re
       JOIN research_sessions rs ON re.session_id = rs.id AND re.tenant_id = rs.tenant_id
       JOIN research_programs rp ON rs.program_id = rp.id AND rp.tenant_id = rs.tenant_id
       WHERE rs.tenant_id = ${tenantId} AND re.status = 'keep' AND rs.started_at >= ${sevenDaysAgo}::timestamp
       ORDER BY re.metric_value DESC
     `);
-    const findings = (findingsResult as any).rows || [];
+    const findings = ((findingsResult as any).rows || []).filter((f: any) =>
+      f.program_name !== MODEL_INTELLIGENCE_PROGRAM || researchModelDigestEvidence(f.verification_details));
 
     const proposalsResult = await db.execute(sql`
-      SELECT id, title, description, target_file, rationale, status, validation_result, created_at
-      FROM code_proposals
-      WHERE tenant_id = ${tenantId} AND created_at >= ${sevenDaysAgo}::timestamp
-      ORDER BY created_at DESC
+      SELECT cp.id, cp.title, cp.description, cp.target_file, cp.rationale, cp.status, cp.validation_result, cp.created_at
+      FROM code_proposals cp
+      WHERE cp.tenant_id = ${tenantId} AND cp.created_at >= ${sevenDaysAgo}::timestamp
+        AND NOT EXISTS (
+          SELECT 1 FROM research_sessions rs
+          JOIN research_programs rp ON rp.id = rs.program_id AND rp.tenant_id = rs.tenant_id
+          WHERE rs.id = cp.source_session_id AND rs.tenant_id = cp.tenant_id
+            AND rp.name = ${MODEL_INTELLIGENCE_PROGRAM}
+            AND cp.source IN ('autoresearch', 'autoresearch-replay')
+        )
+      ORDER BY cp.created_at DESC
     `);
     const proposals = (proposalsResult as any).rows || [];
 
@@ -807,6 +819,7 @@ async function generateResearchDigestUncoordinated(tenantId: number = 1): Promis
       SELECT id, title, content, category, priority, persona_id, created_at
       FROM agent_knowledge
       WHERE tenant_id = ${tenantId} AND source = 'autoresearch' AND created_at >= ${sevenDaysAgo}::timestamp
+        AND category IS DISTINCT FROM 'model_intelligence'
       ORDER BY priority DESC, created_at DESC
       LIMIT 50
     `);
@@ -838,6 +851,10 @@ async function generateResearchDigestUncoordinated(tenantId: number = 1): Promis
       for (const f of topFindings) {
         lines.push(`### [Score ${f.metric_value}] ${(f.hypothesis || "").substring(0, 120)}`);
         lines.push(`**Program:** ${f.program_name}`);
+        if (f.program_name === MODEL_INTELLIGENCE_PROGRAM) {
+          const evidence = researchModelDigestEvidence(f.verification_details);
+          if (evidence) lines.push(`**Provider evidence:** \`${evidence.id}\` released ${evidence.releaseDate}; [model catalog](${evidence.sourceUrl}) · [lifecycle status](${evidence.lifecycleUrl}). Fit assessment is advisory.`);
+        }
         lines.push(`**Approach:** ${(f.approach || "").substring(0, 200)}`);
         lines.push(`**Result:** ${(f.result || "").substring(0, 500)}`);
         lines.push(``);
@@ -880,7 +897,9 @@ async function generateResearchDigestUncoordinated(tenantId: number = 1): Promis
       lines.push(`### ${s.program_name} — Session #${s.id}`);
       lines.push(`- Experiments: ${s.total_experiments} (kept: ${s.experiments_kept}, discarded: ${s.experiments_discarded}, crashed: ${s.experiments_crashed})`);
       lines.push(`- Model: ${s.model}`);
-      if (s.summary) {
+      if (s.program_name === MODEL_INTELLIGENCE_PROGRAM) {
+        if (s.status === "model_catalog_unavailable") lines.push("- Official model sources unavailable; no new candidates could be verified.");
+      } else if (s.summary) {
         const summaryPreview = s.summary.substring(0, 300).replace(/\n/g, " ");
         lines.push(`- Summary: ${summaryPreview}${s.summary.length > 300 ? "..." : ""}`);
       }

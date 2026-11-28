@@ -1,6 +1,11 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["scripts/publish-preflight.ts"],
+  "include": [
+    "scripts/publish-preflight.ts",
+    "scripts/prepublish.ts",
+    "scripts/remote-release-worker.ts",
+    "scripts/remote-release-setup-worker.ts"
+  ],
   "exclude": ["node_modules", "build", "dist"],
   "compilerOptions": {
     "incremental": false,

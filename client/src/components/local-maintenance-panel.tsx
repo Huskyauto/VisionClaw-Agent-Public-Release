@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SparkRelayStatus, type SparkRelayData } from "./spark-relay-status";
 
 type MaintenanceTask = "both" | "lenovo" | "surface";
 
@@ -38,6 +39,7 @@ interface MaintenanceJob {
 }
 
 interface LocalMaintenanceData {
+  sparkRelay: SparkRelayData;
   enabled: boolean;
   nightlyEnabled: boolean;
   surfaceEnabled: boolean;
@@ -131,7 +133,10 @@ export function LocalMaintenancePanel() {
             <div>
               <CardTitle className="text-base">Local laptop maintenance</CardTitle>
               <CardDescription className="mt-1 max-w-2xl">
-                Owner-only controls for Bob’s two local machines. This is queue and configuration metadata—not a live connection monitor.
+                Owner-only routine background work—not conversational answers or interactive troubleshooting.
+                Lenovo uses the approved Mellum model through direct-first access and a separately enabled Spark backup.
+                The overnight runbook schedule has catch-up; not every housekeeping task is offloaded.
+                Queue and configuration metadata are not a full live connection monitor.
               </CardDescription>
             </div>
           </div>
@@ -183,6 +188,7 @@ export function LocalMaintenancePanel() {
         </CardContent>
       ) : data ? (
         <CardContent className="space-y-5 p-4 sm:p-5" data-testid="maintenance-content">
+          {data.sparkRelay && <SparkRelayStatus data={data.sparkRelay} />}
           <div className="grid gap-3 md:grid-cols-[1fr_auto]">
             <div className="rounded-md border border-border/80 bg-background/70 p-3.5">
               <div className="flex flex-wrap items-center gap-2">

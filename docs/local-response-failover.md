@@ -1,6 +1,49 @@
 # Validated local-first runbook recovery
 
-**Current parallel allocation:** `docs/parallel-local-maintenance.md` supersedes
+## Current continuity policy — November 26, 2026
+
+Republish follow-through: memory tasks preserve uncertain started inference
+as a distinct non-replayable outcome, including their own deadline. Genuine
+pre-dispatch contention can still use enabled recovery. The dormant routine
+wrapper now receives supervisor shutdown at its outer boundary as well as
+local dispatch; shutdown cannot authorize its cloud closure.
+
+Bob explicitly requested backup plans so Lenovo unavailability does not abandon
+projects. The existing hosted-recovery flag was already `1` in development and
+production; no environment setting was changed by this fix.
+
+- Lenovo remains primary. Pre-generation contention can use an enabled,
+  task-eligible Surface backup. Uncertain already-started local work is not
+  restarted on another provider.
+- If local routes have no capacity, enabled hosted recovery can submit once
+  through the existing fast-tier router and autonomous budget reservation.
+  Both the full runbook and short source-rule compiler use this policy.
+- Cloud model-resolution, admission or budget unavailability **before any
+  generation** keeps the same queue job pending under its existing tenant,
+  environment, source, attempt and lease fences. Attempts stay monotonic.
+- A real/uncertain generation still counts toward bounded failure limits.
+  Cancellation, revocation, invalid owner/source and exhausted approval authority
+  never authorize more work. This is not an unlimited paid retry loop.
+- Memory categorization/digest/proposal work can return to its original hosted
+  processor after local deferral when recovery is enabled. Independent review
+  still owns consequential memory changes.
+
+A controlled development diagnostic injected local unavailability without
+disconnecting either laptop. The **real** hosted fast-tier path selected
+`muse-spark-1.3-contributor`, reserved the existing budget, made one submission
+and returned three source-grounded concepts in 4,765 ms. Receipt:
+`generated-artifacts/legion-backup/live-proof.json`. This proves cloud recovery
+under an injected outage, not a physical laptop shutdown or published-build
+acceptance. No publishing or production setting changes were performed.
+
+Verification after this fix: 101 focused provider, queue, memory, source-rule,
+slot and routing regressions passed. Full TypeScript checking and production
+build passed. Active persona guidance was synchronized and its wiring audit
+passed (existing warn-only orphan-table notices remained). Review was scoped
+self-review of these branches and their callers, not independent security
+clearance or a new whole-repository audit.
+
+**Earlier parallel allocation:** `docs/parallel-local-maintenance.md` superseded
 the serial/shared-lock allocation below when `LOCAL_PARALLEL_ENABLED=1`.
 Complex tasks no longer ask Surface for multi-concept output; simple tasks start
 there. Hosted validation, budget and authority boundaries below remain in force.
@@ -8,7 +51,7 @@ there. Hosted validation, budget and authority boundaries below remain in force.
 Bob approved deterministic failed-response checks, then explicitly requested
 normal hosted LLM recovery when both on-premise systems fail.
 
-## Design and boundaries
+## Earlier design and boundaries (historical)
 
 1. **Cost:** three screened sources × three queue attempts × at most one call
    per provider = at most 27 generation submissions/night (18 local, 9 hosted).

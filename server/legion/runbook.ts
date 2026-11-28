@@ -2,8 +2,9 @@ import { z } from "zod";
 import { readLegionRunbook, LEGION_RUNBOOKS, LegionSourceChanged } from "./runbook-source";
 import { runLegionBackground } from "./background-runtime";
 import { LegionAdmissionDeferred } from "./background";
-import { assertRunbookActive, generateHostedRunbook, localHostedFallbackEnabled } from "./runbook-hosted";
+import { assertRunbookActive, generateHostedRunbook, localHostedFallbackEnabled, HostedRunbookWaiting } from "./runbook-hosted";
 import { legionShutdownSignal } from "./runtime";
+import { sparkRelayEnabled } from "./spark-relay-runtime";
 
 export { LEGION_RUNBOOKS } from "./runbook-source";
 const output = z.object({ concepts: z.array(z.object({
@@ -39,7 +40,7 @@ export function createRunbookCompiler(deps: CompilerDependencies) {
 return async (sourcePath: string, expectedSha256?: string) => {
   // Leave headroom for lease-fenced completion under the existing five-minute
   // queue lease, even when both local attempts reach their individual deadlines.
-  const signal = AbortSignal.any([legionShutdownSignal(), AbortSignal.timeout(240_000)]);
+  const signal = AbortSignal.any([legionShutdownSignal(), AbortSignal.timeout(sparkRelayEnabled() ? 270_000 : 240_000)]);
   if (!(LEGION_RUNBOOKS as readonly string[]).includes(sourcePath)) throw new Error("Legion runbook source refused");
   const source = await deps.read(sourcePath);
   if (expectedSha256 !== undefined && source.sha256 !== expectedSha256) {
@@ -65,10 +66,18 @@ return async (sourcePath: string, expectedSha256?: string) => {
   } catch (error) {
     signal.throwIfAborted();
     deps.assertActive();
-    if (error instanceof LegionAdmissionDeferred || (error instanceof Error && error.name === "AbortError") ||
+    if ((error instanceof LegionAdmissionDeferred && error.generationStarted) ||
+        (error instanceof Error && error.name === "AbortError") ||
         !deps.hostedEnabled()) throw error;
     console.warn("[local-inference] local runbook attempts failed; trying configured hosted recovery");
-    reply = await deps.hosted(messages, signal);
+    try { reply = await deps.hosted(messages, signal); }
+    catch (hostedError) {
+      if (hostedError instanceof HostedRunbookWaiting &&
+          !(error instanceof LegionAdmissionDeferred && !error.generationStarted)) {
+        throw new HostedRunbookWaiting(hostedError.message, true);
+      }
+      throw hostedError;
+    }
     hostedFallback = true;
   }
   deps.assertActive();

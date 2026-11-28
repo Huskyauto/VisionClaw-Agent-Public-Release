@@ -17,6 +17,7 @@ import { db } from "../db";
 import { sql, and, eq } from "drizzle-orm";
 import { validate, adminTenantUpdateSchema } from "../validation";
 import { registerVerifierMemoryDiagnosticRoute } from "./verifier-memory-diagnostic";
+import { registerDailyAiInsightsRoutes } from "./daily-ai-insights";
 
 type AdminHelpers = {
   authMiddleware: any;
@@ -30,6 +31,7 @@ type AdminHelpers = {
 };
 
 export function registerAdminRoutes(app: Express, helpers: AdminHelpers) {
+  registerDailyAiInsightsRoutes(app, helpers);
   const {
     authMiddleware,
     getTenantFromRequest,

@@ -2616,7 +2616,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "propose_skill",
-      description: "R98.21 / Bob 2026-06-03 — AUTONOMOUS SKILL BUILD (jury-gated, NO human queue). Call this when you notice a reusable pattern worth saving as a skill (a recurring multi-step recipe, a tricky failure-mode workaround, a known-good prompt template, a third-party API quirk, etc.). A 3-frontier-model jury immediately votes BUILD/REJECT (2-of-3 majority): majority BUILD ⇒ the skill is inserted as a LIVE enabled skill available to all agents right away, no human review; majority REJECT ⇒ not added; no majority ⇒ left pending and the owner is pinged (the ONLY case a human is involved). Be specific in `body`: write it as you'd want a future agent to read it (numbered steps, gotchas, example inputs/outputs) — it becomes a trusted prompt. Set `confidence` honestly: 90+ = battle-tested, 70-89 = solid pattern from this session, 40-69 = hunch worth flagging.",
+      description: "Platform-owner-only global skill build. Customer tenants are rejected before persistence or model spending; this does not create private customer skills. For authenticated owner-tenant work, save a reusable recipe, known-good prompt, failure workaround, or API quirk. The existing 3-model jury votes BUILD/REJECT: 2-of-3 BUILD enables the global skill immediately; majority REJECT drops it; a split leaves it pending and pings the owner. Write specific numbered steps, gotchas, and examples in body: it becomes a trusted prompt. Set confidence honestly: 90+ battle-tested, 70-89 solid pattern, 40-69 a hunch.",
       parameters: {
         type: "object",
         properties: {
@@ -3461,11 +3461,10 @@ async function executeToolBody(name: string, params: Record<string, any>): Promi
       }
     }
   } catch (tnrGateErr) {
-    // The TNR gate itself must never silently fail — log loudly and proceed
-    // ONLY if the gate machinery itself is broken (not the adapter). This
-    // matches the AHB intent-gate "fail open with loud log" pattern for
-    // gate plumbing while keeping the adapter itself fail-closed (above).
-    console.error(`[TNR] gate plumbing error (falling through): ${errorMessage(tnrGateErr, String(tnrGateErr))}`);
+    // An unavailable policy cannot establish that dispatch needs no snapshot.
+    // Refuse the attempt; infrastructure failures never grant undo-free execution.
+    console.error(`[TNR] snapshot gate unavailable (refusing dispatch): ${errorMessage(tnrGateErr, String(tnrGateErr))}`);
+    return { error: "[TNR] snapshot policy unavailable — refusing dispatch without verified undo requirements" };
   }
 
   const _ledgerStart = Date.now();
@@ -3610,6 +3609,17 @@ async function _legacySwitchExec(name: string, params: Record<string, any>): Pro
       const { ADMIN_TENANT_ID: TID_AK } = await import("./auth");
       if (!params._tenantId) return { error: "Tenant context required for test_api_keys" };
       if (params._tenantId !== TID_AK) return { error: "Admin access required. Provider key telemetry is platform-wide." };
+      if (params.provider === "legion-local") {
+        const { runLegionDiagnostics } = await import("./legion/felix-diagnostics-runtime");
+        // The guarded executor stamps both conversation aliases. Remove only
+        // the alias matching sealed authority; arbitrary public keys still fail.
+        const input = Object.fromEntries(Object.entries(params).filter(([key, value]) =>
+          !key.startsWith("_") && !(key === "conversationId" && value === params._conversationId)));
+        return runLegionDiagnostics(input, { tenantId: params._tenantId, personaId: params._personaId,
+          conversationId: params._conversationId });
+      }
+      if ((params.provider !== undefined && params.provider !== "all") || params.local_check !== undefined)
+        return { error: "Use provider legion-local for a local_check; no cloud check was started." };
       return testApiKeys();
     }
     case "check_system_status": {
@@ -4869,6 +4879,17 @@ RULES:
         const ALLOWED_PERSONAS = [2, 3];
         if (typeof pid !== "number" || !Number.isFinite(pid) || !ALLOWED_PERSONAS.includes(pid)) {
           return { error: `delegate_task gate_command requires a numeric _personaId in [2 (Felix), 3 (Forge)]; got ${typeof pid === "number" ? pid : `(${typeof pid})`}. Omit gate_command to delegate without a pre-step.` };
+        }
+        // Keep the intentional owner/persona shell capability, but never use
+        // this pre-step to bypass exec's platform-wide accident-prevention floor.
+        const { isCommandAllowed, loadExecConfig } = await import("./exec-tool");
+        const gateConfig = loadExecConfig();
+        const admission = isCommandAllowed(gateCmdRaw, {
+          ...gateConfig,
+          securityMode: gateConfig.securityMode === "deny" ? "deny" : "full",
+        });
+        if (!admission.allowed) {
+          return { error: `delegate_task gate_command blocked: ${admission.reason}` };
         }
         const gateTimeoutMs = Math.min(Math.max(Number(params.gate_timeout_ms) || 30000, 1000), 180000);
         // R98.11+sec2 — Architect HIGH (secret-exfil): same env allowlist as
@@ -7279,111 +7300,8 @@ RULES:
       }
     }
     case "generate_social_image": {
-      const { generateImage } = await import("./replit_integrations/image/client");
-      const { uploadAndShare } = await import("./google-drive");
-      const fsP = await import("fs/promises");
-      
-      const stylePrefix: Record<string, string> = {
-        professional: "Clean, professional corporate style with modern design,",
-        minimalist: "Minimalist design with ample white space and subtle colors,",
-        vibrant: "Bold, vibrant colors with high contrast and energy,",
-        tech: "Futuristic tech aesthetic with gradients, circuits, and digital elements,",
-        corporate: "Polished corporate style suitable for business presentations,",
-        creative: "Artistic, creative style with unique composition,",
-        photorealistic: "Photorealistic, high-quality photograph-style,",
-        illustration: "Modern digital illustration style,",
-        infographic: "Clean infographic-style with data visualization elements,",
-      };
-      const platformHint: Record<string, string> = {
-        x: "Optimized for Twitter/X (16:9 aspect ratio, bold text if any, eye-catching).",
-        linkedin: "Professional LinkedIn post image (1200x627, clean and corporate).",
-        instagram: "Square format (1:1) optimized for Instagram feed.",
-        facebook: "Facebook post image (1200x630, engaging and shareable).",
-        blog: "Blog header image (16:9, professional and relevant to topic).",
-        general: "General-purpose marketing image.",
-      };
-      
-      const style = params.style || "professional";
-      const platform = params.platform || "general";
-      const fullPrompt = `${stylePrefix[style] || ""} ${platformHint[platform] || ""} ${params.prompt}. No text overlays unless specifically requested.`;
-
-      // R99.1 — Optional reference images (Felix Visual Continuity). When
-      // provided, generateImage routes through gpt-image-2's /v1/images/edits
-      // endpoint so the model SEES the references rather than reading a text
-      // description. Filtered to existing files on disk to avoid silent
-      // multipart errors deep inside the OpenAI client.
-      const refPathsRaw = Array.isArray(params.reference_image_paths) ? params.reference_image_paths : [];
-      let refPaths: string[] = [];
-      if (refPathsRaw.length > 0) {
-        const fsMod0 = await import("fs");
-        const { filterAllowedRefPaths } = await import("./lib/image-ref-jail");
-        // R99.1 +sec — Layer 1: jail to project-assets/uploads/attached_assets
-        // BEFORE checking existence, so we never even stat paths outside the
-        // allowed roots (no oracle for "does /etc/passwd exist?"). Layer 2
-        // (in client.ts) re-applies the same filter for defense in depth.
-        const stringified = refPathsRaw.map((p: unknown) => String(p || ""));
-        const { allowed: jailed, rejected: jailRejected } = filterAllowedRefPaths(stringified);
-        if (jailRejected.length > 0) {
-          console.warn(`[generate_social_image] R99.1 +sec: rejected ${jailRejected.length} reference path(s) outside allowed roots (project-assets/uploads/attached_assets)`);
-        }
-        refPaths = jailed.filter((p: string) => fsMod0.existsSync(p));
-        if (refPaths.length !== jailed.length) {
-          console.warn(`[generate_social_image] R99.1: ${jailed.length - refPaths.length}/${jailed.length} jailed reference paths missing on disk; using ${refPaths.length}`);
-        }
-      }
-
-      try {
-        const makeImage = () => generateImage(fullPrompt, {
-            tenantId: params._tenantId,
-            model: params.image_model,
-            purpose: params.purpose,
-            callerLabel: "generate_social_image",
-            ...(refPaths.length > 0 ? { referenceImagePaths: refPaths } : {}),
-          });
-        // Ambiguous wallet requests must not be retried by the outer helper.
-        const dataUrl = params.image_model?.startsWith("cheaperinference/")
-          ? await makeImage()
-          : await retryWithBackoff(makeImage, { retries: 3, delayMs: 8000, label: "generate_social_image" });
-        const base64Data = dataUrl.split(",")[1];
-        const mimeMatch = dataUrl.match(/data:([^;]+);/);
-        const mimeType = mimeMatch?.[1] || "image/png";
-        const ext = mimeType.includes("jpeg") ? ".jpg" : ".png";
-        const fileName = `social-image-${Date.now()}${ext}`;
-        const pathMod = await import("path");
-        const fsMod = await import("fs");
-        const assetsDir = pathMod.resolve(process.cwd(), "project-assets");
-        if (!fsMod.existsSync(assetsDir)) fsMod.mkdirSync(assetsDir, { recursive: true });
-        const localPath = pathMod.join(assetsDir, fileName);
-        await fsP.writeFile(localPath, Buffer.from(base64Data, "base64"));
-        
-        const folderLabel = params.folder_label || `${(await import("./site-config")).siteConfig.platformName} Social Media/Generated Images`;
-        const driveResult = await uploadAndShare({
-          filePath: localPath, fileName, mimeType, folderLabel,
-          parentFolderId: params._projectDriveFolderId || undefined,
-          tenantId: params._tenantId,
-          projectId: params.project_id,
-          generatedArtifact: { artifactKind: "image", logicalName: fileName, sourceRunKey: `social-image:${fileName}` },
-        });
-        if (!driveResult.success) return { error: driveResult.error || "Drive durability verification failed" };
-        
-        const driveSuccess = driveResult?.success && driveResult?.viewUrl;
-        const fileId = driveResult?.fileId;
-        return {
-          success: true,
-          imageUrl: driveSuccess ? driveResult.viewUrl : undefined,
-          downloadUrl: driveSuccess ? (driveResult.downloadUrl || driveResult.viewUrl) : undefined,
-          slidesEmbedUrl: fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : undefined,
-          drive_url: driveSuccess ? driveResult.viewUrl : "Drive upload failed — file saved locally",
-          local_path: localPath,
-          fileName,
-          platform,
-          style,
-          prompt: params.prompt,
-          instructions: "Image generated. The local_path can be used as a slide image_path in create_slideshow_video.",
-        };
-      } catch (err) {
-        return { error: `Image generation failed: ${errorMessage(err)}` };
-      }
+      const { generateSocialImageTool } = await import("./lib/social-image-tool");
+      return generateSocialImageTool(params, { errorMessage, retryWithBackoff });
     }
     case "compose_social_post": {
       const { draftSocialPost } = await import("./social-marketing");
@@ -9044,168 +8962,8 @@ Reply with ONLY this JSON:
     }
     // Tools-layer-split S10: grade_deliverable migrated → server/tools/domains/quality/handlers.ts
     case "propose_skill": {
-      // R98.21 — Skill auto-emission queue. Writes to proposed_skills (status='pending').
-      const tid = params._tenantId;
-      if (typeof tid !== "number" || tid <= 0) return { error: "propose_skill requires tenant context" };
-      const name = String(params.name || "").trim();
-      const description = String(params.description || "").trim();
-      const body = String(params.body || "").trim();
-      if (!name || !description || !body) return { error: "propose_skill requires name, description, body" };
-      if (name.length > 80) return { error: "name must be ≤80 chars" };
-      if (description.length > 300) return { error: "description must be ≤300 chars" };
-      if (body.length > 20000) return { error: "body must be ≤20000 chars" };
-      try {
-        const { db } = await import("./db");
-        const { proposedSkills } = await import("@shared/schema");
-        const { sanitizeUntrusted } = await import("./lib/sanitize-untrusted");
-        // R98.22+sec — strip prompt-injection payloads from the agent-authored
-        // body before persisting. The body becomes a future skill prompt, so
-        // unsanitized injection here would persist into a later trusted-context
-        // execution. Name/description are also user-visible — sanitize them too.
-        const safeName = sanitizeUntrusted(name);
-        const safeDescription = sanitizeUntrusted(description);
-        const safeBody = sanitizeUntrusted(body);
-        const confRaw = typeof params.confidence === "number" ? params.confidence : 70;
-        const confidence = Math.max(0, Math.min(100, Math.round(confRaw)));
-        const { eq } = await import("drizzle-orm");
-        const [row] = await db.insert(proposedSkills).values({
-          tenantId: tid,
-          name: safeName,
-          description: safeDescription,
-          body: safeBody,
-          category: params.category ? String(params.category).slice(0, 60) : "general",
-          sourceContext: params.source_context ? String(params.source_context).slice(0, 500) : null,
-          proposingPersona: params._personaName ? String(params._personaName).slice(0, 80) : null,
-          confidence,
-        }).returning();
-
-        // Bob 2026-06-03 — JURY-GATED AUTONOMOUS SKILL BUILD (no human queue).
-        // The agent doesn't wait for a human. A 3-frontier-model jury votes
-        // BUILD/REJECT (2-of-3 majority). Majority BUILD ⇒ the skill is inserted
-        // as an enabled live skill immediately. Majority REJECT ⇒ dropped. No
-        // majority ⇒ ESCALATE: left pending + a NON-BLOCKING owner ping (the
-        // ONLY case a human is involved). Consistent with R125+3.6
-        // jury-decides-and-ships. proposed_skills stays as the audit trail.
-        const { jurySkillBuild, skillBuildApproved } = await import("./lib/jury-skill-build");
-        const jury = await jurySkillBuild({
-          name: safeName,
-          description: safeDescription,
-          body: safeBody,
-          sourceContext: params.source_context ? String(params.source_context).slice(0, 500) : undefined,
-          proposingPersona: params._personaName ? String(params._personaName) : undefined,
-          confidence,
-          tenantId: tid,
-        });
-        const juryLine = jury.votes.map((v) => `${v.model}:${v.verdict}`).join(", ") || "(no votes)";
-
-        if (skillBuildApproved(jury.decision)) {
-          // R98.23+sec parity — re-sanitize + hard byte-cap before promoting
-          // agent-authored prose into the GLOBAL trusted system-prompt path.
-          // Rejection over truncation: an over-cap body escalates (a human edits
-          // it) rather than silently shipping a truncated skill.
-          const MAX_PROMOTED_BODY_CHARS = 8000;
-          if (safeBody.length > MAX_PROMOTED_BODY_CHARS) {
-            await db.update(proposedSkills).set({
-              status: "pending",
-              reviewedBy: `jury (${jury.majority}/3 BUILD, body over ${MAX_PROMOTED_BODY_CHARS}-char cap)`,
-              reviewedAt: new Date(),
-            }).where(eq(proposedSkills.id, row.id));
-            return {
-              ok: true,
-              decision: "escalate",
-              proposed_skill_id: row.id,
-              review_url: "/admin/proposed-skills",
-              jury: juryLine,
-              message: `Jury voted BUILD (${jury.majority}/3) but the body exceeds the ${MAX_PROMOTED_BODY_CHARS}-char promote cap; left pending for a human to trim/approve.`,
-            };
-          }
-          const promoteName = sanitizeUntrusted(safeName, { maxBytes: 200 });
-          const promoteDesc = sanitizeUntrusted(safeDescription, { maxBytes: 1000 });
-          const promoteBody = sanitizeUntrusted(safeBody, { maxBytes: MAX_PROMOTED_BODY_CHARS });
-          let built: any;
-          try {
-            built = await storage.createSkill({
-              name: promoteName,
-              description: promoteDesc,
-              promptContent: promoteBody,
-              category: params.category ? String(params.category).slice(0, 60) : "general",
-              enabled: true,
-            } as any);
-          } catch (error) {
-            const { isManagedSkillSecurityError } = await import("./lib/managed-skill-safety");
-            if (!isManagedSkillSecurityError(error)) throw error;
-            await db.update(proposedSkills).set({
-              status: "pending",
-              reviewedBy: `jury (${jury.majority}/3 BUILD, security scan rejected: ${error.patterns.join(", ")})`,
-              reviewedAt: new Date(),
-            }).where(eq(proposedSkills.id, row.id));
-            return {
-              ok: true,
-              decision: "escalate",
-              proposed_skill_id: row.id,
-              review_url: "/admin/proposed-skills",
-              jury: juryLine,
-              message: "Jury voted BUILD, but the skill security scan rejected the content; left pending for owner review.",
-            };
-          }
-          await db.update(proposedSkills).set({
-            status: "accepted",
-            reviewedBy: `jury (${jury.majority}/3 BUILD)`,
-            reviewedAt: new Date(),
-            promotedSkillId: built.id,
-          }).where(eq(proposedSkills.id, row.id));
-          return {
-            ok: true,
-            decision: "build",
-            built_skill_id: built.id,
-            proposed_skill_id: row.id,
-            jury: juryLine,
-            message: `Jury approved (${jury.majority}/3 BUILD). Skill '${name}' is now LIVE and enabled for all agents — no human review needed.`,
-          };
-        }
-
-        if (jury.decision === "reject") {
-          await db.update(proposedSkills).set({
-            status: "rejected",
-            reviewedBy: `jury (${jury.majority}/3 REJECT)`,
-            reviewedAt: new Date(),
-          }).where(eq(proposedSkills.id, row.id));
-          return {
-            ok: true,
-            decision: "reject",
-            proposed_skill_id: row.id,
-            jury: juryLine,
-            message: `Jury declined to build '${name}' (${jury.majority}/3 REJECT). Not added. Reasoning: ${jury.votes.find((v) => v.verdict === "REJECT")?.rationale?.slice(0, 200) || "n/a"}`,
-          };
-        }
-
-        // ESCALATE — no 2/3 majority (or jury failure). Leave the proposal
-        // pending (the queue is the human sink) and fire a NON-BLOCKING owner
-        // ping. This is the only path a human is involved in.
-        void (async () => {
-          try {
-            const { sendEmail, isEmailConfigured } = await import("./email");
-            if (!isEmailConfigured?.()) return;
-            const OWNER_EMAIL = process.env.OWNER_EMAIL || process.env.OWNER_ALERT_EMAIL || process.env.SITE_OWNER_EMAIL;
-            if (!OWNER_EMAIL) return;
-            await (sendEmail as any)({
-              to: OWNER_EMAIL,
-              subject: `[VisionClaw] Skill jury split — '${name}' needs your call`,
-              text: `An agent proposed a new skill and the 3-model jury could NOT reach a 2-of-3 majority, so it was NOT auto-built.\n\nSkill: ${name}\nProposed by: ${params._personaName || "unknown"}\nVotes: ${juryLine}\n\nReview/decide at /admin/proposed-skills (proposal #${row.id}).\n\nThis is the only case a skill build needs your eyes — majority BUILD/REJECT verdicts auto-apply with no human in the loop.`,
-            });
-          } catch (e) {
-            console.warn(`[propose_skill] escalate owner-ping failed (non-fatal): ${errorMessage(e, String(e))}`);
-          }
-        })();
-        return {
-          ok: true,
-          decision: "escalate",
-          proposed_skill_id: row.id,
-          review_url: "/admin/proposed-skills",
-          jury: juryLine,
-          message: `Jury split — no 2/3 majority (${juryLine}). Skill '${name}' left pending for your call; you've been pinged. This is the only case that needs a human.`,
-        };
-      } catch (e) { return { error: `propose_skill failed: ${errorMessage(e, String(e))}` }; }
+      const { proposeSkillTool } = await import("./lib/proposed-skill-tool");
+      return proposeSkillTool(params, { storage, errorMessage });
     }
     case "run_ab_eval": {
       // R98.21 — Cross-run A/B. Fans out N parallel runs per config, judges each, ranks.

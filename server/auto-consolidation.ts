@@ -139,8 +139,15 @@ async function runREMPhase(tenantId: number, deepResult: DreamConsolidationResul
 
     // Use the RETURNED actualModelId: the $0 policy may swap the client to the free
     // modelfarm lane, and sending the original id to that endpoint 400s.
-    const { client, actualModelId } = await getClientForModel("gpt-5.4", tenantId, {});
-    const resp = await client.chat.completions.create({
+    const { localMemoryTasks, localMemoryAllowsHosted } = await import("./legion/memory-runtime");
+    const local = await localMemoryTasks.diary(tenantId, rows);
+    let diary: string | undefined;
+    if (local.status === "accepted") {
+      diary = local.value;
+    } else {
+      if (!localMemoryAllowsHosted(local)) return { wrote: false, error: "Local dream digest deferred" };
+      const { client, actualModelId } = await getClientForModel("gpt-5.4", tenantId, {});
+      const resp = await client.chat.completions.create({
       model: actualModelId,
       messages: [
         {
@@ -156,7 +163,8 @@ async function runREMPhase(tenantId: number, deepResult: DreamConsolidationResul
       temperature: 0.7,
     });
 
-    const diary = resp.choices?.[0]?.message?.content?.trim();
+      diary = resp.choices?.[0]?.message?.content?.trim();
+    }
     if (!diary || diary.length < 20) {
       console.log(`[dreaming:REM] Empty or too-short diary for tenant ${tenantId}, skipping write`);
       return { wrote: false };
@@ -266,6 +274,13 @@ async function runForTenant(tenantId: number): Promise<DreamConsolidationResult 
     tracker.totalRuns++;
 
     console.log(`[dreaming:Deep] Tenant ${tenantId} completed: ${result.summary}`);
+
+    // Rehearse/compact the same source-backed working pointers, not another
+    // model-training loop. No generated text, permissions or extra model call.
+    try {
+      const { getWorkingContextService } = await import("./working-context");
+      await (await getWorkingContextService()).consolidate(tenantId);
+    } catch { console.warn("[working-context] dreaming-unavailable"); }
 
     try {
       await db.execute(sql`

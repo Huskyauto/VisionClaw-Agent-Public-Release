@@ -4,6 +4,11 @@ import { legionBackgroundEnabled, legionShutdownSignal } from "./runtime";
 export const localHostedFallbackEnabled = () =>
   legionBackgroundEnabled() && process.env.LOCAL_HOSTED_FALLBACK_ENABLED === "1";
 
+/** Waiting is refundable capacity only if no local or hosted generation began. */
+export class HostedRunbookWaiting extends Error {
+  constructor(message: string, readonly generationStarted = false) { super(message); }
+}
+
 export function assertRunbookActive() {
   legionShutdownSignal().throwIfAborted();
   if (!legionBackgroundEnabled() || (currentTenantId() !== null && currentTenantId() !== 1)) {
@@ -35,10 +40,23 @@ export function createHostedRunbookGenerator(deps: HostedDependencies) {
     try {
       return await Promise.race([
         (async () => {
-          const lane = await deps.resolve();
+          let lane: Awaited<ReturnType<HostedDependencies["resolve"]>>;
+          try { lane = await deps.resolve(); }
+          catch {
+            signal.throwIfAborted();
+            deps.assertActive();
+            throw new HostedRunbookWaiting("Hosted routing unavailable; work retained");
+          }
           signal.throwIfAborted();
           deps.assertActive();
-          if (!await deps.claim(lane.model)) throw Error("Runbook hosted recovery blocked by autonomous budget");
+          let claimed: boolean;
+          try { claimed = await deps.claim(lane.model); }
+          catch {
+            signal.throwIfAborted();
+            deps.assertActive();
+            throw new HostedRunbookWaiting("Hosted admission unavailable; work retained");
+          }
+          if (!claimed) throw new HostedRunbookWaiting("Runbook hosted recovery blocked by autonomous budget; work retained");
           signal.throwIfAborted();
           deps.assertActive();
           const response = await lane.generate(messages, signal);

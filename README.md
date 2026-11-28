@@ -1,6 +1,81 @@
 # VisionClaw Agent
 
-## Latest source update — R137.3+sec2 (November 17, 2026)
+## Latest source update — R138+sec (November 27, 2026)
+
+- **Background processing, not interactive chat:** owner-approved Lenovo work
+  uses Mellum 2.1 for screened runbooks and source-backed reference extraction.
+  The overnight runbook schedule is enabled in the owner installation.
+  Questions and interactive troubleshooting remain on the main assistant route.
+  Broader routine compaction requires its own separate opt-in.
+- **Direct plus Spark:** direct Lenovo access is primary; the installed Spark
+  worker provides a second transport. A production relay check returned `42`
+  with the exact approved model, 172 input / 3 output tokens, 4,039 ms server
+  start-to-result time excluding polling, confirmed accounting and zero metered
+  cloud inference cost. Outage-triggered switching is not yet verified.
+- **Preserved safeguards:** owner-scoped authentication, model/guardrail checks,
+  bounded jobs, durable checkpoints and no automatic replay of uncertain
+  generations. Opaque secure credential injection works without exposing raw
+  credentials. Optional connection-alert email has a separate activation gate.
+- **Research and source checks:** shared daily research submissions receive
+  separate feedback, not automatic adoption. Portable GitHub release checks bind
+  their evidence to exact source candidates. Forks require their own configuration
+  and have no access to the owner's devices or credentials.
+- **Review corrections:** structured source extraction now uses the shared
+  DNS-pinned HTTPS fetch boundary and refuses redirects before contact.
+  Unavailable snapshot-policy checks refuse dispatch rather than silently
+  bypassing undo requirements. Offline fixtures reproduced both old failures;
+  these corrections are not exhaustive platform or production certification.
+- **Current documentation:** landing views, dashboard updates, navigation and
+  SEO share the current release summary. See [remeasured development totals](docs/CURRENT_PLATFORM_TOTALS.md)
+  and [review scope and limitations](docs/app-review-2026-11-27.md).
+  This repository exports eligible sanitized source only—not private records,
+  customer uploads, credentials, runtime state or proprietary material.
+  A source push is not an application deployment or whole-platform certification.
+
+## Previous source update — R137.4+sec2 (November 23, 2026)
+
+- **Safer delivered apps:** self-contained HTML previews run in a browser
+  sandbox separate from signed-in workspace storage. Downloads remain
+  available, and preview scripts cannot make background network requests.
+- **Website Audit:** when enabled, the owner can request a GLM 5.4 layout
+  second opinion on a public or synthetic screenshot and related CSS. The
+  advisory result does not modify source files, run tools or publish a website.
+- **Routine owner routing:** GPT-6 Luna is an optional fast/balanced paid
+  fallback through CheaperInference after included routes, subject to catalog
+  price checks and existing budgets. No new customer default, advanced tier,
+  automatic jury member or grant of tool authority.
+- **Existing tools and workflows:** Firecrawl uses v2 with bounded pagination
+  and cancellation; crawl depth means URL path segments. Tenant-created
+  Google Slides stay under Google account sharing controls. Memory edits
+  cannot change ownership, and scheduled fixture replay uses guarded tools.
+- **Model intelligence:** verified first-party release and lifecycle evidence
+  can queue a pending registry review, not automatic activation.
+- **Source boundaries:** development evidence is not production certification.
+  The sanitized snapshot exports eligible source, not customer files, private
+  audit records, runtime state or credentials. It does not publish the app.
+
+## Previous source update — R137.4+sec (November 19, 2026)
+
+- **Finished but Not Billed:** a manual HVAC billing-review workbench compares
+  coded jobs and invoices in the browser. Findings go to the office; the
+  feature does not invoice customers, upload their records, or collect payment.
+- **Source-backed working context:** bounded excerpts from authorized stored
+  conversations can carry forward decisions and corrections. Retrieved text
+  is not execution evidence, a new instruction, or approval. Valid local
+  selection is a fallback when the existing richer extraction is unavailable.
+- **Owner model options:** explicit GPT-6.2 Sol and Astra selection and
+  optional frontier-jury routing do not change general defaults or make
+  any provider allowance unlimited.
+- **Account and release integrity:** modern MCP keys require a currently active
+  account. Backup permission checks and isolated staging evidence are not
+  proof of production parity or completed tenant-audit coverage.
+- **Source boundaries:** the Business and Technical landing views distinguish
+  feature status from the November 19 development census. The public repository
+  exports eligible source only; it excludes private records, credentials,
+  runtime state, customer uploads and proprietary material. Source publication
+  does not deploy the application.
+
+## Previous source update — R137.3+sec2 (November 17, 2026)
 
 - **Cross-application review:** source and page inventories include public
   landing pages, authenticated dashboards, shared navigation and backend
@@ -120,8 +195,8 @@ excluded by the existing export policy.
   See the [November source reconciliation](docs/platform-update-2026-11-04.md).
 
 **428 registered tools · 386 publicly documented tools · 18 personas · 68 platform
-skills · 148 active capabilities · 202 declared / 283 live development tables ·
-905 platform indexes · 100 curated models · 41 governance rules.**
+skills · 150 active capabilities · 202 declared / 283 live development tables ·
+905 platform indexes · 102 curated models · 41 governance rules.**
 These are dated development measurements, not production telemetry.
 
 Recent source additions include an eight-document **AI Stack Decision Review**
@@ -192,7 +267,7 @@ Instead of a single chatbot, you get a full agent workforce. Give it a task. The
 
 **Earlier source update — R137+sec (October 19, 2026): Business pilots, company report packages and evidence-first operations.** Owner-only health/re-scan, release, governance and cost/routing pilots; read-only website readiness; sourced company reports with required audio; private alert logs; receipt-backed delivery checks, outcome-first briefings and video packaging. Private report packages are excluded from generic tenant file access. [Feature/access matrix](docs/platform-update-2026-10-19.md). Forks need their own credentials, entitlements and configuration. Focused live pilot verification is not universal certification; GitHub synchronization is not website publication.
 
-The November 17 application inventory covers 1,634 source modules in `client/src`, `server` and `shared`, including 115 page components and one page-data module. Not every component is a standalone route. **428 total registered tools · 386 public documented tools · 68 total skills · 148 active capabilities · 18 personas · 202 declared / 283 live development tables · 41 governance rules · 905 platform indexes · 100 curated AI models · 6 AI providers · 6 deployment targets.** These are a November 17 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
+The retained November 19 application inventory covered 1,644 source modules in `client/src`, `server` and `shared`; that module inventory was not rerun for this census. Not every component is a standalone route. **428 total registered tools · 386 public documented tools · 68 total skills · 150 active capabilities · 18 personas · 202 declared / 283 live development tables · 41 governance rules · 905 platform indexes · 102 curated AI models · 6 AI providers · 6 deployment targets.** These platform counts are the November 27 **development evidence snapshot**, not live production telemetry. The public tool index deliberately excludes trusted-persona-only tools. Current release facts: [`docs/release-facts.json`](docs/release-facts.json). Browsable indexes: [`docs/tools.md`](docs/tools.md) · [`docs/personas.md`](docs/personas.md).
 
 ### October 9–14 source updates
 
@@ -459,7 +534,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
 | AI Agents (Personas) | 18 |
 | Tools (total registered) | 428 |
 | Tools (public documented) | 386 |
-| AI Models in Core Registry | 100 curated |
+| AI Models in Core Registry | 102 curated |
 | Daily Catalog Discovery | 1000+ models scanned on OpenRouter |
 | AI Providers | 6 (OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity) |
 | Governance Rules | 41 |
@@ -503,7 +578,7 @@ Real screenshots from the live instance at [agenticcorporation.net](https://agen
         ┌────────────┐   ┌────────────┐   ┌────────────┐
         │ PostgreSQL │   │ Google     │   │ 6 AI       │
         │ + pgvector │   │ Drive      │   │ providers  │
-        │ D202/L283  │   │ storage    │   │100 curated │
+        │ D202/L283  │   │ storage    │   │102 curated │
         └────────────┘   └────────────┘   └────────────┘
 ```
 
@@ -549,7 +624,7 @@ Every agent has a defined role, personality, skill set, and operating rules. The
 
 ### AI & Intelligence
 
-- **100 Curated AI Models in the Development Registry** with configured routing across supported providers. Bring your own provider credentials — availability and billing are governed by provider and account terms, not a promise of universally free inference.
+- **102 Curated AI Models in the Development Registry** with configured routing across supported providers. Bring your own provider credentials — availability and billing are governed by provider and account terms, not a promise of universally free inference.
 - **Adaptive Model Discovery (R73)** — a daily background task scans OpenRouter's full catalog of 1000+ models, tier-classifies each by completion price (reasoning / powerful / balanced / fast), probes the Replit gateway for new releases, and emails the owner a ranked digest of new models worth adding to the registry. Hard caps prevent inbox spam (10 alerts/run max), lifetime dedupe prevents re-alerts, and silent days mean nothing changed.
 - **Streaming Responses** via Server-Sent Events (SSE) — real-time token-by-token output
 - **Thinking Mode** — explainable reasoning with decision traces for complex problems

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict EoENq6fDdX8ljEZcafNv37I4vnPH8A9Pe1BHGepzRsDpuFyyA3Xbg7EfWUWPzFZ
+\restrict ywHBDhwqT1mh7Fcj74eEDKEa3vbEGAjk0ghjW6ttD4PELHyBPyLUCRDLsbuTNMU
 
 -- Dumped from database version 16.10
 -- Dumped by pg_dump version 16.10
@@ -868,7 +868,7 @@ CREATE TABLE public.agent_jobs (
     completed_at timestamp with time zone,
     failure_class text,
     rollback_note text,
-    CONSTRAINT agent_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'succeeded'::text, 'failed'::text, 'failed_terminal'::text, 'cancelled'::text])))
+    CONSTRAINT agent_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'succeeded'::text, 'failed'::text, 'failed_terminal'::text, 'cancelled'::text, 'relay_queued'::text, 'relay_claimed'::text, 'relay_running'::text, 'relay_complete'::text, 'relay_failed_before_send'::text, 'relay_uncertain'::text, 'relay_cancelled'::text, 'relay_released'::text, 'relay_worker'::text])))
 );
 
 
@@ -22920,5 +22920,5 @@ ALTER TABLE public.skill_optimization_versions ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EoENq6fDdX8ljEZcafNv37I4vnPH8A9Pe1BHGepzRsDpuFyyA3Xbg7EfWUWPzFZ
+\unrestrict ywHBDhwqT1mh7Fcj74eEDKEa3vbEGAjk0ghjW6ttD4PELHyBPyLUCRDLsbuTNMU
 

@@ -12,6 +12,8 @@ import { installConsoleRedactor } from "./log-redactor";
 import { logger, runWithRequestId, newRequestId, sanitizeRequestId } from "./lib/logger";
 import { createOwnerOnlyGate, ownerOnlyAccess } from "./lib/owner-only-access";
 import { isVerifiedOwnerRequest } from "./auth";
+import { runStripeMigrationsWithRetry } from "./lib/stripe-migration-retry";
+import { GLM_LAYOUT_REVIEW_PATH } from "../shared/glm54-layout-contract";
 
 // R84 — Wrap console.* with the secret redactor BEFORE anything logs.
 installConsoleRedactor();
@@ -84,7 +86,7 @@ if [ -z "\$GITHUB_REPO_VAL" ]; then echo "No GITHUB_REPO set"; exit 0; fi
 GIT_ASKPASS="" git \\
   -c credential.helper='!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN_VAL"; }; f' \\
   push "https://github.com/\${GITHUB_REPO_VAL}.git" main 2>&1 \\
-  | sed -E 's#https://[^@[:space:]]+@github\\.com#https://[REDACTED]@github.com#g'
+  | sed -E 's#https?://[^@[:space:]]+@github\\.com#https://[REDACTED]@github.com#g'
 echo "[push] Done"
 `;
   writeScriptIfStale(scriptPath, script);
@@ -119,7 +121,7 @@ git remote add origin "https://github.com/\${PUBLIC_REPO}.git"
 GIT_ASKPASS="" git \\
   -c credential.helper='!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN_VAL"; }; f' \\
   push -f origin main 2>&1 \\
-  | sed -E 's#https://[^@[:space:]]+@github\\.com#https://[REDACTED]@github.com#g'
+  | sed -E 's#https?://[^@[:space:]]+@github\\.com#https://[REDACTED]@github.com#g'
 echo "[public-push] Done — https://github.com/\${PUBLIC_REPO}"
 cd /home/runner/workspace
 rm -rf /tmp/visionclaw-public
@@ -269,6 +271,20 @@ app.use("/internal/workspace-verifier", (req, res, next) => {
   verify: (req, _res, buf) => { req.rawBody = buf; },
 }));
 
+// Bound this paid feature's input before the general application parser.
+app.use(GLM_LAYOUT_REVIEW_PATH, (req: Request, res: Response, next: NextFunction) => {
+  if (req.method === "POST" && !req.is("application/json")) {
+    res.setHeader("Cache-Control", "no-store");
+    return void res.status(415).json({ error: "An uncompressed JSON submission is required." });
+  }
+  next();
+}, express.json({ limit: "512kb", inflate: false }),
+  (error: { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+    const status = error.status === 413 ? 413 : error.status === 415 ? 415 : 400;
+    res.setHeader("Cache-Control", "no-store");
+    res.status(status).json({ error: "Use uncompressed JSON and a screenshot no larger than 360 KB." });
+  });
+
 app.use(
   express.json({
     limit: "50mb",
@@ -344,56 +360,57 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  if (!isolatedStaging) {
-    (async () => {
-    try {
-      const databaseUrl = process.env.DATABASE_URL;
-      if (databaseUrl) {
-        console.log('[stripe] Initializing Stripe schema...');
-        await runMigrations({ databaseUrl, schema: 'stripe' } as any);
-        console.log('[stripe] Schema ready');
-
-        const stripeSync = await getStripeSync();
-        const replitDomains = process.env.REPLIT_DOMAINS;
-        if (replitDomains) {
-          const webhookBaseUrl = `https://${replitDomains.split(',')[0]}`;
-          const desiredUrl = `${webhookBaseUrl}/api/stripe/webhook`;
-          try {
-            const stripe = await getUncachableStripeClient();
-            // Match by URL only. Never auto-create here: Stripe reveals a new
-            // endpoint's signing secret once, and this process has no atomic
-            // path to install it as STRIPE_WEBHOOK_SECRET.
-            const existing = await stripe.webhookEndpoints.list({ limit: 100 });
-            const match = existing.data.find((e: any) => e.url === desiredUrl);
-            if (match) {
-              const secretReady = !!process.env.STRIPE_WEBHOOK_SECRET;
-              const level = match.status === 'enabled' && secretReady ? 'log' : 'error';
-              console[level](
-                `[stripe] Webhook endpoint found: ${match.url}; status=${match.status}; signing-secret=${secretReady ? 'configured (parity is verified per delivery)' : 'missing'}`,
-              );
-            } else {
-              console.error(`[stripe] No webhook exists for ${desiredUrl}; configure it with its signing secret before accepting live events`);
-            }
-          } catch (whErr: any) {
-            console.error(`[stripe] Webhook configuration check failed: ${whErr.message?.slice(0, 80)}`);
-          }
-        } else {
-          console.log('[stripe] No REPLIT_DOMAINS, webhook setup skipped');
-        }
-
-        stripeSync.syncBackfill()
-          .then(() => console.log('[stripe] Data synced'))
-          .catch((err: any) => console.error('[stripe] Sync error:', err.message));
-      }
-    } catch (err: any) {
-      console.error('[stripe] Init error (non-fatal):', err.message);
-    }
-    })();
-  } else {
-    console.log("[staging] Stripe/payment startup disabled");
+async function initializeStripeAtStartup() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) return;
+  try {
+    console.log('[stripe] Initializing Stripe schema...');
+    await runStripeMigrationsWithRetry(() => runMigrations({ databaseUrl }), {
+      onRetry: () => console.warn('[stripe] Database connection timed out before migrations; retrying once in 5s'),
+    });
+    console.log('[stripe] Schema ready');
+  } catch (error) {
+    console.error('[stripe] Schema initialization failed (non-fatal):', error instanceof Error ? error.message : 'Unrecognized error');
+    return;
   }
 
+  try {
+    const stripeSync = await getStripeSync();
+    const replitDomains = process.env.REPLIT_DOMAINS;
+    if (replitDomains) {
+      const desiredUrl = `https://${replitDomains.split(',')[0]}/api/stripe/webhook`;
+      try {
+        const stripe = await getUncachableStripeClient();
+        // Match by URL only. Never auto-create: the new signing secret
+        // cannot be atomically installed as STRIPE_WEBHOOK_SECRET.
+        const existing = await stripe.webhookEndpoints.list({ limit: 100 });
+        const match = existing.data.find((endpoint) => endpoint.url === desiredUrl);
+        if (match) {
+          const secretReady = !!process.env.STRIPE_WEBHOOK_SECRET;
+          const level = match.status === 'enabled' && secretReady ? 'log' : 'error';
+          console[level](
+            `[stripe] Webhook endpoint found: ${match.url}; status=${match.status}; signing-secret=${secretReady ? 'configured (parity is verified per delivery)' : 'missing'}`,
+          );
+        } else {
+          console.error(`[stripe] No webhook exists for ${desiredUrl}; configure it with its signing secret before accepting live events`);
+        }
+      } catch (error) {
+        console.error('[stripe] Webhook configuration check failed:', error instanceof Error ? error.message.slice(0, 80) : 'Unrecognized error');
+      }
+    } else {
+      console.log('[stripe] No REPLIT_DOMAINS, webhook setup skipped');
+    }
+
+    // Keep the installed library's existing scope: this call alone does
+    // not establish that the catalog (or any other resource) was refreshed.
+    await stripeSync.syncBackfill();
+    console.log('[stripe] Startup sync call completed; catalog backfill not requested');
+  } catch (error) {
+    console.error('[stripe] Startup sync failed (non-fatal):', error instanceof Error ? error.message : 'Unrecognized error');
+  }
+}
+
+(async () => {
   if (!isolatedStaging) {
     (async () => {
     try {
@@ -756,8 +773,12 @@ app.use((req, res, next) => {
   }
 
   if (isolatedStaging) {
+    log("Stripe/payment startup disabled", "staging");
     log("Isolated staging: email, schedulers, autonomous recovery, job workers, and maintenance loops disabled", "staging");
   } else {
+  // Stripe's migrator opens a separate DB connection. Start it off the
+  // readiness path, after the core boot has had a chance to warm PostgreSQL.
+  void initializeStripeAtStartup();
   setTimeout(async () => {
     try {
       const { isEmailConfigured, startInboxPolling, provisionAllTenantInboxes, backfillEmptyBodies } = await import("./email");

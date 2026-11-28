@@ -34,6 +34,7 @@
 
 import path from "node:path";
 import { UPLOADS_DIR } from "../../../uploads-path";
+import { ADMIN_TENANT_ID } from "../../lib/tenant-constants";
 
 const UPLOADS_ROOT = path.resolve(UPLOADS_DIR);
 const UPLOADS_ROOT_WITH_SEP = UPLOADS_ROOT + path.sep;
@@ -810,20 +811,10 @@ export async function writeFileHandler(
   if (writeBasename.startsWith(".") && !SAFE_DOTFILES_WRITE.has(writeBasename) && !safePartsLower.includes("/")) {
     return { error: `Cannot write top-level dotfile '${writeBasename}'` };
   }
-  // Freeze-guard: the platform-stamped allowlist of paths this tool may write.
-  // Read from the trusted ToolContext (ctx.allowedPaths) — never a
-  // caller-supplied `_allowedPaths` (stripped upstream; see context.ts).
-  if (ctx.allowedPaths && Array.isArray(ctx.allowedPaths) && ctx.allowedPaths.length > 0) {
-    const normalizedParts = safeParts.toLowerCase().split("/");
-    const allowed = ctx.allowedPaths.some((ap: string) => {
-      const apNorm = ap.toLowerCase().replace(/^\/+/, "").replace(/\/+$/, "");
-      const apSegments = apNorm.split("/");
-      return apSegments.every((seg: string, i: number) => normalizedParts[i] === seg);
-    });
-    if (!allowed) {
-      return { error: `Directory freeze active — write blocked outside allowed paths: ${ctx.allowedPaths.join(", ")}. File: ${safeParts}` };
-    }
-  }
+  const writeAuthorizationError = workspaceWriteAuthorizationError(safeParts, ctx);
+  if (writeAuthorizationError) return { error: writeAuthorizationError };
+  // The trusted platform-stamped grant is checked above; model-supplied
+  // `_allowedPaths` is stripped by the dispatcher and never authorizes writes.
   const absPath = path.resolve("/home/runner/workspace", safeParts);
   if (!isPathInsideRoot(absPath, WORKSPACE_ROOT)) return { error: "Access denied: path outside workspace" };
   // R114 +sec v8d (architect Pass 4 HIGH closed) — AEvo bypass guard.
@@ -839,8 +830,7 @@ export async function writeFileHandler(
   {
     const outputSkillsRoot = path.resolve("/home/runner/workspace", "data/output-skills");
     if (absPath === outputSkillsRoot || absPath.startsWith(outputSkillsRoot + "/")) {
-      const { ADMIN_TENANT_ID: WF_ADMIN_TID } = await import("../../../auth");
-      if (ctx.tenantId !== WF_ADMIN_TID) {
+      if (ctx.tenantId !== ADMIN_TENANT_ID) {
         return { error: "Access denied: data/output-skills/* is AEvo-managed — use propose_procedure_edit → approve → apply_procedure_edit. Direct writes require admin tenant." };
       }
     }
@@ -1093,6 +1083,35 @@ export async function writeFileHandler(
     result.message += `\nFile added to project #${linkedProjectId} — visible in the project's Files tab.`;
   }
   return result;
+}
+
+/**
+ * Non-owner workspace writes need an explicit, host-stamped path capability.
+ * The platform owner retains the existing unrestricted workspace access when
+ * no allowlist is present; any supplied allowlist still constrains that owner.
+ */
+export function workspaceWriteAuthorizationError(
+  safeParts: string,
+  ctx: Pick<ToolContext, "tenantId" | "allowedPaths">,
+): string | null {
+  const allowedPaths = ctx.allowedPaths;
+  const hasTrustedGrant = Array.isArray(allowedPaths) && allowedPaths.length > 0;
+  if (ctx.tenantId !== ADMIN_TENANT_ID && !hasTrustedGrant) {
+    return "Access denied: non-owner workspace writes require a trusted, non-empty allowedPaths grant.";
+  }
+
+  if (hasTrustedGrant) {
+    const normalizedParts = safeParts.toLowerCase().split("/");
+    const allowed = allowedPaths!.some((ap: string) => {
+      const apNorm = ap.toLowerCase().replace(/^\/+/, "").replace(/\/+$/, "");
+      const apSegments = apNorm.split("/");
+      return apSegments.every((seg: string, i: number) => normalizedParts[i] === seg);
+    });
+    if (!allowed) {
+      return `Directory freeze active — write blocked outside allowed paths: ${allowedPaths!.join(", ")}. File: ${safeParts}`;
+    }
+  }
+  return null;
 }
 
 /** Registered by ./index.ts at import time. */

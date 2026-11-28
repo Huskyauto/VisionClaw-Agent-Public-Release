@@ -1,5 +1,15 @@
-import { test, after } from "node:test";
+import { test, after, mock } from "node:test";
 import assert from "node:assert/strict";
+import { Socket } from "node:net";
+
+// These probes must never reach a real payout even if the firewall regresses.
+mock.method(globalThis, "fetch", async () => { throw new Error("Offline firewall fixture: fetch denied"); });
+mock.method(Socket.prototype, "connect", () => { throw new Error("Offline firewall fixture: TCP denied"); });
+const authority = {
+  tenantId: 1, actor: "system" as const, invokedVia: "offline-sandbox-fixture",
+  internalPurpose: "Verify simulation stubs without any external side effects",
+  approvalGranted: true,
+};
 
 // Simulation-sandbox firewall (S1) contract tests.
 // Contract: data/feature-contracts/simulation-sandbox/spec.md — acceptance #1:
@@ -92,7 +102,7 @@ test("dispatch integration: executeTool stubs a destructive tool during simulati
     // stripe_create_payout is destructive; inside sim it must return the stub
     // envelope BEFORE the rate-limit gate, TNR capture, ledger, or dispatch —
     // proving zero real execution and zero side-effect machinery engaged.
-    return executeTool("stripe_create_payout", { amount: 100, _tenantId: 1 });
+    return executeTool("stripe_create_payout", { amount: 100, _tenantId: 1 }, authority);
   });
 
   assert.ok(isSimStubResult(result), `expected sim stub, got: ${JSON.stringify(result).slice(0, 200)}`);
@@ -105,7 +115,7 @@ test("dispatch integration: unknown tool during simulation is stubbed (fail-clos
   const { runInSimulation, isSimStubResult } = await import("../../server/lib/sandbox/firewall");
 
   const { result } = await runInSimulation("test-run-6", async () => {
-    return executeTool("__sim_unknown_tool_probe__", {});
+    return executeTool("__sim_unknown_tool_probe__", {}, authority);
   });
   assert.ok(isSimStubResult(result), "unknown tool must be stubbed in sim, not dispatched to the unknown-tool path");
 });
@@ -117,7 +127,7 @@ test("dispatch integration: executeToolWithTimeout (guarded/plan-executor entryp
   const { result, sim } = await runInSimulation("test-run-7", async () => {
     // This is the exact path executeGuardedTool and the plan-executor step
     // runners use — proving the chokepoint holds for every real entrypoint.
-    return executeToolWithTimeout("stripe_create_payout", { amount: 100, _tenantId: 1 });
+    return executeToolWithTimeout("stripe_create_payout", { amount: 100, _tenantId: 1 }, authority);
   });
   assert.ok(isSimStubResult(result), "guarded/plan path must be stubbed in sim");
   assert.equal(sim.stubbedCalls.length, 1);
@@ -125,7 +135,7 @@ test("dispatch integration: executeToolWithTimeout (guarded/plan-executor entryp
 
 test("dispatch integration: outside simulation, unknown tool still returns the normal structured error", async () => {
   const { executeTool } = await import("../../server/tools");
-  const result = await executeTool("__sim_firewall_baseline_probe__", {});
+  const result = await executeTool("__sim_firewall_baseline_probe__", {}, authority);
   assert.ok(result?.error, "baseline behavior unchanged outside sim");
   assert.match(result.error, /[Uu]nknown tool/);
 });

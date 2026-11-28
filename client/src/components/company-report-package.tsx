@@ -36,6 +36,8 @@ type Configuration = { ready: boolean; issues: string[]; notice: string; modelBu
   models: Array<{ report: string; model: string; outputTokens: number }> };
 
 type ReportPackage = {
+  costs?: { status: "unavailable" | "invalid" | "unreconciled"; reservedModelUsd: number | null;
+    reservationCount: number | null; actualTotalUsd: null; excludedCosts: string[] };
   productionVersion?: number;
   compilationProgress?: { authors: number; syntheses: number; delivered: number;
     execution?: string;
@@ -748,6 +750,17 @@ function OwnerPackageForm({ tenantId, onModeChange }: { tenantId: number; onMode
                   Independent compilations: {activeItem.compilationProgress.authors}/9 · Final syntheses: {activeItem.compilationProgress.syntheses}/3 · Verified report/audio pairs: {activeItem.compilationProgress.delivered}/3.
                   {activeItem.compilationProgress.execution && <p className="mt-1 text-xs text-muted-foreground">Unfinished authors run concurrently. Each final synthesis starts when its three matching author drafts are accepted.</p>}
                   <p className="mt-1 text-xs text-muted-foreground">Each PDF becomes available only after its complete MP3 decodes, its listening link is embedded, and delivery is verified.</p>
+                </div>}
+                {activeItem.costs && <div className="rounded-md border p-3 text-sm" data-testid="package-cost-visibility">
+                  <p className="font-medium">Package costs · not yet reconciled</p>
+                  <p>{activeItem.costs.reservedModelUsd === null
+                    ? "Recorded model reservations are unavailable."
+                    : `Model reservations: $${activeItem.costs.reservedModelUsd.toFixed(6)} across ${activeItem.costs.reservationCount} operations.`}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Reservations are spending allowances, not actual charges. The full package cost is unknown.
+                    Research, narration, rendering, storage and delivery, and labor are not included in this reservation total.
+                    Do not use it to calculate profit or assume a free preview costs nothing.
+                  </p>
                 </div>}
                 {!!activeItem.audioProgress?.length && <div className="space-y-1 rounded-md border p-3 text-sm" data-testid="package-fish-progress">
                   <p className="font-medium">Fish Audio · s2-pro · Onyx</p>

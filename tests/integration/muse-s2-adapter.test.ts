@@ -66,7 +66,6 @@ before(async () => {
   server = await new Promise<any>((resolve) => {
     const s = app.listen(0, "127.0.0.1", () => resolve(s));
   });
-  process.env.MUSE_REVENUE_ORCHESTRATOR_ENABLED = "1";
 });
 
 after(async () => {
@@ -84,8 +83,22 @@ after(async () => {
   }
 });
 
-test("S2 adapter integration covers authorization, normalization, isolation, conflicts, concurrency and no side effects", async () => {
+test("S2 adapter integration covers authorization, normalization, isolation, conflicts, concurrency and no side effects", async (t) => {
+  const originalAccessMode = process.env.APP_ACCESS_MODE;
+  const originalOrchestratorMode = process.env.MUSE_REVENUE_ORCHESTRATOR_ENABLED;
+  t.after(() => {
+    if (originalAccessMode === undefined) delete process.env.APP_ACCESS_MODE;
+    else process.env.APP_ACCESS_MODE = originalAccessMode;
+    if (originalOrchestratorMode === undefined) delete process.env.MUSE_REVENUE_ORCHESTRATOR_ENABLED;
+    else process.env.MUSE_REVENUE_ORCHESTRATOR_ENABLED = originalOrchestratorMode;
+  });
+  process.env.MUSE_REVENUE_ORCHESTRATOR_ENABLED = "1";
   const readKey = (await makeKey(tenantA, ["read"], "read")).raw;
+  // Exercise both policies in this isolated HTTP fixture. Changing the expected
+  // 403 to 401 would skip the scope check and never test the multi-tenant path.
+  delete process.env.APP_ACCESS_MODE;
+  assert.equal((await request("/api/v1/revenue-orchestrator/missions", "POST", keyA, body(sourceGood))).status, 401);
+  process.env.APP_ACCESS_MODE = "multi-tenant";
   assert.equal((await request("/api/v1/revenue-orchestrator/missions", "POST", readKey, body(sourceGood))).status, 403);
   assert.equal((await request(`/api/v1/revenue-orchestrator/missions/${sourceGood}`, "GET", readKey)).status, 404);
   assert.equal((await request(`/api/v1/revenue-orchestrator/missions/${sourceGood}`, "GET", keyA)).status, 404);
@@ -94,6 +107,7 @@ test("S2 adapter integration covers authorization, normalization, isolation, con
   process.env.MUSE_REVENUE_ORCHESTRATOR_ENABLED = "1";
 
   for (const id of [999999999, sourceOtherKey, sourceOtherTenant]) assert.equal((await request("/api/v1/revenue-orchestrator/missions", "POST", keyA, body(id))).status, 404);
+  assert.equal((await request("/api/v1/revenue-orchestrator/missions", "POST", keyB, body(sourceGood))).status, 404);
   for (const id of [sourceIncomplete, sourceLive]) assert.equal((await request("/api/v1/revenue-orchestrator/missions", "POST", keyA, body(id))).status, 422);
   for (const [key, value] of [["maxCashAtRiskUsd", 26], ["maxProspects", 26], ["maxContactsPerProspect", 4]]) {
     assert.equal((await request("/api/v1/revenue-orchestrator/missions", "POST", keyA, body(sourceGood, { caps: { [key]: value } }))).status, 422);

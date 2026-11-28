@@ -4,7 +4,8 @@ import vm from "node:vm";
 import test from "node:test";
 import { transformSync } from "esbuild";
 import { defineTool } from "../../server/tools/define-tool";
-import { dispatchTool } from "../../server/tools/dispatcher";
+import { dispatchTool as realDispatchTool } from "../../server/tools/dispatcher";
+import { withToolAuthority, type ToolAuthority } from "../../server/tools/invocation-authority";
 import { registerTools, __resetRegistryForTests } from "../../server/tools/registry";
 import { fileIncomeOpportunitySchema } from "../../shared/models/income-opportunities";
 import * as overview from "../../server/lib/owner-business-overview";
@@ -20,6 +21,14 @@ const metadata = {
   _invokedByModel: true, conversationId: 620, _skipTracking: true,
   _invokedVia: "chat_engine", _selfHeal: false,
 };
+
+// Model metadata is task data. Only the separate host context grants authority.
+const dispatchTool = (name: string, params: Record<string, unknown>,
+  authority: Partial<ToolAuthority> = {}) => withToolAuthority({
+    tenantId: 1, personaId: 2, conversationId: 620, actor: "persona",
+    invokedVia: "offline-opportunity-fixture", rateLimitChecked: true, skipTracking: true,
+    ...authority,
+  }, () => realDispatchTool(name, params));
 
 function fixture() {
   const writes: Array<{ tenant: number; input: Record<string, unknown> }> = [];
@@ -73,10 +82,12 @@ test("envelope separation preserves unknown-field rejection and owner-only filin
     const result = await dispatchTool("opportunity_bank_file", { ...idea, ...metadata, ...extra });
     assert.equal(result.error, "Invalid opportunity fields");
   }
-  for (const identity of [{ _tenantId: 2 }, { _tenantId: undefined }, { _personaId: 3 }]) {
-    const result = await dispatchTool("opportunity_bank_file", { ...idea, ...metadata, ...identity });
+  for (const identity of [{ tenantId: 2 }, { personaId: 3 }]) {
+    const result = await dispatchTool("opportunity_bank_file", { ...idea, ...metadata }, identity);
     assert.ok(result.error);
   }
+  const missing = await realDispatchTool("opportunity_bank_file", { ...idea, ...metadata });
+  assert.match(missing.error, /Missing trusted tool authority/);
   assert.equal(writes.length, 0);
 });
 

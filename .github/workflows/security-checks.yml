@@ -2,6 +2,27 @@ name: Bounded security checks
 
 on:
   workflow_dispatch:
+    inputs:
+      release_setup:
+        description: "Use true only for a limited release-tooling setup proof, not release clearance"
+        required: false
+        default: ""
+        type: string
+      release_base:
+        description: "Exact comparison-base commit SHA for isolated remote release checks"
+        required: false
+        default: ""
+        type: string
+      release_head:
+        description: "Exact candidate SHA (must equal this dispatch's github.sha)"
+        required: false
+        default: ""
+        type: string
+      release_source:
+        description: "Expected 64-character SHA-256 of the complete release source snapshot"
+        required: false
+        default: ""
+        type: string
   pull_request:
     paths:
       - "server/**"
@@ -30,13 +51,315 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: bounded-security-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  remote-setup:
+    name: Setup / ${{ matrix.check }}
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.release_setup == 'true' &&
+      inputs.release_base == '' && inputs.release_head == '' && inputs.release_source == ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        check: [unit-tests, typecheck, portable-install, publish-typecheck, surface-preflight, domain-preflight, build]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require isolated setup branch
+        run: |
+          [[ "$GITHUB_REF_TYPE" == "branch" ]]
+          [[ "$GITHUB_REF_NAME" =~ ^release-checks/[a-f0-9]{64}$ ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.0"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Run bounded credential-isolated setup check
+        env:
+          SETUP_CHECK: ${{ matrix.check }}
+        run: |
+          node --import tsx scripts/remote-release-setup-worker.ts "$SETUP_CHECK"
+
+  invalid-release-mode:
+    name: Reject incomplete remote release inputs
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      ((inputs.release_setup != '' && inputs.release_setup != 'true') ||
+       (inputs.release_setup == 'true' &&
+        (inputs.release_base != '' || inputs.release_head != '' || inputs.release_source != '')) ||
+       ((inputs.release_base != '' || inputs.release_head != '' || inputs.release_source != '') &&
+        !(inputs.release_base != '' && inputs.release_head != '' && inputs.release_source != '')))
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::Remote release mode requires release_base, release_head and release_source together."
+          exit 1
+
+  remote-release-plan:
+    name: Remote release plan
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.release_base != '' && inputs.release_head != '' && inputs.release_source != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_head }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate isolated dispatch branch, head and exact inputs
+        env:
+          RELEASE_BASE: ${{ inputs.release_base }}
+          RELEASE_HEAD: ${{ inputs.release_head }}
+          RELEASE_SOURCE: ${{ inputs.release_source }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_TYPE" == "branch" ]]
+          [[ "$GITHUB_REF_NAME" =~ ^release-checks/[a-f0-9]{12,64}$ ]]
+          [[ "$RELEASE_BASE" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$RELEASE_HEAD" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$RELEASE_SOURCE" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$RELEASE_HEAD" == "$GITHUB_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$RELEASE_HEAD" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.0"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Create exact source-bound plan
+        id: plan
+        env:
+          RELEASE_BASE: ${{ inputs.release_base }}
+          RELEASE_HEAD: ${{ inputs.release_head }}
+          RELEASE_SOURCE: ${{ inputs.release_source }}
+        run: >-
+          npx --no-install tsx scripts/remote-release-worker.ts plan
+          --base "$RELEASE_BASE" --head "$RELEASE_HEAD" --source "$RELEASE_SOURCE"
+      - name: Upload remote release plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .local/remote-release/plan.json
+          if-no-files-found: error
+          retention-days: 1
+
+  remote-release-checks:
+    name: Remote release / ${{ matrix.checkId }}
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.release_base != '' && inputs.release_head != '' && inputs.release_source != ''
+    needs: remote-release-plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix: ${{ fromJson(needs.remote-release-plan.outputs.matrix) }}
+    services:
+      postgres:
+        image: mirror.gcr.io/pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: visionclaw_test
+        options: >-
+          --health-cmd "pg_isready -U postgres -d visionclaw_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    env:
+      REMOTE_RELEASE_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/visionclaw_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_head }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.0"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Install disposable database client
+        if: matrix.database
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Install Chromium for browser-based regression shards
+        if: startsWith(matrix.checkId, 'regressions-')
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: /tmp/visionclaw-release-browser-cache
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Download exact remote release plan
+        uses: actions/download-artifact@v4
+        with:
+          name: plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .local/remote-release
+      - name: Run fixed source-bound check
+        env:
+          CHECK_ID: ${{ matrix.checkId }}
+          PLAYWRIGHT_BROWSERS_PATH: /tmp/visionclaw-release-browser-cache
+        run: >-
+          npx --no-install tsx scripts/remote-release-worker.ts check
+          --plan .local/remote-release/plan.json --check "$CHECK_ID"
+      - name: Upload lane receipt and bounded log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-${{ matrix.checkId }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .local/remote-release/results/
+          if-no-files-found: warn
+          retention-days: 1
+
+  remote-release-aggregate:
+    name: Remote release aggregate
+    if: >-
+      always() && github.event_name == 'workflow_dispatch' &&
+      inputs.release_base != '' && inputs.release_head != '' && inputs.release_source != ''
+    needs: [remote-release-plan, remote-release-checks]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_head }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.0"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Download plan artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/remote-release
+      - name: Download every lane artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: check-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/remote-release/results
+          merge-multiple: true
+      - name: Verify exact required receipts and source binding
+        id: verify
+        env:
+          EXPECTED_BASE: ${{ inputs.release_base }}
+          EXPECTED_HEAD: ${{ inputs.release_head }}
+          EXPECTED_SOURCE: ${{ inputs.release_source }}
+          EXPECTED_RUN_ID: ${{ github.run_id }}
+          EXPECTED_ATTEMPT: ${{ github.run_attempt }}
+          MATRIX_RESULT: ${{ needs.remote-release-checks.result }}
+          REMOTE_RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/remote-release
+        run: |
+          node --import tsx --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { execFileSync } from "node:child_process";
+          import { createHash } from "node:crypto";
+          import { existsSync, readFileSync } from "node:fs";
+          import path from "node:path";
+          import { incrementalSourceDigest } from "./scripts/lib/republish-incremental-readiness.ts";
+          import { assertExactRemoteReleasePlan } from "./scripts/lib/remote-release-plan.ts";
+          import { releaseInputPaths } from "./scripts/lib/targeted-release-check.ts";
+          const fail = message => { console.error(`::error::${message}`); process.exitCode = 1; };
+          try {
+            const base = process.env.EXPECTED_BASE;
+            const head = process.env.EXPECTED_HEAD;
+            const source = process.env.EXPECTED_SOURCE;
+            assert.match(base, /^[a-f0-9]{40}$/, "invalid expected base");
+            assert.match(head, /^[a-f0-9]{40}$/, "invalid expected head");
+            assert.match(source, /^[a-f0-9]{64}$/, "invalid expected source digest");
+            assert.equal(head, process.env.GITHUB_SHA, "workflow SHA differs from expected head");
+            assert.equal(
+              execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+              head,
+              "aggregate checkout differs from expected head",
+            );
+            const artifactDir = process.env.REMOTE_RELEASE_ARTIFACT_DIR;
+            assert.ok(path.isAbsolute(artifactDir), "remote evidence directory must be absolute");
+            const relativeArtifactDir = path.relative(process.cwd(), artifactDir);
+            assert.ok(relativeArtifactDir === ".." ||
+              relativeArtifactDir.startsWith(`..${path.sep}`) || path.isAbsolute(relativeArtifactDir),
+              "remote evidence must stay outside the source checkout");
+            const planPath = path.join(artifactDir, "plan.json");
+            assert.ok(existsSync(planPath), "missing remote release plan artifact");
+            const plan = JSON.parse(readFileSync(planPath, "utf8"));
+            assert.equal(plan.version, 1);
+            const sourceDigest = incrementalSourceDigest(process.cwd());
+            assert.equal(sourceDigest, source, "checkout source digest changed (including untracked source)");
+            const changed = execFileSync("git", [
+              "--no-optional-locks", "diff", "--name-only", "--no-renames",
+              "--no-ext-diff", "--no-textconv", "-z", base, head,
+            ], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 })
+              .split("\0").filter(Boolean);
+            assertExactRemoteReleasePlan(plan, {
+              base,
+              head,
+              sourceDigest,
+              changed: releaseInputPaths([], changed),
+            });
+            const checks = plan.checks;
+            assert.ok(Array.isArray(checks), "invalid required check list");
+            const ids = checks.map(check => check.id);
+            assert.equal(new Set(ids).size, ids.length, "duplicate planned check IDs");
+            const resultDir = path.join(artifactDir, "results");
+            for (const check of checks) {
+              const receiptPath = `${resultDir}/${check.id}.json`;
+              const logPath = `${resultDir}/${check.id}.log`;
+              assert.ok(existsSync(receiptPath), `missing receipt for ${check.id}`);
+              assert.ok(existsSync(logPath), `missing log for ${check.id}`);
+              const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+              const logHash = createHash("sha256").update(readFileSync(logPath)).digest("hex");
+              assert.equal(receipt.version, 1, `${check.id}: receipt version`);
+              assert.equal(receipt.checkId, check.id, `${check.id}: receipt ID`);
+              assert.equal(receipt.head, plan.head, `${check.id}: receipt head`);
+              assert.equal(receipt.sourceDigest, plan.sourceDigest, `${check.id}: receipt source`);
+              assert.equal(receipt.runId, Number(process.env.EXPECTED_RUN_ID), `${check.id}: run ID`);
+              assert.equal(receipt.runAttempt, Number(process.env.EXPECTED_ATTEMPT), `${check.id}: run attempt`);
+              assert.deepEqual(receipt.tests, check.tests, `${check.id}: planned tests`);
+              assert.equal(receipt.logSha256, logHash, `${check.id}: log hash`);
+              assert.equal(receipt.passed, true, `${check.id}: check failed`);
+              assert.equal(receipt.code, 0, `${check.id}: nonzero exit`);
+              assert.equal(receipt.timedOut, false, `${check.id}: timeout`);
+              assert.equal(receipt.outputLimitExceeded, false, `${check.id}: output cap`);
+            }
+            assert.equal(process.env.MATRIX_RESULT, "success", "one or more matrix jobs failed");
+            console.log(`Validated ${checks.length} receipts for ${plan.head} (${plan.sourceDigest}).`);
+          } catch (error) {
+            fail(error instanceof Error ? error.message : String(error));
+          }
+          NODE
+      - name: Assemble same-run aggregate evidence
+        if: always()
+        run: mkdir -p "$RUNNER_TEMP/remote-release/results"
+      - name: Upload aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/remote-release/
+          if-no-files-found: warn
+          retention-days: 1
+
   deterministic-security:
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      (inputs.release_setup == '' && inputs.release_base == '' && inputs.release_head == '' && inputs.release_source == '')
     name: Security ${{ matrix.lane }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -60,6 +383,8 @@ jobs:
               tests/security/persona-export-access.test.ts
           - lane: audit-controls
             tests: >-
+              tests/lib/tenant-audit-coordinator.test.ts
+              tests/lib/tenant-audit-parallel-integration.test.ts
               tests/lib/tenant-audit-fallback.test.ts
               tests/lib/tenant-audit-recovery-controller.test.ts
               tests/security/tenant-audit-call-timeout.test.ts
@@ -88,6 +413,9 @@ jobs:
           npx --no-install tsx --test ${{ matrix.tests }}
 
   scraping-worker:
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      (inputs.release_setup == '' && inputs.release_base == '' && inputs.release_head == '' && inputs.release_source == '')
     name: Scraping worker compatibility and security
     runs-on: ubuntu-latest
     timeout-minutes: 10

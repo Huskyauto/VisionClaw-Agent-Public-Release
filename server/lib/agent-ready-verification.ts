@@ -70,7 +70,10 @@ export async function verifyAgentReadyInstallation(
           status = "fail"; detail = `Expected ${target.mime}; the server returned another content type.`;
         } else {
           let match = false;
-          try { match = target.matches(response.text); } catch { /* Invalid remote JSON is a failed comparison. */ }
+          try { match = target.matches(response.text); } catch {
+            // Unparseable remote content is explicitly a failed comparison.
+            match = false;
+          }
           status = match ? "pass" : "fail";
           detail = match ? "Retrieved content matches this package's scoped requirements."
             : "Retrieved content does not match this package. Review existing content before making changes.";

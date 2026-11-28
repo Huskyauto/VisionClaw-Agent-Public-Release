@@ -293,11 +293,11 @@ export const readabilityExtractDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "readability_extract",
-    description: "Extract clean article text from any URL using Mozilla's Readability.js (the Firefox Reader View engine). Free, runs locally, zero per-call API cost. Best for articles, blog posts, docs, news. Returns title, byline, excerpt, and clean text. Use this BEFORE firecrawl_scrape when you only need readable article text — it costs nothing.",
+    description: "Extract clean article text from a final public HTTPS URL using Mozilla's Readability.js (the Firefox Reader View engine). Redirects and private destinations are refused. Free, runs locally, zero per-call API cost. Best for articles, blog posts, docs, news. Returns title, byline, excerpt, and clean text. Use this BEFORE firecrawl_scrape when you only need readable article text — it costs nothing.",
     parameters: {
       type: "object",
       properties: {
-        url: { type: "string", description: "The article URL to extract" },
+        url: { type: "string", description: "Final public HTTPS article URL; redirects, HTTP and private destinations are refused" },
       },
       required: ["url"],
     },
@@ -314,7 +314,7 @@ export const firecrawlCrawlDefinition: ToolDefinition = {
       properties: {
         url: { type: "string", description: "Starting URL to crawl from" },
         limit: { type: "number", description: "Max pages to crawl (1-100, default 20)" },
-        maxDepth: { type: "number", description: "Max link depth from starting URL (default 3)" },
+        maxDepth: { type: "number", description: "Maximum URL path depth in segments, not link hops (default 3)" },
         includePaths: { type: "array", items: { type: "string" }, description: "Only crawl URLs matching these path patterns (e.g. ['/blog/*', '/docs/*'])" },
         excludePaths: { type: "array", items: { type: "string" }, description: "Skip URLs matching these path patterns (e.g. ['/login', '/admin/*'])" },
         tags: { type: "array", items: { type: "string" }, description: "Tags to apply to all crawled pages" },

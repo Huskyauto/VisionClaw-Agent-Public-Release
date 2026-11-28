@@ -83,7 +83,7 @@ const WORKSPACES: Record<RevenueWorkspaceKey, RevenueWorkspaceDefinition> = {
     key: "customer-revenue-launchpad",
     parentProjectName: "Customer Revenue Launchpad",
     parentProjectDescription:
-      "Owner-only workspace for five evidence-driven customer offers. Manual validation only; no outreach, customer records, payments, or automatic fulfillment.",
+      "Owner-only workspace for evidence-driven customer offers. Manual validation only; no outreach, customer records, payments, or automatic fulfillment.",
     parentProjectTags: ["revenue", "launchpad", "owner-only", "manual-validation"],
     ownerOnly: true,
     ideas: [
@@ -131,6 +131,15 @@ const WORKSPACES: Record<RevenueWorkspaceKey, RevenueWorkspaceDefinition> = {
         validationState: "Planned",
         briefPath: "project-assets/customer-revenue-launchpad/offers/05-ai-readiness-governance-audit.md",
         starterPrompt: `Help me outline an evidence-led first proof for the AI Readiness & Governance Audit. Start with the buyer's current risk, a narrow assessment scope, and a manual owner decision before anything is delivered. ${MANUAL_VALIDATION_RULE}`,
+      },
+      {
+        slug: "hvac-invoice-processing-pilot",
+        title: "HVAC Invoice Processing Pilot",
+        summary: "Measure human-reviewed invoice header extraction accuracy and net entry-time savings on 20 approved documents before offering a paid pilot.",
+        targetBuyer: "HVAC shop owner or office manager handling supplier invoices",
+        validationState: "Offline evaluator ready; customer evidence required",
+        briefPath: "project-assets/customer-revenue-launchpad/offers/06-hvac-invoice-processing-pilot.md",
+        starterPrompt: `Help me validate the HVAC Invoice Processing Pilot. Read project-assets/customer-revenue-launchpad/offers/06-hvac-invoice-processing-pilot.md. Use scripts/evaluate-invoice-pilot.ts for operator-supplied results; it scores five header fields and timing, not document extraction. Start with --demo. Never upload real invoices or send them to a model without explicit customer approval for that exact processing location. No new model installs or laptop changes. A synthetic score is not customer evidence; a pass only supports a supervised paid pilot, never automatic accounting entries. ${MANUAL_VALIDATION_RULE}`,
       },
     ],
   },

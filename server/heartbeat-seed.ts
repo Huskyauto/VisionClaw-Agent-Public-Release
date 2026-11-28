@@ -12,7 +12,6 @@ export const MAINTENANCE_SCRIPTS: Record<string, { bin: string; args: string[]; 
   "golden-path-replay": { bin: "tsx", args: ["scripts/golden-path-replay.ts"], timeoutMs: 20 * 60 * 1000, label: "Golden Path Replay" },
   "loadtest-layer1":    { bin: "tsx", args: ["scripts/loadtest-layer1.ts"],    timeoutMs: 10 * 60 * 1000, label: "Load Test Layer 1" },
   "model-tier-refresh": { bin: "tsx", args: ["scripts/model-tier-refresh.ts"], timeoutMs: 20 * 60 * 1000, label: "Model Tier Refresh" },
-  "typecheck":          { bin: "tsc", args: ["--noEmit", "--incremental"],     timeoutMs: 10 * 60 * 1000, label: "Typecheck" },
   "owner-digest-flush": { bin: "tsx", args: ["scripts/owner-digest-flush.ts"], timeoutMs: 5 * 60 * 1000,  label: "Owner Notification Digest" },
   "offline-eval":       { bin: "tsx", args: ["scripts/offline-eval.ts"],       timeoutMs: 20 * 60 * 1000, label: "Offline Golden-Set Eval" },
   "action-ledger-reconcile": { bin: "tsx", args: ["scripts/action-ledger-reconcile.ts"], timeoutMs: 5 * 60 * 1000, label: "Action Ledger Reconciler" },
@@ -22,6 +21,7 @@ export const MAINTENANCE_SCRIPTS: Record<string, { bin: string; args: string[]; 
   "ideabrowser-weekly-scenario": { bin: "tsx", args: ["scripts/ideabrowser-weekly-scenario.ts"], timeoutMs: 20 * 60 * 1000, label: "IdeaBrowser Weekly Scenario" },
   "wedge-lifecycle":    { bin: "tsx", args: ["scripts/wedge-lifecycle-update.ts"], timeoutMs: 5 * 60 * 1000, label: "Wedge Lifecycle Update" },
   "plan-prewarm":       { bin: "tsx", args: ["scripts/plan-prewarm.ts"],           timeoutMs: 5 * 60 * 1000, label: "Plan Pre-Warm" },
+  "daily-ai-insights": { bin: "tsx", args: ["scripts/daily-ai-insights.ts", "--scheduled"], timeoutMs: 15 * 60 * 1000, label: "Daily AI Insights Review" },
 };
 
 export async function seedSystemHeartbeatTasks(): Promise<void> {
@@ -255,13 +255,24 @@ export async function seedSystemHeartbeatTasks(): Promise<void> {
       } as any);
       console.log("[heartbeat] Seeded mission_reply_intake task (every 15 min) — production-only");
     }
-    // Bob 2026-06-04: the four ex-workflow maintenance jobs as DB-driven crons.
+    // Compilation is a hard gate in GitHub CI and the workspace release checker.
+    // Retire the existing system row without deleting its production history.
+    if (isProductionRuntime()) for (const task of allTasksForSeed) {
+      if (task.type !== "maintenance_script" || task.createdBy !== "system" ||
+          Number(task.tenantId) !== ADMIN_TENANT_ID || task.promptContent.trim() !== "typecheck" || !task.enabled) continue;
+      await storage.updateHeartbeatTask(task.id, {
+        enabled: false,
+        description: "Retired on the serving VM. Full TypeScript checking remains a hard gate in CI and workspace release verification.",
+      }, ADMIN_TENANT_ID);
+      console.log("[heartbeat] Retired the production TypeScript cron; CI and release checks still compile the project");
+    }
+    // The ex-workflow maintenance jobs now run as DB-driven crons.
     // Pre-approved (approvalStatus) so they're picked up by getDueHeartbeatTasks;
     // type "maintenance_script" + promptContent = allowlist key (see
     // MAINTENANCE_SCRIPTS). Production-gated in the due-task filter. Times are
     // staggered + off-peak (UTC). Intervals chosen per each script's design.
     const MAINT_SEED: Array<{ key: string; name: string; cron: string; desc: string }> = [
-      { key: "typecheck",          name: "Typecheck (scheduled)",        cron: "0 7 * * *",  desc: "Daily TypeScript typecheck (tsc --noEmit --incremental) across the codebase. Free, source-only. Was a manual workflow button." },
+      { key: "daily-ai-insights", name: "Daily AI Insights Review (08:00 Chicago)", cron: "*/5 * * * *", desc: "Owner-only Drive research intake. Five-minute trigger admits one daily review at/after 08:00 America/Chicago with DST, durable report-only synthesis and exact evidence receipts. Runtime pause/status: /api/admin/daily-ai-insights. No source application or publishing; explicit owner promotion uses the existing signed workspace verification/approval handoff." },
       { key: "golden-path-replay", name: "Golden Path Replay (nightly)", cron: "0 8 * * *",  desc: "Nightly golden-path pipeline replay — one canonical prompt per format, fingerprints the artifact, compares to last-known-good, freezes + emails Bob on drift. Cost-capped $1/run. Was a manual workflow button." },
       { key: "model-tier-refresh", name: "Model Tier Refresh (weekly)",  cron: "0 9 * * 1",  desc: "Weekly autonomous model-tier re-evaluation — refreshes frontier/mundane tiers from the latest catalog + competence probes, updates data/model-tiers.json, emails Bob. Was a manual workflow button." },
       { key: "loadtest-layer1",    name: "Load Test Layer 1 (weekly)",   cron: "30 9 * * 1", desc: "Weekly synthetic burst load test against the production deploy — p50/p95 latency, error rate, tail behavior; emails Bob a one-page report. Was a manual workflow button." },

@@ -17,7 +17,9 @@
  * `_personaName` reads anywhere in `server/agentic-features.ts`), so passing the
  * dispatcher-stripped `params` alongside `tenantId: ctx.tenantId` is behavior-
  * identical to the legacy `fn({ tenantId, ...params })`. The sole external
- * dependency (`../../../agentic-features`) is pulled via a call-time dynamic
+ * SECURITY: trusted context is stamped AFTER untrusted params. A non-underscore
+ * tenantId is still ordinary caller input and must never replace ctx.tenantId.
+ * The dependency (`../../../agentic-features`) is pulled via a call-time dynamic
  * `import(...)` inside each handler — NOT a top-level static import — so the
  * domain module statically imports only within server/tools/ and cannot recurse
  * back into the app graph (acyclicity invariant, plan.md S2; same seam
@@ -99,7 +101,7 @@ async function addCompetitorHandler(
 ): Promise<ToolResult> {
   if (!ctx.tenantId) return { error: "Tenant context required" };
   const af = await import("../../../agentic-features");
-  return af.addCompetitor({ tenantId: ctx.tenantId, ...params } as any);
+  return af.addCompetitor({ ...params, tenantId: ctx.tenantId } as any);
 }
 
 async function listCompetitorsHandler(
@@ -108,7 +110,7 @@ async function listCompetitorsHandler(
 ): Promise<ToolResult> {
   if (!ctx.tenantId) return { error: "Tenant context required" };
   const af = await import("../../../agentic-features");
-  return af.listCompetitors({ tenantId: ctx.tenantId, ...params } as any);
+  return af.listCompetitors({ ...params, tenantId: ctx.tenantId } as any);
 }
 
 async function takeCompetitorSnapshotHandler(
@@ -117,7 +119,7 @@ async function takeCompetitorSnapshotHandler(
 ): Promise<ToolResult> {
   if (!ctx.tenantId) return { error: "Tenant context required" };
   const af = await import("../../../agentic-features");
-  return af.takeCompetitorSnapshot({ tenantId: ctx.tenantId, ...params } as any);
+  return af.takeCompetitorSnapshot({ ...params, tenantId: ctx.tenantId } as any);
 }
 
 async function detectCompetitorChangesHandler(
@@ -126,7 +128,7 @@ async function detectCompetitorChangesHandler(
 ): Promise<ToolResult> {
   if (!ctx.tenantId) return { error: "Tenant context required" };
   const af = await import("../../../agentic-features");
-  return af.detectCompetitorChanges({ tenantId: ctx.tenantId, ...params } as any);
+  return af.detectCompetitorChanges({ ...params, tenantId: ctx.tenantId } as any);
 }
 
 async function competitorBriefingHandler(
@@ -135,7 +137,7 @@ async function competitorBriefingHandler(
 ): Promise<ToolResult> {
   if (!ctx.tenantId) return { error: "Tenant context required" };
   const af = await import("../../../agentic-features");
-  return af.competitorBriefing({ tenantId: ctx.tenantId, ...params } as any);
+  return af.competitorBriefing({ ...params, tenantId: ctx.tenantId } as any);
 }
 
 async function defineIcpHandler(
@@ -144,7 +146,7 @@ async function defineIcpHandler(
 ): Promise<ToolResult> {
   if (!ctx.tenantId) return { error: "Tenant context required" };
   const af = await import("../../../agentic-features");
-  return af.defineICP({ tenantId: ctx.tenantId, ...params } as any);
+  return af.defineICP({ ...params, tenantId: ctx.tenantId } as any);
 }
 
 /** Registered by ./index.ts at import time. */

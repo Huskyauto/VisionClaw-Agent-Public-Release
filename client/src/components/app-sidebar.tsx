@@ -670,10 +670,11 @@ export function AppSidebar() {
         </NavSection>
 
         {isAdmin && (
-           <NavSection title="Income Products" icon={DollarSign} defaultOpen={["/admin/website-audit", "/audit", "/admin/research-report", "/admin/digital-products", "/admin/payment-links", "/admin/archive-rescue", "/admin/wedges", "/admin/revenue-missions", "/admin/service-orders", "/admin/executive-report", "/admin/smart-leads", "/admin/cmmc", "/admin/missed-call-recovery"].some(p => location === p)} accent badge="$$">
+           <NavSection title="Income Products" icon={DollarSign} defaultOpen={["/admin/website-audit", "/audit", "/admin/research-report", "/admin/digital-products", "/admin/payment-links", "/admin/archive-rescue", "/admin/wedges", "/admin/revenue-missions", "/admin/service-orders", "/admin/executive-report", "/admin/smart-leads", "/admin/cmmc", "/admin/missed-call-recovery", "/admin/pilot-tools", "/admin/finished-not-billed"].includes(location)} accent badge="$$">
             <NavLink path="/admin/payment-links" icon={DollarSign} label="Get Paid" badge="NEW" />
-            <NavLink path="/admin/website-audit" icon={Gauge} label="AI Readiness Reports" badge="MANUAL" />
+            <NavLink path="/admin/website-audit" icon={Gauge} label="Website Audit" badge="MANUAL" />
             {isPlatformAdmin && <NavLink path="/admin/pilot-tools" icon={Gauge} label="Business Pilot Tools" badge="NEW · MANUAL" />}
+            {isPlatformAdmin && config.finishedNotBilledEnabled && <NavLink path="/admin/finished-not-billed" icon={FileCheck} label="Finished but Not Billed" badge="$175 PILOT" touchFriendly />}
             <NavLink path="/admin/executive-report" icon={Gauge} label="Company Reports" badge="NEW" />
             <NavLink path="/admin/cmmc" icon={ShieldCheck} label="CMMC Level 1 / FCI" badge="NEW" />
              {config.hvacMissedCallRecoveryEnabled && <NavLink path="/admin/missed-call-recovery" icon={Phone} label="HVAC Missed-Call Recovery" badge="NEW" />}
@@ -692,7 +693,7 @@ export function AppSidebar() {
           <NavSection title="Admin" icon={Shield} defaultOpen={["/heartbeat", "/agentic", "/payments", "/settings", "/compare", "/admin/tools", "/operator"].some(p => location === p)}>
             <NavLink path="/admin/tools" icon={Wrench} label="Admin Tools" />
             {isPlatformAdmin && <NavLink path="/admin/alert-logs" icon={FileText} label="Alert Logs" badge="NEW" />}
-            <NavLink path="/operator" icon={Inbox} label="Operator Inbox" badge="New" />
+            <NavLink path="/operator" icon={Inbox} label="Operator Inbox & Background Work" badge="Mellum" />
             <NavLink path="/heartbeat" icon={Heart} label="Heartbeat Engine" />
             <NavLink path="/code-health" icon={Activity} label="Code Health" />
             <NavLink path="/code-proposals" icon={FileCode} label="Code Proposals & Verifier" badge="SOURCE" />

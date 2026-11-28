@@ -91,6 +91,8 @@ import { signQueueEntry } from "../server/agentic/jury-queue-integrity";
 import { appendQueueEntries as appendQueueEntriesLocked } from "../server/agentic/jury-queue-store";
 import { waitForProductionClear } from "./lib/production-priority";
 import { matchVerdictToFinding } from "./lib/triage-verdict-match";
+import { auditConcurrency, createAuditStateGate, createAuditPrecisionState, runAuditTaskPool,
+  AUDIT_PRECISION_RESPONSE_BYTES } from "./lib/tenant-audit-coordinator";
 import { loadSuppressions, matchSuppression, loadDeferrals, matchDeferral } from "../server/lib/audit-suppressions";
 import { withDeadline } from "../server/reasoning-front-door-core";
 import { meteredLlmEnabled } from "../server/provider-recovery";
@@ -110,6 +112,8 @@ let providerRecoveryNeeded = false;
 let schedulingYieldNeeded = false;
 const controllerDeadline = auditDeadlineAt(process.env.AUDIT_DEADLINE_AT);
 const precisionLocalPath = path.resolve("data/tenant-isolation-audit/precision-progress.json");
+let stopPrecisionDispatch: ((error: unknown) => void) | undefined;
+const auditStateGate = createAuditStateGate(error => stopPrecisionDispatch?.(error));
 async function precisionState(field: "auditPrecision" | "auditHandoff" | "auditProviderHealth" | "auditPaidAttempts", value?: unknown): Promise<any> {
   if (auditJobIdentity()) return auditJobState(field, value);
   let state: Record<string, any> = {};
@@ -142,13 +146,17 @@ async function auditRouteFailed(route: AuditRoute, error: unknown): Promise<void
     return;
   }
   log(`audit route ${route.providerLane} failed (${auditFailureSummary(error)}); saving cooldown, advancing fallback`);
-  const health = readAuditProviderHealth(await precisionState("auditProviderHealth"));
-  await precisionState("auditProviderHealth", auditProviderFailure(health, route, error));
+  await auditStateGate(async () => {
+    const health = readAuditProviderHealth(await precisionState("auditProviderHealth"));
+    await precisionState("auditProviderHealth", auditProviderFailure(health, route, error));
+  });
 }
 async function auditRouteSucceeded(route: AuditRoute): Promise<void> {
-  const health = readAuditProviderHealth(await precisionState("auditProviderHealth"));
-  if (health[auditHealthKey(route)])
-    await precisionState("auditProviderHealth", auditProviderSuccess(health, route));
+  await auditStateGate(async () => {
+    const health = readAuditProviderHealth(await precisionState("auditProviderHealth"));
+    if (health[auditHealthKey(route)])
+      await precisionState("auditProviderHealth", auditProviderSuccess(health, route));
+  });
 }
 // The 240k default made the first gpt-5.4 request time out on every attempt,
 // leaving the entire nightly at zero coverage. Smaller complete-source windows
@@ -230,7 +238,9 @@ const PENDING_APPROVAL = path.join(REPORT_JSON_DIR, "pending-approval.json");
 const PRECISION_ON =
   process.env.TENANT_AUDIT_PRECISION !== "off" && process.env.TENANT_AUDIT_PRECISION !== "0";
 const TRIAGE_MODEL = process.env.AUDIT_TRIAGE_MODEL || MODEL;
-const TRIAGE_BATCH = Math.max(1, Number(process.env.AUDIT_TRIAGE_BATCH) || 12);
+const TRIAGE_CONCURRENCY = auditConcurrency(process.env.AUDIT_TRIAGE_CONCURRENCY);
+// Single-finding identities remain unambiguous even when source windows overlap.
+const TRIAGE_BATCH = Math.max(1, Number(process.env.AUDIT_TRIAGE_BATCH) || 1);
 const TRIAGE_MAX_BATCHES = Number.isFinite(Number(process.env.AUDIT_TRIAGE_MAX_BATCHES))
   ? Math.max(0, Number(process.env.AUDIT_TRIAGE_MAX_BATCHES))
   : 0; // 0 = no cap (triage every batch)
@@ -729,10 +739,15 @@ async function prepareAuditCompletion(route: AuditRoute, system: string, user: s
 }
 
 async function auditCompletion(route: AuditRoute, system: string, user: string,
-  maxTokens: number, timeoutMs: number): Promise<{ raw: string; model: string }> {
+  maxTokens: number, timeoutMs: number, assertDispatchAllowed?: () => void): Promise<{ raw: string; model: string }> {
   assertAuditTimeBudget(controllerDeadline, Math.min(timeoutMs, AUDIT_ROUTE_TIMEOUT_MS));
   return invokeAuditRoute(route, system, user, maxTokens, { timeoutMs,
-    beforeDispatch: async () => {
+    beforeDispatch: () => auditStateGate(async () => {
+      assertDispatchAllowed?.();
+      await auditJobState();
+      const health = readAuditProviderHealth(await precisionState("auditProviderHealth"));
+      if ((health[auditHealthKey(route)]?.until ?? 0) > Date.now())
+        throw new AuditWorkDeferred("Audit provider entered cooldown before dispatch");
       assertAuditTimeBudget(controllerDeadline, Math.min(timeoutMs, AUDIT_ROUTE_TIMEOUT_MS));
       if (route.providerLane === "cheaperinference")
         await reserveAuditPaidAttempt(auditPaidRequestKey(route, system, user, maxTokens), {
@@ -740,7 +755,7 @@ async function auditCompletion(route: AuditRoute, system: string, user: string,
           write: async value => { await precisionState("auditPaidAttempts", value); },
         });
       unitsDispatched++;
-    },
+    }),
   });
 }
 
@@ -1251,9 +1266,8 @@ async function precisionTriage(
     return { batch, userContent, routes, cacheKey };
   });
   const storedPrecision = await precisionState("auditPrecision") ?? {};
-  const currentKeys = new Set(plans.map(p => p.cacheKey));
-  const currentPrecision = Object.fromEntries(Object.entries(storedPrecision).filter(([key]) => currentKeys.has(key)));
-  await precisionState("auditPrecision", currentPrecision);
+  // Historical exact-input receipts remain intact; only exact current keys are read.
+  const currentPrecision = storedPrecision;
   const uncachedBatches = plans.slice(0, runBatches).filter(p => currentPrecision[p.cacheKey] === undefined).length;
 
   // Budget claim BEFORE any spend; denial fails CLOSED (keep every severe finding).
@@ -1286,31 +1300,36 @@ async function precisionTriage(
   for (const f of severe)
     verdicts.set(f, { finding: f, verdict: "KEEP", pattern: "none", reason: "default-keep (not affirmatively cleared)" });
 
-  for (let b = 0; b < runBatches; b++) {
+  const taskState = createAuditPrecisionState({
+    read: field => precisionState(field),
+    write: (field, value) => precisionState(field, value),
+  }, auditStateGate);
+  log(`precision workers=${TRIAGE_CONCURRENCY}, tasks=${runBatches}, uncached=${uncachedBatches}; single coordinator`);
+  const pool = await runAuditTaskPool(plans.slice(0, runBatches).map(p => p.cacheKey), TRIAGE_CONCURRENCY, async (b, control) => {
+    stopPrecisionDispatch = control.stop;
     const { batch, userContent, routes, cacheKey } = plans[b];
     try {
+      control.assertDispatchAllowed();
       await auditJobState();
-      const precisionCache = await precisionState("auditPrecision") ?? {};
-      let retainedRaw: string | undefined = precisionCache[cacheKey];
-      // JSON escaping can expand one raw byte to six bytes. Reserve for the
-      // entire permitted response plus its key BEFORE calling the provider.
-      if (retainedRaw === undefined &&
-          Buffer.byteLength(JSON.stringify(precisionCache)) + 6 * 512 * 1024 + 256 > 8 * 1024 * 1024)
-        throw new Error("Precision checkpoint capacity exhausted before dispatch");
+      let retainedRaw: string | undefined = await taskState.acquire(cacheKey);
       if (retainedRaw === undefined) {
-        const handoff = await precisionState("auditHandoff");
+        const cursor = await taskState.cursor(cacheKey);
         let successfulRoute: AuditRoute | undefined;
         retainedRaw = await runAuditFallback({
-          routes, cursor: handoff?.key === cacheKey ? handoff.nextRoute : 0,
+          routes, cursor,
           beforeAttempt: async nextRoute => {
+            control.assertDispatchAllowed();
             await auditJobState();
-            await precisionState("auditHandoff", { key: cacheKey, nextRoute });
+            await taskState.advance(cacheKey, nextRoute);
           },
           beforeDispatch: route => prepareAuditCompletion(route, TRIAGE_SYSTEM_PROMPT,
             `Classify these ${batch.length} finding(s):\n\n${userContent}`, TRIAGE_MAX_TOKENS),
           invoke: async route => {
             const response = await auditCompletion(route, TRIAGE_SYSTEM_PROMPT,
-              `Classify these ${batch.length} finding(s):\n\n${userContent}`, TRIAGE_MAX_TOKENS, AUDIT_TRIAGE_TIMEOUT_MS);
+              `Classify these ${batch.length} finding(s):\n\n${userContent}`, TRIAGE_MAX_TOKENS, AUDIT_TRIAGE_TIMEOUT_MS,
+              control.assertDispatchAllowed);
+            if (Buffer.byteLength(response.raw) > AUDIT_PRECISION_RESPONSE_BYTES)
+              throw new AuditContentError("Precision response exceeds retained byte limit");
             const parsed = parseVerdicts(response.raw);
             const targets = parsed?.map(v => matchVerdictToFinding(batch, v));
             if (!targets || targets.length !== batch.length || targets.some(f => !f) ||
@@ -1325,8 +1344,9 @@ async function precisionTriage(
             `Classify these ${batch.length} finding(s):\n\n${userContent}`, TRIAGE_MAX_TOKENS),
         });
         // Identity is the exact task, not the provider that happened to finish.
-        await precisionState("auditPrecision", { ...precisionCache, [cacheKey]: retainedRaw });
-        if (successfulRoute) await auditRouteSucceeded(successfulRoute);
+        await taskState.save(cacheKey, retainedRaw);
+        // A concurrent success must not erase another worker's newer cooldown.
+        if (successfulRoute && TRIAGE_CONCURRENCY === 1) await auditRouteSucceeded(successfulRoute);
       }
       const parsed = parseVerdicts(retainedRaw);
       const targets = parsed?.map(v => matchVerdictToFinding(batch, v));
@@ -1334,7 +1354,7 @@ async function precisionTriage(
           targets.some(f => !f) || new Set(targets).size !== batch.length) {
         degraded = true;
         log(`precision batch ${b + 1}/${runBatches}: unparseable verdicts — keeping all ${batch.length} (fail closed).`);
-        continue;
+        return;
       }
       for (const v of parsed) {
         // Only a recognized SUPPRESS verdict can ever flip a finding; everything
@@ -1348,21 +1368,25 @@ async function precisionTriage(
         verdicts.set(f, { finding: f, verdict: "SUPPRESS", pattern: v.pattern, reason: v.reason || "cleared by precision pass" });
       }
     } catch (e) {
+      control.stop(e); // No new dispatch after a storage/fence/admission failure.
+      degraded = true;
       if (e instanceof AuditWorkDeferred) {
         schedulingYieldNeeded = true;
-        degraded = true;
-        break;
+        return;
       }
       if (e instanceof AuditProvidersExhausted) {
         providerRecoveryNeeded = true;
-        degraded = true;
-        break; // Never spend on later batches while every provider is down.
+        return; // In-flight results still drain and persist.
       }
       degraded = true;
       log(`precision batch ${b + 1}/${runBatches} FAILED — ${(e as Error)?.message || e}; keeping all ${batch.length} (fail closed).`);
-      continue;
+    } finally {
+      await taskState.release(cacheKey);
     }
-  }
+  });
+  stopPrecisionDispatch = undefined;
+  if (pool.stopped || pool.errors.length) degraded = true;
+  log(`precision pool: settled=${pool.completed}/${runBatches}, started=${pool.started}, stopped=${pool.stopped}`);
   if (runBatches < batches.length) {
     degraded = true;
     log(`precision: capped at ${runBatches}/${batches.length} batch(es) (AUDIT_TRIAGE_MAX_BATCHES) — remaining severe kept (fail closed).`);

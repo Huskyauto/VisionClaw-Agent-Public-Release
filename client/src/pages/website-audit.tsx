@@ -9,6 +9,7 @@ import { ReportDeliveryOption } from "@/components/report-delivery-option";
 import CompanyReportPackage from "@/components/company-report-package";
 import AgentJourneyResults from "@/components/agent-journey-results";
 import AgentReadyPackage from "@/components/agent-ready-package";
+import Glm54LayoutReview from "@/components/glm54-layout-review";
 import type { AgentJourneyResult } from "../../../shared/agent-journey";
 import { Loader2, Globe, FileText, Download, CheckCircle2, AlertTriangle, XCircle, Gauge, Wrench, Link as LinkIcon, Printer } from "lucide-react";
 
@@ -224,6 +225,7 @@ export default function WebsiteAuditPage() {
       </div>
 
       <AgentReadyPackage />
+      <Glm54LayoutReview />
       <CompanyReportPackage onModeChange={setPackageMode} />
       <div className={packageMode ? "hidden" : "contents"}>
       {/* ------------------------------------------------ Quick audit */}

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createLegionWorker } from "../../server/legion/background";
+import { LEGION_MODEL } from "../../server/legion/model-policy";
 import { generateStatusSummary } from "../../server/agent-summary";
 
 test("local background work refuses disabled, wrong-tenant and unknown-task requests before transport", async () => {
@@ -26,9 +27,9 @@ test("owner text runs locally once, records usage and never returns separate rea
     acquire: async () => async () => { releases++; },
     request: async (body: any) => {
       calls++;
-      assert.equal(body.model, "qwen3:8b");
+      assert.equal(body.model, LEGION_MODEL);
       assert.equal(body.stream, false);
-      return { model: "qwen3:8b", system_fingerprint: "fp_ollama",
+      return { model: LEGION_MODEL, system_fingerprint: "fp_ollama",
         usage: { prompt_tokens: 12, completion_tokens: 8 },
         choices: [{ finish_reason: "stop", message: { content: "Reviewing selected engineering runbooks", reasoning: "PRIVATE REASONING" } }] };
     }, record: async receipt => { receipts.push(receipt); return true; },
@@ -44,7 +45,7 @@ test("owner text runs locally once, records usage and never returns separate rea
 });
 
 test("wrong trusted tenant, offline, busy, revocation and invalid replies never retry or escape the local boundary", async () => {
-  const good = { model: "qwen3:8b", system_fingerprint: "fp_ollama",
+  const good = { model: LEGION_MODEL, system_fingerprint: "fp_ollama",
     usage: { prompt_tokens: 2, completion_tokens: 3 },
     choices: [{ finish_reason: "stop", message: { content: "Reviewing task results" } }] };
   const work = { tenantId: 1, task: "delegation-status" as const,
@@ -93,7 +94,7 @@ test("runbook compilation requests schema-constrained output, not prompt-only JS
     acquire: async () => async () => {},
     request: async payload => {
       body = payload;
-      return { model: "qwen3:8b", system_fingerprint: "fp_ollama",
+      return { model: LEGION_MODEL, system_fingerprint: "fp_ollama",
         usage: { prompt_tokens: 10, completion_tokens: 10 },
         choices: [{ finish_reason: "stop", message: { content: '{"concepts":[]}' } }] };
     }, record: async () => true,
@@ -119,7 +120,7 @@ test("Surface dispatch keeps owner gating, actual provider accounting and strict
         calls++;
         if (scenario === "revoked") enabled = false;
         return { provider: "surface-local", localFallback: false, response: {
-          model: scenario === "wrong-model" ? "phi-3.5-mini" : "qwen2.5-7b-instruct-qnn-npu:3",
+          model: scenario === "wrong-model" ? "phi-3.5-mini" : "qwen2.5-7b-instruct-generic-gpu:4",
           ...(scenario === "unknown-usage" ? {} : { usage: { prompt_tokens: 10, completion_tokens: 10 } }),
           choices: [{ finish_reason: "stop", message: { content: '{"concepts":[]}',
             ...(scenario === "tools" ? { tool_calls: [{ id: "forbidden" }] } : {}) } }],
@@ -131,7 +132,7 @@ test("Surface dispatch keeps owner gating, actual provider accounting and strict
       messages: [{ role: "user", content: "Synthetic public engineering text" }] });
     if (scenario === "valid" || scenario === "unknown-usage") {
       const result = await run();
-      assert.equal(result.model, "surface-local:qwen2.5-7b-instruct-qnn-npu:3");
+      assert.equal(result.model, "surface-local:qwen2.5-7b-instruct-generic-gpu:4");
       assert.equal(receipts[0].toolName, "llm.surface-local");
       assert.equal(receipts[0].costUsd, 0);
       assert.equal(receipts[0].operation, scenario === "unknown-usage" ? "compile-runbook:usage-unreported" : "compile-runbook");

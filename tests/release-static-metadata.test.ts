@@ -70,6 +70,11 @@ test("static HTML metadata uses current release facts and explicit tool semantic
   assert.match(jsonLd ?? "", new RegExp(`${c.publicDocumentedTools} Publicly Documented Tools`, "i"));
   assert.match(noScript ?? "", new RegExp(`${c.registeredTools} total registered tools`, "i"));
   assert.match(noScript ?? "", new RegExp(`${c.publicDocumentedTools} publicly documented tools`, "i"));
+  for (const snippet of [jsonLd ?? "", noScript ?? ""]) {
+    assert.match(snippet, new RegExp(`${c.declaredTables} declared / ${c.liveTables} live (?:development )?tables`, "i"));
+    assert.match(snippet, new RegExp(`${c.platformIndexes} platform indexes`, "i"));
+    assert.match(snippet, new RegExp(`${c.coreRegistryModels} curated models`, "i"));
+  }
 });
 
 test("the totals generator and static extractor agree on registered tools", () => {

@@ -11,6 +11,7 @@ import { executeTool, getAllToolDefinitions } from "../../server/tools";
 import { filterSparkLineTools, routeTools } from "../../server/tool-router";
 import "../../server/tools/domains/income-opportunities";
 import { getMigratedHandler } from "../../server/tools/registry";
+import { withToolAuthority } from "../../server/tools/invocation-authority";
 
 test("Instinct's server-owned marker survives async processing and is not inherited by other Felix turns", async () => {
   assert.equal(instinctToolBlocked("opportunity_bank_file"), false);
@@ -33,10 +34,23 @@ test("Instinct's tool boundary permits owner overview and private replies only, 
   await withInstinctReadDraft(async () => {
     assert.equal(instinctToolBlocked("owner_business_overview"), false);
     assert.equal(instinctToolBlocked("instinct_send_message"), false);
+    let reachedInstinctGate = 0;
     for (const name of ["opportunity_bank_file", "product_listing_create", "create_payment_link", "delegate_task", "exec", "grok_send_message", "spark_send_message", "decide_approval", "unknown_tool"]) {
-      const result = await executeTool(name, { _tenantId: ownerTenantId(), _personaId: 2, _channel: "admin" });
-      assert.match(result.error, /Instinct can review/);
+      assert.equal(instinctToolBlocked(name), true, `${name} must be prohibited by the Instinct scope`);
+      const result = await withToolAuthority({
+        tenantId: ownerTenantId(), personaId: 2, personaName: "Felix", actor: "persona",
+        invokedVia: "chat_engine", rateLimitChecked: true, skipTracking: true,
+      }, () => executeTool(name, { _tenantId: ownerTenantId(), _personaId: 2, _channel: "admin" }));
+      if (result.blocked === true) {
+        // The outer destructive-policy gate may deny sooner (e.g. payments
+        // require a fresh approval row). Never bypass it to reach this gate.
+        assert.match(result.error, /^Blocked by destructive-tool policy:/);
+      } else {
+        assert.match(result.error, /^Instinct can review/);
+        reachedInstinctGate++;
+      }
     }
+    assert.ok(reachedInstinctGate > 0, "the real executor must enforce the Instinct guard, not just upstream policy");
   });
 });
 

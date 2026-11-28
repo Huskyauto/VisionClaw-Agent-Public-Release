@@ -36,12 +36,12 @@ export interface Scenario {
   verdict: string;
 }
 
-export const SCENARIO_PROMPT = `You are a venture-grade analyst running a MONEY SCENARIO simulation for VisionClaw — Bob's solo-founder, multi-tenant agentic-AI platform (a ~400-tool platform; Felix persona executes deliverable pipelines end-to-end: videos, PDFs, landing pages, email/CRM, lead capture wedge landings, payment links via Stripe; near-zero marginal labor cost since the platform does the work).
+export const SCENARIO_PROMPT = `You are an analyst running an ADVISORY MONEY SCENARIO for VisionClaw — Bob's solo-founder, multi-tenant agentic-AI platform with existing report, media, CRM and workflow capabilities. Automation does not eliminate model/API fees, human review, delivery or support costs. No measured customer demand, delivery outcome or zero marginal labor is established by the platform's existence.
 
 Given ONE product idea, output STRICT JSON (no prose, no markdown fence) with these keys:
 {
   "revenue12moUsd": <realistic 12-month revenue for a solo founder w/ this platform, integer USD>,
-  "buildCostUsd": <one-time out-of-pocket cost to implement (APIs, infra, ads for validation), integer USD>,
+  "buildCostUsd": <one-time out-of-pocket cost to implement (APIs, infrastructure, permissioned validation; no paid ads), integer USD>,
   "buildHours": <Bob-hours to ship an MVP using VisionClaw to do most of the work, integer>,
   "monthlyRunCostUsd": <ongoing monthly cost, integer USD>,
   "daysToFirstDollar": <days until first paying customer, integer>,
@@ -51,7 +51,7 @@ Given ONE product idea, output STRICT JSON (no prose, no markdown fence) with th
   "topRisk": "<1 sentence: the biggest reason this makes $0>",
   "verdict": "<1 sentence: build / skip and why>"
 }
-Be conservative on revenue and honest on risk — Bob is optimizing for most money for least cost/effort.`;
+Be conservative on revenue and honest on risk — Bob is optimizing for most money for least cost/effort. Prefer existing capabilities, permissioned relationships, referrals and small reversible discovery tests; do not rely on paid advertising, bulk scraping or mass unsolicited outreach. Never invent savings guarantees, customers, credentials, consent or proven demand. Prices and projections are hypotheses, not measured results.`;
 
 export interface Validation {
   whatItIs: string;
@@ -63,12 +63,12 @@ export interface Validation {
   goNoGo: string;
 }
 
-export const VALIDATION_PROMPT = `You are an INDEPENDENT skeptical validator (a second opinion — do NOT rubber-stamp). A venture analyst just simulated a money scenario for a product idea that a solo founder (Bob) would build on VisionClaw, his ~400-tool agentic-AI platform (Felix persona ships videos, PDFs, landing pages, email/CRM, lead-capture wedge pages, Stripe payment links with near-zero marginal labor).
+export const VALIDATION_PROMPT = `You are an INDEPENDENT skeptical validator (a second opinion — do NOT rubber-stamp). An analyst simulated an idea for Bob's existing VisionClaw platform. Its report, media, CRM and workflow capabilities do not prove demand, savings, zero labor or free fulfillment.
 
 Your job:
 1. Explain in plain English what this project actually is and who pays for it.
 2. Independently sanity-check the analyst's numbers — call out anything inflated or missed.
-3. Lay out the CHEAPEST possible path to first revenue: ordered steps, each with its out-of-pocket dollar cost (Bob optimizes for least cash spent, platform does the labor).
+3. If GO, propose the cheapest reversible discovery path with estimated cash costs, review/support labor and unknown fees disclosed. No paid advertising, bulk scraping, mass unsolicited outreach or unsupported savings promises. Existing flat subscriptions do not make paid generation, delivery or labor free.
 4. Give concrete week-1 actions and a final go/no-go.
 
 Output STRICT JSON (no prose, no markdown fence):
@@ -76,9 +76,9 @@ Output STRICT JSON (no prose, no markdown fence):
   "whatItIs": "<2-3 sentences: what the product is, who the customer is, why they pay>",
   "numbersVerdict": "<2-3 sentences: your independent take on the analyst's revenue/cost/probability — agree, or state what you'd change and why>",
   "adjustedSuccessProbabilityPct": <your own honest 0-100 probability of ANY net profit in 12 months>,
-  "cheapestMoneyPlan": ["<step 1 with $ cost, e.g. 'Ship landing page + Stripe link via Felix — $0'>", "<step 2 …>", "<3-6 steps total, cheapest viable path to first dollar>"],
+  "cheapestMoneyPlan": ["<GO only: proposed discovery step with estimated cost; return [] for NO-GO>"],
   "totalOutOfPocketUsd": <sum of cash costs across the plan, integer USD>,
-  "week1Actions": ["<concrete action 1>", "<action 2>", "<2-4 actions>"],
+  "week1Actions": ["<GO only: proposed discovery action for owner review; return [] for NO-GO>"],
   "goNoGo": "<1 sentence: GO or NO-GO and the single deciding reason>"
 }`;
 
@@ -94,8 +94,8 @@ function requiredText(value: unknown, field: string): string {
   return value.trim();
 }
 
-function requiredStringArray(value: unknown, field: string): string[] {
-  if (!Array.isArray(value) || value.length === 0) throw new Error(`empty ${field}`);
+function requiredStringArray(value: unknown, field: string, allowEmpty = false): string[] {
+  if (!Array.isArray(value) || !allowEmpty && value.length === 0) throw new Error(`empty ${field}`);
   const strings = value.map((item) => requiredText(item, field));
   return strings;
 }
@@ -114,14 +114,16 @@ export function parseValidationOutput(raw: string): Validation {
     throw new Error(`bad adjustedSuccessProbabilityPct: ${String(p.adjustedSuccessProbabilityPct)}`);
   }
   const oop = requiredNonNegativeNumber(p.totalOutOfPocketUsd, "totalOutOfPocketUsd");
+  const goNoGo = requiredText(p.goNoGo, "goNoGo");
+  const noGo = /^no[\s–—-]*go\b/i.test(goNoGo);
   return {
     whatItIs: requiredText(p.whatItIs, "whatItIs"),
     numbersVerdict: requiredText(p.numbersVerdict, "numbersVerdict"),
     adjustedSuccessProbabilityPct: Math.round(prob),
-    cheapestMoneyPlan: requiredStringArray(p.cheapestMoneyPlan, "cheapestMoneyPlan"),
+    cheapestMoneyPlan: requiredStringArray(p.cheapestMoneyPlan, "cheapestMoneyPlan", noGo),
     totalOutOfPocketUsd: Math.round(oop),
-    week1Actions: requiredStringArray(p.week1Actions, "week1Actions"),
-    goNoGo: requiredText(p.goNoGo, "goNoGo"),
+    week1Actions: requiredStringArray(p.week1Actions, "week1Actions", noGo),
+    goNoGo,
   };
 }
 

@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { revenueMissions } from "./models/revenue-missions";
+import { AGENT_JOB_STATUSES } from "./agent-job-status";
 
 export * from "./models/auth";
 export * from "./models/research";
@@ -2338,6 +2339,8 @@ export const agentJobs = pgTable("agent_jobs", {
   claimIdx: index("agent_jobs_claim_idx").on(t.status, t.nextRunAt).where(sql`status = 'pending'`),
   leaseIdx: index("agent_jobs_lease_idx").on(t.status, t.leaseUntil).where(sql`status = 'running'`),
   kindStatusIdx: index("agent_jobs_kind_status_idx").on(t.kind, t.status, t.createdAt.desc()),
+  statusCheck: check("agent_jobs_status_check",
+    sql`${t.status} IN (${sql.raw(AGENT_JOB_STATUSES.map(status => `'${status}'`).join(", "))})`),
   tenantIdx: index("agent_jobs_tenant_idx").on(t.tenantId, t.createdAt.desc()),
   failureClassIdx: index("agent_jobs_failure_class_idx").on(t.failureClass, t.createdAt.desc()).where(sql`failure_class IS NOT NULL`),
 }));

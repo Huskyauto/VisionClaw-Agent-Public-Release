@@ -17,11 +17,11 @@ export const templateScrapeDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "template_scrape",
-    description: "Extract typed structured data from a webpage using a Zod-style schema. First call uses an LLM to generate a deterministic CSS-selector recipe; subsequent calls of the same (domain + schema) re-use the cached recipe at ZERO LLM cost. After 3 successful cache hits the recipe is GRADUATED. Snaps back to LLM regeneration if coverage drops below 50%. Use for repeat-scrape patterns: lead enrichment fields from company About pages, competitor pricing, product listings, structured directory data.",
+    description: "Extract typed structured data from a public HTTPS webpage using a Zod-style schema. Redirects and private destinations are refused; use the final public HTTPS URL. First call uses an LLM to generate a deterministic CSS-selector recipe; subsequent calls of the same (domain + schema) re-use the cached recipe at ZERO LLM cost. After 3 successful cache hits the recipe is GRADUATED. Snaps back to LLM regeneration if coverage drops below 50%. Use for repeat-scrape patterns: lead enrichment fields from company About pages, competitor pricing, product listings, structured directory data.",
     parameters: {
       type: "object",
       properties: {
-        url: { type: "string", description: "The URL to scrape" },
+        url: { type: "string", description: "Final public HTTPS URL to scrape; redirects, HTTP and private destinations are refused" },
         schema: { type: "object", description: "JSON object describing desired fields. Example: {company:'string', employees:'number', tagline:'string', team:[{name:'string', title:'string'}]}" },
         schemaName: { type: "string", description: "Friendly name for this schema (e.g. 'company_about', 'product_listing'). Used to key the recipe cache." },
         forceRegenerate: { type: "boolean", description: "Force LLM regeneration of the recipe even if cached. Default false." },

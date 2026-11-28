@@ -540,6 +540,7 @@ async function buildWorkspaceContext(
   tenantId?: number,
   personaId?: number | null,
   currentConvId?: number,
+  skipRecentWork = false,
 ): Promise<string | null> {
   const lines: string[] = ["## WORKSPACE AWARENESS\nYou have access to these resources. Use them — don't ask the user to re-upload or re-explain."];
 
@@ -597,7 +598,7 @@ async function buildWorkspaceContext(
   // SECURITY: never run the cross-conversation surface unscoped — without a
   // tenantId we'd inject arbitrary cross-tenant message previews. Architect-flagged
   // R53 short-circuit risk; if tenantId missing, skip the whole block.
-  if (!validTenant) {
+  if (!validTenant || skipRecentWork) {
     return lines.length > 1 ? lines.join("\n") : null;
   }
   try {
@@ -1565,9 +1566,19 @@ DO NOT pile everything into agent_knowledge. DO NOT skip writing because "I'll r
     }
   } catch (_silentErr) { logSilentCatch("server/chat-engine.ts", _silentErr); }
 
+  let workingContextBrief = "";
+  if (conversationId) {
+    try {
+      const { getWorkingContextService } = await import("./working-context");
+      workingContextBrief = await (await getWorkingContextService()).prompt({
+        tenantId, personaId: persona?.id ?? null, conversationId, message: userMessage,
+      });
+      if (workingContextBrief) dynamicParts.push(workingContextBrief);
+    } catch { console.warn("[working-context] prompt-unavailable"); }
+  }
   try {
     // R53.A: pass tenantId + personaId + currentConvId so RECENT WORK is properly scoped.
-    const workspaceContext = await buildWorkspaceContext(tenantId, persona?.id, conversationId);
+    const workspaceContext = await buildWorkspaceContext(tenantId, persona?.id, conversationId, !!workingContextBrief);
     if (workspaceContext) dynamicParts.push(workspaceContext);
   } catch (_silentErr) { logSilentCatch("server/chat-engine.ts", _silentErr); }
 
@@ -2696,6 +2707,15 @@ DO NOT stop at a "spec" or "plan" — actually produce the file. The ONE-CALL pa
     collectedCitations = buildResult.citations;
   }
 
+  if (opts?.leanContext && persona) {
+    try {
+      const { getWorkingContextService } = await import("./working-context");
+      const brief = await (await getWorkingContextService()).prompt({
+        tenantId, personaId: persona?.id ?? null, conversationId, message: content.trim(),
+      });
+      if (brief) systemPrompt += "\n\n" + brief;
+    } catch { console.warn("[working-context] lean-prompt-unavailable"); }
+  }
   if (projectContextStr) systemPrompt += "\n\n" + projectContextStr;
   const buildGuidance = buildExperimentGuidance(content);
   if (buildGuidance) systemPrompt += "\n\n" + buildGuidance;
@@ -4090,6 +4110,7 @@ Never hide failures behind vague language. The user trusts you because you're tr
       if (toolName === "orchestrate") {
         parsedArgs._conversationId = conversationId;
       }
+      if (toolName === "test_api_keys") parsedArgs._conversationId = conversationId;
       return { toolName, parsedArgs };
     }
 
@@ -4192,6 +4213,10 @@ Never hide failures behind vague language. The user trusts you because you're tr
           const { withIncomeDiscoveryTurn } = await import("./lib/income-claude-route");
           result = await withIncomeDiscoveryTurn({ tenantId: rateLimitTenantId,
             conversationId, personaId: conv.personaId, userMessageId: persistedUserMessage.id }, dispatch);
+        } else if (!opts?.isDelegation && (toolName === "jury_triage" || toolName === "ensemble_query")) {
+          const { withOwnerFrontierTurn, explicitlyRequestsFrontierJury } = await import("./lib/owner-frontier-refresh");
+          result = await withOwnerFrontierTurn(rateLimitTenantId, explicitlyRequestsFrontierJury(content),
+            dispatch, opts?.abortSignal);
         } else result = await dispatch();
       } catch (err: unknown) {
         result = {
@@ -4823,6 +4848,7 @@ Never hide failures behind vague language. The user trusts you because you're tr
     persona?.id,
     tenantId,
     persistedUserMessage?.id ?? null,
+    assistantMsgRow?.id ? { conversationId, assistantMessageId: assistantMsgRow.id } : undefined,
   ).catch(() => {});
   updateDailyLog(titleForLog, persona?.id, opts?.source, tenantId).catch(() => {});
   // R125+137.22 — open-loop mining (OpenClaw borrow): fire-and-forget; the

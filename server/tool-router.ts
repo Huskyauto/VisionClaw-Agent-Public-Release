@@ -382,6 +382,7 @@ export async function routeTools(
   }
   const ownerFelix = opts?.personaId === 2 && opts.tenantId === ownerTenantId();
   const userMsg = getActiveUserRoutingMessage(messages);
+  const legionDiagnosticsRequested = ownerFelix && /\b(?:legion(?:-local)?|mellum|tailscale)\b/i.test(userMsg);
   const pilotRequested = isInteractivePilotRequest(userMsg, opts?.personaId, opts?.tenantId, ownerTenantId());
   // These capabilities cannot travel to an orchestrated/background worker.
   // Preserve ordinary coordination tools, but do not offer impossible handoffs.
@@ -389,9 +390,10 @@ export async function routeTools(
     allTools = allTools.filter(tool => !["orchestrate", "delegate_task", "spawn_agent"].includes(tool.function.name));
   // Keep the established extra handoff slots, so none displaces cash_flow_summary.
   const maxTools = effectiveRoutedToolCap(opts?.maxTools ?? 25, opts?.personaId, opts?.tenantId)
-    + (ownerFelix ? 2 : 0) + (pilotRequested ? 1 : 0);
+    + (ownerFelix ? 2 : 0) + (pilotRequested ? 1 : 0) + (legionDiagnosticsRequested ? 1 : 0);
   const routingContext = buildRecentUserRoutingContext(messages);
   const mandatoryContextTools = getMandatoryContextTools(routingContext);
+  if (legionDiagnosticsRequested) mandatoryContextTools.push("test_api_keys");
   if (pilotRequested)
     mandatoryContextTools.push("business_pilot");
   // Private owner-tenant handoff queues are coordination tools, not external sends.
@@ -668,6 +670,7 @@ export async function routeTools(
     requiredToolName: pilotRequested && requiresPilotTool(userMsg) && filtered.some(tool => tool.function.name === "business_pilot")
       ? "business_pilot" : undefined,
     contrastiveNote: [
+      legionDiagnosticsRequested ? "LEGION DIAGNOSTICS: Use test_api_keys with provider:\"legion-local\", local_check:\"status\"; an explicit fixed 17+25 acceptance uses local_check:\"arithmetic\". Return its actual servedModel, rawOutput, latencyMs, usageLedgerConfirmed, unreported/recorded cost and activity-log receipt. Your own cloud reply model is separate. No arbitrary prompts, other-model substitution, or automatic retries; unavailable/unconfirmed is not acceptance." : "",
       pilotRequested ? "OWNER INTERACTIVE PILOTS: When the owner requests an action, invoke business_pilot directly in this interactive chat. Run every requested pilot, using describe for missing schemas. Never orchestrate or delegate these owner-only actions; workers cannot execute them. A mention or opt-out does not authorize execution. Do not claim completion without successful tool results for each requested action; report missing input or failed calls instead of retrying." : "",
       contrastiveNote,
     ].filter(Boolean).join("\n\n") || undefined,

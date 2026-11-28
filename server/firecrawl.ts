@@ -1,10 +1,12 @@
 import fs from "fs";
 import path from "path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { db } from "./db";
 import { scrapedPages } from "@shared/schema";
 import { eq, and, ilike, desc, sql } from "drizzle-orm";
 import { fetchWithTimeout } from "./lib/fetch-with-timeout";
 import { readResponseTextBounded } from "./lib/bounded-response";
+import { getCurrentToolAbortSignal } from "./lib/tool-abort-context";
 
 export interface FirecrawlConfig {
   apiKey: string;
@@ -16,6 +18,7 @@ export interface FirecrawlConfig {
 }
 
 const CONFIG_PATH = path.resolve(process.cwd(), "data", "firecrawl-config.json");
+const FIRECRAWL_API = "/v2";
 
 const DEFAULT_CONFIG: FirecrawlConfig = {
   apiKey: "",
@@ -116,6 +119,23 @@ function parseRetryAfter(value: string | null): number | undefined {
   return Number.isFinite(at) ? Math.max(0, at - Date.now()) : undefined;
 }
 
+function firecrawlEndpoint(baseUrl: string, route: string): string {
+  assertSafeFirecrawlBaseUrl(baseUrl);
+  const base = new URL(baseUrl);
+  if (base.search || base.hash) throw new Error("Invalid Firecrawl baseUrl: query or fragment not allowed");
+  base.pathname = base.pathname.replace(/\/+$/, "").replace(/\/v(?:1|2)$/, "") + FIRECRAWL_API + route;
+  return base.href;
+}
+
+function firstText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) {
+    const first = value.find((item): item is string => typeof item === "string" && item.trim().length > 0);
+    return first?.trim() || "";
+  }
+  return "";
+}
+
 const resultCache = new Map<string, { result: FirecrawlResult; timestamp: number }>();
 
 function extractDomain(url: string): string {
@@ -159,8 +179,9 @@ export async function firecrawlScrape(url: string): Promise<FirecrawlResult> {
   const timeout = setTimeout(() => controller.abort(), config.timeoutSeconds * 1000);
   try {
 
-    const response = await fetch(`${config.baseUrl}/v1/scrape`, {
+    const response = await fetch(firecrawlEndpoint(config.baseUrl, "/scrape"), {
       method: "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${config.apiKey}`,
@@ -171,6 +192,7 @@ export async function firecrawlScrape(url: string): Promise<FirecrawlResult> {
         onlyMainContent: config.onlyMainContent,
         proxy: "auto",
         storeInCache: true,
+        maxAge: config.maxAgeMs,
         waitFor: 3000,
       }),
       signal: controller.signal,
@@ -196,7 +218,7 @@ export async function firecrawlScrape(url: string): Promise<FirecrawlResult> {
     }
 
     const markdown = data.data?.markdown || "";
-    const title = data.data?.metadata?.title || "";
+    const title = firstText(data.data?.metadata?.title);
     const sourceUrl = data.data?.metadata?.sourceURL || url;
 
     if (!markdown.trim()) {
@@ -289,26 +311,42 @@ export async function firecrawlCrawlSite(
     return { success: false, error: "Firecrawl not configured" };
   }
 
-  const limit = Math.min(options.limit || 20, 100);
-  const maxDepth = options.maxDepth || 3;
+  const limit = options.limit ?? 20;
+  const maxDepth = options.maxDepth ?? 3;
+  if (!Number.isSafeInteger(limit) || limit < 1) return { success: false, error: "Invalid crawl page limit" };
+  if (!Number.isSafeInteger(maxDepth) || maxDepth < 0 || maxDepth > 100) {
+    return { success: false, error: "Invalid crawl path depth (expected an integer from 0 to 100)" };
+  }
+  const pageLimit = Math.min(limit, 100);
 
   try {
-    console.log(`[firecrawl] Starting crawl: ${url} (limit: ${limit}, depth: ${maxDepth})`);
+    const crawlEndpoint = firecrawlEndpoint(config.baseUrl, "/crawl");
+    console.log(`[firecrawl] Starting crawl: ${url} (limit: ${pageLimit}, path depth: ${maxDepth})`);
 
-    const crawlBody: any = {
+    // The v1 field counted URL path segments, not hops between links.
+    // When callers supply their own include filters, preserve them and enforce
+    // depth independently with an extra exclusion.
+    const depthPattern = `^(/+[^/]+){0,${maxDepth}}`;
+    const crawlBody = {
       url,
-      limit,
-      maxDepth,
+      limit: pageLimit,
+      regexOnFullURL: false,
+      includePaths: options.includePaths?.length
+        ? options.includePaths
+        : [`${depthPattern}/*$`, `${depthPattern}/+index\\.(html|php)/*$`],
+      excludePaths: [
+        ...(options.excludePaths ?? []),
+        ...(options.includePaths?.length ? [`^(/+[^/]+){${maxDepth + 1}}`] : []),
+      ],
       scrapeOptions: {
         formats: ["markdown"],
         onlyMainContent: true,
       },
     };
-    if (options.includePaths?.length) crawlBody.includePaths = options.includePaths;
-    if (options.excludePaths?.length) crawlBody.excludePaths = options.excludePaths;
 
-    const startResponse = await fetchWithTimeout(`${config.baseUrl}/v1/crawl`, {
+    const startResponse = await fetchWithTimeout(crawlEndpoint, {
       method: "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${config.apiKey}`,
@@ -323,36 +361,104 @@ export async function firecrawlCrawlSite(
     }
 
     const startData = await startResponse.json() as any;
-    if (!startData.success || !startData.id) {
+    if (!startData.success || typeof startData.id !== "string" || !/^[A-Za-z0-9_-]{1,120}$/.test(startData.id)) {
       return { success: false, error: startData.error || "Crawl failed to start" };
     }
 
     const crawlId = startData.id;
     console.log(`[firecrawl] Crawl job started: ${crawlId}`);
 
-    const maxWaitMs = Math.max(limit * 15000, 120000);
+    const maxWaitMs = Math.max(pageLimit * 15000, 120000);
     const pollInterval = 5000;
     const startTime = Date.now();
-    let allPages: any[] = [];
-
-    while (Date.now() - startTime < maxWaitMs) {
-      await new Promise(r => setTimeout(r, pollInterval));
-
-      let statusResponse: Response;
+    const statusUrl = `${crawlEndpoint}/${crawlId}`;
+    const callerSignal = getCurrentToolAbortSignal();
+    let lastPollError: string | undefined;
+    async function readStatusPage(pageUrl: string, maxBytes: number) {
+      const remaining = maxWaitMs - (Date.now() - startTime);
+      if (remaining <= 0) throw new Error("Crawl deadline exceeded");
+      const deadline = AbortSignal.timeout(Math.min(20_000, remaining));
+      const signal = callerSignal ? AbortSignal.any([deadline, callerSignal]) : deadline;
+      let response: Response;
       try {
-        statusResponse = await fetchWithTimeout(`${config.baseUrl}/v1/crawl/${crawlId}`, {
+        response = await fetch(pageUrl, {
           headers: { "Authorization": `Bearer ${config.apiKey}` },
-          timeoutMs: 20_000,
+          redirect: "error",
+          signal,
         });
       } catch {
-        continue; // transient poll failure/timeout — retry on next interval (outer maxWaitMs bounds the loop)
+        callerSignal?.throwIfAborted();
+        return { kind: "transport", error: deadline.aborted ? "status poll timed out" : "status request failed" } as const;
       }
+      if (!response.ok) {
+        const retryAfterMs = parseRetryAfter(response.headers.get("retry-after"));
+        await response.body?.cancel();
+        return { kind: "http", status: response.status, retryAfterMs } as const;
+      }
+      const text = await readResponseTextBounded(response, maxBytes);
+      return { kind: "page", data: JSON.parse(text) as any, bytes: Buffer.byteLength(text) } as const;
+    }
+    const maxPageBytes = 12 * 1024 * 1024;
+    const allPages: any[] = [];
+    let finished = false;
 
-      if (!statusResponse.ok) continue;
-      const statusData = await statusResponse.json() as any;
+    while (Date.now() - startTime < maxWaitMs) {
+      callerSignal?.throwIfAborted();
+      await new Promise(r => setTimeout(r, pollInterval));
+      const response = await readStatusPage(statusUrl, maxPageBytes);
+      if (response.kind === "transport") {
+        lastPollError = response.error;
+        continue;
+      }
+      if (response.kind === "http") {
+        if (response.status === 429 || response.status >= 500) {
+          lastPollError = `HTTP ${response.status}`;
+          continue;
+        }
+        return { success: false, error: `Crawl status failed HTTP ${response.status}` };
+      }
+      let statusData = response.data;
+      if (typeof statusData?.status !== "string") throw new Error("Invalid crawl status response");
 
       if (statusData.status === "completed") {
-        allPages = statusData.data || [];
+        let bytesRemaining = 32 * 1024 * 1024 - response.bytes;
+        const visited = new Set([statusUrl]);
+        for (;;) {
+          if (statusData.status !== "completed" || !Array.isArray(statusData.data)) {
+            throw new Error("Invalid completed crawl page");
+          }
+          for (const page of statusData.data) {
+            if (allPages.length === pageLimit) break;
+            allPages.push(page);
+          }
+          if (statusData.next == null || statusData.next === "" || allPages.length === pageLimit) break;
+          if (typeof statusData.next !== "string" || visited.size >= 16 || bytesRemaining <= 0) {
+            throw new Error("Crawl pagination exceeded safe limits or returned an invalid cursor");
+          }
+          const next = new URL(statusData.next, statusUrl);
+          const job = new URL(statusUrl);
+          if (next.origin !== job.origin || next.pathname !== job.pathname ||
+              next.username || next.password || next.hash || !next.search || visited.has(next.href)) {
+            throw new Error("Invalid crawl pagination cursor");
+          }
+          visited.add(next.href);
+          const readContinuation = () => readStatusPage(next.href, Math.min(maxPageBytes, bytesRemaining));
+          let continuation = await readContinuation();
+          if (continuation.kind === "transport" ||
+              (continuation.kind === "http" && (continuation.status === 429 || continuation.status >= 500))) {
+            const waitMs = continuation.kind === "http" ? continuation.retryAfterMs ?? 1_000 : 1_000;
+            // Retry just the read of this completed job, never submit another crawl.
+            if (waitMs <= 10_000 && Date.now() - startTime + waitMs < maxWaitMs) {
+              await sleep(waitMs, undefined, { signal: callerSignal });
+              continuation = await readContinuation();
+            }
+          }
+          if (continuation.kind === "transport") throw new Error(`Crawl pagination: ${continuation.error}`);
+          if (continuation.kind === "http") throw new Error(`Crawl pagination failed HTTP ${continuation.status}`);
+          statusData = continuation.data;
+          bytesRemaining -= continuation.bytes;
+        }
+        finished = true;
         break;
       } else if (statusData.status === "failed" || statusData.status === "cancelled") {
         return { success: false, error: `Crawl ${statusData.status}: ${statusData.error || "unknown"}` };
@@ -361,19 +467,20 @@ export async function firecrawlCrawlSite(
       console.log(`[firecrawl] Crawl ${crawlId} status: ${statusData.status} (${statusData.completed || 0}/${statusData.total || "?"})`);
     }
 
+    if (!finished) return { success: false, error: `Crawl deadline exceeded${lastPollError ? ` (${lastPollError})` : ""}` };
     if (allPages.length === 0) {
-      return { success: false, error: "Crawl completed but returned no pages (may have timed out)" };
+      return { success: false, error: "Crawl completed but returned no pages" };
     }
 
     const domain = extractDomain(url);
     const storedPages: { url: string; title: string; contentLength: number }[] = [];
 
     for (const page of allPages) {
-      const markdown = page.markdown || "";
+      const markdown = typeof page?.markdown === "string" ? page.markdown : "";
       if (!markdown.trim()) continue;
 
-      const pageUrl = page.metadata?.sourceURL || page.url || url;
-      const pageTitle = page.metadata?.title || "";
+      const pageUrl = firstText(page.metadata?.sourceURL) || firstText(page.url) || url;
+      const pageTitle = firstText(page.metadata?.title);
 
       const existing = await db.select({ id: scrapedPages.id })
         .from(scrapedPages)
@@ -390,7 +497,7 @@ export async function firecrawlCrawlSite(
             tags: options.tags || null,
             scrapedAt: new Date(),
           })
-          .where(eq(scrapedPages.id, existing[0].id));
+          .where(and(eq(scrapedPages.id, existing[0].id), eq(scrapedPages.tenantId, tenantId)));
       } else {
         await db.insert(scrapedPages).values({
           tenantId,
@@ -408,6 +515,7 @@ export async function firecrawlCrawlSite(
       storedPages.push({ url: pageUrl, title: pageTitle, contentLength: markdown.length });
     }
 
+    if (storedPages.length === 0) return { success: false, error: "Crawl returned no usable markdown" };
     console.log(`[firecrawl] Crawl complete: ${storedPages.length} pages stored from ${url}`);
     return { success: true, pagesScraped: storedPages.length, pages: storedPages };
 
@@ -427,8 +535,9 @@ export async function firecrawlMapSite(
   }
 
   try {
-    const response = await fetchWithTimeout(`${config.baseUrl}/v1/map`, {
+    const response = await fetchWithTimeout(firecrawlEndpoint(config.baseUrl, "/map"), {
       method: "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${config.apiKey}`,
@@ -447,7 +556,11 @@ export async function firecrawlMapSite(
       return { success: false, error: data.error || "Map failed" };
     }
 
-    return { success: true, urls: (data.links || []).slice(0, 200) };
+    if (!Array.isArray(data.links)) return { success: false, error: "Invalid Firecrawl map results" };
+    return { success: true, urls: data.links
+      .map((entry: unknown) => typeof entry === "string" ? entry : (entry as { url?: unknown } | null)?.url)
+      .filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0)
+      .slice(0, 200) };
   } catch (err: any) {
     return { success: false, error: `Map error: ${err.message}` };
   }
@@ -565,12 +678,12 @@ export async function firecrawlSearch(query: string, limit = 5): Promise<{ succe
     return { success: false, error: "Firecrawl not configured" };
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutSeconds * 1000);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), config.timeoutSeconds * 1000);
-
-    const response = await fetch(`${config.baseUrl}/v1/search`, {
+    const response = await fetch(firecrawlEndpoint(config.baseUrl, "/search"), {
       method: "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${config.apiKey}`,
@@ -578,28 +691,32 @@ export async function firecrawlSearch(query: string, limit = 5): Promise<{ succe
       body: JSON.stringify({
         query,
         limit,
+        sources: ["web"],
         scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
       }),
       signal: controller.signal,
     });
 
-    clearTimeout(timeout);
-
     if (!response.ok) {
-      const errText = await response.text().catch(() => "");
+      const errText = await readResponseTextBounded(response, 256_000, () => controller.abort()).catch(() => "");
       return { success: false, error: `Firecrawl HTTP ${response.status}: ${errText.slice(0, 200)}` };
     }
 
-    const data = await response.json() as any;
+    const data = JSON.parse(await readResponseTextBounded(response, 6 * 1024 * 1024, () => controller.abort())) as any;
     if (!data.success) {
       return { success: false, error: data.error || "Firecrawl search failed" };
     }
 
-    const results = (data.data || []).map((item: any) => ({
-      title: item.metadata?.title || item.url || "",
-      url: item.metadata?.sourceURL || item.url || "",
-      markdown: (item.markdown || "").slice(0, 3000),
-    }));
+    if (!Array.isArray(data.data?.web)) return { success: false, error: "Invalid Firecrawl web search results" };
+    const results = data.data.web.flatMap((item: any) => {
+      const url = firstText(item?.url) || firstText(item?.metadata?.sourceURL);
+      if (!url) return [];
+      return [{
+        title: firstText(item?.title) || firstText(item?.metadata?.title) || url,
+        url,
+        markdown: typeof item?.markdown === "string" ? item.markdown.slice(0, 3000) : "",
+      }];
+    });
 
     return { success: true, results };
   } catch (err: any) {
@@ -607,6 +724,8 @@ export async function firecrawlSearch(query: string, limit = 5): Promise<{ succe
       return { success: false, error: `Firecrawl search timeout (${config.timeoutSeconds}s)` };
     }
     return { success: false, error: `Firecrawl search error: ${err.message}` };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

@@ -5,6 +5,66 @@ import releaseFacts from "../../../docs/release-facts.json";
 
 const updates = [
   {
+    title: "Mellum background work with a verified Spark backup",
+    business: "Owner-approved Lenovo processing turns screened runbooks into source-backed reference material on an enabled overnight schedule. Your questions and interactive troubleshooting stay on the main assistant route; broader routine compaction remains separately gated.",
+    technical: "Direct Lenovo remains primary. The installed Spark relay completed a real production arithmetic probe on the exact approved Mellum model, with token usage and ledger accounting confirmed. The minute schedule is enabled; actual outage-triggered switching is not proven. Unknown generation outcomes never authorize automatic replay.",
+  },
+  {
+    title: "Daily AI Insights and source-bound release checks",
+    business: "Connected research agents can share daily reports and separate reviews without automatically adopting suggestions. Current dashboards and documentation distinguish measured features from ideas and unfinished work.",
+    technical: "Portable release verification runs against exact source candidates on GitHub, not stale receipts. Source pushes and application deployment are separate. Optional connection-alert emails retain their own activation gate.",
+  },
+  {
+    title: "Safer source fetching and undo-policy failures",
+    business: "Structured page extraction refuses unsafe connections before contacting them. If required undo-policy checks are unavailable, the attempted action stops rather than proceeding without verified protection.",
+    technical: "The extraction caller now uses the shared DNS-pinned HTTPS fetch boundary and refuses redirects before contact. Snapshot-policy plumbing errors fail closed at pre-dispatch. Both old failures were reproduced in offline fixtures; this is not whole-platform or production certification.",
+  },
+  {
+    title: "Delivered apps open separately from your workspace",
+    business: "Self-contained HTML apps can still open from a Play link. The preview no longer shares your signed-in workspace's browser storage or can make background requests to the workspace. Download remains available.",
+    technical: "The HTML Play response now uses an opaque-origin browser sandbox. Inline JavaScript and CSS and browser downloads remain supported; the preview cannot make background requests or load remote resources. Signed-link and file-ownership checks are unchanged.",
+  },
+  {
+    title: "Website Audit: layout second opinion",
+    business: "The owner can request an optional GLM 5.4 second opinion on a public or synthetic screenshot and related CSS. It suggests what to check, without editing or publishing the website.",
+    technical: "The opt-in Website Audit panel sends only the public or synthetic screenshot and CSS the owner explicitly submits. It uses a capped GLM 5.4 advisory request, returns verification steps, and does not run proposed code.",
+  },
+  {
+    title: "Lower-cost option for routine owner work",
+    business: "Included model routes still go first. For routine owner work that needs the paid fallback, GPT-6 Luna can be preferred when it meets the existing pricing rules. This is not a new charge or default for customers.",
+    technical: "Optional CheaperInference GPT-6 Luna selection is limited to owner fast/balanced paid fallback after included lanes. Live-catalog discount, list and reserve-rate comparison, authorization and budget checks still apply; pins and advanced tiers are unchanged.",
+  },
+  {
+    title: "Web research and private slide delivery",
+    business: "Existing web research tools can collect more pages from supported public sites. Slides created with a customer's Google connection stay under that account's sharing settings rather than being made public by default.",
+    technical: "Existing Firecrawl tools now use v2 with bounded pagination and cancellation. Crawl depth counts URL path segments, not link hops. Tenant-created Slides require Google account access, and memory edits cannot change record ownership.",
+  },
+  {
+    title: "Finished but Not Billed: HVAC billing review",
+    business: "The proposed $175 manual pilot helps an HVAC office find completed jobs that may need a billing check. The owner workbench accepts up to 30 coded jobs, flags holds and conflicting records, and exports a handoff for office review. No checkout or invoices are sent.",
+    technical: "The owner-only Business Pilot Tools workbench validates bounded CSV inputs locally and exports review status without storing or uploading batch records. A missing match is not billing authorization; no payment or accounting integrations were added.",
+  },
+  {
+    title: "Working context with references to the original conversation",
+    business: "A later conversation can pick up relevant goals, decisions, corrections and next steps from authorized prior work. What the assistant reported remains distinct from what the user said or what the system verified.",
+    technical: "The existing extraction call records bounded pointers to persisted message excerpts. Retrieval revalidates tenant, persona, project, message revision and tombstones; existing consolidation compacts pointers. No weight training, separate model call or execution authority is added.",
+  },
+  {
+    title: "More owner model choices and bounded local memory work",
+    business: "The owner can choose GPT-6.2 Sol or Astra for an appropriate job. An explicitly requested jury can use the configured frontier panel, while optional local memory assistance handles smaller internal jobs. Availability and task quality depend on configuration and evidence.",
+    technical: "Manual GPT-6.2 selection and the optional direct-owner DeepSeek V4 Pro / GPT-6.2 Sol / Fable 5.2 jury remain separate from automatic defaults. The opt-in jury respects the subscription-first path and metered reservations. Bounded local memory tasks use configured local lanes, not wider tenant access.",
+  },
+  {
+    title: "Backup confidentiality and safer release preparation",
+    business: "Backup routines check who can access the approved destination. Source publishing and app rollout remain separate; a Railway startup repair was verified in isolated staging, not certified across production.",
+    technical: "Backup uploads reject ambiguous or non-private effective permissions. Snapshot preparation checks the publishing workspace before cleanup and sets a retained-size budget. Isolated Railway staging has separate startup and schema evidence; neither source sync nor that evidence establishes production parity.",
+  },
+  {
+    title: "Current account checks for MCP keys",
+    business: "A previously issued MCP key no longer grants access when its owning account is disabled. If the platform cannot verify current account activity, it does not accept the key.",
+    technical: "Modern MCP bearer verification joins the key to its current active tenant in one authorization lookup before constructing the request's MCP server. This is a focused safeguard, not a completed tenant audit.",
+  },
+  {
     title: "Subscription, memory and finished-video integrity repairs",
     business: "An old paid checkout is no longer enough to reactivate a canceled subscription. Memory replacement saves the new fact before retiring the old one, and force-cancel preserves finished video jobs. These are source changes, not evidence of production rollout.",
     technical: "Current subscription status/customer/price checks cover activation and both subscription webhook upgrade paths. MCP replacement and successor linking share one database transaction; force-cancel updates only active statuses. The MCP persona catalog column and Hono advisories are corrected. Source review and bounded local checks do not clear incomplete tenant auditing or staged RLS.",
@@ -175,7 +235,7 @@ export function RecentPlatformUpdates({ technical = false }: { technical?: boole
         <span className="rounded bg-cyan-600 text-white px-2 py-1 text-xs font-semibold">{CURRENT_SOURCE_RELEASE}</span>
       </div>
       <p className="text-sm text-muted-foreground mb-6">
-        Source updates through {releaseFacts.releaseDate}. Counts remain the dated development snapshot.
+        Counts reflect the {releaseFacts.releaseDate} development inventory.
         Integration access, account allowances and feature flags still apply.
         These notes describe the source, not a guarantee that every option is enabled on this deployment.
       </p>

@@ -21,6 +21,7 @@ import { canApproveTargetedRepair, approveTargetedRepair, hasTargetedRepairAppro
   TARGETED_COMPILATION_REPAIR_GRANT, targetedRepairSpendKey } from "../lib/company-compilation-targeted-repair";
 import { canReconcileUnspentCompilation, reconcileUnspentCompilation,
   UNSPENT_COMPILATION_RECONCILIATION } from "../lib/company-compilation-unspent-recovery";
+import { companyPackageCostSummary } from "../lib/company-package-cost-summary";
 
 export const companyPackageBody = z.object({
   requestId: z.string().uuid(), company: z.string().trim().min(1).max(200),
@@ -61,6 +62,7 @@ function projection(job: any) {
     phase: state.phase, company: state.intake.company, website: state.intake.website, error,
     createdAt: job.created_at, files: state.files, coverage: state.research?.coverage,
     reports: state.reports, emailSummary: state.emailSummary,
+    costs: companyPackageCostSummary(job.payload),
     productionVersion: job.payload.productionVersion,
     automaticCorrectionsApproved: hasCompilationCorrectionApproval(job.payload),
     canResumeWithAutomaticCorrections: canResumeCompilation(job, true),

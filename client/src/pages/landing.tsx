@@ -80,7 +80,7 @@ function TypewriterHero() {
     "drafts hooks across 6 angles and post formats (PAS/AIDA/STAR/4Ps) for any platform",
     "audits its own reasoning chains for causal validity (KisMATH R77.5)",
     "deterministically re-executes math chains for finance work",
-    "isolates every tenant — no cross-account leakage",
+    "uses scoped access controls for tenant data",
     "summarizes memory clusters via Louvain communities (R75)",
     "answers why-questions with extracted causal chains (R75)",
     "scores every memory by PageRank importance (R75)",
@@ -124,7 +124,7 @@ function TypewriterHero() {
 }
 
 const CURRENT_TRUST_SUBTITLE: Record<string, string> = {
-  subtitle: `${SOURCE_UPDATE_SUMMARY} Three HIGH review findings were fixed: disabled-tenant authorization for API-key and cached-identity activity checks, plus per-hop app-side DNS pinning. Four focused offline regressions pass. The wider tenant audit remains degraded and incomplete; this is not whole-app security certification.`,
+  subtitle: `${SOURCE_UPDATE_SUMMARY} Delivered HTML previews are isolated from workspace storage, and modern MCP keys require an active account. The wider tenant audit remains incomplete; this is not whole-app security certification.`,
 };
 
 function CurrentReleaseEvidence() {
@@ -156,13 +156,22 @@ function CurrentReleaseEvidence() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
               <p>
-                <strong className="text-foreground">AI Stack Decision Review:</strong> an owner-only preparation package with eight substantive documents—from the $350 pilot hypothesis and illustrative report to intake, evidence method, manual fulfillment/support, economics, launch drafts and templates. $350 is a hypothesis; customer-specific PDF, Markdown and CSV work remains manual. There is no checkout, booking flow or public product launch.
+                <strong className="text-foreground">Background work, not your conversations:</strong> owner-approved Lenovo processing turns screened internal runbooks into source-backed reference material. The overnight schedule is enabled. A Spark backup connection completed a real production probe; automatic switching during an outage is not yet proven. Questions and interactive troubleshooting stay on the main assistant route.
+              </p>
+              <p>
+                <strong className="text-foreground">Daily AI Insights:</strong> connected research agents can contribute to a shared research folder, with separate reviews and recommendations. A submitted idea is evidence to evaluate—not permission to change the system.
+              </p>
+              <p>
+                <strong className="text-foreground">Finished but Not Billed:</strong> a proposed $175 manual pilot for HVAC offices. Compare up to 30 coded completed jobs with invoice records and export a list for office review. The workbench does not receive payment, send invoices or store the batch on the server.
+              </p>
+              <p>
+                <strong className="text-foreground">Website Audit:</strong> when enabled, the owner can ask GLM 5.4 for a layout second opinion using a public or synthetic screenshot and its CSS. The feature suggests edits; it does not apply them or publish the site.
               </p>
               <p>
                 <strong className="text-foreground">Company reports:</strong> full-package continuation and review remain in development. The latest recorded run is blocked; final approved reports, narrated audio and verified delivery are still acceptance requirements, not completed customer outcomes.
               </p>
               <p>
-                <strong className="text-foreground">Focused production evidence:</strong> five guarded business pilots were verified on October 19. That evidence does not certify the wider platform.
+                <strong className="text-foreground">AI Stack Decision Review:</strong> an owner-only preparation package for a separate $350 pilot hypothesis. Customer-specific fulfillment remains manual; it is not a public launch or live checkout.
               </p>
             </CardContent>
           </Card>
@@ -175,13 +184,25 @@ function CurrentReleaseEvidence() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
               <p>
-                <strong className="text-foreground">Chat and quota recovery:</strong> disconnect handling distinguishes a true browser abort from normal request completion, and interrupted turns reconcile saved conversation state without blind resend advice. Provider cooldowns bound admission; they are not quota increases or an uptime guarantee. Development checks passed, but served-provider identity and production behavior are not established.
+                <strong className="text-foreground">Mellum and Spark relay:</strong> the owner production check returned the fixed answer 42 through Spark using the exact approved Mellum 2.1 model, 172 input / 3 output tokens and confirmed usage accounting. Server start-to-result time was 4.04 seconds, excluding the polling wait. This proves one real relay completion, not automatic failover under an actual outage.
               </p>
               <p>
-                <strong className="text-foreground">Gmail reconnect:</strong> a scoped form-navigation policy fixes the intended Google redirect. A synthetic PIN/302 browser check followed it without real credentials or consent; expired/revoked access still needs owner reauthorization, and publication is required.
+                <strong className="text-foreground">Bounded execution:</strong> direct-first routing, scoped worker credentials, model/guardrail validation and durable checkpoints constrain the backup transport. Unknown generation outcomes stop automatic replay. Release checks bind GitHub evidence to exact source candidates; optional connection-alert email remains off unless separately authorized.
               </p>
               <p>
-                <strong className="text-foreground">Audit status:</strong> three HIGH review findings were fixed: disabled-tenant authorization for API-key and cached-identity activity checks, and per-hop app-side DNS pinning. Four focused offline regressions pass. The wider tenant audit remains degraded and incomplete; this is not whole-app security certification.
+                <strong className="text-foreground">Source-review corrections:</strong> structured extraction now validates and pins public HTTPS connections before fetching, refusing redirects rather than checking their targets after contact. Unavailable snapshot-policy checks refuse dispatch. These targeted corrections are not a claim that every route or production integration passed an exhaustive audit.
+              </p>
+              <p>
+                <strong className="text-foreground">Working context:</strong> later turns can recall exact source excerpts for goals, decisions and corrections within the same authorized workspace scope. Recalled text is not instruction or approval, and assistant reports are not execution evidence.
+              </p>
+              <p>
+                <strong className="text-foreground">Owner models:</strong> GPT-6.2 Sol and Astra are explicit choices. GPT-6 Luna is an opt-in paid fallback for routine work when included routes are unavailable and rates qualify. Existing budget, jury and access controls are unchanged.
+              </p>
+              <p>
+                <strong className="text-foreground">Safer Play links:</strong> delivered HTML apps can run locally in the browser without access to the signed-in workspace's storage. The preview blocks background network requests and still allows downloading.
+              </p>
+              <p>
+                <strong className="text-foreground">Verification limits:</strong> the wider tenant audit remains incomplete. Backup access checks, release packaging and isolated Railway staging evidence do not establish production parity or whole-app security certification.
               </p>
             </CardContent>
           </Card>
@@ -346,7 +367,7 @@ const CAPABILITY_SECTIONS = [
     features: [
       { icon: Eye, label: "Live Vision Streaming", detail: "Meta Ray-Ban glasses stream point-of-view video frames over a tenant-isolated gateway. Felix and the specialist agents see what you see — read signs, identify products, analyze environments in real time." },
       { icon: Mic, label: "Sub-Second Voice Replies", detail: "Gemini Live handles bidirectional audio with conversational latency. Ask a question while walking; get an answer before you finish the next step. Full conversation history persists into your tenant memory." },
-      { icon: Key, label: "Per-Tenant Glasses Keys", detail: "Each pair of glasses authenticates with its own scoped key (`vc_glasses_*`). Gateway enforces tenant isolation, rate limits, and revocation — no cross-tenant data leakage even on shared hardware." },
+      { icon: Key, label: "Per-Tenant Glasses Keys", detail: "Each pair of glasses authenticates with its own scoped key. The gateway applies tenant access checks, rate limits, and key revocation." },
       { icon: Smartphone, label: "Hands-Free Workflow", detail: `Trigger governed voice-safe actions across the ${releaseFacts.metrics.registeredTools}-tool registry: 'log this expense', 'add to project notes', 'remind me at 3pm'. Available actions depend on your permissions and setup.` },
     ],
   },
@@ -737,7 +758,7 @@ const CAPABILITY_SECTIONS = [
     features: [
       { icon: Key, label: "API Key Hygiene", detail: "Scans for expired, weak, or overly-permissioned API keys. Detects keys without rotation policies and flags shared credentials." },
       { icon: ShieldCheck, label: "Governance Rule Audit", detail: "Validates all 41 governance rules are active and correctly configured. Flags disabled rules, missing categories, and coverage gaps." },
-      { icon: Users, label: "Tenant Isolation Check", detail: "Verifies complete data isolation between tenants. All queries tenant-scoped, admin operations gated, no cross-tenant data leakage." },
+      { icon: Users, label: "Tenant Isolation Check", detail: "Checks tenant scope and administrative authorization in reviewed paths. The wider tenant audit remains incomplete." },
       { icon: Activity, label: "Trust Score Validation", detail: "Audits agent trust scores across 9 categories. Flags anomalous trust levels, validates earned autonomy progression, and checks safety boundaries." },
     ],
   },

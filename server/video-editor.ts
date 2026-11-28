@@ -6,20 +6,58 @@
 //   3. 30ms audio fades at every cut so you never hear a pop.
 //   4. 2-word UPPERCASE caption chunks burned in via ffmpeg drawtext.
 //
-// Plays nicely with the existing mpeg-engine.ts conventions: same OUTPUT_DIR,
-// same ffmpeg locator, same {success, filePath, driveUrl} result shape.
+// Plays nicely with the existing mpeg-engine.ts conventions: same owner
+// OUTPUT_DIR, ffmpeg locator, and {success, filePath, driveUrl} result shape.
 
 import { execFileSync, execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 
 import { logSilentCatch } from "./lib/silent-catch";
-import { resolveUploadsChild } from "./uploads-path";
+import { currentTenantId } from "./lib/tenant-context";
+import { ADMIN_TENANT_ID } from "./tenant-constants";
+import { isPathWithin, resolveUploadsChild, UPLOADS_DIR } from "./uploads-path";
 const OUTPUT_DIR = path.resolve(process.cwd(), "project-assets");
 const TMP_DIR = path.resolve(OUTPUT_DIR, "video-editor-tmp");
+const WORKSPACE_ROOT = path.resolve("/home/runner/workspace");
 
-function ensureDirs() {
-  for (const d of [OUTPUT_DIR, TMP_DIR]) if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+export interface ResolvedInputPath {
+  filePath: string;
+  cleanup?: () => void;
+}
+
+function mediaOutputDirs(): { outputDir: string; tempDir: string } {
+  const tenantId = currentTenantId();
+  if (typeof tenantId !== "number" || !Number.isSafeInteger(tenantId) || tenantId <= 0) {
+    throw new Error("A trusted tenant context is required to write video-editor outputs");
+  }
+  if (tenantId === ADMIN_TENANT_ID) return { outputDir: OUTPUT_DIR, tempDir: TMP_DIR };
+  const outputDir = path.resolve(WORKSPACE_ROOT, "project-assets", `tenant-${tenantId}`, "video-editor");
+  return { outputDir, tempDir: path.join(outputDir, "tmp") };
+}
+
+function ensureDirs(outputDir: string, tempDir: string) {
+  const tenantId = currentTenantId();
+  for (const d of [outputDir, tempDir]) {
+    if (tenantId !== ADMIN_TENANT_ID) {
+      const tenantRoot = path.resolve(WORKSPACE_ROOT, "project-assets", `tenant-${tenantId}`);
+      if (!isPathWithin(tenantRoot, d)) throw new Error("Media output is outside the tenant namespace");
+      // Validate existing parents BEFORE recursive mkdir or private staging.
+      // A tenant directory symlink must not redirect verified bytes elsewhere.
+      let probe = d;
+      while (isPathWithin(tenantRoot, probe)) {
+        try {
+          if (fs.lstatSync(probe).isSymbolicLink()) throw new Error("Media output parent is a symlink");
+        } catch (error: any) {
+          if (error?.code !== "ENOENT") throw error;
+        }
+        const parent = path.dirname(probe);
+        if (parent === probe) break;
+        probe = parent;
+      }
+    }
+    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+  }
 }
 
 // R110.20 — bundled ffmpeg-static via shared helper.
@@ -52,14 +90,138 @@ function probeDuration(filePath: string): number {
   return n;
 }
 
-function resolveInputPath(input: string): string {
-  // Accept absolute paths, /uploads/<file>, or workspace-relative.
+export async function resolveInputPath(input: string, explicitTenantId?: number): Promise<ResolvedInputPath> {
+  const tenantId = currentTenantId();
+  if (typeof tenantId !== "number" || !Number.isSafeInteger(tenantId) || tenantId <= 0) {
+    throw new Error("A trusted tenant context is required to process a media source");
+  }
+  if (explicitTenantId !== undefined && explicitTenantId !== tenantId) {
+    throw new Error("Media source tenant does not match the authenticated tenant context");
+  }
+  if (typeof input !== "string" || input.length === 0) {
+    throw new Error("A media source path is required");
+  }
+
+  // Accept absolute paths, /uploads/<file>, or workspace-relative. The path is
+  // canonicalized before any file read or media-tool side effect.
+  let candidate: string;
   if (input.startsWith("/uploads/") || input.startsWith("uploads/")) {
     const fname = input.replace(/^\/?uploads\//, "");
-    return resolveUploadsChild(fname);
+    candidate = resolveUploadsChild(fname);
+  } else if (path.isAbsolute(input)) {
+    candidate = path.resolve(input);
+  } else {
+    candidate = path.resolve(process.cwd(), input);
   }
-  if (path.isAbsolute(input)) return input;
-  return path.resolve(process.cwd(), input);
+
+  const configuredRoots = [
+    { kind: "uploads" as const, root: UPLOADS_DIR },
+    { kind: "uploads" as const, root: path.resolve(WORKSPACE_ROOT, "uploads") },
+    { kind: "project-assets" as const, root: path.resolve(WORKSPACE_ROOT, "project-assets") },
+    { kind: "attached_assets" as const, root: path.resolve(WORKSPACE_ROOT, "attached_assets") },
+  ];
+  if (tenantId !== ADMIN_TENANT_ID) {
+    const lexicalRoot = configuredRoots.find(({ root }) => isPathWithin(root, candidate));
+    if (!lexicalRoot) {
+      throw new Error("Media source is outside tenant-owned uploads and project assets");
+    }
+    if (lexicalRoot.kind === "attached_assets") {
+      throw new Error("Shared attached_assets paths are not authorized for tenant media processing");
+    }
+    if (lexicalRoot.kind === "uploads" && !isPathWithin(UPLOADS_DIR, candidate)) {
+      throw new Error("Media source is outside the configured uploads root");
+    }
+    if (lexicalRoot.kind === "project-assets") {
+      const tenantRoot = path.resolve(lexicalRoot.root, `tenant-${tenantId}`);
+      if (!isPathWithin(tenantRoot, candidate)) {
+        throw new Error("Media source is outside this tenant's project-assets namespace");
+      }
+    }
+  }
+
+  let canonical: string;
+  try {
+    canonical = fs.realpathSync(candidate);
+    if (!fs.statSync(canonical).isFile()) throw new Error("Media source is not a regular file");
+  } catch (error) {
+    throw new Error(`Media source is unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  // The platform owner intentionally edits workspace media without a tenant
+  // asset row. Other tenants use verified upload bytes or the canonical
+  // project-assets/tenant-<id> namespace before these APIs can read media.
+  if (tenantId === ADMIN_TENANT_ID) return { filePath: canonical };
+
+  const canonicalRoots: Array<{ kind: "uploads" | "project-assets" | "attached_assets"; root: string }> = [];
+  for (const configured of configuredRoots) {
+    try {
+      const realRoot = fs.realpathSync(configured.root);
+      if (!canonicalRoots.some((entry) => entry.kind === configured.kind && entry.root === realRoot)) {
+        canonicalRoots.push({ kind: configured.kind, root: realRoot });
+      }
+    } catch (_silentErr) {
+      // A root that is not present cannot authorize a file.
+      if ((_silentErr as NodeJS.ErrnoException).code !== "ENOENT")
+        logSilentCatch("server/video-editor.ts", _silentErr);
+      continue;
+    }
+  }
+  const ownedRoot = canonicalRoots.find((entry) => isPathWithin(entry.root, canonical));
+  if (!ownedRoot) {
+    throw new Error("Media source is outside tenant-owned uploads, project assets, and attachments");
+  }
+
+  if (ownedRoot.kind === "uploads") {
+    // The existing helper returns bytes only after checking canonical path,
+    // all file_storage owners, and (when needed) the tenant-owned artifact hash.
+    // Never authorize a shared uploads path from project_files metadata alone.
+    const { readTenantDriveUploadBytes } = await import("./google-drive");
+    const verifiedBytes = await readTenantDriveUploadBytes(canonical, tenantId);
+    // Keep verified references inside the existing image-client path jail.
+    // The tenant-private directory and cleanup still prevent shared reuse.
+    const { outputDir, tempDir } = mediaOutputDirs();
+    ensureDirs(outputDir, tempDir);
+    const stagingDir = fs.mkdtempSync(path.join(tempDir, ".verified-source-"));
+    try {
+      fs.chmodSync(stagingDir, 0o700);
+      const stagedPath = path.join(stagingDir, `source${path.extname(canonical)}`);
+      fs.writeFileSync(stagedPath, verifiedBytes, { flag: "wx", mode: 0o600 });
+      return {
+        filePath: stagedPath,
+        cleanup: () => fs.rmSync(stagingDir, { recursive: true, force: true }),
+      };
+    } catch (error) {
+      fs.rmSync(stagingDir, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
+  if (ownedRoot.kind === "project-assets") {
+    // A DB association can name bytes in a shared directory, so project_files
+    // metadata alone is not read authority. Tenant-produced assets live only
+    // below this canonical tenant namespace.
+    const configuredRoot = configuredRoots.find((entry) => entry.kind === "project-assets")!.root;
+    let canonicalAssetsRoot: string;
+    let canonicalTenantRoot: string;
+    try {
+      canonicalAssetsRoot = fs.realpathSync(configuredRoot);
+      const tenantRoot = path.resolve(configuredRoot, `tenant-${tenantId}`);
+      canonicalTenantRoot = fs.realpathSync(tenantRoot);
+      if (canonicalTenantRoot !== path.resolve(canonicalAssetsRoot, `tenant-${tenantId}`)) {
+        throw new Error("Tenant asset root is not canonical");
+      }
+    } catch {
+      throw new Error("Tenant-owned project-assets namespace is unavailable");
+    }
+    if (!isPathWithin(canonicalTenantRoot, canonical)) {
+      throw new Error("Media source is outside this tenant's project-assets namespace");
+    }
+    return { filePath: canonical };
+  }
+
+  // attached_assets is a shared namespace. Customers need an existing
+  // verified-byte recovery path rather than a metadata-only association.
+  throw new Error("Shared attached_assets paths are not authorized for tenant media processing");
 }
 
 // ---------------------------------------------------------------------------
@@ -83,12 +245,20 @@ export interface TranscribeResult {
   error?: string;
 }
 
-export async function transcribeWords(input: string): Promise<TranscribeResult> {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) return { success: false, error: "ELEVENLABS_API_KEY not set" };
+export async function transcribeWords(input: string, tenantId?: number): Promise<TranscribeResult> {
+  let resolved: ResolvedInputPath;
+  try {
+    resolved = await resolveInputPath(input, tenantId);
+  } catch (error) {
+    return { success: false, error: `Access denied: ${error instanceof Error ? error.message : String(error)}` };
+  }
 
-  const filePath = resolveInputPath(input);
-  if (!fs.existsSync(filePath)) return { success: false, error: `File not found: ${filePath}` };
+  const filePath = resolved.filePath;
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    resolved.cleanup?.();
+    return { success: false, error: "ELEVENLABS_API_KEY not set" };
+  }
 
   try {
     const fileBuf = fs.readFileSync(filePath);
@@ -137,6 +307,8 @@ export async function transcribeWords(input: string): Promise<TranscribeResult> 
     };
   } catch (e: any) {
     return { success: false, error: `Transcription failed: ${e.message}` };
+  } finally {
+    resolved.cleanup?.();
   }
 }
 
@@ -238,16 +410,29 @@ export interface RenderResult {
   error?: string;
 }
 
-export async function renderEDL(sourcePath: string, segments: KeepSegment[], opts: RenderOptions = {}): Promise<RenderResult> {
-  ensureDirs();
-  const ffmpeg = getFFmpegPath();
-  const src = resolveInputPath(sourcePath);
-  if (!fs.existsSync(src)) return { success: false, error: `Source not found: ${src}` };
+export async function renderEDL(sourcePath: string, segments: KeepSegment[], opts: RenderOptions = {}, tenantId?: number): Promise<RenderResult> {
   if (!segments.length) return { success: false, error: "No segments to render" };
+  let resolved: ResolvedInputPath;
+  try {
+    resolved = await resolveInputPath(sourcePath, tenantId);
+  } catch (error) {
+    return { success: false, error: `Access denied: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  try {
+    return await renderResolvedEDL(resolved.filePath, segments, opts);
+  } finally {
+    resolved.cleanup?.();
+  }
+}
+
+async function renderResolvedEDL(src: string, segments: KeepSegment[], opts: RenderOptions): Promise<RenderResult> {
+  const { outputDir, tempDir } = mediaOutputDirs();
+  ensureDirs(outputDir, tempDir);
+  const ffmpeg = getFFmpegPath();
 
   const audioFade = (opts.audioFadeMs ?? 30) / 1000;
   const outName = (opts.outputName || `cut-${Date.now()}`).replace(/[^a-z0-9._-]/gi, "_");
-  const outPath = path.join(OUTPUT_DIR, `${outName}.mp4`);
+  const outPath = path.join(outputDir, `${outName}.mp4`);
 
   // Cut each segment to its own file with ffmpeg, applying afade in/out so cuts are pop-free.
   const segFiles: string[] = [];
@@ -255,7 +440,7 @@ export async function renderEDL(sourcePath: string, segments: KeepSegment[], opt
     for (let i = 0; i < segments.length; i++) {
       const s = segments[i];
       const dur = Math.max(0.04, s.end - s.start);
-      const segPath = path.join(TMP_DIR, `${outName}-seg${String(i).padStart(4, "0")}.ts`);
+      const segPath = path.join(tempDir, `${outName}-seg${String(i).padStart(4, "0")}.ts`);
       const fadeIn = audioFade;
       const fadeOut = Math.min(audioFade, dur / 2);
       const args = [
@@ -273,7 +458,7 @@ export async function renderEDL(sourcePath: string, segments: KeepSegment[], opt
     // Concat via the demuxer (proven reliable in mpeg-engine.ts) — handles
     // variable-frame-rate and non-zero start timestamps better than the
     // concat: protocol.
-    const listPath = path.join(TMP_DIR, `${outName}.concat.txt`);
+    const listPath = path.join(tempDir, `${outName}.concat.txt`);
     fs.writeFileSync(listPath, segFiles.map(f => `file '${path.resolve(f).replace(/'/g, "'\\''")}'`).join("\n"));
     try {
       // R74.13z-quint+10: -movflags +faststart relocates the moov atom to the
@@ -338,12 +523,25 @@ function escapeDrawtext(s: string): string {
   return s.replace(/[\\':;\[\]{}()%#=@&!<>^~`|"]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export async function burnCaptions(sourcePath: string, words: WordToken[], opts: BurnCaptionOptions = {}): Promise<RenderResult> {
-  ensureDirs();
-  const ffmpeg = getFFmpegPath();
-  const src = resolveInputPath(sourcePath);
-  if (!fs.existsSync(src)) return { success: false, error: `Source not found: ${src}` };
+export async function burnCaptions(sourcePath: string, words: WordToken[], opts: BurnCaptionOptions = {}, tenantId?: number): Promise<RenderResult> {
   if (!words.length) return { success: false, error: "No words provided" };
+  let resolved: ResolvedInputPath;
+  try {
+    resolved = await resolveInputPath(sourcePath, tenantId);
+  } catch (error) {
+    return { success: false, error: `Access denied: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  try {
+    return await burnCaptionsResolved(resolved.filePath, words, opts);
+  } finally {
+    resolved.cleanup?.();
+  }
+}
+
+async function burnCaptionsResolved(src: string, words: WordToken[], opts: BurnCaptionOptions): Promise<RenderResult> {
+  const { outputDir, tempDir } = mediaOutputDirs();
+  ensureDirs(outputDir, tempDir);
+  const ffmpeg = getFFmpegPath();
 
   // R110.20 — bundled ffmpeg-static lacks the `drawtext` filter (johnvansickle
   // GPL build ships without libfreetype configure). Probe capabilities BEFORE
@@ -368,7 +566,7 @@ export async function burnCaptions(sourcePath: string, words: WordToken[], opts:
   }
 
   const outName = (opts.outputName || `captioned-${Date.now()}`).replace(/[^a-z0-9._-]/gi, "_");
-  const outPath = path.join(OUTPUT_DIR, `${outName}.mp4`);
+  const outPath = path.join(outputDir, `${outName}.mp4`);
   const chunks = chunkWords(words, opts.wordsPerChunk ?? 2, opts.upperCase !== false);
 
   const fontSize = opts.fontSize ?? 64;
@@ -388,7 +586,7 @@ export async function burnCaptions(sourcePath: string, words: WordToken[], opts:
   }).join(",");
 
   // ffmpeg has filter graph length limits — write to a script file when long.
-  const scriptPath = path.join(TMP_DIR, `${outName}.filter`);
+  const scriptPath = path.join(tempDir, `${outName}.filter`);
   fs.writeFileSync(scriptPath, drawtexts);
   try {
     execFileSync(ffmpeg, [

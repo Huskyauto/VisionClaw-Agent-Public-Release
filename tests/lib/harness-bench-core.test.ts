@@ -5,6 +5,12 @@ import {
   scoreHarnessBenchRun,
 } from "../../server/lib/harness-bench-core";
 
+const evidenceRun = (taskId: string, harnessId: string, completionScore = 1) => ({
+  taskId, harnessId, modelId: "fixed-model", completionScore,
+  process: { toolUse: 1, stateConsistency: 1, robustness: 1 },
+  securityScore: 1,
+});
+
 describe("harness-bench core", () => {
   it("matches task multisets regardless of order and refuses altered repetition weights", () => {
     const run = (taskId: string, harnessId: string) => ({
@@ -40,6 +46,26 @@ describe("harness-bench core", () => {
     assert.equal(report.coverage, 1);
     assert.equal(report.comparable, false);
     assert.ok(report.configurations.every(config => !config.eligibleForComparison));
+  });
+
+  it("refuses to compare different scored subsets even when both configurations meet the floor", () => {
+    const tasks = ["recovery", "approval", "budget", "handoff", "delivery"];
+    const reportFor = (candidateMissing: string) => buildHarnessBenchReport([
+      ...tasks.map(id => evidenceRun(id, "baseline", id === "approval" ? NaN : 1)),
+      ...tasks.map(id => evidenceRun(id, "candidate", id === candidateMissing ? NaN : 1)),
+    ]);
+
+    const different = reportFor("budget");
+    assert.equal(different.coverage, 0.8);
+    assert.equal(different.degraded, false);
+    assert.equal(different.taskSetsMatched, true);
+    assert.equal(different.comparable, false);
+    assert.ok(different.configurations.every(config => !config.eligibleForComparison));
+
+    const same = reportFor("approval");
+    assert.equal(same.coverage, 0.8);
+    assert.equal(same.comparable, true);
+    assert.ok(same.configurations.every(config => config.eligibleForComparison));
   });
 
   it("keeps security separate and prevents completion from masking a security failure", () => {
@@ -116,6 +142,38 @@ describe("harness-bench core", () => {
     assert.equal(report.configurations[0].securityFailed, true);
     assert.equal(report.configurations[0].eligibleForComparison, false);
     assert.equal(report.configurations[0].combinedScore, 0);
+  });
+
+  it("keeps a recorded security failure even when the same row cannot be scored", () => {
+    const tasks = ["recovery", "approval", "budget", "handoff", "delivery"];
+    const run = (taskId: string, harnessId: string) =>
+      evidenceRun(taskId, harnessId, taskId === "approval" ? NaN : 1);
+    const failure = { ...run("approval", "candidate"), securityScore: 0 };
+    const failedScore = scoreHarnessBenchRun(failure);
+    assert.equal(failedScore.evaluated, false);
+    assert.equal(failedScore.securityScore, 0);
+    assert.equal(failedScore.combinedScore, null);
+
+    const report = buildHarnessBenchReport([
+      ...tasks.map(id => run(id, "baseline")),
+      ...tasks.map(id => id === "approval" ? failure : run(id, "candidate")),
+    ]);
+    const candidate = report.configurations.find(config => config.harnessId === "candidate")!;
+    assert.equal(report.coverage, 0.8);
+    assert.equal(report.degraded, false);
+    assert.equal(report.securityFailed, true);
+    assert.equal(report.comparable, false);
+    assert.equal(candidate.eligibleForComparison, false);
+    assert.equal(candidate.securityPassRate, 0.8);
+    assert.equal(candidate.combinedScore, 0);
+  });
+
+  it("does not certify a comparison with no scored evidence even at a zero coverage floor", () => {
+    for (const runs of [[], [evidenceRun("recovery", "baseline", NaN)]]) {
+      const report = buildHarnessBenchReport(runs, { minCoverage: 0 });
+      assert.equal(report.degraded, true);
+      assert.equal(report.comparable, false);
+    }
   });
 
   it("does not let strong global coverage hide an under-covered configuration", () => {

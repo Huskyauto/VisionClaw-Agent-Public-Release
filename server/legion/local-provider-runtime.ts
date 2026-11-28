@@ -3,6 +3,11 @@ import { legionRequest } from "./proxy-client";
 import { surfaceRequest } from "./surface-client";
 import { createLocalBackgroundRouter, selectLocalBackgroundProvider, SURFACE_MODEL, type AcceptLocalResponse } from "./local-router";
 import { localParallelEnabled, withLocalInferenceSlot } from "./local-slots";
+import { localMemoryTaskPolicy } from "./memory-tasks";
+import { LEGION_MODEL, LEGION_REASONING_MODEL } from "./model-policy";
+import { randomUUID } from "node:crypto";
+import { createSparkFallback } from "./spark-relay-fallback";
+import { sparkRelayAvailable, currentSparkRelayWork, requestSparkRelay, sparkRelayStore } from "./spark-relay-runtime";
 
 // Exact owner opt-in. No new credential or daemon.
 export const surfaceLocalEnabled = () =>
@@ -24,33 +29,52 @@ export async function checkLocalCapacity(signal?: AbortSignal, simple = false) {
   await selectLocalBackgroundProvider({
     surfaceEnabled: () => surfaceLocalEnabled() && (!localParallelEnabled() || simple),
     surfaceHealth: () => { signal?.throwIfAborted(); return checkSurfaceHealth(signal); },
-    legionHealth: () => checkLegionHealth(signal),
+    legionHealth: async () => {
+      try { await checkLegionHealth(signal); }
+      catch (error) {
+        signal?.throwIfAborted();
+        if (!(await sparkRelayAvailable())) throw error;
+      }
+    },
   });
 }
 
 export function dispatchLocalBackground(body: Record<string, any>, signal: AbortSignal, accept: AcceptLocalResponse,
   task = "compile-runbook") {
-  const simple = localParallelEnabled() && task === "extract-runbook-rule";
+  const memoryPolicy = localMemoryTaskPolicy(task);
+  const simple = localParallelEnabled() && (task === "extract-runbook-rule" || memoryPolicy?.simple === true);
+  const assertActive = () => {
+    signal.throwIfAborted();
+    if (!legionBackgroundEnabled()) throw Error("Local background disabled");
+    if (task.startsWith("routine-") && (process.env.LEGION_ROUTINE_ENABLED !== "1" ||
+        process.env.APP_ACCESS_MODE !== "owner-only")) throw Error("Routine local routing disabled");
+  };
+  const workId = currentSparkRelayWork() ?? randomUUID();
+  const transport = createSparkFallback({
+    assertActive,
+    eligible: ["compile-runbook", "extract-runbook-rule"].includes(task),
+    directHealth: () => checkLegionHealth(signal),
+    relayAvailable: sparkRelayAvailable,
+    retainedRelay: async () => currentSparkRelayWork() !== undefined &&
+      !!(await sparkRelayStore.find(1, body, task, workId)),
+    relayGenerate: value => requestSparkRelay(value, signal, task, workId),
+    directGenerate: value => withLocalInferenceSlot("legion-local", signal, active =>
+      legionRequest(legionProxyPort(), "/v1/chat/completions", value, memoryPolicy ? 45_000 : 90_000, active)),
+  });
   return createLocalBackgroundRouter({
-    preferred: simple ? "surface-local" : "legion-local",
-    assertActive: () => {
-      signal.throwIfAborted();
-      if (!legionBackgroundEnabled()) throw Error("Local background disabled");
-    },
-    surfaceEnabled: () => surfaceLocalEnabled() && (!localParallelEnabled() || simple),
+    preferred: "legion-local",
+    legionRetryModels: [task === "dream-proposals" ? LEGION_REASONING_MODEL : LEGION_MODEL],
+    assertActive,
+    surfaceEnabled: () => surfaceLocalEnabled() &&
+      (memoryPolicy ? memoryPolicy.simple : (!localParallelEnabled() || simple)),
     surfaceHealth: () => checkSurfaceHealth(signal),
     surfaceGenerate: value => {
       signal.throwIfAborted();
       if (!surfaceLocalEnabled()) throw Error("Surface disabled before dispatch");
       return withLocalInferenceSlot("surface-local", signal, active =>
-        surfaceRequest(legionProxyPort(), "/v1/chat/completions", value, 90_000, active));
+        surfaceRequest(legionProxyPort(), "/v1/chat/completions", value, memoryPolicy ? 35_000 : 90_000, active));
     },
-    legionHealth: () => checkLegionHealth(signal),
-    legionGenerate: value => {
-      signal.throwIfAborted();
-      if (!legionBackgroundEnabled()) throw Error("Local background disabled before dispatch");
-      return withLocalInferenceSlot("legion-local", signal, active =>
-        legionRequest(legionProxyPort(), "/v1/chat/completions", value, 90_000, active));
-    },
-  })(body, accept);
+    legionHealth: transport.health,
+    legionGenerate: transport.generate,
+  })(body, candidate => transport.accept(candidate, accept));
 }

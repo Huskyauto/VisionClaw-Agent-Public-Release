@@ -1,14 +1,20 @@
 #!/usr/bin/env tsx
 /**
  * Deterministic release gate. This performs no model calls and never changes
- * the application. A clean result requires an authoritative completed audit.
+ * the application. Both policies require an authoritative completed audit:
+ * either current full-audit evidence, or the preserved baseline plus exact
+ * independently accepted current-source/delta evidence.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { computeTenantAuditEvidenceHash } from "./lib/tenant-audit-evidence-hash";
+import { verifyIncrementalReadiness } from "./lib/republish-incremental-readiness";
 
 const root = path.resolve(process.env.AUDIT_EVIDENCE_ROOT || ".");
-const reportPath = path.resolve(process.env.AUDIT_REPORT_JSON || path.join(root, "data/tenant-isolation-audit/latest.json"));
+const incremental = fs.existsSync(path.join(root, ".local/republication-triage/acceptance.json"));
+const baselineReportPath = path.join(root, "generated-artifacts/republish-audit-baseline/data/tenant-isolation-audit/latest.json");
+const reportPath = incremental ? baselineReportPath
+  : path.resolve(process.env.AUDIT_REPORT_JSON || path.join(root, "data/tenant-isolation-audit/latest.json"));
 const checkpointPath = path.resolve(process.env.AUDIT_CHECKPOINT_JSON || path.join(root, "data/tenant-isolation-audit/checkpoint.json"));
 
 function fail(reason: string): never {
@@ -16,11 +22,16 @@ function fail(reason: string): never {
   process.exit(1);
 }
 
+if (incremental && process.env.AUDIT_REPORT_JSON &&
+    path.resolve(process.env.AUDIT_REPORT_JSON) !== baselineReportPath)
+  fail("baseline-plus-review requires the preserved baseline report, not an override");
 if (!fs.existsSync(reportPath)) fail("authoritative tenant-isolation report is missing");
-if (fs.existsSync(checkpointPath)) fail("tenant-isolation audit checkpoint still exists");
+if (!incremental && fs.existsSync(checkpointPath)) fail("tenant-isolation audit checkpoint still exists");
 
 let report: any;
 try {
+  if (!fs.lstatSync(reportPath).isFile() || fs.realpathSync(reportPath) !== reportPath)
+    fail("authoritative tenant-isolation report is not a regular evidence file");
   report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
 } catch {
   fail("tenant-isolation report is not valid JSON");
@@ -49,11 +60,13 @@ if (!Array.isArray(report.findings) || !Array.isArray(report.suppressed) || !Arr
   fail("audit report shape is incomplete");
 }
 
-const currentEvidenceHash = computeTenantAuditEvidenceHash(root);
+const currentEvidenceHash = incremental ? undefined : computeTenantAuditEvidenceHash(root);
 if (
+  !incremental && (
   typeof report.evidenceHash !== "string" ||
   report.evidenceHash.length !== 64 ||
   report.evidenceHash !== currentEvidenceHash
+  )
 ) {
   fail("audit report does not match the current server/audit inputs");
 }
@@ -81,6 +94,18 @@ if (dispositionKeys.size !== rawKeys.size || report.severeDispositions.length !=
 
 const kept = report.severeDispositions.filter((f: any) => f.disposition === "kept");
 const deferred = report.severeDispositions.filter((f: any) => f.disposition === "deferred-real-risk");
+if (incremental) {
+  try {
+    verifyIncrementalReadiness(root, report, fs.readFileSync(reportPath));
+  } catch (error) {
+    fail(`baseline-plus-review rejected: ${error instanceof Error ? error.message : "invalid evidence"}`);
+  }
+  if (fs.existsSync(checkpointPath))
+    console.log("[republish-readiness] Separate audit checkpoint preserved; not completion evidence");
+  console.log(`[republish-readiness] READY: verified audit baseline + independent delta/disposition review; ` +
+    `${kept.length + deferred.length} retained allegations accounted for; no publish authority`);
+  process.exit(0);
+}
 if (kept.length > 0 || deferred.length > 0) {
   fail(`${kept.length} kept CRITICAL/HIGH finding(s) and ${deferred.length} deferred real-risk finding(s) remain`);
 }

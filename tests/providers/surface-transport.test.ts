@@ -50,6 +50,8 @@ test("transport pins the Surface destination through the existing proxy and refu
     [10551, "/v1/models", {}, 2500],
     [10551, "/v1/chat/completions", { model: SURFACE_MODEL, stream: true, max_tokens: 8 }, 90_000],
     [10551, "/v1/chat/completions", { model: "phi-3.5-mini", stream: true }, 90_000],
+    [10551, "/v1/chat/completions", { model: "qwen2.5-7b-instruct-qnn-npu:3", stream: true, temperature: 0,
+      messages: [{ role: "user", content: "Retired model must never dispatch" }] }, 90_000],
   ] as any[]) await assert.rejects(transport(port, path, body, timeout));
   assert.equal(calls.length, 1);
 });
@@ -85,11 +87,12 @@ test("only explicit unloaded-model HTTP errors are classified as node-away; redi
 });
 
 test("stream validation refuses truncation, tools, wrong models, oversized output and unfinished events", () => {
-  for (const scenario of ["truncated", "tools", "wrong-model", "oversized", "unfinished", "post-terminal"]) {
+  for (const scenario of ["truncated", "tools", "wrong-model", "retired-npu", "oversized", "unfinished", "post-terminal"]) {
     const decoder = new SurfaceStreamDecoder();
     const event = (value: any) => decoder.push(Buffer.from(`data: ${JSON.stringify(value)}\n\n`));
     assert.throws(() => {
-      event({ model: scenario === "wrong-model" ? "phi-3.5-mini" : SURFACE_MODEL,
+      event({ model: scenario === "wrong-model" ? "phi-3.5-mini"
+        : scenario === "retired-npu" ? "qwen2.5-7b-instruct-qnn-npu:3" : SURFACE_MODEL,
         choices: [{ index: 0, delta: scenario === "tools" ? { tool_calls: [{}] } : {
           content: scenario === "oversized" ? "x".repeat(12_001) : "synthetic",
         }, finish_reason: scenario === "truncated" ? "length" : "stop" }] });

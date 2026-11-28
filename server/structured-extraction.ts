@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as crypto from "crypto";
 import { logSilentCatch } from "./lib/silent-catch";
+import { ssrfSafeFetchBytes } from "./lib/ssrf-jail";
 // @ts-ignore - jsdom types not bundled
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
@@ -138,53 +139,15 @@ type Recipe = {
 type RecipeStore = { recipes: Recipe[] };
 
 async function fetchHtml(url: string): Promise<string> {
-  const safety = isSafeUrl(url);
-  if (!safety.ok) throw new Error(`unsafe url: ${safety.reason}`);
-  // DNS-rebinding defense: resolve the hostname and reject if any A/AAAA
-  // record points to a private network. A literal-IP hostname short-circuits
-  // inside isSafeDns.
-  const hostname = new URL(url).hostname.toLowerCase();
-  const dnsSafety = await isSafeDns(hostname);
-  if (!dnsSafety.ok) throw new Error(`unsafe url: ${dnsSafety.reason}`);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const resp = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; VisionClawAgent/1.0; +https://agenticcorporation.net)",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "follow",
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    // Re-check the final URL after redirects (defense in depth) — both URL shape and DNS
-    const finalSafety = isSafeUrl(resp.url || url);
-    if (!finalSafety.ok) throw new Error(`unsafe redirect target: ${finalSafety.reason}`);
-    if (resp.url && resp.url !== url) {
-      const finalHost = new URL(resp.url).hostname.toLowerCase();
-      const finalDns = await isSafeDns(finalHost);
-      if (!finalDns.ok) throw new Error(`unsafe redirect target: ${finalDns.reason}`);
-    }
-    // Cap response size to prevent memory exhaustion
-    const reader = resp.body?.getReader();
-    if (!reader) return await resp.text();
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_HTML_RESPONSE_BYTES) {
-        try { reader.cancel(); } catch (_silentErr) { logSilentCatch("server/structured-extraction.ts", _silentErr); }
-        throw new Error(`response exceeds ${MAX_HTML_RESPONSE_BYTES} bytes`);
-      }
-      chunks.push(value);
-    }
-    return Buffer.concat(chunks.map(c => Buffer.from(c))).toString("utf-8");
-  } finally {
-    clearTimeout(timer);
-  }
+  // Validate before connecting, pin the checked addresses, and refuse redirects.
+  // A post-fetch URL check cannot undo a request already sent to a private host.
+  const result = await ssrfSafeFetchBytes(url, {
+    timeoutMs: FETCH_TIMEOUT_MS,
+    maxBytes: MAX_HTML_RESPONSE_BYTES,
+    userAgent: "Mozilla/5.0 (compatible; VisionClawAgent/1.0; +https://agenticcorporation.net)",
+  });
+  if (!result.ok) throw new Error(`unsafe or unavailable source: ${result.reason}`);
+  return result.bytes.toString("utf-8");
 }
 
 export async function readabilityExtract(url: string): Promise<{

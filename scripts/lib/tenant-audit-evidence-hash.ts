@@ -15,6 +15,7 @@ const INCLUDED_CONFIG = [
   "scripts/lib/tenant-audit-unit-ledger.ts",
   "scripts/lib/tenant-audit-deadline.ts",
   "scripts/lib/tenant-audit-precision-cache.ts",
+  "scripts/lib/tenant-audit-coordinator.ts",
   "scripts/lib/tenant-audit-paid-attempts.ts",
   "scripts/lib/triage-verdict-match.ts",
   "shared/schema.ts",

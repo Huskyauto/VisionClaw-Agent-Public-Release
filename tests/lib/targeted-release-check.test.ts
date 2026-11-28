@@ -1,6 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+test("Spark alerts and shared identity/schema paths retain broad release coverage", () => {
+  const scope = classifyReleaseScope([
+    "server/health-monitor.ts", "server/routes/api-v1.ts", "shared/schema.ts",
+    "server/tenant-constants.ts", "server/tools/lib/tenant-constants.ts",
+    "server/legion/background-runtime.ts", "server/legion/local-slots.ts",
+    "server/legion/nightly.ts", "server/legion/spark-relay-alert-runtime.ts",
+    "server/legion/spark-relay-alert-store.ts", "server/legion/spark-relay-alerts.ts",
+    "tests/providers/spark-relay-alerts.test.ts",
+  ]);
+  assert.deepEqual(scope.unknown, []);
+  for (const file of [
+    "tests/providers/spark-relay-alerts.test.ts",
+    "tests/providers/spark-relay-api.test.ts",
+    "tests/lib/mcp-api-keys.test.ts",
+    "tests/security/tenant-auth-revocation.test.ts",
+    "tests/security/structured-extraction-fetch-boundary.test.ts",
+    "tests/security/tnr-plumbing-fail-closed.test.ts",
+    "tests/security/backup-confidentiality.test.ts",
+  ]) assert.ok(scope.tests.includes(file), `missing shared-boundary check ${file}`);
+});
+
 test("landing release cards select the full source-surface regression set", () => {
   const scope = classifyReleaseScope(["client/src/components/recent-platform-updates.tsx"]);
   assert.deepEqual(scope.unknown, []);
@@ -14,6 +35,143 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { classifyReleaseScope, digestReleaseInputs, releaseInputPaths, sameReleaseMembership, runBoundedReleaseCommand } from "../../scripts/lib/targeted-release-check";
 import { buildDataPolicy } from "../../scripts/lib/build-data-policy";
+import { isReleaseRuntimeArtifact } from "../../scripts/lib/release-runtime-artifacts";
+
+test("Felix diagnostics classify their exact source and menu changes and select both probe regressions", () => {
+  const scope = classifyReleaseScope([
+    "server/legion/felix-diagnostics.ts", "server/legion/felix-diagnostics-runtime.ts",
+    "server/tool-router.ts", "server/tools/domains/system/definitions.ts",
+    "tests/providers/legion-felix-diagnostics.test.ts", "tests/providers/legion-felix-runtime.test.ts",
+    "tests/tools/schema-discovery-routing.test.ts",
+  ]);
+  assert.deepEqual(scope.unknown, []);
+  for (const path of ["tests/providers/legion-felix-diagnostics.test.ts",
+    "tests/providers/legion-felix-runtime.test.ts", "tests/tools/schema-discovery-routing.test.ts"])
+    assert.ok(scope.tests.includes(path), `missing Felix diagnostic regression ${path}`);
+});
+
+test("the pending full-app source delta has explicit bounded feature and deployment mappings", () => {
+  const pendingCodePaths = [
+    ".agents/skills/post-edit-code-review/SKILL.md", ".agents/skills/post-edit-pipeline/SKILL.md",
+    ".dockerignore", ".github/workflows/docs.yml", "client/src/App.tsx",
+    "client/src/components/business-pilots/health-workbench.tsx", "client/src/hooks/use-site-config.ts",
+    "client/src/pages/admin-finished-not-billed.tsx",
+    "data/feature-contracts/agent-working-context/plan.md",
+    "data/feature-contracts/agent-working-context/spec.md",
+    "data/feature-contracts/agent-working-context/verification.md",
+    "data/feature-contracts/finished-but-not-billed/plan.md",
+    "data/feature-contracts/finished-but-not-billed/spec.md",
+    "data/feature-contracts/laptop-memory-work/plan.md",
+    "data/feature-contracts/laptop-memory-work/spec.md",
+    "scripts/lib/release-runtime-artifacts.ts", "tests/lib/release-runtime-artifacts.test.ts",
+    "scripts/lib/remote-release-tree.ts",
+    "tests/lib/remote-release-tree.test.ts",
+    "scripts/lib/publish-workspace-boundary.cjs", "scripts/prepare-publish-snapshot.cjs",
+    "scripts/surface-local-preflight.ts", "scripts/verify-counts.ts",
+    "server/agentic/cost-ledger.ts", "server/auto-consolidation.ts", "server/chat-engine.ts",
+    "server/chat-engine/project-context.ts", "server/context-window-guard.ts", "server/firecrawl.ts",
+    "server/google-drive.ts", "server/insights-engine.ts", "server/job-spool.ts",
+    "server/lib/agent-working-context.ts", "server/lib/backup-confidentiality.ts",
+    "server/lib/gpt-6-2.ts", "server/lib/mcp-api-keys.ts", "server/lib/owner-frontier-refresh.ts",
+    "server/lib/owner-service-offerings.ts", "server/lib/stream-create-timeout.ts",
+    "server/lib/stripe-migration-retry.ts", "server/lib/subscription-jury-recovery.ts",
+    "server/memory-graph.ts", "server/memory-intelligence.ts", "server/minerva-planner.ts",
+    "server/moa.ts", "server/model-registry.ts", "server/resource-predictor.ts", "server/site-config.ts",
+    "server/tools/domains/income-opportunities/handlers.ts",
+    "server/tools/domains/multiagent/definitions.ts", "server/tools/domains/web/definitions.ts",
+    "server/working-context-store.ts", "server/working-context.ts", "shared/lib/finished-not-billed.ts",
+    "tests/deployment/publish-snapshot.test.cjs", "tests/docker-release-facts-context.test.ts",
+    "tests/lib/agent-working-context.test.ts", "tests/lib/startup-readiness-contract.test.ts",
+    "tests/lib/working-context-preview-comparison.test.ts", "tests/lib/working-context-service.test.ts",
+    "tests/lib/working-context-wiring.test.ts", "tests/minerva-s6-lifecycle-projection.test.ts",
+    "tests/providers/gpt-6-2.test.ts", "tests/providers/surface-transport.test.ts",
+    "tests/queue/spool.test.ts", "tests/security/app-review-followthrough.test.ts",
+    "tests/security/backup-confidentiality.test.ts", "tests/security/reviewer-bias-guard.test.ts",
+    "tests/storage/agent-working-context-isolation.test.ts", "tests/unit/finished-not-billed.test.ts",
+    "tests/unit/firecrawl-v2.test.ts", "tests/unit/owner-frontier-refresh.test.ts",
+  ];
+  const scope = classifyReleaseScope(pendingCodePaths);
+  assert.deepEqual(scope.unknown, []);
+  for (const area of ["packaging", "working-context", "finished-not-billed", "chat-runtime",
+    "memory-runtime", "backup-safety", "provider-runtime", "agent-runtime", "queue-runtime",
+    "billing-runtime", "business-operations", "owner-operations"]) {
+    assert.ok(scope.areas.includes(area), `missing pending-code area ${area}`);
+  }
+  for (const testPath of [
+    "tests/deployment/publish-snapshot.test.cjs",
+    "tests/lib/working-context-service.test.ts",
+    "tests/storage/agent-working-context-isolation.test.ts",
+    "tests/unit/finished-not-billed.test.ts",
+    "tests/unit/chat-context-provenance.test.ts",
+    "tests/memory/temporal-triple-store.test.ts",
+    "tests/security/backup-confidentiality.test.ts",
+    "tests/providers/gpt-6-2.test.ts",
+    "tests/lib/mcp-api-keys.test.ts",
+    "tests/lib/google-drive-permissions.test.ts",
+    "tests/security/publish-preflight.test.ts",
+    "tests/unit/subscription-jury-recovery.test.ts",
+    "tests/minerva-s6-lifecycle-projection.test.ts",
+    "tests/queue/spool.test.ts",
+  ]) assert.ok(scope.tests.includes(testPath), `missing pending-code regression ${testPath}`);
+  for (const testPath of [
+    "tests/security/tenant-audit-blockers.test.ts",
+    "tests/security/tenant-audit-blocker-batch.test.ts",
+    "tests/security/residual-tenant-audit.test.ts",
+  ]) assert.ok(scope.tests.includes(testPath), `missing combined known-risk boundary ${testPath}`);
+  assert.deepEqual(classifyReleaseScope([
+    ".agents/skills/post-edit-code-review/SKILL.md",
+    ".agents/skills/post-edit-pipeline/SKILL.md",
+    ".github/workflows/docs.yml",
+  ]).areas, ["known-problems", "release-tooling"]);
+  assert.ok(classifyReleaseScope([".dockerignore"]).areas.includes("packaging"));
+});
+
+test("application shared entrypoints select unions, while unknown future paths still fail closed", () => {
+  for (const entrypoint of ["client/src/App.tsx", "server/index.ts", "server/routes.ts"]) {
+    const scope = classifyReleaseScope([entrypoint]);
+    assert.deepEqual(scope.unknown, [], entrypoint);
+    for (const testPath of [
+      "tests/unit/finished-not-billed.test.ts",
+      "tests/lib/working-context-service.test.ts",
+      "tests/unit/chat-context-provenance.test.ts",
+      "tests/security/backup-confidentiality.test.ts",
+      "tests/providers/gpt-6-2.test.ts",
+      "tests/lib/mcp-api-keys.test.ts",
+      "tests/lib/google-drive-permissions.test.ts",
+      "tests/deployment/publish-snapshot.test.cjs",
+      "tests/security/uploads-read-tenant-gate.test.ts",
+    ]) assert.ok(scope.tests.includes(testPath), `${entrypoint}: missing union member ${testPath}`);
+  }
+  assert.deepEqual(classifyReleaseScope(["server/working-context/new-boundary.ts"]).unknown,
+    ["server/working-context/new-boundary.ts"]);
+  assert.deepEqual(classifyReleaseScope([".agents/skills/post-edit-future/SKILL.md"]).unknown,
+    [".agents/skills/post-edit-future/SKILL.md"]);
+});
+
+test("Lenovo feature contracts select local inference checks without admitting unknown contracts", () => {
+  const scope = classifyReleaseScope([
+    "data/feature-contracts/legion-mellum-offload/plan.md",
+    "data/feature-contracts/legion-mellum-offload/spec.md",
+    "data/feature-contracts/unreviewed-feature/spec.md",
+  ]);
+  assert.deepEqual(scope.unknown, ["data/feature-contracts/unreviewed-feature/spec.md"]);
+  assert.ok(scope.tests.includes("tests/providers/legion-mellum-policy.test.ts"));
+});
+
+test("benchmark and scheduled replay changes select their own regressions without relaxing unknown paths", () => {
+  const scope = classifyReleaseScope([
+    "scripts/harness-bench-report.ts", "server/lib/harness-bench-core.ts",
+    "tests/lib/harness-bench-core.test.ts", "tests/unit/felix-outcome-loop-integration.test.ts",
+    "scripts/golden-path-replay.ts", "scripts/lib/golden-path-replay-runtime.ts",
+    "server/heartbeat.ts", "server/heartbeat-seed.ts", "scripts/unreviewed-replay.ts",
+  ]);
+  assert.deepEqual(scope.unknown, ["scripts/unreviewed-replay.ts"]);
+  for (const path of [
+    "tests/lib/harness-bench-core.test.ts", "tests/unit/felix-outcome-loop-integration.test.ts",
+    "tests/unit/golden-path-replay-authority.test.ts", "tests/unit/golden-path-replay-evidence.test.ts",
+    "tests/security/tool-authority-boundary.test.ts",
+  ]) assert.ok(scope.tests.includes(path), path);
+});
 
 test("current sensitive changes select explicit boundaries and regressions", () => {
   const scope = classifyReleaseScope(["server/auth.ts", "server/tools/lib/safe-fetch.ts", "server/job-worker.ts"]);
@@ -25,11 +183,35 @@ test("current sensitive changes select explicit boundaries and regressions", () 
   assert.ok(scope.tests.includes("tests/security/tool-fetch-dns-pinning.test.ts"));
 });
 
+test("republish ownership sources always select the complete new boundary regression set", () => {
+  for (const file of ["server/tools.ts", "server/lib/social-image-tool.ts",
+    "server/lib/proposed-skill-tool.ts", "server/video-editor.ts", "server/crews-engine.ts",
+    "server/agentic/self-heal.ts", "server/tools/domains/files/handlers.ts",
+    "server/tools/domains/research-intel/handlers.ts"]) {
+    const scope = classifyReleaseScope([file]);
+    assert.deepEqual(scope.unknown, [], file);
+    for (const regression of ["research-intel-tenant-authority", "proposed-skill-global-authority",
+      "generated-social-image-ownership", "republish-orchestration-ownership",
+      "republish-media-file-ownership", "media-verified-reference-staging",
+      "delegation-gate-command-floor"]) {
+      assert.ok(scope.tests.includes(`tests/security/${regression}.test.ts`), `${file}: ${regression}`);
+    }
+  }
+});
+
 test("PDF ownership changes select document boundary regressions", () => {
   const scope = classifyReleaseScope(["server/lib/pdf-input-ownership.ts", "server/pdf-create.ts", "server/tools/domains/documents/handlers.ts"]);
   assert.deepEqual(scope.unknown, []);
   assert.ok(scope.areas.includes("documents"));
   assert.ok(scope.tests.includes("tests/security/pdf-input-ownership.test.ts"));
+});
+
+test("memory ownership changes select the storage boundary regressions", () => {
+  for (const file of ["server/routes/memory.ts", "server/storage.ts"]) {
+    const scope = classifyReleaseScope([file]);
+    assert.deepEqual(scope.unknown, []);
+    assert.ok(scope.tests.includes("tests/security/storage-required-tenant-boundaries.test.ts"));
+  }
 });
 
 test("payment and plan ownership changes select their actual boundary regressions", () => {
@@ -47,6 +229,31 @@ test("unknown production and configuration changes never default to reviewed", (
   assert.equal(scope.unknown.length, 4);
 });
 
+test("republish follow-through selects feature checks and combined entry-point boundaries", () => {
+  const expected: Record<string, string[]> = {
+    "server/daily-ai-insights/runner.ts": ["tests/daily-ai-insights.test.ts", "tests/deployment/daily-insights-capabilities.test.ts"],
+    "server/providers.ts": ["tests/providers/cheaper-inference.test.ts", "tests/providers/cheaper-inference-automatic.test.ts"],
+    "server/routes.ts": ["tests/security/uploads-read-tenant-gate.test.ts"],
+    "server/routes/admin.ts": ["tests/daily-ai-insights.test.ts"],
+    "server/index.ts": ["tests/unit/glm54-layout-review.test.ts"],
+    "server/routes/audit.ts": ["tests/unit/glm54-layout-review.test.ts", "tests/lib/company-package-v3-api.test.ts"],
+    "server/routes/watchlist.ts": ["tests/security/watchlist-route-authority.test.ts"],
+    "client/src/components/company-report-package.tsx": ["tests/lib/company-package-cost-summary.test.ts"],
+    "scripts/ideabrowser-weekly-scenario.ts": ["tests/lib/ideabrowser-scenario-decision.test.ts"],
+    ".github/workflows/ci.yml": ["tests/unit/report-regression-guard.test.ts"],
+    "scripts/evaluate-invoice-pilot.ts": ["tests/invoice-pilot-cli.test.ts"],
+  };
+  for (const [file, tests] of Object.entries(expected)) {
+    const scope = classifyReleaseScope([file]);
+    assert.deepEqual(scope.unknown, [], file);
+    for (const target of tests) assert.ok(scope.tests.includes(target), `${file}: missing ${target}`);
+  }
+  for (const file of ["server/daily-ai-insights/unreviewed.ts", "server/routes/new-admin.ts",
+    ".agents/skills/unreviewed/SKILL.md", ".env.production"]) {
+    assert.deepEqual(classifyReleaseScope([file]).unknown, [file]);
+  }
+});
+
 test("known problem regressions run even when only public copy changed", () => {
   const scope = classifyReleaseScope(["client/src/pages/landing.tsx"]);
   assert.ok(scope.tests.includes("tests/security/tenant-audit-blockers.test.ts"));
@@ -59,6 +266,10 @@ test("progress reports and research are distinct from runtime changes", () => {
   assert.equal(scope.informational.length, 3);
   assert.deepEqual(scope.unknown, []);
   assert.ok(scope.tests.length > 0);
+  const referral = "project-assets/customer-revenue-launchpad/verified-referral-candidates-2026-11-26.md";
+  assert.deepEqual(classifyReleaseScope([referral]).informational, [referral]);
+  assert.deepEqual(classifyReleaseScope(["project-assets/customer-revenue-launchpad/unreviewed.ts"]).unknown,
+    ["project-assets/customer-revenue-launchpad/unreviewed.ts"]);
 });
 
 test("path confusion, arbitrary tests and unrecognized executable surfaces block", () => {
@@ -110,6 +321,52 @@ test("release metadata imported by the UI is hashed even when unchanged in the d
   assert.ok(classifyReleaseScope(["docs/release-facts.json"]).areas.includes("public-interface"));
 });
 
+test("only generated weekly-video job outputs leave source identity; brand, fixtures and deployment inputs remain bound", () => {
+  const outputs = [
+    "data/youtube/scripts/weekly-2026-11-22-src-99ad7170051ff75a.json",
+    "data/youtube/scripts/weekly-2026-11-22-src-99ad7170051ff75a.result.json",
+    "data/youtube/weekly-2026-11-22-src-99ad7170051ff75a-thumbnail.png",
+  ];
+  assert.ok(outputs.every(isReleaseRuntimeArtifact));
+  const bound = [
+    "BRAND.md",
+    "data/youtube/brand-style-guide.md",
+    "data/youtube/scripts/video-01-origin-story.json",
+    "data/youtube/scripts/weekly-2026-11-22.json",
+    "data/youtube/video-01-origin-story-v2.mp4",
+    "data/youtube/video-01-thumbnail.png",
+    "Dockerfile",
+    ".dockerignore",
+    "migrations/0103_plans_publish_required_status.sql",
+    "project-assets/brand.png",
+    ".github/workflows/ci.yml",
+  ];
+  const inputs = releaseInputPaths([...outputs, ...bound], []);
+  for (const output of outputs) assert.ok(!inputs.includes(output), `runtime output was hashed: ${output}`);
+  for (const input of bound) assert.ok(inputs.includes(input), `source input was masked: ${input}`);
+
+  const initial = [...outputs, ...bound].map(path => ({ path, content: `initial:${path}` }));
+  const runtimeChanged = initial.map(item =>
+    outputs.includes(item.path) ? { ...item, content: `rotated:${item.path}` } : item);
+  assert.equal(
+    digestReleaseInputs(releaseInputPaths(initial.map(item => item.path), []).map(path =>
+      runtimeChanged.find(item => item.path === path)!)),
+    digestReleaseInputs(releaseInputPaths(initial.map(item => item.path), []).map(path =>
+      initial.find(item => item.path === path)!)),
+    "generated runtime output changes must not invalidate the release source identity",
+  );
+  const brandChanged = initial.map(item =>
+    item.path === "BRAND.md" ? { ...item, content: "reviewed brand policy change" } : item);
+  const sourcePaths = releaseInputPaths(initial.map(item => item.path), []);
+  assert.notEqual(
+    digestReleaseInputs(sourcePaths.map(path => brandChanged.find(item => item.path === path)!)),
+    digestReleaseInputs(sourcePaths.map(path => initial.find(item => item.path === path)!)),
+    "brand policy changes remain source-bound",
+  );
+  assert.deepEqual(classifyReleaseScope([outputs[0]]).unknown, [outputs[0]],
+    "unfiltered runtime-output paths must not become an implicit classifier allowlist");
+});
+
 test("reviewed release documents select surface tests and bind exact bytes, including new files", () => {
   const docs = ["README.md", "README.md", "ROADMAP.md", "replit.md",
     "docs/CURRENT_PLATFORM_TOTALS.md", "docs/platform-update-2026-11-04.md"];
@@ -132,6 +389,14 @@ test("mutable audit reports are not build inputs, but audit implementation remai
   const paths = releaseInputPaths([...evidence, ...source], evidence);
   for (const path of evidence) assert.ok(!paths.includes(path));
   for (const path of source) assert.ok(paths.includes(path));
+});
+
+test("release inputs always bind deployment, migrations, assets and CI, even without a changed list", () => {
+  const paths = ["Dockerfile", ".dockerignore", ".npmrc", "drizzle.config.ts",
+    "migrations/0001.sql", "public/widget.js", ".github/workflows/ci.yml",
+    "services/example/start.sh", "project-assets/brand.png", ".agents/skills/example/SKILL.md",
+    "data/tenant-isolation-audit/suppressions.json", "data/tenant-isolation-audit/deferrals.json"];
+  assert.deepEqual(releaseInputPaths(paths, []), [...paths].sort());
 });
 
 test("changed membership catches new, removed and unclassified paths", () => {
@@ -158,6 +423,7 @@ test("check builds neither export database records nor preserve old snapshots", 
     assert.deepEqual(buildDataPolicy(true, skipSync), { syncDevData: false, preserveDevSnapshot: false });
   }
   assert.equal(buildDataPolicy(false, false).syncDevData, true);
+  assert.deepEqual(buildDataPolicy(false, false, true), { syncDevData: false, preserveDevSnapshot: false });
   const build = readFileSync("scripts/build.ts", "utf8");
   const runner = readFileSync("scripts/targeted-release-check.ts", "utf8");
   assert.match(build, /process\.argv\.includes\("--release-check"\)/);

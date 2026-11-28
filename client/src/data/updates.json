@@ -1,5 +1,49 @@
 [
   {
+    "version": "R138+sec",
+    "date": "November 27, 2026",
+    "title": "Mellum background work, verified Spark relay and safer source fetching",
+    "type": "security",
+    "highlights": [
+      { "icon": "Cpu", "text": "Owner-approved Lenovo work uses Mellum 2.1 for screened background tasks and source-backed runbook processing. The overnight runbook schedule is enabled. Questions and interactive troubleshooting remain on the main assistant route; broader routine compaction has its own separate opt-in." },
+      { "icon": "Network", "text": "Direct Lenovo remains primary. Spark's installed revision 1.3 worker authenticated to production, verified the exact model and enabled its one-minute schedule. An owner-issued real relay probe returned 42 with 172 input / 3 output tokens, 4,039 ms server start-to-result time excluding polling, zero metered cloud inference cost and confirmed ledger accounting. Actual outage-triggered switching remains untested." },
+      { "icon": "ShieldCheck", "text": "The relay preserves owner/API scope gates, exact-model and guardrail checks, bounded jobs, device admission, durable checkpoints and uncertain-generation protection. Safe opaque injected credentials are accepted without requesting raw secrets. Optional offline/recovery email notices remain separately gated, not activated by installing the worker." },
+      { "icon": "BookOpen", "text": "Daily AI Insights supports a shared research exchange with separate contributor reports and reviews. Suggestions do not authorize automatic system changes. GitHub-hosted portable release checks bind results to exact source candidates rather than a stale local build." },
+      { "icon": "Settings", "text": "Retained owner options include GLM 5.4 Website Audit layout advice for explicitly submitted public or synthetic screenshots and CSS, plus optional GPT-6 Luna routine paid fallback after included routes and within existing pricing, budget and authorization limits. Neither feature automatically edits or publishes a website." },
+      { "icon": "BarChart3", "text": "Refreshed development inventory: 428 total registered tools, 386 public documented tools, 18 active personas, 68 platform skills, 150 active capabilities, 202 declared / 283 live tables, 905 platform indexes and 102 curated models. These counts are not production telemetry." },
+      { "icon": "ShieldCheck", "text": "A cross-app source review identified a high-priority structured-extraction redirect/DNS-rebinding gap. The caller now uses the existing DNS-pinned HTTPS fetch boundary and rejects redirects before contacting their targets. Separately, unavailable snapshot-policy machinery refuses tool dispatch instead of allowing an operation without verified undo requirements. Focused regressions reproduced the old failures." },
+      { "icon": "AlertTriangle", "text": "Cross-app source review is not certification of every source line, integration or production journey. Known audit/RLS limitations remain explicit. Website and repository synchronization does not perform another Replit production publish." }
+    ]
+  },
+  {
+    "version": "R137.4+sec2",
+    "date": "November 23, 2026",
+    "title": "Safer delivered-app previews and owner Website Audit options",
+    "type": "security",
+    "highlights": [
+      { "icon": "ShieldCheck", "text": "Delivered HTML Play links use a browser sandbox that isolates previews from application storage and blocks background network requests. Self-contained inline apps and downloads remain available; signed-link and ownership checks are unchanged." },
+      { "icon": "FileCheck", "text": "When enabled, owner Website Audit offers a GLM 5.4 layout second opinion for an explicitly submitted public or synthetic screenshot and CSS. The advisory result never edits or deploys the site." },
+      { "icon": "Settings", "text": "Optional GPT-6 Luna preference is limited to owner fast/balanced paid fallback through CheaperInference, after included routes and only when catalog prices qualify. Advanced tiers, manual pins, the jury and spending limits are unchanged." },
+      { "icon": "Layers", "text": "Existing Firecrawl tools now use v2 with bounded pagination and cancellation. Tenant-created Google Slides retain account-controlled access, memory edits cannot change ownership, and scheduled fixture replay uses the same guarded executor as other tool calls." },
+      { "icon": "BookOpen", "text": "Recent model intelligence checks first-party release and lifecycle evidence before creating a pending registry review. A result cannot automatically enable or route to a model." },
+      { "icon": "AlertTriangle", "text": "The cross-app review sampled important authority and reliability boundaries. Source and development checks are not whole-platform certification, full tenant-audit clearance, or proof of production deployment." }
+    ]
+  },
+  {
+    "version": "R137.4+sec",
+    "date": "November 19, 2026",
+    "title": "HVAC billing review, source-backed working context, and owner model choices",
+    "type": "feature",
+    "highlights": [
+      { "icon": "FileCheck", "text": "Finished but Not Billed adds a $175 manual-pilot procedure and a browser-only owner workbench for up to 30 coded HVAC jobs. Conflicts and missing matches go to the office for review; no invoices, payments or customer uploads are created." },
+      { "icon": "BookOpen", "text": "Working context rehydrates bounded excerpts from authorized messages, distinguishes user statements from assistant reports, and compacts references during existing consolidation without granting new execution authority." },
+      { "icon": "Settings", "text": "GPT-6.2 Sol and Astra are explicit owner options. The optional direct-owner jury panel retains subscription priority and budget controls. Local memory assistance and recovery remain bounded and configuration-dependent." },
+      { "icon": "ShieldCheck", "text": "Backup destination checks cover effective owner-only access. The publishing-copy admission and cleanup checks are separate from normal source synchronization. Railway startup repair evidence is confined to isolated staging." },
+      { "icon": "Lock", "text": "Modern MCP key authentication now checks the owning account's current activity on each request. Inactive accounts or an unavailable authorization lookup cannot use a previously issued key." },
+      { "icon": "AlertTriangle", "text": "Business and Technical views, the dashboard and both repository guides distinguish current source, dated development metrics and staged verification from production telemetry. Incomplete tenant-audit coverage is not whole-platform certification." }
+    ]
+  },
+  {
     "version": "R137.3+sec2",
     "date": "November 17, 2026",
     "title": "Credential revocation, logout cleanup and private-mode website review",

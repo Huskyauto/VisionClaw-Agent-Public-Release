@@ -101,8 +101,9 @@ export async function useDbAuthState(tenantId?: number) {
 export async function clearDbAuthState(tenantId?: number): Promise<void> {
   await ensureTable();
   if (tenantId != null) {
-    const prefix = `t${tenantId}_%`;
-    await db.execute(sql`DELETE FROM whatsapp_auth WHERE key LIKE ${prefix}`);
+    const prefix = `t${tenantId}_`;
+    // A SQL LIKE '_' wildcard would also match tenants 20/21/200 for tenant 2.
+    await db.execute(sql`DELETE FROM whatsapp_auth WHERE starts_with(key, ${prefix})`);
   } else {
     await db.execute(sql`DELETE FROM whatsapp_auth WHERE key NOT LIKE 't%'`);
   }

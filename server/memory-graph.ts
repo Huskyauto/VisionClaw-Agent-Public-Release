@@ -132,7 +132,16 @@ export async function classifyMemoryCategory(
       return { categoryId: catId, categoryPath: topLevel };
     }
 
-    const resp = await replitOpenai.chat.completions.create({
+    const { localMemoryTasks, localMemoryAllowsHosted } = await import("./legion/memory-runtime");
+    const local = await localMemoryTasks.category(tenantId, fact, categories.map((c: any) => c.name));
+    let parsed: { category?: string; parentCategory?: string | null };
+    if (local.status === "accepted") {
+      const selected = categories.find((c: any) => c.name === local.value);
+      parsed = { category: local.value,
+        parentCategory: categories.find((c: any) => c.id === selected?.parent_id)?.name ?? null };
+    } else {
+      if (!localMemoryAllowsHosted(local)) throw Error("Local categorization deferred");
+      const resp = await replitOpenai.chat.completions.create({
       model: "gpt-5.4",
       messages: [
         {
@@ -155,13 +164,15 @@ Output JSON: {"category": "CategoryName", "isNew": true/false, "parentCategory":
     const content = resp.choices[0]?.message?.content;
     if (!content) throw new Error("No response");
 
-    const parsed = JSON.parse(content);
+      parsed = JSON.parse(content);
+    }
     const catName = parsed.category || mapCategoryFromFlat(existingCategory);
 
     let parentCatId: number | null = null;
-    if (parsed.parentCategory) {
+    const parentName = typeof parsed.parentCategory === "string" ? parsed.parentCategory.toLowerCase() : "";
+    if (parentName) {
       const parentMatch = categories.find((c: any) =>
-        c.name.toLowerCase() === parsed.parentCategory.toLowerCase()
+        c.name.toLowerCase() === parentName
       );
       if (parentMatch) parentCatId = parentMatch.id;
     }

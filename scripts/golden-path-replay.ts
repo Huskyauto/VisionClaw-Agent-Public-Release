@@ -24,17 +24,12 @@ import {
 import { selectGoldenPathFixtures } from "./lib/golden-path-fixture-filter";
 import { twoSceneVideoJobArgs } from "./lib/golden-path-two-scene-video";
 import { replayEvidenceErrors } from "./lib/golden-path-replay-evidence";
+import { createGoldenPathDispatcher, isLegacyReplayAuthorityFreeze, ReplayToolBlocked, withGoldenPathProgress } from "./lib/golden-path-replay-runtime";
+import { ADMIN_TENANT_ID } from "../server/tenant-constants";
+import { resolveOwnerEmail } from "../server/lib/owner-email";
+import { sendOwnerEmailVerified } from "../server/lib/owner-delivery-email";
 
-const ADMIN_TENANT_ID = (() => {
-  const raw = process.env.GOLDEN_PATH_TENANT_ID;
-  if (!raw) return 1;
-  const n = parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0) {
-    console.warn(`[golden-path] GOLDEN_PATH_TENANT_ID="${raw}" is not a positive integer — defaulting to 1`);
-    return 1;
-  }
-  return n;
-})();
+const dispatchReplayTool = createGoldenPathDispatcher(executeTool);
 const REPLAY_LOG_DIR = path.resolve(process.cwd(), "data", "golden-path-replay");
 const FREEZE_DIR = path.join(REPLAY_LOG_DIR, "freezes");
 const FINGERPRINTS_FILE = path.join(REPLAY_LOG_DIR, "fingerprints.json");
@@ -179,7 +174,17 @@ function saveFingerprints(fps: Record<string, FingerprintRecord>): void {
 }
 
 function freezePath(id: string): string { return path.join(FREEZE_DIR, `${id}.frozen.json`); }
-function isFrozen(id: string): boolean { return fs.existsSync(freezePath(id)); }
+function isFrozen(id: string): boolean {
+  const file = freezePath(id);
+  if (!fs.existsSync(file)) return false;
+  try {
+    const record = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (record.id === id && isLegacyReplayAuthorityFreeze(record.reason)) return false;
+  } catch {
+    // Unreadable or invalid freeze records still block the fixture.
+  }
+  return true;
+}
 
 function freezePipeline(id: string, reason: string, lastKnownGood: FingerprintRecord | null): void {
   ensureDir(FREEZE_DIR);
@@ -243,20 +248,19 @@ async function runOnePath(gp: GoldenPath): Promise<FingerprintRecord> {
       // replay sees a false regression on a tool that's actually fine in
       // production. Real customer tenants keep the default model.
       producerResult = await Promise.race([
-        executeTool("build_html_app", { topic: gp.prompt, description: gp.prompt, model: "gpt-5.4", _tenantId: ADMIN_TENANT_ID }, ADMIN_TENANT_ID),
+        dispatchReplayTool("build_html_app", { topic: gp.prompt, description: gp.prompt, model: "gpt-5.4" }),
         new Promise((_, rej) => setTimeout(() => rej(new Error("per-task timeout")), PER_TASK_TIMEOUT_MS)),
       ]);
       artifactPath = producerResult?.file_path || producerResult?.filePath;
     } else if (gp.format === "pdf") {
       producerResult = await Promise.race([
-        executeTool("create_styled_report", {
+        dispatchReplayTool("create_styled_report", {
           title: "Q4 Productivity Recap",
           sections: [
             { title: "Executive Summary", content: "Q4 closed strong with three key wins across productivity, customer satisfaction, and engineering velocity." },
             { title: "Key Stats", content: "Productivity index: 87 (up from 71). Satisfaction: 4.6/5. Velocity: 122 PRs/week.", takeaway: "Triple-digit improvements across all three KPIs." },
           ],
-          _tenantId: ADMIN_TENANT_ID,
-        }, ADMIN_TENANT_ID),
+        }),
         new Promise((_, rej) => setTimeout(() => rej(new Error("per-task timeout")), PER_TASK_TIMEOUT_MS)),
       ]);
       // In production the uploads URL is backed by /tmp/uploads, not
@@ -270,7 +274,7 @@ async function runOnePath(gp: GoldenPath): Promise<FingerprintRecord> {
       if (gp.id === "bwb_video_3chapter_multichapter_smoke") {
         const sharedImg = path.join(process.cwd(), "data", "youtube", "video-01-thumbnail.png");
         producerResult = await Promise.race([
-          executeTool("mpeg_produce_parallel", markInternalRenderStaging({
+          dispatchReplayTool("mpeg_produce_parallel", markInternalRenderStaging({
             title: "VisionClaw Multichapter Pipeline Smoke",
             chapters: [
               { chapterTitle: "Intro", scenes: [
@@ -293,8 +297,7 @@ async function runOnePath(gp: GoldenPath): Promise<FingerprintRecord> {
             crossfadeMs: 0,            // R110.21 reliable-playback default
             uploadToDrive: false,      // skip Drive in CI — local artifact only
             maxParallelChapters: 1,    // R110.22 — match prod default
-            _tenantId: ADMIN_TENANT_ID,
-          }), ADMIN_TENANT_ID),
+          })),
           new Promise((_, rej) => setTimeout(() => rej(new Error("per-task timeout")), PER_TASK_TIMEOUT_MS)),
         ]);
       } else {
@@ -304,10 +307,7 @@ async function runOnePath(gp: GoldenPath): Promise<FingerprintRecord> {
         // writes video_jobs for the replay poll below.
         const sharedImg = path.join(process.cwd(), "data", "youtube", "video-01-thumbnail.png");
         producerResult = await Promise.race([
-          executeTool("start_video_job", {
-            ...twoSceneVideoJobArgs(sharedImg),
-            _tenantId: ADMIN_TENANT_ID,
-          }, ADMIN_TENANT_ID),
+          dispatchReplayTool("start_video_job", twoSceneVideoJobArgs(sharedImg)),
           new Promise((_, rej) => setTimeout(() => rej(new Error("per-task timeout")), PER_TASK_TIMEOUT_MS)),
         ]);
         if (producerResult?.total_scenes !== 2 || typeof producerResult?.job_id !== "string") {
@@ -384,6 +384,7 @@ async function runOnePath(gp: GoldenPath): Promise<FingerprintRecord> {
       return { id: gp.id, format: gp.format, ran_at: ranAt, ok: false, notes: `format '${gp.format}' not yet wired into golden-path runner — add a producer call in scripts/golden-path-replay.ts` };
     }
   } catch (e: any) {
+    if (e instanceof ReplayToolBlocked) throw e;
     return { id: gp.id, format: gp.format, ran_at: ranAt, ok: false, notes: `producer threw: ${(e?.message || String(e)).slice(0, 300)}` };
   }
 
@@ -411,14 +412,14 @@ async function runOnePath(gp: GoldenPath): Promise<FingerprintRecord> {
 
   let gradeRes: any;
   try {
-    gradeRes = await executeTool("grade_deliverable", {
+    gradeRes = await dispatchReplayTool("grade_deliverable", {
       deliverable_type: gp.format,
       file_path: artifactPath,
       expected_spec: gp.expected.page_count ? { min_pages: gp.expected.page_count, max_pages: gp.expected.page_count } : undefined,
-      _tenantId: ADMIN_TENANT_ID,
-    }, ADMIN_TENANT_ID);
+    });
     pageCount = gradeRes?.metrics?.estimated_page_count;
   } catch (e: any) {
+    if (e instanceof ReplayToolBlocked) throw e;
     return { id: gp.id, format: gp.format, ran_at: ranAt, ok: false, artifact_size_bytes: sizeBytes, artifact_path: artifactPath, notes: `grader threw: ${(e?.message || String(e)).slice(0, 300)}`, ...archive };
   }
 
@@ -486,12 +487,14 @@ async function runOnePath(gp: GoldenPath): Promise<FingerprintRecord> {
 async function emailOwnerOnRegression(failed: FingerprintRecord[]): Promise<void> {
   if (failed.length === 0) return;
   try {
+    const to = resolveOwnerEmail();
+    if (!to) throw new Error("owner alert address is not configured");
     const subj = `[VisionClaw] Golden-path replay regression — ${failed.length} pipeline(s) frozen`;
-    const body = `Nightly golden-path replay caught regressions in the following pipelines:\n\n${failed.map((f) => `- ${f.id} (${f.format}): ${f.drift || f.notes}`).join("\n")}\n\nThese pipelines have been frozen at their last-known-good revision. Inspect data/golden-path-replay/fingerprints.json and the freeze files in data/golden-path-replay/freezes/ to triage. Clear the freeze file to unfreeze a pipeline once fixed.\n\n— VisionClaw Golden-Path Watcher`;
-    await executeTool("send_email", { to: process.env.OWNER_EMAIL || "huskyauto@gmail.com", subject: subj, text: body, _tenantId: ADMIN_TENANT_ID }, ADMIN_TENANT_ID);
-    console.log(`[golden-path] regression email sent (${failed.length} failures)`);
-  } catch (e: any) {
-    console.error(`[golden-path] failed to email owner: ${e?.message || String(e)}`);
+    const body = `Nightly golden-path replay froze these fixtures:\n\n${failed.map((f) => `- ${f.id} (${f.format})`).join("\n")}\n\nCheck the maintenance log and the replay freeze records for details.`;
+    await sendOwnerEmailVerified({ tenantId: ADMIN_TENANT_ID, to, subject: subj, text: body });
+    console.log(`[golden-path] regression alert verified in owner inbox (${failed.length} failures)`);
+  } catch {
+    console.error("[golden-path] regression alert delivery was not verified");
   }
 }
 
@@ -500,44 +503,40 @@ async function main(): Promise<void> {
   let exitCode = 0;
   let runPaths = GOLDEN_PATHS;
   try {
+    if (process.env.GOLDEN_PATH_TENANT_ID && process.env.GOLDEN_PATH_TENANT_ID !== String(ADMIN_TENANT_ID))
+      throw new Error("Golden-path replay only supports the platform fixture tenant");
     runPaths = selectGoldenPathFixtures(GOLDEN_PATHS, process.env.GOLDEN_PATH_ONLY);
     ensureDir(REPLAY_LOG_DIR);
     ensureDir(FREEZE_DIR);
     console.log(`[golden-path] starting ${process.env.GOLDEN_PATH_ONLY ? "targeted" : "nightly"} replay — ${runPaths.length} paths, $${COST_CAP_USD.toFixed(2)} cost cap`);
     const fps = loadFingerprints();
-  const newFailures: FingerprintRecord[] = [];
-  const startCost = await readCostUsage().catch(() => 0);
-
-  for (const gp of runPaths) {
-    const cur = await readCostUsage().catch(() => 0);
-    if (cur - startCost > COST_CAP_USD) {
-      console.warn(`[golden-path] cost cap $${COST_CAP_USD} hit — aborting remaining paths`);
-      break;
-    }
-    const rec = await runOnePath(gp);
-    runRecords.push(rec);
-    const prev = fps[gp.id] || null;
-    fps[gp.id] = rec;
-    if (!rec.ok && !isFrozen(gp.id)) {
-      console.error(`[golden-path] FAIL ${gp.id}: ${rec.drift || rec.notes}`);
-      freezePipeline(gp.id, rec.drift || rec.notes || "unknown", prev);
-      newFailures.push(rec);
-    } else if (rec.ok) {
-      console.log(`[golden-path] OK ${gp.id} — size=${rec.artifact_size_bytes}B${rec.page_count ? ` pages=${rec.page_count}` : ""}${rec.duration_sec ? ` dur=${rec.duration_sec.toFixed(1)}s` : ""}`);
-    } else {
-      // R110.21.1 silent-skip fix: previously a frozen pipeline silently
-      // returned ok:false and fell through with no log line, so a 2/4 pass
-      // result hid two pre-frozen pipelines indefinitely. Always surface
-      // skipped-frozen so the operator knows the run did NOT exercise it.
-      console.warn(`[golden-path] SKIP ${gp.id} — frozen at last-known-good (delete data/golden-path-replay/freezes/${gp.id}.frozen.json to retry): ${rec.notes || "(no reason)"}`);
-    }
-  }
-  saveFingerprints(fps);
-
-  await emailOwnerOnRegression(newFailures);
-  const okCount = runRecords.filter((rec) => rec.ok).length;
-  console.log(`[golden-path] DONE — ${okCount}/${runPaths.length} pass${newFailures.length ? ` (${newFailures.length} new freezes)` : ""}`);
-    exitCode = newFailures.length > 0 || (process.env.GOLDEN_PATH_ONLY && okCount !== runPaths.length) ? 1 : 0;
+    const newFailures: FingerprintRecord[] = [];
+    await withGoldenPathProgress(async () => {
+      const startCost = await readCostUsage();
+      for (const gp of runPaths) {
+        const cur = await readCostUsage();
+        if (cur - startCost > COST_CAP_USD) {
+          console.warn(`[golden-path] cost cap $${COST_CAP_USD} hit — aborting remaining paths`);
+          break;
+        }
+        const rec = await runOnePath(gp);
+        runRecords.push(rec);
+        if (!rec.ok && !isFrozen(gp.id)) {
+          console.error(`[golden-path] FAIL ${gp.id}: ${rec.drift || rec.notes}`);
+          freezePipeline(gp.id, rec.drift || rec.notes || "unknown", fps[gp.id] ?? null);
+          newFailures.push(rec);
+        } else if (rec.ok) {
+          console.log(`[golden-path] OK ${gp.id} — size=${rec.artifact_size_bytes}B${rec.page_count ? ` pages=${rec.page_count}` : ""}${rec.duration_sec ? ` dur=${rec.duration_sec.toFixed(1)}s` : ""}`);
+        } else {
+          console.warn(`[golden-path] SKIP ${gp.id} — already frozen: ${rec.notes || "(no reason)"}`);
+          continue; // A skip is not a new fingerprint.
+        }
+        fps[gp.id] = rec;
+      }
+    }, () => saveFingerprints(fps), () => emailOwnerOnRegression(newFailures));
+    const okCount = runRecords.filter((rec) => rec.ok).length;
+    console.log(`[golden-path] DONE — ${okCount}/${runPaths.length} pass${newFailures.length ? ` (${newFailures.length} new freezes)` : ""}`);
+    exitCode = okCount !== runPaths.length ? 1 : 0;
   } catch (error: any) {
     exitCode = 2;
     console.error(`[golden-path] FATAL: ${error?.message || String(error)}`);

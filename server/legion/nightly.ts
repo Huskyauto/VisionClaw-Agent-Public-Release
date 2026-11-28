@@ -5,6 +5,7 @@ import { legionBackgroundEnabled, legionProduction, legionRuntimeReady } from ".
 import { readLegionRunbook, LEGION_RUNBOOKS } from "./runbook-source";
 import { compileLegionRunbook } from "./runbook";
 import { checkLocalCapacity, surfaceLocalEnabled } from "./local-provider-runtime";
+import { sparkRelayEnabled, withSparkRelayWork } from "./spark-relay-runtime";
 import { localHostedFallbackEnabled } from "./runbook-hosted";
 import { LEGION_RUNBOOK_JOB, SURFACE_RULE_JOB, runLocalRunbookJob } from "./nightly-policy";
 import { localParallelEnabled, withLocalPriority } from "./local-slots";
@@ -37,9 +38,10 @@ export async function handleLegionRunbookJob(job: AgentJob) {
   const enabled = () => (job.payload.priority === "daytime" ? localParallelEnabled() : legionNightlyEnabled()) &&
     (!simple || (localParallelEnabled() && surfaceLocalEnabled()));
   return withLocalPriority(job.payload.priority === "daytime" ? "daytime" : "overnight", () => runLocalRunbookJob(job, {
-    enabled, ready: legionRuntimeReady, environment,
+    enabled, ready: () => legionRuntimeReady() || sparkRelayEnabled(), environment,
     hostedEnabled: localHostedFallbackEnabled,
-    read: readLegionRunbook, compile: simple ? compileSimpleRunbookRule : compileLegionRunbook,
+    read: readLegionRunbook, compile: (path, hash) => withSparkRelayWork(`runbook:${job.id}`,
+      () => (simple ? compileSimpleRunbookRule : compileLegionRunbook)(path, hash)),
     health: () => checkLocalCapacity(undefined, simple),
   }, simple ? SURFACE_RULE_JOB : LEGION_RUNBOOK_JOB));
 }

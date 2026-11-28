@@ -15,6 +15,7 @@ import { sanitizeSpawnEnv } from "../server/safety/spawn-env-guard";
 import { claimNodeIdentity } from "../server/legion/node-store";
 import { LEGION_TAG, legionRequest } from "../server/legion/proxy-client";
 import { startTailnetNode } from "../server/legion/local-api";
+import { LEGION_MODEL, LEGION_REASONING_MODEL, guardLocalMessages } from "../server/legion/model-policy";
 
 const bin = join(process.cwd(), "generated-artifacts/legion-tailscale/bin");
 const scope = { tenantId: 1, environment: "development" as const };
@@ -172,7 +173,7 @@ async function runCycle(pool: Pool, cycle: number) {
     const versionReply = await legionRequest(10551, "/api/version");
     const inventory = await legionRequest(10551, "/api/tags");
     const names = inventory.models?.map((m: { name: string }) => m.name);
-    if (!["qwen3:8b", "qwen3:14b", "nomic-embed-text:latest"].every(name => names?.includes(name))) {
+    if (![LEGION_MODEL, LEGION_REASONING_MODEL].every(name => names?.includes(name))) {
       throw new Error("Legion model inventory mismatch");
     }
     console.log(JSON.stringify({ event: "legion_health", cycle, tailscale: version,
@@ -186,10 +187,10 @@ async function runCycle(pool: Pool, cycle: number) {
       phase = "synthetic-completion";
       const start = performance.now();
       const reply = await legionRequest(10551, "/v1/chat/completions", {
-        model: "qwen3:8b", messages: [{ role: "user", content: "Reply with exactly: LOCAL MODEL OK" }],
+        model: LEGION_MODEL, messages: guardLocalMessages([{ role: "user", content: "Reply with exactly: LOCAL MODEL OK" }]),
         temperature: 0, max_tokens: 1024, stream: false,
       }, 120_000);
-      if (reply.model !== "qwen3:8b" || reply.choices?.[0]?.message?.content?.trim() !== "LOCAL MODEL OK") {
+      if (reply.model !== LEGION_MODEL || reply.choices?.[0]?.message?.content?.trim() !== "LOCAL MODEL OK") {
         throw new Error("Local synthetic completion failed exact model/content check");
       }
       console.log(JSON.stringify({ event: "legion_completion", provider: "legion-local",

@@ -1,10 +1,11 @@
 import test from "node:test";
+import { LEGION_MODEL } from "../../server/legion/model-policy";
 import assert from "node:assert/strict";
 import { createLocalBackgroundRouter } from "../../server/legion/local-router";
 import { createLegionWorker } from "../../server/legion/background";
 import { createRunbookCompiler } from "../../server/legion/runbook";
 import { runLocalRunbookJob } from "../../server/legion/nightly-policy";
-import { createHostedRunbookGenerator, assertRunbookActive } from "../../server/legion/runbook-hosted";
+import { createHostedRunbookGenerator, assertRunbookActive, HostedRunbookWaiting } from "../../server/legion/runbook-hosted";
 import { LegionAdmissionDeferred } from "../../server/legion/background";
 import { withTenantContext } from "../../server/lib/tenant-context";
 
@@ -29,7 +30,7 @@ test("a rejected Lenovo answer automatically tries Surface once through the same
 const source = { text: "Inspect the real caller before changing code.", sha256: "a".repeat(64) };
 const validContent = '{"concepts":[{"key":"caller-check","title":"Check caller","lineStarts":[1]}]}';
 const completion = (content: string, surface = false) => ({
-  model: surface ? "qwen2.5-7b-instruct-qnn-npu:3" : "qwen3:8b",
+  model: surface ? "qwen2.5-7b-instruct-generic-gpu:4" : LEGION_MODEL,
   system_fingerprint: "fp_ollama", usage: { prompt_tokens: 20, completion_tokens: 20 },
   choices: [{ finish_reason: "stop", message: { content } }],
 });
@@ -64,7 +65,7 @@ test("every rejected Lenovo response type reaches Surface, while a valid primary
       hosted: async () => { calls.push("hosted"); throw Error("Hosted must not run"); },
     });
     const result = await compile(".agents/skills/zoom-out/SKILL.md");
-    assert.equal(result.model, kind === "valid" ? "legion-local:qwen3:8b" : "surface-local:qwen2.5-7b-instruct-qnn-npu:3", kind);
+    assert.equal(result.model, kind === "valid" ? `legion-local:${LEGION_MODEL}` : "surface-local:qwen2.5-7b-instruct-generic-gpu:4", kind);
     assert.deepEqual(calls, kind === "valid" ? ["lenovo"] : ["lenovo", "surface"], kind);
   }
 });
@@ -105,13 +106,12 @@ test("both local and hosted invalid answers fail explicitly without a retry loop
   assert.equal(hostedCalls, 1);
 });
 
-test("disabled hosted route, admission contention, cancellation and revoked work cannot trigger hosted spend", async () => {
-  for (const kind of ["disabled", "busy", "cancelled", "revoked"]) {
+test("disabled hosted route, cancellation and revoked work cannot trigger hosted spend", async () => {
+  for (const kind of ["disabled", "cancelled", "revoked"]) {
     let revoked = false, hostedCalls = 0;
     const compile = createRunbookCompiler({ read: async () => source,
       assertActive: () => { if (revoked) throw Error("Revoked"); },
       local: async () => {
-        if (kind === "busy") throw new LegionAdmissionDeferred("Busy");
         if (kind === "cancelled") throw new DOMException("Cancelled", "AbortError");
         revoked = kind === "revoked";
         throw Error("Local failure");
@@ -122,6 +122,52 @@ test("disabled hosted route, admission contention, cancellation and revoked work
     });
     await assert.rejects(compile(".agents/skills/zoom-out/SKILL.md"), kind);
     assert.equal(hostedCalls, 0, kind);
+  }
+});
+
+test("an enabled cloud backup completes a runbook when laptops have no free capacity", async () => {
+  let hostedCalls = 0;
+  const compile = createRunbookCompiler({
+    read: async () => source, assertActive: () => {}, hostedEnabled: () => true,
+    local: async () => { throw new LegionAdmissionDeferred("Both laptops busy"); },
+    hosted: async () => { hostedCalls++; return { model: "normal-fast-route", content: validContent }; },
+  });
+  const result = await compile(".agents/skills/zoom-out/SKILL.md");
+  assert.equal(result.hostedFallback, true);
+  assert.equal(hostedCalls, 1);
+});
+
+test("busy Lenovo can use its enabled Surface backup before considering cloud", async () => {
+  let surface = 0;
+  const route = createLocalBackgroundRouter({
+    surfaceEnabled: () => true, legionHealth: async () => {}, surfaceHealth: async () => {},
+    legionGenerate: async () => { throw new LegionAdmissionDeferred("Lenovo busy"); },
+    surfaceGenerate: async () => { surface++; return completion(validContent, true); },
+  });
+  assert.equal((await route({ messages: [] })).provider, "surface-local");
+  assert.equal(surface, 1);
+});
+
+test("uncertain local generation is never converted into an uncharged capacity wait", async () => {
+  let hosted = 0;
+  const uncertain = createRunbookCompiler({
+    read: async () => source, assertActive: () => {}, hostedEnabled: () => true,
+    local: async () => { throw new LegionAdmissionDeferred("Lost admission connection", true); },
+    hosted: async () => { hosted++; return { model: "fast", content: validContent }; },
+  });
+  await assert.rejects(uncertain(".agents/skills/zoom-out/SKILL.md"), LegionAdmissionDeferred);
+  assert.equal(hosted, 0);
+  for (const generated of [false, true]) {
+    const compile = createRunbookCompiler({
+      read: async () => source, assertActive: () => {}, hostedEnabled: () => true,
+      local: async () => {
+        if (!generated) throw new LegionAdmissionDeferred("Both local services offline");
+        throw Error("A generated result failed validation");
+      },
+      hosted: async () => { throw new HostedRunbookWaiting("Cloud budget exhausted"); },
+    });
+    await assert.rejects(compile(".agents/skills/zoom-out/SKILL.md"), error =>
+      error instanceof HostedRunbookWaiting && error.generationStarted === generated);
   }
 });
 
@@ -269,7 +315,7 @@ test("task validation happens inside failover; both returned completions are acc
     legionGenerate: async () => reply("qwen3:8b", "not JSON"),
     surfaceGenerate: async () => {
       assert.equal(releases, 0);
-      return reply("qwen2.5-7b-instruct-qnn-npu:3", '{"concepts":[]}');
+      return reply("qwen2.5-7b-instruct-generic-gpu:4", '{"concepts":[]}');
     },
   });
   const worker = createLegionWorker({
@@ -282,7 +328,7 @@ test("task validation happens inside failover; both returned completions are acc
     messages: [{ role: "user", content: "Synthetic engineering source" }],
     validateContent: content => { JSON.parse(content); },
   });
-  assert.equal(result.model, "surface-local:qwen2.5-7b-instruct-qnn-npu:3");
+  assert.equal(result.model, "surface-local:qwen2.5-7b-instruct-generic-gpu:4");
   assert.deepEqual(receipts.map(r => r.toolName), ["llm.legion-local", "llm.surface-local"]);
   assert.equal(releases, 1);
 });

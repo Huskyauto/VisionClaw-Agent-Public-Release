@@ -1,21 +1,29 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { existsSync, readFileSync } from "node:fs";
 import {
   getRevenueWorkspace,
   getRevenueWorkspaceIdea,
   getRevenueWorkspaceByProjectName,
 } from "../server/lib/revenue-idea-catalog";
 
-test("exposes five actionable ideas for each owner revenue workspace", () => {
+test("preserves existing offers and adds the invoice pilot to the owner launchpad", () => {
   const launchpad = getRevenueWorkspace("customer-revenue-launchpad");
   const fable = getRevenueWorkspace("fable-5");
 
-  assert.equal(launchpad.ideas.length, 5);
+  assert.equal(launchpad.ideas.length, 6);
   assert.equal(fable.ideas.length, 5);
   assert.equal(launchpad.ownerOnly, true);
   assert.equal(fable.ownerOnly, true);
   assert.match(launchpad.ideas[0].starterPrompt, /manual|evidence|validate/i);
   assert.equal(fable.ideas[0].linkedProjectName, "Idea 1: HVAC Contractor Document Packs");
+  const pilot = getRevenueWorkspaceIdea("customer-revenue-launchpad", "hvac-invoice-processing-pilot");
+  assert.ok(pilot);
+  assert.match(pilot.starterPrompt, /invoice-pilot-evaluation|evaluate-invoice-pilot/);
+  assert.match(pilot.starterPrompt, /Do not send outreach/);
+  assert.match(pilot.summary, /human-reviewed/);
+  assert.ok(existsSync(pilot.briefPath));
+  assert.match(readFileSync(pilot.briefPath, "utf8"), /98%/);
 });
 
 test("only resolves briefs belonging to the requested workspace", () => {

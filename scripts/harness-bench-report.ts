@@ -13,7 +13,7 @@
  * Exit codes:
  *   0 — every configuration is comparable at the requested coverage floor
  *   1 — malformed input or invalid configuration
- *   3 — incomplete coverage or a security failure; results are not comparable
+ *   3 — insufficient coverage, mismatched tasks, or a security failure
  */
 
 import * as fs from "node:fs";
@@ -133,6 +133,8 @@ function main(): void {
       ? "a configuration failed a structural security check"
       : !report.taskSetsMatched
       ? "configurations have different task IDs or repetition counts"
+      : !report.evaluatedTaskSetsMatched
+      ? "configurations have different successfully scored task IDs or repetition counts"
       : "at least one configuration lacks sufficient coverage";
     console.error(`[harness-bench] NOT COMPARABLE — ${reason}.`);
     process.exit(3);

@@ -675,19 +675,35 @@ export async function compactMessages(
         ? `\n\nPREVIOUS ATTEMPT FAILED QUALITY CHECK:\n${qualityAudit.reasons.map(r => `- ${r}`).join("\n")}\nFix these issues in your new summary.`
         : "";
 
-      const resp = await replitOpenai.chat.completions.create({
-        model: "gpt-5.4",
-        messages: [
+      const summaryMessages = [
           { role: "system", content: STRUCTURED_COMPACTION_PROMPT },
           {
             role: "user",
             content: `Summarize this conversation history (${meaningfulMessages.length} meaningful messages out of ${toSummarize.length} total) into the required structured format. Preserve relevant facts and reconcile newer corrections:${identifierHint}${taskSpecificInstructions}${retryHint}\n\n${reconciliationInput}`,
           },
-        ],
-        max_completion_tokens: SUMMARY_MAX_TOKENS,
-      });
-
-      summary = resp.choices[0]?.message?.content?.trim();
+        ] as { role: "system" | "user"; content: string }[];
+      const originalCloud = async () => {
+        const resp = await replitOpenai.chat.completions.create({
+          model: "gpt-5.4", messages: summaryMessages, max_completion_tokens: SUMMARY_MAX_TOKENS,
+        });
+        return resp.choices[0]?.message?.content?.trim() || "";
+      };
+      // Keep long synthesis and correction reconciliation on the stronger route.
+      // The local lane cannot bypass the existing exact-identifier quality audit.
+      if (tenantId === 1 && meaningfulMessages.length <= 12 && reconciliationInput.length <= 6000 &&
+          !/\b(actually|correction|instead|no longer|i said|replace)\b/i.test(reconciliationInput)) {
+        const { routineCompletion } = await import("./legion/routine-runtime");
+        summary = await routineCompletion({
+          tenantId, task: "routine-summary", messages: summaryMessages,
+          contract: { kind: "validated", parse: text => {
+            const audit = auditCompactionQuality(text, identifiers, latestAsk);
+            if (!audit.ok) throw Error("Local summary failed existing compaction quality requirements");
+            return text;
+          } },
+        }, originalCloud);
+      } else {
+        summary = await originalCloud();
+      }
       if (!summary) {
         summary = buildStructuredFallbackSummary();
         console.warn(`[compaction] Empty summary from LLM, using structured fallback`);

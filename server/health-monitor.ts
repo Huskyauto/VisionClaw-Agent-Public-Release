@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { storage } from "./storage";
+import { sparkRelayAlertConfiguration } from "./legion/spark-relay-alerts";
 
 import { logSilentCatch } from "./lib/silent-catch";
 export interface HealthCheck {
@@ -25,6 +26,7 @@ let consecutiveDownChecks = 0;
 let lastAlertSentAt = 0;
 const ALERT_COOLDOWN_MS = 30 * 60 * 1000;
 const ALERT_THRESHOLD = 3;
+let relayAlertCheck: Promise<void> | null = null;
 
 async function checkDatabase(): Promise<HealthCheck> {
   const start = Date.now();
@@ -268,6 +270,18 @@ async function attemptAutoRemediation(checks: HealthCheck[]): Promise<string[]> 
 }
 
 export async function runHealthChecks(): Promise<HealthReport> {
+  // Optional, owner-scoped observer. Keep it out of the generic DOWN alert
+  // path, which has separate cooldown and cannot describe a relay recovery.
+  // Single-flight and detached so a slow mailbox/DB cannot stall health checks.
+  // Avoid loading relay/runtime dependencies at all when notifications are off.
+  if (!relayAlertCheck && sparkRelayAlertConfiguration(process.env).enabled) {
+    relayAlertCheck = import("./legion/spark-relay-alert-runtime")
+      .then(({ checkSparkRelayOwnerAlerts }) => checkSparkRelayOwnerAlerts(1))
+      .catch(() => {
+        console.warn("[spark-relay-alerts] Observation or delivery failed/uncertain; no automatic resend");
+      })
+      .finally(() => { relayAlertCheck = null; });
+  }
   const checks = await Promise.all([
     checkDatabase(),
     checkObjectStorage(),

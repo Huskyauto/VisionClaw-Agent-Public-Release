@@ -86,7 +86,7 @@ export const writeFileDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "write_file",
-    description: "Write content to a file in the workspace AND automatically upload it to Google Drive. Creates the file if it doesn't exist, overwrites if it does. Creates parent directories automatically. Use for creating HTML, scripts, configs, mockups, or any text file. Max 500KB. The result includes a drive_url — ALWAYS share this link with the user so they can access the file.",
+    description: "Write a workspace file and upload it to Google Drive. Customer tenants require a non-empty path grant stamped by the platform; model-supplied _allowedPaths cannot grant access. The platform owner retains intentional workspace access. Creates or overwrites the file and creates parent directories. Use for HTML, scripts, configs, mockups, or text. Max 500KB. ALWAYS share the returned drive_url with the user.",
     parameters: {
       type: "object",
       properties: {

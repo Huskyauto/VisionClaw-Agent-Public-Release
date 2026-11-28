@@ -16,8 +16,13 @@ export const testApiKeysDefinition: ToolDefinition = {
   type: "function",
   function: {
     name: "test_api_keys",
-    description: "Test all configured AI provider API keys for connectivity. Returns status, latency, and details for each provider (OpenAI, Anthropic, xAI, Google, Perplexity, OpenRouter, Replit).",
-    parameters: { type: "object", properties: {}, required: [] },
+    description: "Check providers. Owner Felix: legion-local status or fixed 17+25 arithmetic returns a served-model receipt. No local cloud fallback.",
+    parameters: { type: "object", properties: {
+      provider: { type: "string", enum: ["all", "legion-local"],
+        description: "Omit for existing cloud-provider checks. Choose legion-local for the owner's private laptop." },
+      local_check: { type: "string", enum: ["status", "arithmetic"],
+        description: "Legion only: status inspects availability; arithmetic runs the fixed 17+25 synthetic check. No custom prompts." },
+    }, required: [], additionalProperties: false },
   },
 };
 

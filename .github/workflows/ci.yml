@@ -95,8 +95,17 @@ jobs:
       - run: npm ci
       - name: Audit progress trigger regression
         run: node --test tests/deployment/ci-audit-progress.test.cjs
+      - name: Isolated staging startup repair replay
+        run: node --test tests/deployment/railway-staging-startup-repair.test.cjs
       - name: Production bundle
         run: npm run build
+      - name: Offline customer-report regression guard
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.test === 'PUBLIC_MIRROR_TESTS=1 bash tests/run.sh' ? 0 : 1)"; then
+            echo "Public mirror uses its explicit exported-test manifest; private report guard is not part of that contract."
+          else
+            npm run check:reports
+          fi
       - name: Share startup bundle with the database test job
         uses: actions/upload-artifact@v4
         with:

@@ -1,5 +1,47 @@
 # Weekly tenant-isolation audit, bounded daily batches
 
+## Controlled parallel precision validation
+
+Within one admitted audit process, precision validation uses
+`AUDIT_TRIAGE_CONCURRENCY=2` by default. Only exact integer strings `1`, `2`,
+`3`, or `4` are accepted; `1` restores serial operation. The source scan and
+controller slices remain sequential. Do not start multiple audit processes
+against the same job/checkpoint or disable the global heavy-work lane.
+
+Each worker receives a unique exact-input task, not a complete repository
+audit. A single state gate serializes whole read/check/write operations for
+receipts, paid-attempt admission and provider health. Fallback cursors are
+task-specific, including migration of the existing single cursor. Failed
+storage, authority, admission, or exhausted-provider work stops new dispatch;
+already-started work drains and persists when its original fence still allows.
+Every unreviewed finding remains KEEP; concurrency grants no suppression or
+publication authority.
+
+The default `AUDIT_TRIAGE_BATCH=1` keeps distinct allegations at identical
+file/line locations unambiguous. Each precision response is bounded to 128 KiB,
+with worst-case JSON-expansion space reserved for every in-flight response
+before dispatch. Historical exact-input receipts are retained, not pruned on
+each run. A cache-capacity failure stops the audit before additional dispatch;
+do not delete paid markers or override the limit to force progress.
+
+Worker count is scheduling configuration, not evidence identity. Switching
+between 1 and 4 workers does not invalidate exact-input receipts. Actual
+producer/source/prompt/schema changes still invalidate their bound evidence;
+this implementation does not re-sign or relabel legacy producer contracts.
+No paid whole-repository audit is necessary merely to benchmark the scheduler.
+The shared spending reservation, provider authorization/cooldowns and daily
+dispatch-batch policy below remain unchanged. Concurrency concentrates the same
+bounded work in time; it does not buy more work, retries or daily batches.
+
+The existing GitHub `security-checks.yml` has three independent offline test
+lanes on hosted runners. It does not currently distribute live model audit
+tasks. Do not send customer source or production credentials there, dispatch
+workflows, or push source without the required owner authorization.
+
+Offline verification:
+`node --import tsx --test tests/lib/tenant-audit-coordinator.test.ts tests/lib/tenant-audit-parallel-integration.test.ts`.
+Verify real-provider throughput separately before claiming a particular speedup.
+
 ## Owner-approved operating policy
 
 The full model-assisted audit runs as one weekly campaign with at most one

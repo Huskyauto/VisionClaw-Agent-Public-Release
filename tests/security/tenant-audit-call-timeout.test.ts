@@ -273,6 +273,8 @@ test("degraded tenant audits preserve the authoritative completed report", () =>
 
 test("republish readiness rejects a stale completed report", () => {
   const dir = mkdtempSync(join(tmpdir(), "republish-readiness-"));
+  mkdirSync(join(dir, "server"));
+  writeFileSync(join(dir, "server/fixture.ts"), "export const fixture = true;\n");
   const reportPath = join(dir, "latest.json");
   const checkpointPath = join(dir, "checkpoint.json");
   writeFileSync(reportPath, JSON.stringify({
@@ -299,6 +301,7 @@ test("republish readiness rejects a stale completed report", () => {
       encoding: "utf8",
       env: {
         ...process.env,
+        AUDIT_EVIDENCE_ROOT: dir,
         AUDIT_REPORT_JSON: reportPath,
         AUDIT_CHECKPOINT_JSON: checkpointPath,
       },

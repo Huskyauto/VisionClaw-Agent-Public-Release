@@ -1042,11 +1042,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const wantsPlay = req.query.play === "1";
     if (isDeliveryHtml && wantsPlay) {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      // Lock down the page: no remote scripts, no framing of arbitrary origins,
-      // no plugins. Allows inline JS/CSS so single-file apps still work.
+      // Frame denial alone does not isolate a top-level page. The sandbox
+      // gives delivered scripts an opaque origin; inline single-file apps still
+      // run, but don't inherit the signed-in app's storage or network access.
       res.setHeader(
         "Content-Security-Policy",
-        "default-src 'self' 'unsafe-inline' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';",
+        "sandbox allow-scripts allow-downloads; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none';",
       );
       res.setHeader("X-Frame-Options", "DENY");
       res.setHeader("Referrer-Policy", "no-referrer");
@@ -5858,6 +5859,7 @@ ${buildFelixProtocol()}`
           if (tc.name === "grok_send_message") {
             parsedArgs._conversationId = conversationId;
           }
+          if (tc.name === "test_api_keys") parsedArgs._conversationId = conversationId;
           if (tc.name === "instinct_send_message") {
             parsedArgs._conversationId = conversationId;
           }
@@ -5910,7 +5912,7 @@ ${buildFelixProtocol()}`
           }, 8000);
           try {
             const { executeGuardedTool } = await import("./guarded-tool-executor");
-            result = await executeGuardedTool(tc.name, parsedArgs, {
+            const dispatch = () => executeGuardedTool(tc.name, parsedArgs, {
               tenantId,
               conversationId,
               personaId: persona?.id,
@@ -5929,6 +5931,11 @@ ${buildFelixProtocol()}`
               // so we don't double-prompt on the same call.
               skipApprovalGate: true,
             });
+            if (isPlatformAdmin(req) && ["jury_triage", "ensemble_query"].includes(tc.name)) {
+              const { withOwnerFrontierTurn, explicitlyRequestsFrontierJury } = await import("./lib/owner-frontier-refresh");
+              result = await withOwnerFrontierTurn(tenantId, explicitlyRequestsFrontierJury(content),
+                dispatch, streamAbortController.signal);
+            } else result = await dispatch();
           } catch (err: unknown) {
             result = { error: errorMessage(err) || "Tool execution failed" };
           }
@@ -6169,7 +6176,8 @@ ${buildFelixProtocol()}`
         await storage.updateConversation(conversationId, {}, conv.tenantId ?? ADMIN_TENANT_ID);
       }
 
-      intelligentExtractMemory(fullResponse, content.trim(), persona?.id, conv.tenantId ?? ADMIN_TENANT_ID).catch(() => {});
+      intelligentExtractMemory(fullResponse, content.trim(), persona?.id, tenantId,
+        savedUserMsg.id, { conversationId, assistantMessageId: __asstMsg.id }).catch(() => {});
       updateDailyLog(titleForLog, persona?.id, undefined, conv.tenantId).catch(() => {});
 
       captureToolChainMemory(

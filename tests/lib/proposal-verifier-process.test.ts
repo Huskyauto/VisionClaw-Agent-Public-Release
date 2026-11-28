@@ -57,7 +57,7 @@ function runtime(child = mockChild(), overrides: Partial<ProposalVerifierRuntime
     },
     clearTimer: (timer) => clearTimeout(timer),
     rss: () => 500 * 1024 * 1024,
-    readCgroupMemory: () => null,
+    readCgroupMemory: () => ({ maxBytes: 4 * 1024 ** 3, currentBytes: 1 * 1024 ** 3 }),
     production: false,
     childBundleExists: () => true,
     ...overrides,
@@ -345,6 +345,28 @@ describe("verifyProposalIsolated", () => {
     });
     await assert.rejects(__verifyProposalIsolatedForTest(1, 2, unobservable.value), /cgroup memory admission/i);
     assert.equal(unobservable.spawnCalls.length, 0);
+  });
+
+  it("defers development when authoritative cgroup headroom is unavailable", async () => {
+    const originalWarn = console.warn;
+    try {
+      console.warn = () => {};
+      const missing = runtime(mockChild(), {
+        production: false,
+        readCgroupMemory: () => null,
+      });
+      const rejected = assert.rejects(
+        __verifyProposalIsolatedForTest(1, 2, missing.value),
+        /cgroup memory admission/i,
+      );
+      await waitForChildSpawn();
+      if (missing.spawnCalls.length) complete(missing.child);
+      await rejected;
+      assert.equal(missing.spawnCalls.length, 0);
+      assert.deepEqual(missing.releaseCalls, ["released"]);
+    } finally {
+      console.warn = originalWarn;
+    }
   });
 
   it("uses a larger verifier heap only with 8 GiB capacity and 4.5 GiB free at admission", async () => {

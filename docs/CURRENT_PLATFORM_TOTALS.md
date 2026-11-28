@@ -10,7 +10,7 @@
 > is the filtered public index and intentionally excludes trusted-persona-only
 > tools. These are different valid metrics, not competing totals.
 
-**Release evidence date:** 2026-11-17. **Evidence environment: development.**
+**Release evidence date:** 2026-11-27. **Evidence environment: development.**
 This snapshot describes the measured source and evidence database, not proof
 of production publication, production schema parity, or live feature readiness.
 Database-derived values are a
@@ -29,14 +29,14 @@ checkout. Fresh checkouts verify committed facts with `verify-counts.ts`.
 | **AI agent personas (active)** | **18** | `SELECT count(*) FROM personas WHERE is_active=true` |
 | **Skills (DB seeded)** | **63** | `SELECT count(*) FROM skills` |
 | **Skills (total incl. .agents/skills/)** | **68** | DB count + 5 platform agent skills not yet seeded |
-| **Capabilities (active)** | **148** | `SELECT count(*) FROM capabilities WHERE is_active=true` |
+| **Capabilities (active)** | **150** | `SELECT count(*) FROM capabilities WHERE is_active=true` |
 | **Database tables (declared)** | **202** | Published core-schema baseline plus explicitly tracked new split-model declarations |
 | **Database tables (live in `public` schema)** | **283** | `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'` |
 | **Governance rules** | **41** | `SELECT count(*) FROM governance_rules` |
 | **Platform indexes (release aggregate)** | **905** | Live `pg_indexes` count minus versioned auth/session infrastructure exclusions |
 | **Non-PK indexes (evidence database)** | **628** | `SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname NOT LIKE '%_pkey'` |
 | **AI providers** | **6** | OpenAI, Anthropic, Google, xAI, OpenRouter, Perplexity |
-| **AI models (core registry)** | **100 curated** | `MODEL_REGISTRY.length` in `server/model-registry.ts` |
+| **AI models (core registry)** | **102 curated** | `MODEL_REGISTRY.length` in `server/model-registry.ts` |
 
 ---
 

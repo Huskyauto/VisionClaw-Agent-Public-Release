@@ -36,7 +36,7 @@ export function registerWatchlistRoutes(app: Express, helpers: WatchlistHelpers)
       const tenantId = getTenantFromRequest(req);
       if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
       const { addWatchlistItem } = await import("../watchlist");
-      const item = await addWatchlistItem({ tenantId, ...req.body });
+      const item = await addWatchlistItem({ ...req.body, tenantId });
       res.json(item);
     } catch (e: any) { res.status(500).json({ error: e.message }); }
   });

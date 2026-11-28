@@ -1,3 +1,21 @@
+test("durable direct admission precedes inference and preserves uncertain outcomes", async () => {
+  for (const failed of [false, true]) {
+    const events: string[] = [];
+    const run = createLocalSlotRunner({ acquire: async () => ({
+      signal: new AbortController().signal,
+      beforeGenerate: async () => { events.push("reserved"); },
+      finishGenerate: async definite => { events.push(definite ? "definite" : "uncertain"); },
+      release: async () => { events.push("released"); },
+    }) });
+    const generation = run("legion-local", new AbortController().signal, async () => {
+      assert.deepEqual(events, ["reserved"]); events.push("inference");
+      if (failed) throw Error("socket lost");
+      return "done";
+    });
+    if (failed) await assert.rejects(generation, /socket lost/); else assert.equal(await generation, "done");
+    assert.deepEqual(events, ["reserved", "inference", failed ? "uncertain" : "definite", "released"]);
+  }
+});
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createLocalSlotRunner, LocalAdmissionDeferred, withLocalPriority, currentLocalPriority } from "../../server/legion/local-slots";

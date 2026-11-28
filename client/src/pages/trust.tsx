@@ -136,7 +136,7 @@ export default function TrustPage() {
             icon={Wrench}
             label="Tools exercised"
             value={c.registeredTools}
-            sub="distinct tools used in production"
+            sub="distinct tools recorded for the platform workspace, not catalog size"
             testid="stat-tools"
           />
           <StatCard

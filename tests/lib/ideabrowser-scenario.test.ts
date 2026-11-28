@@ -101,3 +101,12 @@ test("strict scenario parsers accept a complete response", () => {
   assert.equal(scenario.projectId, candidate.id);
   assert.equal(scenario.expectedProfitUsd, 2400);
 });
+
+test("explicit NO-GO may omit launch actions without failing parsing", () => {
+  const value = { whatItIs: "A hypothetical report.", numbersVerdict: "Unvalidated.",
+    adjustedSuccessProbabilityPct: 8, cheapestMoneyPlan: [], totalOutOfPocketUsd: 0,
+    week1Actions: [], goNoGo: "NO-GO — no evidence" };
+  assert.deepEqual(parseValidationOutput(JSON.stringify(value)).week1Actions, []);
+  assert.throws(() => parseValidationOutput(JSON.stringify({ ...value, goNoGo: "GO" })), /empty cheapestMoneyPlan/);
+  assert.throws(() => parseValidationOutput(JSON.stringify({ ...value, cheapestMoneyPlan: null })), /empty cheapestMoneyPlan/);
+});

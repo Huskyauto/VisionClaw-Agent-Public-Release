@@ -1,4 +1,5 @@
 const env = process.env;
+export const isFinishedNotBilledEnabled = () => env.FINISHED_NOT_BILLED_ENABLED !== "0";
 
 export const siteConfig = {
   companyName: env.SITE_COMPANY_NAME || "Your Company",
@@ -32,6 +33,7 @@ export function getPublicSiteConfig() {
     platformTagline: siteConfig.platformTagline,
     contactEmail: siteConfig.contactEmail || siteConfig.ownerEmail,
     hvacMissedCallRecoveryEnabled: env.HVAC_MISSED_CALL_PRODUCT_ENABLED !== "0",
+    finishedNotBilledEnabled: isFinishedNotBilledEnabled(),
     researchFrontierEnabled: env.RESEARCH_FRONTIER_ENABLED === "1",
   };
 }

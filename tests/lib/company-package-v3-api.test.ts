@@ -60,6 +60,13 @@ test("one company form durably starts v3 once; duplicate submit reuses job, conf
     assert.equal((await send(body, false)).status, 403);
     assert.equal(queries, count, "unprivileged request never reaches storage");
     const status = await (await fetch(`${base}/91`, { headers: { "x-fixture-owner": "yes" } })).json();
+    assert.equal(status.costs.actualTotalUsd, null);
+    assert.equal(status.costs.status, "unavailable", "a new job has no settled charge evidence");
+    job.payload.packageSpend = { "matrix:fixture": 1_250_000 };
+    const costStatus = await (await fetch(`${base}/91`, { headers: { "x-fixture-owner": "yes" } })).json();
+    assert.equal(costStatus.costs.reservedModelUsd, 1.25);
+    assert.equal(costStatus.costs.actualTotalUsd, null);
+    assert.equal(costStatus.costs.status, "unreconciled");
     assert.deepEqual(status.compilationProgress, { authors: 0, syntheses: 0, delivered: 0, corrections: [],
       execution: "parallel-authors-per-category-synthesis", evidenceReferenceRecovery: [] });
     assert.equal(status.repairPlan, undefined, "no legacy jury-recovery control on new jobs");

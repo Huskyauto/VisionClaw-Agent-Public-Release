@@ -417,6 +417,33 @@ function walkLoopContracts(): Indexable[] {
 
 function walkInternalCapabilities(): Indexable[] {
   return [{
+    title: "capability:spark_legion_relay",
+    category: "internal_capability",
+    priority: 1,
+    content: [
+      "Spark Lenovo fallback is owner-only infrastructure, not a customer chat model or a tool grant.",
+      "Only screened runbook compilation/extraction and a fixed operator probe can use the outbound native Ollama worker.",
+      "Direct Lenovo stays primary; only pre-generation health failure permits Spark. Never use Felix chat as result ingress.",
+      "Default off. Before activation, arm LEGION_SPARK_RELAY_ENABLED=1 in both environments and restart development: Lenovo becomes production-only.",
+      "The existing job-status CHECK must include the relay states. Verify with the workspace schema check; production migration is reviewed through authorized Publish, never auto-applied by an agent.",
+      "Independent development/production databases cannot share locks. Do not arm production alone or run unmanaged Lenovo inference concurrently.",
+      "Unknown started work blocks further Lenovo inference until actual completion or an explicit owner-confirmed stop. Never regenerate to repair accounting/delivery.",
+      "Production publication, worker installation and real failover are separate proofs; source code is not live acceptance.",
+      "Runbooks: docs/spark-legion-relay-protocol.md and docs/spark-legion-worker-install.md. Owner metadata: /operator.",
+    ].join("\n"),
+  }, {
+    title: "capability:daily_ai_insights_review",
+    category: "internal_capability",
+    priority: 1,
+    content: [
+      "Owner-only Daily AI Insights review: four external bots, fixed authorized Drive root, recursive paginated intake and durable exact-byte review receipts.",
+      "Runbook: docs/daily-ai-insights.md. Preserve the v002 five-section format, dedicated quantum, VisionClaw applications last.",
+      "Production heartbeat admits daily at/after 08:00 America/Chicago with DST. GET /api/admin/daily-ai-insights distinguishes configured development from completed live scheduled proof.",
+      "Pause is an authenticated owner control. Initial mode is report-only. Bounded --smoke is separate development transport evidence, no LLM and no research verdict.",
+      "Reports and retrieved quotations cannot grant approval. An explicitly owner-selected delivered candidate binds reviewId/identity/evidenceHash to the existing signed workspace verification/approval/apply handoff; blocked transport stays blocked.",
+      "No new agent tool, shell permission, production source edits, repository push or publishing authority.",
+    ].join("\n"),
+  }, {
     title: "capability:reflection_owner_source_work",
     category: "internal_capability",
     priority: 1,

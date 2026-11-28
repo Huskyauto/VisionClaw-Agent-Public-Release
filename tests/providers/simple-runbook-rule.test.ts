@@ -15,7 +15,7 @@ test("Surface gets a direct question and returns one exact server-read instructi
       assert.ok(work.messages.reduce((n, m) => n + m.content.length, 0) <= 2400);
       assert.doesNotMatch(work.messages[1].content, /Other text/);
       work.validateContent!('{"lineStart":2}');
-      return { content: '{"lineStart":2}', model: "surface-local:qwen2.5-7b-instruct-qnn-npu:3", latencyMs: 1 };
+      return { content: '{"lineStart":2}', model: "surface-local:qwen2.5-7b-instruct-generic-gpu:4", latencyMs: 1 };
     },
     hosted: async () => { throw Error("must not spend"); },
     hostedEnabled: () => false,
@@ -32,7 +32,7 @@ test("extra references, metadata, unrelated text and malformed answers are not r
     '{"lineStart":3}', '{"lineStart":999}', "not json"]) {
     const compile = createSimpleRuleCompiler({
       read: async () => ({ text: "---\nWatch the test fail before implementation.\nUnrelated source text.", sha256: "a".repeat(64) }),
-      local: async () => ({ content, model: "surface-local:qwen2.5-7b-instruct-qnn-npu:3", latencyMs: 1 }),
+      local: async () => ({ content, model: "surface-local:qwen2.5-7b-instruct-generic-gpu:4", latencyMs: 1 }),
       hosted: async () => { throw Error("must not spend"); }, hostedEnabled: () => false, assertActive: () => {},
     });
     await assert.rejects(compile(".agents/skills/tdd/SKILL.md"));
@@ -63,4 +63,16 @@ test("simple-task hosted recovery still requires the same exact single-source an
   assert.equal(result.hostedFallback, true);
   assert.equal(result.model, "hosted:configured-fast-model");
   assert.deepEqual(result.concepts[0].quotes, [text]);
+});
+
+test("short source-rule work uses enabled recovery when all local capacity is busy before dispatch", async () => {
+  let hosted = 0;
+  const compile = createSimpleRuleCompiler({
+    read: async () => ({ text: "Watch the test fail before implementation.", sha256: "a".repeat(64) }),
+    local: async () => { throw new LocalAdmissionDeferred("No free laptop capacity"); },
+    hosted: async () => { hosted++; return { content: '{"lineStart":1}', model: "configured-fast-model" }; },
+    hostedEnabled: () => true, assertActive: () => {},
+  });
+  assert.equal((await compile(".agents/skills/tdd/SKILL.md")).hostedFallback, true);
+  assert.equal(hosted, 1);
 });

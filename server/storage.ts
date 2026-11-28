@@ -616,6 +616,11 @@ export class DatabaseStorage implements IStorage {
       eq(memoryEntries.id, id),
       requiredTenantScope(memoryEntries.tenantId, tenantId)!,
     ];
+    // The WHERE clause protects the current row; it cannot protect ownership
+    // if the SET clause is allowed to assign a different tenant.
+    if (Object.hasOwn(data, "tenantId")) {
+      throw new Error("Memory tenant ownership cannot be changed");
+    }
     // Gate-1 redaction also on the update path (defense-in-depth — untrusted
     // ingest can reach edits, not just inserts).
     const g = redactRecordFields(data, ["fact"]);
@@ -1112,11 +1117,15 @@ export class DatabaseStorage implements IStorage {
     return (result as any).rows?.[0] || result;
   }
   async updateHeartbeatTask(id: number, data: Partial<InsertHeartbeatTask>, tenantId: TenantScope) {
+    const tenantPredicate = requiredTenantScope(heartbeatTasks.tenantId, tenantId);
+    // A scoped WHERE protects the old owner, not a tenantId in the SET clause.
+    if (Object.hasOwn(data, "tenantId")) {
+      throw new Error("Heartbeat task tenant ownership cannot be changed");
+    }
     const updates: any = { ...data };
     if (data.cronExpression) {
       updates.nextRunAt = getNextCronRun(data.cronExpression);
     }
-    const tenantPredicate = requiredTenantScope(heartbeatTasks.tenantId, tenantId);
     const conditions = [eq(heartbeatTasks.id, id)];
     if (tenantPredicate) conditions.push(tenantPredicate);
     const [task] = await db.update(heartbeatTasks).set(updates).where(and(...conditions)).returning();

@@ -6,7 +6,9 @@ import { logSilentCatch } from "../lib/silent-catch";
 import { INCOME_CLAUDE_COST_PER_1K } from "../lib/income-claude-route";
 import { MODEL_REGISTRY, getCatalogModelPricing } from "../model-registry";
 import { carbonUsageCost } from "../lib/gemini-carbon";
+import { GPT_62_STANDARD_RATES, isGpt62Model } from "../lib/gpt-6-2";
 const MODEL_COST_PER_1K: Record<string, { in: number; out: number }> = {
+  ...GPT_62_STANDARD_RATES,
   // OpenRouter live catalog, 2026-10-15. Report reservations use the higher
   // post-intro $4/$20/M ceiling, NOT this $2/$10/M usage estimate.
   "google/gemini-4-argon": { in: 0.002, out: 0.010 },
@@ -135,6 +137,7 @@ function cacheFactors(model: string): { read: number; write: number } {
   if (m === "moonshotai/kimi-k3.1-pro") return { read: 0.20 / 2, write: 1.0 };
   if (m === "mistralai/mistral-large-4-0") return { read: 0.14 / 1.36, write: 1.0 };
   if (m === "grok-4.7") return { read: 0.25, write: 1.0 };
+  if (isGpt62Model(m)) return { read: 0.05, write: 1.25 };
   if (m === "gpt-6-luna" || m === "gpt-6-sol" || m === "gpt-6-astra" || m === "gpt-6-astra:flex") {
     return { read: 0.1, write: 1.25 };
   }
@@ -180,7 +183,8 @@ export function estimateCostUsd(
     model === "gpt-6-luna" ||
     model === "gpt-6-sol" ||
     model === "gpt-6-astra" ||
-    model === "gpt-6-astra:flex";
+    model === "gpt-6-astra:flex" ||
+    isGpt62Model(model);
   const longContext = (isGpt6 && tokensIn > 272_000) ||
     (model === "grok-4.7" && tokensIn >= 200_000);
   const haikuLongContext = model === "claude-haiku-5-5" && tokensIn > 100_000;

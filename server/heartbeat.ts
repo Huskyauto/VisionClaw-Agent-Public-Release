@@ -736,6 +736,11 @@ async function runMaintenanceScript(task: HeartbeatTask, persona: Persona | null
     });
     activeTaskTracker.delete(task.id);
   };
+  if ((key === "golden-path-replay" || key === "daily-ai-insights") &&
+      (Number(task.tenantId) !== ADMIN_TENANT_ID || task.createdBy !== "system" || task.approvalStatus !== "approved")) {
+    await finish("error", "This review/replay requires an approved platform-owned maintenance task");
+    return;
+  }
   if (!spec) {
     // Self-heal: a maintenance_script row whose promptContent isn't an
     // allowlist key (empty or stale) can ONLY ever error — the handler

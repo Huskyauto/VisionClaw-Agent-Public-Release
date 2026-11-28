@@ -39,6 +39,7 @@ import {
 } from "../lib/muse-revenue-orchestrator";
 import wellnessTemplates from "../templates/wellness-video-templates.json";
 import { registerBusinessReportConnector } from "./business-report-connector";
+import { registerSparkRelayApi } from "./spark-legion-relay";
 
 const apiV1ConversationRuns = () => import("../spark-line");
 const apiV1GrokLine = () => import("../grok-line");
@@ -591,6 +592,7 @@ export function registerApiV1Routes(app: Express, helpers: ApiV1Helpers) {
   );
 
   registerBusinessReportConnector(app, authMiddleware, requireApiKeyOnly, getTenantFromRequest);
+  registerSparkRelayApi(app, authMiddleware, requireApiKeyOnly, getTenantFromRequest);
 
   // GET /api/v1/spark/outbox?since=<integer-cursor>
   app.get(

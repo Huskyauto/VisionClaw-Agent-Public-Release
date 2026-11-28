@@ -9,17 +9,24 @@
  * The gate (server/tools.ts executeTool dispatch) requires BOTH:
  *   - admin tenant (params._tenantId === ADMIN_TENANT_ID), AND
  *   - an owner-interactive channel (_invokedVia ∈ main_chat|chat_engine|auto-route)
- * ...when the call is model-driven (_invokedByModel === true) and not self-heal.
+ * ...regardless of caller-supplied model/self-heal flags.
  *
  * These underscore fields are stamped by guarded-tool-executor before dispatch
  * and are NOT model-spoofable (overwritten, not merged). This suite pins the
  * structural invariant so a future refactor of the dispatch switch cannot
  * silently re-open the non-owner shell route.
  *
- * Runs offline (no LLM, no network). Block paths return early with no DB I/O.
+ * The first two tests exercise public ingress. Consumer-gate tests evaluate
+ * the real legacy case bodies with fixture host stamps and a mocked Lobster
+ * runner. They must not depend on the unrelated live autonomy-rule database:
+ * that middleware correctly fails closed when the offline DB is unavailable.
+ * executeCommand uses its real safety checks and harmless local commands.
  */
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import vm from "node:vm";
+import { transformSync } from "esbuild";
 
 import { executeTool as invokeTool } from "../../server/tools";
 import { executeCommand } from "../../server/exec-tool";
@@ -28,16 +35,27 @@ const ADMIN_TENANT = Number(process.env.ADMIN_TENANT_ID) || 1;
 const CUSTOMER_TENANT = 999999;
 const OWNER_CHANNEL = "main_chat";
 
-// These legacy fixtures describe HOST identity in the old stamped format.
-// Convert that fixture identity into the separate context; production never
-// performs this conversion. Actual adversarial JSON enters via the MCP and
-// tool-authority-boundary integration tests, without a context conversion.
-const executeTool = (name: string, fixture: Record<string, any>) => invokeTool(name, fixture, {
-  tenantId: fixture._tenantId,
-  actor: "persona", personaId: 2, personaName: "Felix",
-  invokedVia: fixture._invokedVia ?? "offline-untrusted-fixture",
-  approvalGranted: true,
+const source = readFileSync("server/tools.ts", "utf8");
+const channels = source.match(/const OWNER_INTERACTIVE_CHANNELS = new Set\(\[[^\]]+\]\);/);
+assert.ok(channels, "consumer fixture must bind the actual production channel set");
+const branches = ["exec", "lobster"].map(name => {
+  const start = source.indexOf(`    case "${name}": {`);
+  const end = source.indexOf('\n    case "', start + 10);
+  assert.ok(start >= 0 && end > start, `missing actual ${name} consumer`);
+  return source.slice(start, end);
 });
+const consumer = vm.createContext({
+  process: { env: { ADMIN_TENANT_ID: String(ADMIN_TENANT) } },
+  executeCommand,
+  runLobster: async () => ({ admitted: true }),
+});
+vm.runInContext(transformSync(
+  `${channels[0]}\nasync function dispatch(name, params) { switch(name) { ${branches.join("\n")} } }\nglobalThis.dispatch = dispatch;`,
+  { loader: "ts", format: "cjs" },
+).code, consumer);
+// Only test-fixture host stamps enter this focused consumer seam. Public JSON
+// authorization is exercised separately, never inferred from this wrapper.
+const executeTool = (name: string, fixture: Record<string, any>) => (consumer as any).dispatch(name, fixture);
 
 // Force-exit so any pg pool opened on module import doesn't hang the runner.
 after(() => { setTimeout(() => process.exit(process.exitCode ?? 0), 50).unref(); });
@@ -199,18 +217,12 @@ test("lobster: admin tenant on a NON-owner channel is BLOCKED", async () => {
 });
 
 test("lobster: OWNER (admin tenant + owner channel) is NOT owner-blocked", async () => {
-  let r: any;
-  try {
-    r = await executeTool("lobster", {
-      action: "list",
-      _invokedByModel: true,
-      _tenantId: ADMIN_TENANT,
-      _invokedVia: OWNER_CHANNEL,
-    });
-  } catch {
-    // A runtime error inside runLobster is fine — we only assert the gate did
-    // not short-circuit with the owner-only refusal.
-    r = {};
-  }
+  const r = await executeTool("lobster", {
+    action: "list",
+    _invokedByModel: true,
+    _tenantId: ADMIN_TENANT,
+    _invokedVia: OWNER_CHANNEL,
+  });
   assert.equal(isOwnerOnlyBlock(r), false);
+  assert.equal(r.admitted, true, "owner must actually reach the fixture runner");
 });

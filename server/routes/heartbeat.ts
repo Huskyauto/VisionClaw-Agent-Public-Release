@@ -60,6 +60,9 @@ export function registerHeartbeatRoutes(app: Express, helpers: HeartbeatHelpers)
   app.patch("/api/heartbeat/tasks/:id", async (req, res) => {
     const tenantId = getTenantFromRequest(req);
     if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
+    if (Object.hasOwn(req.body ?? {}, "tenantId")) {
+      return res.status(400).json({ error: "Heartbeat task tenant ownership cannot be changed" });
+    }
     const parsed = insertHeartbeatTaskSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
     // R74.13k F2-followup — close the PATCH-side approval bypass. Original F2

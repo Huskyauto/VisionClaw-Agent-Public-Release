@@ -210,7 +210,7 @@ async function verifyWithRuntime(
         && cgroupMemoryHasReserve(memory, LARGE_CHILD_START_HEADROOM_BYTES)) {
         childHeapMb = LARGE_CHILD_HEAP_MB;
       }
-      if (memory === null && runtime.production) {
+      if (memory === null) {
         logAdmissionDeferral("cgroup_unavailable");
         throw new HeavyWorkDeferred("proposal verification: cgroup memory admission");
       }
