@@ -269,6 +269,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # This disposable job needs Node/Docker/Postgres, not these large SDKs.
+      # Keep the checked-out source, Docker layers and live service volumes.
+      - name: Free unused hosted-runner SDK disk space
+        run: |
+          df -h /
+          sudo rm -rf -- /usr/local/lib/android /usr/share/dotnet /opt/hostedtoolcache/CodeQL
+          df -h /
       - name: Build container image
         # Digest verified against Docker Hub's Node 22.22.0-slim manifest.
         # Override only CI; Dockerfile's normal production default is unchanged.

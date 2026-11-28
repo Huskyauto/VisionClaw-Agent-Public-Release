@@ -41,3 +41,21 @@ test("CI uses verified Docker Hub cache copies without changing default images",
   // Run the registry check there, not workspace-only publisher/CI contracts.
   assert.ok(dockerfile.includes('--test-name-pattern="^every locked tarball"'));
 });
+
+test("Docker smoke frees only unused hosted-runner SDKs before building and retains its health gate", () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const docker = workflow.split("\n  docker:\n")[1]?.split(/\n  [a-zA-Z0-9_-]+:\n/)[0];
+  assert.ok(docker, "Docker hard gate must remain present");
+  const cleanup = docker.indexOf("- name: Free unused hosted-runner SDK disk space");
+  const build = docker.indexOf("- name: Build container image");
+  const health = docker.indexOf("- name: Boot container and probe /healthz");
+  assert.ok(cleanup >= 0 && cleanup < build && build < health,
+    "reclaim disk before the real image build without removing either smoke step");
+  const body = docker.slice(cleanup, build).split("run: |")[1].trim();
+  assert.deepEqual(body.split("\n").map(line => line.trim()).filter(Boolean), [
+    "df -h /",
+    "sudo rm -rf -- /usr/local/lib/android /usr/share/dotnet /opt/hostedtoolcache/CodeQL",
+    "df -h /",
+  ], "cleanup is an explicit SDK-only allowlist, not Docker, workspace or database pruning");
+  assert.doesNotMatch(docker, /continue-on-error:\s*true/);
+});
