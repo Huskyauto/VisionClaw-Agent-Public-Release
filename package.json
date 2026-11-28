@@ -15,7 +15,7 @@
     "db:push": "drizzle-kit push",
     "check:portable-install": "node --test --test-name-pattern=\"^every locked tarball\" tests/deployment/portable-install.test.cjs",
     "check:reports": "node --import tsx --test tests/unit/report-regression-guard.test.ts",
-    "publish:preflight": "tsx scripts/prepublish.ts",
+    "publish:preflight": "npm run check:portable-install && tsx scripts/prepublish.ts",
     "publish:preflight:local-fallback": "npm run check:portable-install && npm run check && npx tsc -p tsconfig.publish-preflight.json && npx tsx scripts/publish-preflight.ts",
     "release:check": "tsx scripts/remote-release.ts submit",
     "release:check:local-fallback": "tsx scripts/targeted-release-check.ts",
