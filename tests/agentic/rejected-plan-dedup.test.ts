@@ -342,7 +342,15 @@ test("an owner-approved failed repair anchors category-drifted replacements, but
 });
 
 test("an unsupported operational insight is deferred without creating a Felix card", async () => {
-  const tenantId = 1;
+  // Other files create/delete proposal events concurrently in tenant 1.
+  // Retain the complete tenant-wide no-event assertion on an owned fixture.
+  const tenant: any = await db.execute(sql`
+    INSERT INTO tenants (email, name, plan)
+    VALUES (${`unsupported-repair-${randomUUID()}@integration.invalid`}, 'Unsupported repair fixture', 'trial')
+    RETURNING id
+  `);
+  const tenantId = Number((tenant.rows ?? tenant)[0].id);
+  assert.ok(Number.isSafeInteger(tenantId) && tenantId > 0 && tenantId !== 1);
   const category = `unsupported_repair_test_${randomUUID()}`;
   let insightId = 0;
   try {
@@ -361,6 +369,7 @@ test("an unsupported operational insight is deferred without creating a Felix ca
       SELECT count(*)::int AS n FROM event_log
       WHERE tenant_id = ${tenantId} AND event_type = 'plan.proposed'
     `);
+    assert.equal(Number((proposedBefore.rows ?? proposedBefore)[0].n), 0);
 
     const result = await routeInsightToMinerva({
       insightId,
@@ -394,12 +403,22 @@ test("an unsupported operational insight is deferred without creating a Felix ca
       WHERE tenant_id = ${tenantId} AND id = ${insightId}
     `);
     assert.equal(String((afterRetry.rows ?? afterRetry)[0].action_taken), "Deferred: no durable repair path.");
+    const plansAfterRetry: any = await db.execute(sql`
+      SELECT count(*)::int AS n FROM plans
+      WHERE tenant_id = ${tenantId}
+        AND source = 'agentic-engine.auto-apply'
+        AND source_ref = ${String(insightId)}
+    `);
+    assert.equal(Number((plansAfterRetry.rows ?? plansAfterRetry)[0].n), 0);
     const proposedAfter: any = await db.execute(sql`
       SELECT count(*)::int AS n FROM event_log
       WHERE tenant_id = ${tenantId} AND event_type = 'plan.proposed'
     `);
     assert.equal(Number((proposedAfter.rows ?? proposedAfter)[0].n), Number((proposedBefore.rows ?? proposedBefore)[0].n));
   } finally {
+    await db.execute(sql`DELETE FROM event_log WHERE tenant_id = ${tenantId}`);
+    await db.execute(sql`DELETE FROM plans WHERE tenant_id = ${tenantId}`);
     if (insightId) await db.execute(sql`DELETE FROM ai_insights WHERE tenant_id = ${tenantId} AND id = ${insightId}`);
+    await db.execute(sql`DELETE FROM tenants WHERE id = ${tenantId}`);
   }
 });

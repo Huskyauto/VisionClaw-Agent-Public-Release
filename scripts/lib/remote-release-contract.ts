@@ -7,6 +7,7 @@ export const DATABASE_REGRESSION_TESTS = [
   "tests/storage/agent-working-context-isolation.test.ts",
   "tests/minerva-operational-plan-contract.test.ts",
   "tests/queue/spool.test.ts",
+  "tests/agentic/rejected-plan-dedup.test.ts",
 ] as const;
 
 export interface RemoteCheck {

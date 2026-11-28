@@ -208,6 +208,11 @@ const UPLOAD_DIRECT_BASELINE: CallsiteMap = {
     // durableArtifactKey and customerDelivery enforce recovery + reader sharing.
     { line: 276, text: "const result = await uploadToDrive({" },
   ],
+  // Existing generate_social_image call moved out of tools.ts unchanged;
+  // this is a location-only transfer, not another permitted direct upload.
+  "server/lib/social-image-tool.ts": [
+    { line: 84, text: "const driveResult = await uploadAndShare({" },
+  ],
   "server/mpeg-engine.ts": [
     { line: 937, text: "const driveResult = await uploadAndShare({" },
     { line: 1257, text: "const driveResult = await uploadAndShare({" },
@@ -239,7 +244,6 @@ const UPLOAD_DIRECT_BASELINE: CallsiteMap = {
     { line: 3806, text: "driveResult = await uploadAndShare({" },
     { line: 6340, text: "const driveResult = await uploadAndShare({" },
     { line: 6876, text: "const driveResult = await uploadAndShare({" },
-    { line: 7268, text: "const driveResult = await uploadAndShare({" },
   ],
   "server/tools/domains/files/handlers.ts": [
     { line: 516, text: "const shareResult = await gd.uploadAndShare({" },

@@ -10,6 +10,21 @@ const BASE = "1".repeat(40);
 const HEAD = "2".repeat(40);
 const DIGEST = "a".repeat(64);
 
+test("integration corrections select the upload guard and put insight isolation in the disposable database lane", () => {
+  const plan = createRemoteReleasePlan({
+    base: BASE, head: HEAD, sourceDigest: DIGEST,
+    changed: [
+      "tests/security/upload-direct-callsites.test.ts",
+      "tests/agentic/rejected-plan-dedup.test.ts",
+    ],
+  });
+  const database = plan.checks.find(check => check.kind === "database-regressions");
+  assert.ok(database?.tests.includes("tests/agentic/rejected-plan-dedup.test.ts"));
+  const offline = plan.checks.filter(check => check.kind === "regressions").flatMap(check => check.tests);
+  assert.ok(offline.includes("tests/security/upload-direct-callsites.test.ts"));
+  assert.ok(!offline.includes("tests/agentic/rejected-plan-dedup.test.ts"));
+});
+
 test("matrix plan downloads cannot become untracked release source", () => {
   const workflow = readFileSync(".github/workflows/security-checks.yml", "utf8");
   const download = workflow.slice(workflow.indexOf("- name: Download exact remote release plan"),

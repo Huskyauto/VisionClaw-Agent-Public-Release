@@ -135,6 +135,7 @@ const AREA_TESTS: Record<string, string[]> = {
   "watchlist-authority": ["tests/security/watchlist-route-authority.test.ts"],
   "republication-fixes": ["tests/security/republication-finding-fixes.test.ts"],
   "republish-ownership": [
+    "tests/security/upload-direct-callsites.test.ts",
     "tests/security/tnr-plumbing-fail-closed.test.ts",
     "tests/security/whatsapp-auth-namespace.test.ts",
     "tests/security/research-intel-tenant-authority.test.ts",
@@ -238,6 +239,7 @@ const AREA_TESTS: Record<string, string[]> = {
     "tests/unit/finished-not-billed.test.ts",
   ],
   "agent-runtime": [
+    "tests/agentic/rejected-plan-dedup.test.ts",
     "tests/minerva-s6-lifecycle-projection.test.ts",
     "tests/minerva-operational-plan-contract.test.ts",
     "tests/lib/moa-pool.test.ts",
@@ -541,6 +543,8 @@ const PATH_AREAS: Record<string, string> = {
   "scripts/lib/republish-incremental-readiness.ts": "release-tooling",
   "tests/lib/republish-incremental-readiness.test.ts": "release-tooling",
   "tests/lib/republish-readiness-cli.test.ts": "release-tooling",
+  "tests/security/upload-direct-callsites.test.ts": "republish-ownership",
+  "tests/agentic/rejected-plan-dedup.test.ts": "agent-runtime",
   "scripts/lib/offline-verification.ts": "release-tooling",
   "scripts/remote-release.ts": "release-tooling",
   "scripts/remote-release-worker.ts": "release-tooling",

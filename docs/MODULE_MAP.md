@@ -9,7 +9,7 @@
 | :--- | ---: | ---: |
 | `server/` | 1406 | 333,014 |
 | `client/src/` | 235 | 69,133 |
-| `scripts/` | 330 | 59,442 |
+| `scripts/` | 330 | 59,447 |
 | `shared/` | 40 | 9,174 |
 
 ## Hub modules (highest fan-in)
@@ -296,12 +296,12 @@ Changes to these ripple widest — check importers before editing.
 | [`remote-release-worker.ts`](../scripts/remote-release-worker.ts) | 327 | — |
 | _…and 200 more (smaller modules)_ | | |
 
-### `scripts/lib/` — 90 module(s), 11,401 lines
+### `scripts/lib/` — 90 module(s), 11,406 lines
 
 | Module | Lines | Purpose |
 | :--- | ---: | :--- |
 | [`github-render-farm.ts`](../scripts/lib/github-render-farm.ts) | 748 | GitHub Actions render farm — shared, BRAND-AGNOSTIC core. |
-| [`targeted-release-check.ts`](../scripts/lib/targeted-release-check.ts) | 704 | — |
+| [`targeted-release-check.ts`](../scripts/lib/targeted-release-check.ts) | 708 | — |
 | [`drive-discover.ts`](../scripts/lib/drive-discover.ts) | 458 | Built With Bob — weekly clip discovery from Bob's Google Drive folder. |
 | [`prepublish-remote-gate.ts`](../scripts/lib/prepublish-remote-gate.ts) | 433 | — |
 | [`eio-read.ts`](../scripts/lib/eio-read.ts) | 388 | EIO-resilient synchronous file reads for the render-farm scripts path. |
